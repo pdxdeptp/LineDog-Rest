@@ -18,6 +18,10 @@ final class AppViewModel: ObservableObject {
     @Published private(set) var canStopChronoButton = false
     /// 菜单「恢复计时」：用户从运行中点过「停止计时」后为 true，直到恢复或切模式。
     @Published private(set) var showResumeChronoButton = false
+    /// 休息全屏时是否拦截鼠标（默认开）；关则休息时仍可正常点击背后桌面与应用。
+    @Published private(set) var restBlocksClicksDuringRest: Bool
+
+    private static let restBlocksClicksDefaultsKey = "LineDog.restBlocksClicksDuringRest"
 
     /// 「计时中」：自动模式引擎在跑，或手动模式已点「开始专注」尚未「停止计时」。
     private var isChronoSessionActive: Bool
@@ -46,6 +50,11 @@ final class AppViewModel: ObservableObject {
         self.manualEngine = me
         self.autoEngine = ae
         self.isChronoSessionActive = bootstrapAutoEngine
+        if UserDefaults.standard.object(forKey: Self.restBlocksClicksDefaultsKey) == nil {
+            self.restBlocksClicksDuringRest = true
+        } else {
+            self.restBlocksClicksDuringRest = UserDefaults.standard.bool(forKey: Self.restBlocksClicksDefaultsKey)
+        }
 
         // Timer 回调在主 RunLoop 线程上执行，但不在 MainActor 任务上下文中；
         // 使用 `assumeIsolated` 会触发运行时 trap，导致引擎状态永远进不了 ViewModel（霸屏/变暗/菜单状态失效）。
@@ -71,6 +80,13 @@ final class AppViewModel: ObservableObject {
         refreshChronoChrome()
         syncPetDisplayMode()
         windowManager.bindDeskPetMenu(viewModel: self)
+        windowManager.setRestBlocksClicks(restBlocksClicksDuringRest)
+    }
+
+    func setRestBlocksClicksDuringRest(_ enabled: Bool) {
+        restBlocksClicksDuringRest = enabled
+        UserDefaults.standard.set(enabled, forKey: Self.restBlocksClicksDefaultsKey)
+        windowManager.setRestBlocksClicks(enabled)
     }
 
     private enum Source { case manual, auto }

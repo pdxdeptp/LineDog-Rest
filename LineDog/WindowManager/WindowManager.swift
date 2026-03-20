@@ -8,6 +8,8 @@ protocol WindowManaging: AnyObject {
     func applyIdlePetDisplayMode(_ mode: PetDisplayMode)
     /// 绑定后右下角桌宠可点击弹出与菜单栏相同的 `MenuBarContentView`；单测用 `MockWindowManager` 空实现即可。
     func bindDeskPetMenu(viewModel: AppViewModel?)
+    /// `true`（默认）：休息全屏时窗口接收鼠标，挡桌面；`false`：休息时鼠标穿透，不挡操作。
+    func setRestBlocksClicks(_ blocks: Bool)
 }
 
 /// 模块 2：常态为**仅桌宠大小**的透明小窗（不挡桌面点击）；休息时扩展为菜单栏屏全屏霸屏。同一只 `PetStageView`。
@@ -25,6 +27,8 @@ final class WindowManager: WindowManaging {
 
     /// `AppViewModel` 可能在宠物窗创建之前就 `syncPetDisplayMode`，需记住并在首屏安装时应用。
     private var pendingIdlePetMode: PetDisplayMode = .runningBlack
+    /// 与 `AppViewModel.restBlocksClicksDuringRest` 同步；仅影响**休息全屏**阶段的鼠标是否穿透。
+    private var restBlocksClicks: Bool = true
 
     init() {
         // SwiftUI + 仅 MenuBarExtra 时，`AppViewModel` 初始化可能早于应用完成启动；窗口层级未就绪会导致「有进程但桌宠窗从未真正出现」。
@@ -106,7 +110,6 @@ final class WindowManager: WindowManaging {
         // `.fullScreenAuxiliary` 在多显示器 + 透明无边框窗上常被合成到桌面之下，表现为「双屏时桌宠整块没了」。
         win.collectionBehavior = [.canJoinAllSpaces, .stationary]
         win.isReleasedWhenClosed = false
-        win.ignoresMouseEvents = deskMenuViewModel == nil
         win.hidesOnDeactivate = false
 
         let view = PetStageView(frame: NSRect(origin: .zero, size: frame.size))
@@ -114,6 +117,7 @@ final class WindowManager: WindowManaging {
         win.contentView = view
         window = win
         stageView = view
+        applyMousePolicy()
         win.orderFrontRegardless()
         syncContentViewToWindowLayout()
         view.applyNonRestPetDisplayMode(pendingIdlePetMode)
@@ -150,8 +154,13 @@ final class WindowManager: WindowManaging {
         deskMenuPopover?.close()
         deskMenuPopover = nil
         deskMenuHosting = nil
-        window?.ignoresMouseEvents = viewModel == nil
         stageView?.deskMenuPresenter = viewModel != nil ? self : nil
+        applyMousePolicy()
+    }
+
+    func setRestBlocksClicks(_ blocks: Bool) {
+        restBlocksClicks = blocks
+        applyMousePolicy()
     }
 
     func presentRest(duration: TimeInterval, onDismissed: @escaping () -> Void) {
@@ -164,6 +173,7 @@ final class WindowManager: WindowManaging {
         stageView?.beginRestCycle(total: duration) { [weak self] in
             self?.finishRestCycle()
         }
+        applyMousePolicy()
     }
 
     /// 右下角桌宠在非休息时的配色（计时中黑 / 停止白边）。
@@ -225,7 +235,7 @@ final class WindowManager: WindowManaging {
         syncContentViewToWindowLayout()
         stageView?.needsLayout = true
         stageView?.layoutSubtreeIfNeeded()
-        window?.ignoresMouseEvents = deskMenuViewModel == nil
+        applyMousePolicy()
         window?.orderFrontRegardless()
     }
 
@@ -243,8 +253,18 @@ final class WindowManager: WindowManaging {
         syncContentViewToWindowLayout()
         stageView?.needsLayout = true
         stageView?.layoutSubtreeIfNeeded()
-        window?.ignoresMouseEvents = deskMenuViewModel == nil
+        applyMousePolicy()
         window?.orderFrontRegardless()
+    }
+
+    private func applyMousePolicy() {
+        guard let win = window else { return }
+        let inRest = stageView?.isInRestPhase == true
+        if inRest && !restBlocksClicks {
+            win.ignoresMouseEvents = true
+        } else {
+            win.ignoresMouseEvents = deskMenuViewModel == nil
+        }
     }
 }
 

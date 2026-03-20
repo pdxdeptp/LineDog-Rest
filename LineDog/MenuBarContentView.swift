@@ -49,9 +49,17 @@ struct MenuBarContentView: View {
                 viewModel.startTestRestNow()
             }
 
+            Toggle(isOn: Binding(
+                get: { viewModel.restBlocksClicksDuringRest },
+                set: { viewModel.setRestBlocksClicksDuringRest($0) }
+            )) {
+                Text("休息期间阻止点击桌面")
+            }
+            .help("打开时休息全屏会挡住背后窗口的鼠标操作（默认）；关闭时休息画面仍在，但可正常使用桌面。")
+
             Divider()
 
-            Text("休息霸屏期间无关闭按钮；若要终止请使用下方「退出应用」。")
+            Text(restBlockingHint(viewModel.restBlocksClicksDuringRest))
                 .font(.caption)
                 .foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -63,5 +71,12 @@ struct MenuBarContentView: View {
         }
         .padding(12)
         .frame(minWidth: 300)
+    }
+
+    private func restBlockingHint(_ blocks: Bool) -> String {
+        if blocks {
+            return "休息霸屏期间无关闭按钮；若要终止请使用下方「退出应用」。"
+        }
+        return "已关闭阻止点击：休息时可正常使用其他窗口；终止休息仍请用菜单或「退出应用」。"
     }
 }
