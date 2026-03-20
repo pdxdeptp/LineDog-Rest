@@ -1,5 +1,6 @@
 import SwiftUI
 
+/// 控制面板 UI：同时用于 `MenuBarExtra` 与右下角桌宠的 `NSPopover`（`WindowManager`），改此处即可两边同步。
 struct MenuBarContentView: View {
     @ObservedObject var viewModel: AppViewModel
 

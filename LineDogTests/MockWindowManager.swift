@@ -28,6 +28,8 @@ final class MockWindowManager: WindowManaging {
         idleModesApplied.append(mode)
     }
 
+    func bindDeskPetMenu(viewModel: AppViewModel?) {}
+
     /// 对应真实流程里休息动画结束、`finishRestCycle` 调用用户传入的 `onDismissed`。
     func testing_simulateRestPresentationFinished() {
         let cb = pendingUserDismiss

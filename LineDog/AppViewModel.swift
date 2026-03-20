@@ -70,6 +70,7 @@ final class AppViewModel: ObservableObject {
         }
         refreshChronoChrome()
         syncPetDisplayMode()
+        windowManager.bindDeskPetMenu(viewModel: self)
     }
 
     private enum Source { case manual, auto }

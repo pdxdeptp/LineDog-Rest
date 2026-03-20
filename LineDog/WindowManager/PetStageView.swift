@@ -1,5 +1,10 @@
 import AppKit
 
+/// 由 `WindowManager` 实现：在桌宠点击处弹出与菜单栏相同的 SwiftUI 面板。
+protocol PetStageDeskMenuPresenter: AnyObject {
+    func presentDeskMenu(from stage: PetStageView, anchorRect: NSRect)
+}
+
 /// 唯一桌宠舞台：非休息时仅在右下角显示同一只小狗；休息时**同一只**变红、移向中央并放大，背景渐暗，左下角倒计时。
 final class PetStageView: NSView {
     private let dimView = NSView()
@@ -18,6 +23,12 @@ final class PetStageView: NSView {
 
     private static let idlePetSide: CGFloat = 100
     private static let edgeMargin: CGFloat = 16
+
+    /// 非 nil 时：常态小窗整块可点；休息全屏时仅 `petHitRect`（桌宠区域）打开菜单，其余区域仍挡点击（霸屏）。
+    weak var deskMenuPresenter: PetStageDeskMenuPresenter?
+    private var petHitRect: NSRect = .zero
+
+    var isInRestPhase: Bool { restBeganAt != nil }
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -66,6 +77,22 @@ final class PetStageView: NSView {
         super.viewDidMoveToWindow()
         // 首帧 layout 时常尚未拿到最终 bounds，过早 return 会导致 imageView 一直为 .zero，桌宠永久不画。
         needsLayout = true
+    }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        guard deskMenuPresenter != nil, bounds.contains(point) else { return nil }
+        return self
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        guard deskMenuPresenter != nil else { return }
+        let pt = convert(event.locationInWindow, from: nil)
+        if restBeganAt != nil {
+            guard petHitRect.contains(pt) else { return }
+            deskMenuPresenter?.presentDeskMenu(from: self, anchorRect: petHitRect)
+        } else {
+            deskMenuPresenter?.presentDeskMenu(from: self, anchorRect: bounds.insetBy(dx: 4, dy: 4))
+        }
     }
 
     func applyNonRestPetDisplayMode(_ mode: PetDisplayMode) {
@@ -146,12 +173,35 @@ final class PetStageView: NSView {
         return CGPoint(x: x, y: y)
     }
 
+    private static func petHitRect(center: CGPoint, scale: CGFloat, in b: NSRect) -> NSRect {
+        let base = min(b.width, b.height) * 0.22
+        let side = base * scale
+        let padding: CGFloat = 16
+        return NSRect(
+            x: center.x - side / 2 - padding,
+            y: center.y - side / 2 - padding,
+            width: side + 2 * padding,
+            height: side + 2 * padding
+        )
+    }
+
     private func layoutIdlePet() {
         let b = bounds
         guard b.width > 1, b.height > 1 else { return }
-        let center = petCornerCenter(in: b)
+        let center: CGPoint
+        let scale: CGFloat
         let base = min(b.width, b.height) * 0.22
-        let scale = Self.idlePetSide / max(base, 1)
+        if b.width < 400 {
+            // 常态小窗：桌宠居中，整块小窗与菜单栏角标大致对齐。
+            center = CGPoint(x: b.midX, y: b.midY)
+            scale = Self.idlePetSide / max(base, 1)
+            petHitRect = b.insetBy(dx: 4, dy: 4)
+        } else {
+            // 兜底：若窗框异常偏大仍按「全屏右下角」算（不应在常态出现）。
+            center = petCornerCenter(in: b)
+            scale = Self.idlePetSide / max(base, 1)
+            petHitRect = Self.petHitRect(center: center, scale: scale, in: b)
+        }
         pet.layoutPet(in: b, visualCenter: center, scale: scale)
         if restBeganAt == nil {
             pet.setDisplayMode(nonRestDisplayMode)
@@ -172,8 +222,8 @@ final class PetStageView: NSView {
             restBeganAt = nil
             countdownLabel.isHidden = true
             dimView.layer?.backgroundColor = NSColor.black.withAlphaComponent(0).cgColor
-            layoutIdlePet()
             done?()
+            layoutIdlePet()
             return
         }
 
@@ -192,6 +242,7 @@ final class PetStageView: NSView {
         let minScale = Self.idlePetSide / max(base, 1)
         let maxScale: CGFloat = 1.15
         let scale = minScale + (maxScale - minScale) * p
+        petHitRect = Self.petHitRect(center: pos, scale: scale, in: b)
         pet.layoutPet(in: b, visualCenter: pos, scale: scale)
     }
 

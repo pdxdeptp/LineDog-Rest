@@ -20,7 +20,7 @@ final class ManualTimerEngine: TimerEngine {
     /// 计时器是否在跑（未点「停止计时」且 `start()` 已调用）。
     var isTimerRunning: Bool { tickTimer != nil }
 
-    /// 当前是否处于休息段（`start()` 之后的 5 分钟休息内）。
+    /// 当前是否处于休息段（`start()` 之后的 5 分钟休息内）。 
     var isInRestPhase: Bool { isRestPhase }
 
     func start() {
