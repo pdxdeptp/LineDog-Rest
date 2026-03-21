@@ -20,6 +20,8 @@ final class AppViewModel: ObservableObject {
     @Published private(set) var showResumeChronoButton = false
     /// 休息全屏时是否拦截鼠标（默认开）；关则休息时仍可正常点击背后桌面与应用。
     @Published private(set) var restBlocksClicksDuringRest: Bool
+    /// 独立 7 分钟倒计时进行中（与桌宠无关）；结束后出现铃铛直至点击关闭。
+    @Published private(set) var isSevenMinuteReminderRunning = false
 
     private static let restBlocksClicksDefaultsKey = "LineDog.restBlocksClicksDuringRest"
 
@@ -31,6 +33,8 @@ final class AppViewModel: ObservableObject {
     private let manualEngine: ManualTimerEngine
     private let autoEngine: AutoTimerEngine
     private let windowManager: WindowManaging
+    /// 独立倒计时提醒窗口，不经过 `WindowManager`。
+    private let sevenMinuteReminder: SevenMinuteReminderController
 
     private var wasResting = false
     private var testRestActive = false
@@ -42,9 +46,11 @@ final class AppViewModel: ObservableObject {
         windowManager: WindowManaging = WindowManager(),
         manualEngine: ManualTimerEngine? = nil,
         autoEngine: AutoTimerEngine? = nil,
-        bootstrapAutoEngine: Bool = true
+        bootstrapAutoEngine: Bool = true,
+        sevenMinuteReminder: SevenMinuteReminderController? = nil
     ) {
         self.windowManager = windowManager
+        self.sevenMinuteReminder = sevenMinuteReminder ?? SevenMinuteReminderController()
         let me = manualEngine ?? ManualTimerEngine()
         let ae = autoEngine ?? AutoTimerEngine()
         self.manualEngine = me
@@ -81,6 +87,18 @@ final class AppViewModel: ObservableObject {
         syncPetDisplayMode()
         windowManager.bindDeskPetMenu(viewModel: self)
         windowManager.setRestBlocksClicks(restBlocksClicksDuringRest)
+
+        self.sevenMinuteReminder.onRunningChanged = { [weak self] running in
+            self?.isSevenMinuteReminderRunning = running
+        }
+    }
+
+    func startSevenMinuteReminder() {
+        sevenMinuteReminder.start()
+    }
+
+    func cancelSevenMinuteReminder() {
+        sevenMinuteReminder.cancel()
     }
 
     func setRestBlocksClicksDuringRest(_ enabled: Bool) {

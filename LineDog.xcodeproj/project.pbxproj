@@ -21,6 +21,7 @@
 		A20A /* WindowManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20A /* WindowManager.swift */; };
 		A20D /* PetStageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20D /* PetStageView.swift */; };
 		A211 /* MenuBarNSScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = B211 /* MenuBarNSScreen.swift */; };
+		A212 /* SevenMinuteReminderController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B212 /* SevenMinuteReminderController.swift */; };
 		A20B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B20B /* Assets.xcassets */; };
 		A301 /* MockWindowManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B301 /* MockWindowManager.swift */; };
 		A302 /* LineDogInteractionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B302 /* LineDogInteractionTests.swift */; };
@@ -41,6 +42,7 @@
 		B20A /* WindowManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowManager.swift; sourceTree = "<group>"; };
 		B20D /* PetStageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetStageView.swift; sourceTree = "<group>"; };
 		B211 /* MenuBarNSScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarNSScreen.swift; sourceTree = "<group>"; };
+		B212 /* SevenMinuteReminderController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SevenMinuteReminderController.swift; sourceTree = "<group>"; };
 		B20B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		C200 /* LineDog.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LineDog.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C301 /* LineDogTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LineDogTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -96,6 +98,7 @@
 				E203 /* TimerEngine */,
 				E204 /* PetRenderer */,
 				E205 /* WindowManager */,
+				E207 /* SevenMinuteReminder */,
 				B20B /* Assets.xcassets */,
 			);
 			path = LineDog;
@@ -128,6 +131,14 @@
 				B20D /* PetStageView.swift */,
 			);
 			path = WindowManager;
+			sourceTree = "<group>";
+		};
+		E207 /* SevenMinuteReminder */ = {
+			isa = PBXGroup;
+			children = (
+				B212 /* SevenMinuteReminderController.swift */,
+			);
+			path = SevenMinuteReminder;
 			sourceTree = "<group>";
 		};
 		E202 /* Products */ = {
@@ -262,6 +273,7 @@
 				A20A /* WindowManager.swift in Sources */,
 				A20D /* PetStageView.swift in Sources */,
 				A211 /* MenuBarNSScreen.swift in Sources */,
+				A212 /* SevenMinuteReminderController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

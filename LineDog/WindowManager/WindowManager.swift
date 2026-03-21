@@ -12,7 +12,7 @@ protocol WindowManaging: AnyObject {
     func setRestBlocksClicks(_ blocks: Bool)
 }
 
-/// 模块 2：常态为**仅桌宠大小**的透明小窗（不挡桌面点击）；休息时扩展为菜单栏屏全屏霸屏。同一只 `PetStageView`。
+/// 模块 2：常态为**仅桌宠大小**的透明小窗（可拖动，位置持久化）；休息时扩展为菜单栏屏全屏霸屏。同一只 `PetStageView`。
 final class WindowManager: WindowManaging {
     private var window: NSWindow?
     private var stageView: PetStageView?
@@ -23,7 +23,11 @@ final class WindowManager: WindowManaging {
     private var screenObserver: NSObjectProtocol?
     private var primaryDisplayObserver: NSObjectProtocol?
     private var launchObserver: NSObjectProtocol?
+    private var terminateObserver: NSObjectProtocol?
     private var screenRepositionWorkItem: DispatchWorkItem?
+
+    /// 进入休息全屏前一刻的常态小窗框，用于结束后回到原位置（与 `UserDefaults` 一致）。
+    private var idleFrameBeforeRest: NSRect?
 
     /// `AppViewModel` 可能在宠物窗创建之前就 `syncPetDisplayMode`，需记住并在首屏安装时应用。
     private var pendingIdlePetMode: PetDisplayMode = .runningBlack
@@ -47,11 +51,23 @@ final class WindowManager: WindowManaging {
                 self?.installPetWindowIfNeeded()
             }
         }
+        terminateObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.willTerminateNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.persistIdlePetFrameIfIdleSized()
+            }
+        }
     }
 
     deinit {
         if let launchObserver {
             NotificationCenter.default.removeObserver(launchObserver)
+        }
+        if let terminateObserver {
+            NotificationCenter.default.removeObserver(terminateObserver)
         }
         if let screenObserver {
             NotificationCenter.default.removeObserver(screenObserver)
@@ -72,10 +88,14 @@ final class WindowManager: WindowManaging {
         return (s, s.frame)
     }
 
-    /// 常态桌宠：贴近主屏可见区右下角的小窗，避免全屏 `NSWindow` + `ignoresMouseEvents = false` 吞掉整块桌面点击。
-    private static func idlePetWindowFrame() -> NSRect {
-        let w: CGFloat = 132
-        let h: CGFloat = 132
+    private static let idlePetSize = NSSize(width: 132, height: 132)
+    private static let idlePetOriginXKey = "LineDog.idlePetOriginX"
+    private static let idlePetOriginYKey = "LineDog.idlePetOriginY"
+
+    /// 首次启动：菜单栏屏可见区右下角默认位。
+    private static func defaultIdlePetWindowFrame() -> NSRect {
+        let w = idlePetSize.width
+        let h = idlePetSize.height
         guard let s = MenuBarNSScreen.screen ?? NSScreen.screens.first else {
             return NSRect(x: 100, y: 100, width: w, height: h)
         }
@@ -86,6 +106,52 @@ final class WindowManager: WindowManaging {
         return NSRect(x: x, y: y, width: w, height: h)
     }
 
+    private static func loadPersistedIdlePetFrame() -> NSRect? {
+        let d = UserDefaults.standard
+        guard d.object(forKey: idlePetOriginXKey) != nil,
+              d.object(forKey: idlePetOriginYKey) != nil
+        else { return nil }
+        let x = d.double(forKey: idlePetOriginXKey)
+        let y = d.double(forKey: idlePetOriginYKey)
+        return NSRect(x: x, y: y, width: idlePetSize.width, height: idlePetSize.height)
+    }
+
+    private static func isApproximatelyIdleSized(_ rect: NSRect) -> Bool {
+        abs(rect.width - idlePetSize.width) < 24 && abs(rect.height - idlePetSize.height) < 24
+    }
+
+    /// 至少与某块屏的 `frame` 有足够交集则保留位置（支持副屏）；完全离开所有屏则退回默认角。
+    private static func clampIdlePetFrameToScreens(_ rect: NSRect) -> NSRect {
+        let r = NSRect(origin: rect.origin, size: idlePetSize)
+        let union = NSScreen.screens.reduce(CGRect.null) { $0.union($1.frame) }
+        let inter = union.intersection(r)
+        if inter.width >= 32, inter.height >= 32 {
+            return r
+        }
+        return defaultIdlePetWindowFrame()
+    }
+
+    /// 启动或需要默认位时：读盘 → 默认角 → 夹紧。
+    private static func resolvedIdlePetFrameForInstall() -> NSRect {
+        if let saved = loadPersistedIdlePetFrame() {
+            return clampIdlePetFrameToScreens(saved)
+        }
+        return defaultIdlePetWindowFrame()
+    }
+
+    private func persistIdlePetFrame(_ frame: NSRect) {
+        guard Self.isApproximatelyIdleSized(frame) else { return }
+        let d = UserDefaults.standard
+        d.set(frame.origin.x, forKey: Self.idlePetOriginXKey)
+        d.set(frame.origin.y, forKey: Self.idlePetOriginYKey)
+    }
+
+    private func persistIdlePetFrameIfIdleSized() {
+        guard let f = window?.frame, stageView?.isInRestPhase != true else { return }
+        guard Self.isApproximatelyIdleSized(f) else { return }
+        persistIdlePetFrame(f)
+    }
+
     private func installPetWindowIfNeeded() {
         guard window == nil else { return }
         if let obs = launchObserver {
@@ -94,7 +160,7 @@ final class WindowManager: WindowManaging {
         }
 
         let primary = Self.primaryDisplay()
-        let frame = Self.idlePetWindowFrame()
+        let frame = Self.resolvedIdlePetFrameForInstall()
 
         let win = NSWindow(
             contentRect: frame,
@@ -114,6 +180,9 @@ final class WindowManager: WindowManaging {
 
         let view = PetStageView(frame: NSRect(origin: .zero, size: frame.size))
         view.deskMenuPresenter = deskMenuViewModel != nil ? self : nil
+        view.onIdlePetFramePersist = { [weak self] r in
+            self?.persistIdlePetFrame(r)
+        }
         win.contentView = view
         window = win
         stageView = view
@@ -154,7 +223,12 @@ final class WindowManager: WindowManaging {
         deskMenuPopover?.close()
         deskMenuPopover = nil
         deskMenuHosting = nil
-        stageView?.deskMenuPresenter = viewModel != nil ? self : nil
+        if let v = stageView {
+            v.deskMenuPresenter = viewModel != nil ? self : nil
+            v.onIdlePetFramePersist = { [weak self] r in
+                self?.persistIdlePetFrame(r)
+            }
+        }
         applyMousePolicy()
     }
 
@@ -167,6 +241,7 @@ final class WindowManager: WindowManaging {
         deskMenuPopover?.close()
         installPetWindowIfNeeded()
         dismissRestImmediately()
+        idleFrameBeforeRest = window?.frame
         pendingDismiss = onDismissed
         expandWindowToMenuBarScreenFullFrame()
         setWindowLevel(resting: true)
@@ -228,8 +303,10 @@ final class WindowManager: WindowManaging {
         let frame: NSRect
         if stageView?.isInRestPhase == true {
             frame = Self.primaryDisplay().frame
+        } else if let wf = window?.frame, Self.isApproximatelyIdleSized(wf) {
+            frame = Self.clampIdlePetFrameToScreens(wf)
         } else {
-            frame = Self.idlePetWindowFrame()
+            frame = Self.resolvedIdlePetFrameForInstall()
         }
         window?.setFrame(frame, display: true)
         syncContentViewToWindowLayout()
@@ -237,6 +314,9 @@ final class WindowManager: WindowManaging {
         stageView?.layoutSubtreeIfNeeded()
         applyMousePolicy()
         window?.orderFrontRegardless()
+        if stageView?.isInRestPhase != true {
+            persistIdlePetFrameIfIdleSized()
+        }
     }
 
     private func expandWindowToMenuBarScreenFullFrame() {
@@ -249,12 +329,23 @@ final class WindowManager: WindowManaging {
     }
 
     private func shrinkWindowToIdlePetFrame() {
-        window?.setFrame(Self.idlePetWindowFrame(), display: true)
+        let target: NSRect
+        if let r = idleFrameBeforeRest, Self.isApproximatelyIdleSized(r) {
+            target = Self.clampIdlePetFrameToScreens(r)
+            idleFrameBeforeRest = nil
+        } else if let wf = window?.frame, Self.isApproximatelyIdleSized(wf) {
+            target = Self.clampIdlePetFrameToScreens(wf)
+        } else {
+            target = Self.resolvedIdlePetFrameForInstall()
+            idleFrameBeforeRest = nil
+        }
+        window?.setFrame(target, display: true)
         syncContentViewToWindowLayout()
         stageView?.needsLayout = true
         stageView?.layoutSubtreeIfNeeded()
         applyMousePolicy()
         window?.orderFrontRegardless()
+        persistIdlePetFrame(target)
     }
 
     private func applyMousePolicy() {

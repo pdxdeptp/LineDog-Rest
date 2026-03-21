@@ -5,7 +5,7 @@ protocol PetStageDeskMenuPresenter: AnyObject {
     func presentDeskMenu(from stage: PetStageView, anchorRect: NSRect)
 }
 
-/// 唯一桌宠舞台：非休息时仅在右下角显示同一只小狗；休息时**同一只**变红、移向中央并放大，背景渐暗，左下角倒计时。
+/// 唯一桌宠舞台：非休息时小窗内显示小狗，可拖动窗口；休息时**同一只**变红、移向中央并放大，背景渐暗，左下角倒计时。
 final class PetStageView: NSView {
     private let dimView = NSView()
     private let pet = PetRenderer()
@@ -27,6 +27,14 @@ final class PetStageView: NSView {
     /// 非 nil 时：常态小窗整块可点；休息全屏时仅 `petHitRect`（桌宠区域）打开菜单，其余区域仍挡点击（霸屏）。
     weak var deskMenuPresenter: PetStageDeskMenuPresenter?
     private var petHitRect: NSRect = .zero
+
+    /// 常态小窗拖动结束后回写并持久化窗框（屏幕坐标）。
+    var onIdlePetFramePersist: ((NSRect) -> Void)?
+
+    private var idleMouseDownInWindow: NSPoint = .zero
+    private var idleLastScreenMouse: NSPoint?
+    /// 相对 `mouseDown` 的最大位移，用于区分点击弹出菜单与拖动窗口。
+    private var idleMaxDragFromDown: CGFloat = 0
 
     var isInRestPhase: Bool { restBeganAt != nil }
 
@@ -90,8 +98,39 @@ final class PetStageView: NSView {
         if restBeganAt != nil {
             guard petHitRect.contains(pt) else { return }
             deskMenuPresenter?.presentDeskMenu(from: self, anchorRect: petHitRect)
-        } else {
+            return
+        }
+        idleMouseDownInWindow = event.locationInWindow
+        idleLastScreenMouse = NSEvent.mouseLocation
+        idleMaxDragFromDown = 0
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        guard deskMenuPresenter != nil, restBeganAt == nil, let win = window else { return }
+        let cur = event.locationInWindow
+        idleMaxDragFromDown = max(
+            idleMaxDragFromDown,
+            hypot(cur.x - idleMouseDownInWindow.x, cur.y - idleMouseDownInWindow.y)
+        )
+        guard idleMaxDragFromDown >= 4, let lastScreen = idleLastScreenMouse else { return }
+        let nowScreen = NSEvent.mouseLocation
+        var f = win.frame
+        f.origin.x += nowScreen.x - lastScreen.x
+        f.origin.y += nowScreen.y - lastScreen.y
+        win.setFrame(f, display: true)
+        idleLastScreenMouse = nowScreen
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        guard deskMenuPresenter != nil, restBeganAt == nil else { return }
+        defer {
+            idleLastScreenMouse = nil
+            idleMaxDragFromDown = 0
+        }
+        if idleMaxDragFromDown < 4 {
             deskMenuPresenter?.presentDeskMenu(from: self, anchorRect: bounds.insetBy(dx: 4, dy: 4))
+        } else if let win = window {
+            onIdlePetFramePersist?(win.frame)
         }
     }
 

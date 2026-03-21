@@ -59,6 +59,25 @@ struct MenuBarContentView: View {
 
             Divider()
 
+            Text("独立 7 分钟提醒")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            Text("与线条小狗分层显示；倒计时在屏幕右下角，结束后中心出现铃铛，点一下关闭。")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
+            Button("开始 7 分钟倒计时") {
+                viewModel.startSevenMinuteReminder()
+            }
+            .disabled(viewModel.isSevenMinuteReminderRunning)
+            if viewModel.isSevenMinuteReminderRunning {
+                Button("取消倒计时") {
+                    viewModel.cancelSevenMinuteReminder()
+                }
+            }
+
+            Divider()
+
             Text(restBlockingHint(viewModel.restBlocksClicksDuringRest))
                 .font(.caption)
                 .foregroundStyle(.tertiary)
