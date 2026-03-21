@@ -1,5 +1,6 @@
 DerivedData/
 build/
+smart_reminder_model_debug.log
 *.xcuserstate
 xcuserdata/
 *.xccheckout

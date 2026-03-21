@@ -8,18 +8,19 @@
 
 /* Begin PBXBuildFile section */
 		A201 /* LineDogApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B201 /* LineDogApp.swift */; };
-		A210 /* LineDogAppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = B210 /* LineDogAppDelegate.swift */; };
 		A202 /* AppViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B202 /* AppViewModel.swift */; };
 		A203 /* MenuBarContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B203 /* MenuBarContentView.swift */; };
-		A20E /* PetDisplayMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20E /* PetDisplayMode.swift */; };
-		A20F /* MenuBarDogLabel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20F /* MenuBarDogLabel.swift */; };
 		A204 /* TimeState.swift in Sources */ = {isa = PBXBuildFile; fileRef = B204 /* TimeState.swift */; };
 		A205 /* TimerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B205 /* TimerEngine.swift */; };
 		A206 /* ManualTimerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B206 /* ManualTimerEngine.swift */; };
 		A207 /* AutoTimerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B207 /* AutoTimerEngine.swift */; };
 		A208 /* PetRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B208 /* PetRenderer.swift */; };
 		A20A /* WindowManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20A /* WindowManager.swift */; };
+		A20B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B20B /* Assets.xcassets */; };
 		A20D /* PetStageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20D /* PetStageView.swift */; };
+		A20E /* PetDisplayMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20E /* PetDisplayMode.swift */; };
+		A20F /* MenuBarDogLabel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20F /* MenuBarDogLabel.swift */; };
+		A210 /* LineDogAppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = B210 /* LineDogAppDelegate.swift */; };
 		A211 /* MenuBarNSScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = B211 /* MenuBarNSScreen.swift */; };
 		A212 /* SevenMinuteReminderController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B212 /* SevenMinuteReminderController.swift */; };
 		A213 /* LineDogBroadcastNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = B213 /* LineDogBroadcastNotifications.swift */; };
@@ -41,28 +42,44 @@
 		A227 /* LineDogDefaults.swift in Sources */ = {isa = PBXBuildFile; fileRef = B227 /* LineDogDefaults.swift */; };
 		A228 /* LineDogSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B228 /* LineDogSettingsView.swift */; };
 		A229 /* LineDogPresentationAnchor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B229 /* LineDogPresentationAnchor.swift */; };
-		A20B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B20B /* Assets.xcassets */; };
+		A230 /* SmartReminderNotesComposer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B230 /* SmartReminderNotesComposer.swift */; };
+		A231 /* DeskReminderSidebarFormatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = B231 /* DeskReminderSidebarFormatting.swift */; };
+		A232 /* SmartReminderModelDebugLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = B232 /* SmartReminderModelDebugLog.swift */; };
 		A301 /* MockWindowManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B301 /* MockWindowManager.swift */; };
 		A302 /* LineDogInteractionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B302 /* LineDogInteractionTests.swift */; };
 		A303 /* MockRemindersEventStoreBacking.swift in Sources */ = {isa = PBXBuildFile; fileRef = B303 /* MockRemindersEventStoreBacking.swift */; };
 		A304 /* RemindersSyncCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B304 /* RemindersSyncCoordinatorTests.swift */; };
 		A305 /* SmartReminderOrchestratorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B305 /* SmartReminderOrchestratorTests.swift */; };
+		A306 /* SmartReminderNotesComposerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B306 /* SmartReminderNotesComposerTests.swift */; };
+		A307 /* DeskReminderTimeFormatterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B307 /* DeskReminderTimeFormatterTests.swift */; };
+		A308 /* DeskReminderSidebarMergerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B308 /* DeskReminderSidebarMergerTests.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		J302 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = G200 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F200;
+			remoteInfo = LineDog;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		B201 /* LineDogApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LineDogApp.swift; sourceTree = "<group>"; };
-		B210 /* LineDogAppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LineDogAppDelegate.swift; sourceTree = "<group>"; };
 		B202 /* AppViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppViewModel.swift; sourceTree = "<group>"; };
 		B203 /* MenuBarContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarContentView.swift; sourceTree = "<group>"; };
-		B20E /* PetDisplayMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetDisplayMode.swift; sourceTree = "<group>"; };
-		B20F /* MenuBarDogLabel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarDogLabel.swift; sourceTree = "<group>"; };
 		B204 /* TimeState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeState.swift; sourceTree = "<group>"; };
 		B205 /* TimerEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimerEngine.swift; sourceTree = "<group>"; };
 		B206 /* ManualTimerEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManualTimerEngine.swift; sourceTree = "<group>"; };
 		B207 /* AutoTimerEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoTimerEngine.swift; sourceTree = "<group>"; };
 		B208 /* PetRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetRenderer.swift; sourceTree = "<group>"; };
 		B20A /* WindowManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowManager.swift; sourceTree = "<group>"; };
+		B20B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B20D /* PetStageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetStageView.swift; sourceTree = "<group>"; };
+		B20E /* PetDisplayMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetDisplayMode.swift; sourceTree = "<group>"; };
+		B20F /* MenuBarDogLabel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarDogLabel.swift; sourceTree = "<group>"; };
+		B210 /* LineDogAppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LineDogAppDelegate.swift; sourceTree = "<group>"; };
 		B211 /* MenuBarNSScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarNSScreen.swift; sourceTree = "<group>"; };
 		B212 /* SevenMinuteReminderController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SevenMinuteReminderController.swift; sourceTree = "<group>"; };
 		B213 /* LineDogBroadcastNotifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LineDogBroadcastNotifications.swift; sourceTree = "<group>"; };
@@ -84,14 +101,19 @@
 		B227 /* LineDogDefaults.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LineDogDefaults.swift; sourceTree = "<group>"; };
 		B228 /* LineDogSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LineDogSettingsView.swift; sourceTree = "<group>"; };
 		B229 /* LineDogPresentationAnchor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LineDogPresentationAnchor.swift; sourceTree = "<group>"; };
-		B20B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		C200 /* LineDog.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LineDog.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		C301 /* LineDogTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LineDogTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		B230 /* SmartReminderNotesComposer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartReminderNotesComposer.swift; sourceTree = "<group>"; };
+		B231 /* DeskReminderSidebarFormatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeskReminderSidebarFormatting.swift; sourceTree = "<group>"; };
+		B232 /* SmartReminderModelDebugLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartReminderModelDebugLog.swift; sourceTree = "<group>"; };
 		B301 /* MockWindowManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockWindowManager.swift; sourceTree = "<group>"; };
 		B302 /* LineDogInteractionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LineDogInteractionTests.swift; sourceTree = "<group>"; };
 		B303 /* MockRemindersEventStoreBacking.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockRemindersEventStoreBacking.swift; sourceTree = "<group>"; };
 		B304 /* RemindersSyncCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemindersSyncCoordinatorTests.swift; sourceTree = "<group>"; };
 		B305 /* SmartReminderOrchestratorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartReminderOrchestratorTests.swift; sourceTree = "<group>"; };
+		B306 /* SmartReminderNotesComposerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartReminderNotesComposerTests.swift; sourceTree = "<group>"; };
+		B307 /* DeskReminderTimeFormatterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeskReminderTimeFormatterTests.swift; sourceTree = "<group>"; };
+		B308 /* DeskReminderSidebarMergerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeskReminderSidebarMergerTests.swift; sourceTree = "<group>"; };
+		C200 /* LineDog.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LineDog.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C301 /* LineDogTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LineDogTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -121,18 +143,6 @@
 			);
 			sourceTree = "<group>";
 		};
-		E206 /* LineDogTests */ = {
-			isa = PBXGroup;
-			children = (
-				B301 /* MockWindowManager.swift */,
-				B302 /* LineDogInteractionTests.swift */,
-				B303 /* MockRemindersEventStoreBacking.swift */,
-				B304 /* RemindersSyncCoordinatorTests.swift */,
-				B305 /* SmartReminderOrchestratorTests.swift */,
-			);
-			path = LineDogTests;
-			sourceTree = "<group>";
-		};
 		E201 /* LineDog */ = {
 			isa = PBXGroup;
 			children = (
@@ -158,26 +168,13 @@
 			path = LineDog;
 			sourceTree = "<group>";
 		};
-		E20A /* SmartReminder */ = {
+		E202 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				B220 /* LLMReminderJSONPayload.swift */,
-				B221 /* ReminderMutationServing.swift */,
-				B222 /* SmartReminderPromptBuilder.swift */,
-				B223 /* EventKitReminderMutationService.swift */,
-				B224 /* GeminiRemindersAPIClient.swift */,
-				B225 /* SmartReminderOrchestrator.swift */,
-				B226 /* SmartReminderUIPanels.swift */,
+				C200 /* LineDog.app */,
+				C301 /* LineDogTests.xctest */,
 			);
-			path = SmartReminder;
-			sourceTree = "<group>";
-		};
-		E20B /* Settings */ = {
-			isa = PBXGroup;
-			children = (
-				B228 /* LineDogSettingsView.swift */,
-			);
-			path = Settings;
+			name = Products;
 			sourceTree = "<group>";
 		};
 		E203 /* TimerEngine */ = {
@@ -209,6 +206,21 @@
 			path = WindowManager;
 			sourceTree = "<group>";
 		};
+		E206 /* LineDogTests */ = {
+			isa = PBXGroup;
+			children = (
+				B301 /* MockWindowManager.swift */,
+				B302 /* LineDogInteractionTests.swift */,
+				B303 /* MockRemindersEventStoreBacking.swift */,
+				B304 /* RemindersSyncCoordinatorTests.swift */,
+				B305 /* SmartReminderOrchestratorTests.swift */,
+				B306 /* SmartReminderNotesComposerTests.swift */,
+				B307 /* DeskReminderTimeFormatterTests.swift */,
+				B308 /* DeskReminderSidebarMergerTests.swift */,
+			);
+			path = LineDogTests;
+			sourceTree = "<group>";
+		};
 		E207 /* SevenMinuteReminder */ = {
 			isa = PBXGroup;
 			children = (
@@ -235,17 +247,33 @@
 				B219 /* RemindersSyncCoordinator.swift */,
 				B21A /* EventKitRemindersBacking.swift */,
 				B21B /* DeskRemindersModel.swift */,
+				B231 /* DeskReminderSidebarFormatting.swift */,
 			);
 			path = Reminders;
 			sourceTree = "<group>";
 		};
-		E202 /* Products */ = {
+		E20A /* SmartReminder */ = {
 			isa = PBXGroup;
 			children = (
-				C200 /* LineDog.app */,
-				C301 /* LineDogTests.xctest */,
+				B220 /* LLMReminderJSONPayload.swift */,
+				B221 /* ReminderMutationServing.swift */,
+				B222 /* SmartReminderPromptBuilder.swift */,
+				B223 /* EventKitReminderMutationService.swift */,
+				B224 /* GeminiRemindersAPIClient.swift */,
+				B225 /* SmartReminderOrchestrator.swift */,
+				B226 /* SmartReminderUIPanels.swift */,
+				B230 /* SmartReminderNotesComposer.swift */,
+				B232 /* SmartReminderModelDebugLog.swift */,
 			);
-			name = Products;
+			path = SmartReminder;
+			sourceTree = "<group>";
+		};
+		E20B /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				B228 /* LineDogSettingsView.swift */,
+			);
+			path = Settings;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -286,24 +314,6 @@
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
-
-/* Begin PBXContainerItemProxy section */
-		J302 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = G200 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = F200;
-			remoteInfo = LineDog;
-		};
-/* End PBXContainerItemProxy section */
-
-/* Begin PBXTargetDependency section */
-		J301 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = F200 /* LineDog */;
-			targetProxy = J302 /* PBXContainerItemProxy */;
-		};
-/* End PBXTargetDependency section */
 
 /* Begin PBXProject section */
 		G200 /* Project object */ = {
@@ -391,6 +401,9 @@
 				A227 /* LineDogDefaults.swift in Sources */,
 				A228 /* LineDogSettingsView.swift in Sources */,
 				A229 /* LineDogPresentationAnchor.swift in Sources */,
+				A230 /* SmartReminderNotesComposer.swift in Sources */,
+				A231 /* DeskReminderSidebarFormatting.swift in Sources */,
+				A232 /* SmartReminderModelDebugLog.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -403,10 +416,21 @@
 				A303 /* MockRemindersEventStoreBacking.swift in Sources */,
 				A304 /* RemindersSyncCoordinatorTests.swift in Sources */,
 				A305 /* SmartReminderOrchestratorTests.swift in Sources */,
+				A306 /* SmartReminderNotesComposerTests.swift in Sources */,
+				A307 /* DeskReminderTimeFormatterTests.swift in Sources */,
+				A308 /* DeskReminderSidebarMergerTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		J301 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F200 /* LineDog */;
+			targetProxy = J302 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		H200 /* Debug */ = {
@@ -536,7 +560,9 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "";
+				DEVELOPMENT_TEAM = 7MUZ966XS3;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_TESTABILITY = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "LineDog Rest";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
@@ -553,7 +579,6 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_STRICT_CONCURRENCY = complete;
 				SWIFT_VERSION = 5.0;
-				ENABLE_TESTABILITY = YES;
 			};
 			name = Debug;
 		};
@@ -566,6 +591,7 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "";
+				DEVELOPMENT_TEAM = 7MUZ966XS3;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "LineDog Rest";
@@ -635,15 +661,6 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		G201 /* Build configuration list for PBXProject "LineDog" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				H200 /* Debug */,
-				H201 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
 		F201 /* Build configuration list for PBXNativeTarget "LineDog" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -661,6 +678,15 @@
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
+		};
+		G201 /* Build configuration list for PBXProject "LineDog" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				H200 /* Debug */,
+				H201 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};

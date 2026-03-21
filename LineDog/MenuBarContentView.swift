@@ -6,6 +6,10 @@ struct MenuBarContentView: View {
 
     private var deskReminders: DeskRemindersModel { viewModel.deskReminders }
 
+    private var reminderDaySections: [DeskReminderDaySection] {
+        DeskReminderDayGroups.sections(items: deskReminders.items)
+    }
+
     /// 左侧提醒栏固定宽度，避免与右侧主菜单抢空间。
     private let remindersColumnWidth: CGFloat = 300
 
@@ -49,12 +53,50 @@ struct MenuBarContentView: View {
         LineDogSettingsWindowPresenter.present()
     }
 
-    /// 左栏：仅提醒事项（系统 EventKit）。
+    @ViewBuilder
+    private func deskReminderRow(_ item: ReminderDisplayItem) -> some View {
+        let timeText = DeskReminderTimeFormatter.timeOnly(dueDate: item.dueDate)
+        HStack(alignment: .center, spacing: 10) {
+            Button {
+                Task { await deskReminders.completeReminder(id: item.id) }
+            } label: {
+                Image(systemName: "circle")
+                    .font(.title3)
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help("完成")
+
+            Text(item.title.isEmpty ? "（无标题）" : item.title)
+                .font(.body)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            HStack(spacing: 6) {
+                if item.hasRoutineTag {
+                    Text(LineDogRoutineTag.marker)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+                Text(timeText)
+                    .font(.subheadline.weight(.medium).monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
+            .frame(minWidth: 44, alignment: .trailing)
+        }
+        .padding(.vertical, 8)
+        .padding(.horizontal, 2)
+        Divider()
+    }
+
+    /// 左栏：仅提醒事项（系统 EventKit），按日分组类似系统「计划」。
     private var remindersSidebar: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("提醒事项")
-                .font(.headline)
-            Text("来自系统「提醒事项」· 所选列表 · 今日未完成 · 不可在此新建")
+            Text("计划")
+                .font(.title2.bold())
+                .foregroundStyle(.red)
+            Text("所选列表 · 今日「#日常」· 七日内 · 按日期分组 · 不可在此新建")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -89,32 +131,32 @@ struct MenuBarContentView: View {
             Group {
                 if deskReminders.isAuthorized {
                     if deskReminders.items.isEmpty {
-                        Text("今日无未完成项")
+                        Text("当前窗口内无待办")
                             .font(.subheadline)
                             .foregroundStyle(.tertiary)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.vertical, 8)
                     } else {
                         ScrollView {
-                            LazyVStack(alignment: .leading, spacing: 8) {
-                                ForEach(deskReminders.items) { item in
-                                    HStack(alignment: .top, spacing: 8) {
-                                        Text(item.title.isEmpty ? "（无标题）" : item.title)
-                                            .font(.subheadline)
-                                            .multilineTextAlignment(.leading)
-                                            .frame(maxWidth: .infinity, alignment: .leading)
-                                        Button("完成") {
-                                            Task { await deskReminders.completeReminder(id: item.id) }
+                            LazyVStack(alignment: .leading, spacing: 0) {
+                                ForEach(Array(reminderDaySections.enumerated()), id: \.element.id) { idx, section in
+                                    VStack(alignment: .leading, spacing: 0) {
+                                        Text(section.headerTitle)
+                                            .font(.subheadline.weight(.semibold))
+                                            .foregroundStyle(.primary)
+                                            .padding(.top, idx == 0 ? 2 : 12)
+                                            .padding(.bottom, 6)
+                                        Divider()
+                                            .opacity(0.45)
+                                        ForEach(section.items) { item in
+                                            deskReminderRow(item)
                                         }
-                                        .buttonStyle(.bordered)
-                                        .controlSize(.small)
                                     }
-                                    .padding(.vertical, 4)
-                                    Divider()
                                 }
                             }
                             .padding(.vertical, 4)
                         }
+                        .frame(height: 260)
                     }
                 } else {
                     Button("连接提醒事项…") {
@@ -187,7 +229,7 @@ struct MenuBarContentView: View {
             Text("独立 7 分钟提醒")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
-            Text("与线条小狗分层显示；倒计时在屏幕右下角，结束后中心出现铃铛，点一下关闭。")
+            Text("与线条小狗分层显示；倒计时在屏幕右下角，结束后屏幕中央显示铃铛与说明文字，点一下关闭。")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)

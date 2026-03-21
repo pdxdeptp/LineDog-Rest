@@ -52,6 +52,8 @@ final class AppViewModel: ObservableObject {
     /// 智能输入等待 Gemini 时，桌宠与菜单栏显示「思考」态。
     private var smartReminderThinkingActive = false
     private var smartReminderShortcutObserver: NSObjectProtocol?
+    /// 智能提醒写入的 `EKAlarm` 到点后弹出与 7 分钟倒计时相同的中央铃铛。
+    private var smartReminderBellTasks: [String: Task<Void, Never>] = [:]
 
     /// - Parameters:
     ///   - bootstrapAutoEngine: 应用启动为 `true` 并立即跑自动模式；单测传 `false` 避免后台 tick。
@@ -165,7 +167,10 @@ final class AppViewModel: ObservableObject {
     private func processSmartReminderSubmit(_ raw: String) async {
         smartReminderThinkingActive = true
         syncPetDisplayMode()
-        let result = await smartReminderOrchestrator.run(rawUserInput: raw)
+        let result = await smartReminderOrchestrator.run(
+            rawUserInput: raw,
+            uiSelectedReminderListCalendarId: deskReminders.selectedListIdentifier()
+        )
         smartReminderThinkingActive = false
         syncPetDisplayMode()
         guard let result else { return }
@@ -178,14 +183,46 @@ final class AppViewModel: ObservableObject {
             },
             onAutoDismiss: {}
         )
+        if !result.undoItemIdentifier.isEmpty, let fire = result.inAppBellFireDate {
+            let bellText = result.inAppBellMessage ?? "提醒事项"
+            scheduleSmartReminderInAppBell(
+                itemId: result.undoItemIdentifier,
+                fireDate: fire,
+                message: bellText
+            )
+        }
     }
 
     @MainActor
     private func performSmartReminderUndo(id: String) async {
+        cancelSmartReminderInAppBell(forItemId: id)
         windowManager.applyIdlePetDisplayMode(.pausedWhiteOutline)
         try? await Task.sleep(nanoseconds: 220_000_000)
         try? await smartReminderOrchestrator.removeReminder(calendarItemIdentifier: id)
         syncPetDisplayMode()
+    }
+
+    private func scheduleSmartReminderInAppBell(itemId: String, fireDate: Date, message: String) {
+        cancelSmartReminderInAppBell(forItemId: itemId)
+        let delay = fireDate.timeIntervalSinceNow
+        if delay <= 0.5 {
+            if delay > -300 {
+                sevenMinuteReminder.presentCenterBellReminder(message: message)
+            }
+            return
+        }
+        smartReminderBellTasks[itemId] = Task { @MainActor [weak self] in
+            let ns = UInt64(delay * 1_000_000_000)
+            try? await Task.sleep(nanoseconds: ns)
+            guard let self, !Task.isCancelled else { return }
+            self.smartReminderBellTasks.removeValue(forKey: itemId)
+            self.sevenMinuteReminder.presentCenterBellReminder(message: message)
+        }
+    }
+
+    private func cancelSmartReminderInAppBell(forItemId itemId: String) {
+        smartReminderBellTasks[itemId]?.cancel()
+        smartReminderBellTasks.removeValue(forKey: itemId)
     }
 
     func startFiveMinuteCatCompanion() {

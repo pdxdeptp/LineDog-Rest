@@ -51,7 +51,7 @@ final class RemindersSyncCoordinator {
             return
         }
         do {
-            let fetched = try await backing.fetchIncompleteRemindersForToday(calendarId: cid)
+            let fetched = try await backing.fetchDeskSidebarReminders(calendarId: cid)
             items = fetched.filter { !optimisticCompletedIds.contains($0.id) }
             onItemsChanged?(items)
         } catch {

@@ -23,7 +23,7 @@ final class MockRemindersEventStoreBacking: RemindersEventStoreBacking {
         calendars
     }
 
-    func fetchIncompleteRemindersForToday(calendarId: String) async throws -> [ReminderDisplayItem] {
+    func fetchDeskSidebarReminders(calendarId: String) async throws -> [ReminderDisplayItem] {
         if fetchDelayNanos > 0 {
             try await Task.sleep(nanoseconds: fetchDelayNanos)
         }

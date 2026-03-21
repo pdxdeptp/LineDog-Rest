@@ -7,25 +7,39 @@ enum SmartReminderWriteError: Error {
     case reminderNotFound
 }
 
-/// EventKit 创建/删除提醒；独立 `EKEventStore`（与列表拉取实例分离，共享系统已授权限）。
+/// EventKit 创建/删除提醒；与 `EventKitRemindersBacking` 共用 `LineDogReminderEventStore.shared`。
 final class EventKitReminderMutationService: ReminderMutationServing {
-    private let store = EKEventStore()
+    private let store = LineDogReminderEventStore.shared
 
     func fetchReminderCalendarsForMutation() async throws -> [(String, String, Bool)] {
-        store.calendars(for: .reminder).map {
-            ($0.calendarIdentifier, $0.title, $0.allowsContentModifications)
+        // macOS 上在非主线程访问 `EKEventStore` 常得到空列表，导致「无可用列表」。
+        await MainActor.run {
+            store.calendars(for: .reminder).map {
+                ($0.calendarIdentifier, $0.title, $0.allowsContentModifications)
+            }
         }
     }
 
     func defaultCalendarForNewRemindersIdentifier() async throws -> String? {
-        store.defaultCalendarForNewReminders()?.calendarIdentifier
+        await MainActor.run {
+            let all = store.calendars(for: .reminder)
+            if let d = store.defaultCalendarForNewReminders(), d.allowsContentModifications {
+                return d.calendarIdentifier
+            }
+            if let w = all.first(where: { $0.allowsContentModifications }) {
+                return w.calendarIdentifier
+            }
+            return store.defaultCalendarForNewReminders()?.calendarIdentifier
+                ?? all.first?.calendarIdentifier
+        }
     }
 
     func createReminder(
         title: String,
         notes: String?,
         calendarIdentifier: String,
-        alarmDate: Date?,
+        dueDate: Date?,
+        alarmAt: Date?,
         priority: Int
     ) async throws -> String {
         try await withCheckedThrowingContinuation { cont in
@@ -42,14 +56,17 @@ final class EventKitReminderMutationService: ReminderMutationServing {
                     rem.notes = notes
                     rem.calendar = cal
                     rem.priority = priority
-                    if let alarmDate {
+                    let due = dueDate ?? alarmAt
+                    if let due {
                         var dc = Calendar.current.dateComponents(
                             [.year, .month, .day, .hour, .minute],
-                            from: alarmDate
+                            from: due
                         )
                         dc.timeZone = Calendar.current.timeZone
                         rem.dueDateComponents = dc
-                        rem.addAlarm(EKAlarm(absoluteDate: alarmDate))
+                    }
+                    if let alarmAt {
+                        rem.addAlarm(EKAlarm(absoluteDate: alarmAt))
                     }
                     try self.store.save(rem, commit: true)
                     cont.resume(returning: rem.calendarItemIdentifier)
