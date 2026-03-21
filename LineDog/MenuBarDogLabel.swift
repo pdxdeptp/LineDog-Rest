@@ -31,6 +31,11 @@ struct MenuBarDogLabel: View {
                 .font(.system(size: iconSize))
                 .symbolRenderingMode(.monochrome)
                 .foregroundStyle(.red)
+        case .thinking:
+            Image(systemName: "sparkles")
+                .font(.system(size: iconSize))
+                .symbolRenderingMode(.monochrome)
+                .foregroundStyle(.indigo)
         }
     }
 }

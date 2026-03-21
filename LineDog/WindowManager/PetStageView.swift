@@ -3,6 +3,7 @@ import AppKit
 /// 由 `WindowManager` 实现：在桌宠点击处弹出与菜单栏相同的 SwiftUI 面板。
 protocol PetStageDeskMenuPresenter: AnyObject {
     func presentDeskMenu(from stage: PetStageView, anchorRect: NSRect)
+    func presentSmartReminderInput(from stage: PetStageView, anchorRect: NSRect)
 }
 
 /// 唯一桌宠舞台：非休息时小窗内显示小狗，可拖动窗口；休息时**同一只**变红、移向中央并放大，背景渐暗，左下角倒计时。
@@ -119,6 +120,20 @@ final class PetStageView: NSView {
         f.origin.y += nowScreen.y - lastScreen.y
         win.setFrame(f, display: true)
         idleLastScreenMouse = nowScreen
+    }
+
+    override func rightMouseDown(with event: NSEvent) {
+        guard deskMenuPresenter != nil else { return }
+        let pt = convert(event.locationInWindow, from: nil)
+        let anchor: NSRect
+        if restBeganAt != nil {
+            guard petHitRect.contains(pt) else { return }
+            anchor = petHitRect
+        } else {
+            anchor = bounds.insetBy(dx: 4, dy: 4)
+            guard anchor.contains(pt) else { return }
+        }
+        deskMenuPresenter?.presentSmartReminderInput(from: self, anchorRect: anchor)
     }
 
     override func mouseUp(with event: NSEvent) {

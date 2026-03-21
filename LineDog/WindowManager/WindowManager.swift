@@ -10,9 +10,23 @@ protocol WindowManaging: AnyObject {
     func bindDeskPetMenu(viewModel: AppViewModel?)
     /// `true`（默认）：休息全屏时窗口接收鼠标，挡桌面；`false`：休息时鼠标穿透，不挡操作。
     func setRestBlocksClicks(_ blocks: Bool)
+
+    /// 智能输入单行面板；`anchorRectInScreen` 为桌宠区域（屏幕坐标），用于定位在头顶上方。
+    func presentSmartReminderInput(anchorRectInScreen: NSRect, onSubmit: @escaping (String) -> Void, onCancel: @escaping () -> Void)
+    /// 无桌宠框时（或未安装窗）：用菜单栏屏可见区底部中点上方。
+    func presentSmartReminderInputFromGlobalShortcut(onSubmit: @escaping (String) -> Void, onCancel: @escaping () -> Void)
+    func dismissSmartReminderInput()
+    func showSmartReminderToast(
+        message: String,
+        showUndo: Bool,
+        onUndo: @escaping () -> Void,
+        onAutoDismiss: @escaping () -> Void
+    )
+    func dismissSmartReminderToast()
 }
 
 /// 模块 2：常态为**仅桌宠大小**的透明小窗（可拖动，位置持久化）；休息时扩展为菜单栏屏全屏霸屏。同一只 `PetStageView`。
+@MainActor
 final class WindowManager: WindowManaging {
     private var window: NSWindow?
     private var stageView: PetStageView?
@@ -33,6 +47,17 @@ final class WindowManager: WindowManaging {
     private var pendingIdlePetMode: PetDisplayMode = .runningBlack
     /// 与 `AppViewModel.restBlocksClicksDuringRest` 同步；仅影响**休息全屏**阶段的鼠标是否穿透。
     private var restBlocksClicks: Bool = true
+
+    private var smartInputPanel: NSPanel?
+    /// 用户取消智能输入时回调（Esc / 点外部 /「取消」）；提交成功前清除且不调用。
+    private var smartInputUserOnCancel: (() -> Void)?
+    private var smartInputEscapeMonitor: Any?
+    /// 本应用内点击面板外关闭（不依赖辅助功能）。
+    private var smartInputLocalMouseMonitor: Any?
+    /// 系统全局点击面板外关闭（需辅助功能授权）。
+    private var smartInputClickAwayMonitor: Any?
+    private var smartToastPanel: NSPanel?
+    private var smartToastDismiss: Timer?
 
     init() {
         // SwiftUI + 仅 MenuBarExtra 时，`AppViewModel` 初始化可能早于应用完成启动；窗口层级未就绪会导致「有进程但桌宠窗从未真正出现」。
@@ -149,6 +174,7 @@ final class WindowManager: WindowManaging {
 
     private func postIdlePetScreenFrameChanged(_ frame: NSRect) {
         guard Self.isApproximatelyIdleSized(frame), stageView?.isInRestPhase != true else { return }
+        LineDogPresentationAnchor.updateIdlePetWindowFrame(frame)
         NotificationCenter.default.post(
             name: LineDogBroadcastNotifications.idlePetScreenFrameChanged,
             object: nil,
@@ -368,11 +394,155 @@ final class WindowManager: WindowManaging {
             win.ignoresMouseEvents = deskMenuViewModel == nil
         }
     }
+
+    // MARK: - 智能提醒输入 / 气泡（PRD Smart Input）
+
+    private func teardownSmartInputPanel(invokeUserCancel: Bool) {
+        if let m = smartInputEscapeMonitor {
+            NSEvent.removeMonitor(m)
+            smartInputEscapeMonitor = nil
+        }
+        if let m = smartInputLocalMouseMonitor {
+            NSEvent.removeMonitor(m)
+            smartInputLocalMouseMonitor = nil
+        }
+        if let m = smartInputClickAwayMonitor {
+            NSEvent.removeMonitor(m)
+            smartInputClickAwayMonitor = nil
+        }
+        smartInputPanel?.close()
+        smartInputPanel = nil
+        let cb = smartInputUserOnCancel
+        smartInputUserOnCancel = nil
+        if invokeUserCancel {
+            cb?()
+        }
+    }
+
+    private func installSmartInputDismissMonitors() {
+        smartInputEscapeMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self, self.smartInputPanel != nil else { return event }
+            guard event.keyCode == 53 else { return event }
+            self.teardownSmartInputPanel(invokeUserCancel: true)
+            return nil
+        }
+        smartInputLocalMouseMonitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { [weak self] event in
+            guard let self, let panel = self.smartInputPanel else { return event }
+            if !panel.frame.contains(NSEvent.mouseLocation) {
+                self.teardownSmartInputPanel(invokeUserCancel: true)
+            }
+            return event
+        }
+        // 点其它 App / 桌面时关闭（需辅助功能）；否则依赖本地监听 + Esc +「取消」。
+        smartInputClickAwayMonitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDown) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self, let panel = self.smartInputPanel else { return }
+                if !panel.frame.contains(NSEvent.mouseLocation) {
+                    self.teardownSmartInputPanel(invokeUserCancel: true)
+                }
+            }
+        }
+    }
+
+    func presentSmartReminderInput(
+        anchorRectInScreen: NSRect,
+        onSubmit: @escaping (String) -> Void,
+        onCancel: @escaping () -> Void
+    ) {
+        teardownSmartInputPanel(invokeUserCancel: false)
+        smartInputUserOnCancel = onCancel
+        let anchor = anchorRectInScreen.width > 1 && anchorRectInScreen.height > 1
+            ? anchorRectInScreen
+            : Self.defaultSmartInputAnchorInScreen()
+        let (panel, _) = SmartReminderUIPanels.makeInputPanel(
+            onSubmit: { [weak self] text in
+                guard let self else { return }
+                self.teardownSmartInputPanel(invokeUserCancel: false)
+                onSubmit(text)
+            },
+            onCancel: { [weak self] in
+                self?.teardownSmartInputPanel(invokeUserCancel: true)
+            }
+        )
+        smartInputPanel = panel
+        SmartReminderUIPanels.positionPanelTopCenter(panel, anchor: anchor, size: panel.frame.size)
+        NSApp.activate(ignoringOtherApps: true)
+        panel.makeKeyAndOrderFront(nil)
+        panel.makeFirstResponder(panel.contentView)
+        installSmartInputDismissMonitors()
+        DispatchQueue.main.async { [weak panel] in
+            guard let panel else { return }
+            NSApp.activate(ignoringOtherApps: true)
+            panel.makeKeyAndOrderFront(nil)
+            panel.makeFirstResponder(panel.contentView)
+        }
+    }
+
+    func presentSmartReminderInputFromGlobalShortcut(
+        onSubmit: @escaping (String) -> Void,
+        onCancel: @escaping () -> Void
+    ) {
+        installPetWindowIfNeeded()
+        let anchor = window.map { $0.frame } ?? Self.defaultSmartInputAnchorInScreen()
+        presentSmartReminderInput(anchorRectInScreen: anchor, onSubmit: onSubmit, onCancel: onCancel)
+    }
+
+    func dismissSmartReminderInput() {
+        teardownSmartInputPanel(invokeUserCancel: false)
+    }
+
+    func showSmartReminderToast(
+        message: String,
+        showUndo: Bool,
+        onUndo: @escaping () -> Void,
+        onAutoDismiss: @escaping () -> Void
+    ) {
+        dismissSmartReminderToast()
+        let (panel, _, size) = SmartReminderUIPanels.makeToastPanel(
+            message: message,
+            showUndo: showUndo,
+            onUndo: { [weak self] in
+                self?.dismissSmartReminderToast()
+                onUndo()
+            }
+        )
+        smartToastPanel = panel
+        let anchor = window.map { $0.frame } ?? Self.defaultSmartInputAnchorInScreen()
+        SmartReminderUIPanels.positionPanelTopCenter(panel, anchor: anchor, size: size)
+        panel.orderFrontRegardless()
+        smartToastDismiss = Timer.scheduledTimer(withTimeInterval: 4.0, repeats: false) { [weak self] _ in
+            Task { @MainActor in
+                self?.dismissSmartReminderToast()
+                onAutoDismiss()
+            }
+        }
+        if let t = smartToastDismiss {
+            RunLoop.main.add(t, forMode: .common)
+        }
+    }
+
+    func dismissSmartReminderToast() {
+        smartToastDismiss?.invalidate()
+        smartToastDismiss = nil
+        smartToastPanel?.close()
+        smartToastPanel = nil
+    }
+
+    private static func defaultSmartInputAnchorInScreen() -> NSRect {
+        guard let vf = NSScreen.main?.visibleFrame else { return .zero }
+        return NSRect(x: vf.midX - 1, y: vf.minY + 120, width: 2, height: 2)
+    }
 }
 
 // MARK: - 右下角桌宠弹出菜单（复用 `MenuBarContentView`）
 
 extension WindowManager: PetStageDeskMenuPresenter {
+    func presentSmartReminderInput(from stage: PetStageView, anchorRect: NSRect) {
+        guard let vm = deskMenuViewModel, let win = stage.window else { return }
+        let screenAnchor = win.convertToScreen(anchorRect)
+        vm.userRequestedSmartReminderInput(screenAnchor: screenAnchor)
+    }
+
     func presentDeskMenu(from stage: PetStageView, anchorRect: NSRect) {
         guard let vm = deskMenuViewModel else { return }
         if deskMenuPopover == nil {

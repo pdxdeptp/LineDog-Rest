@@ -12,5 +12,9 @@ struct LineDogApp: App {
             MenuBarDogLabel(mode: viewModel.petDisplayMode)
         }
         .menuBarExtraStyle(.window)
+
+        Settings {
+            LineDogSettingsView()
+        }
     }
 }

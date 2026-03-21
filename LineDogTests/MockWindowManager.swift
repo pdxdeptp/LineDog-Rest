@@ -1,7 +1,9 @@
+import AppKit
 import Foundation
 @testable import LineDog
 
 /// 镜像 `WindowManager.presentRest` / `dismissRestImmediately` 的回调顺序，不创建真实窗口。
+@MainActor
 final class MockWindowManager: WindowManaging {
     private(set) var dismissCount = 0
     private(set) var presentCount = 0
@@ -31,6 +33,21 @@ final class MockWindowManager: WindowManaging {
     func bindDeskPetMenu(viewModel: AppViewModel?) {}
 
     func setRestBlocksClicks(_ blocks: Bool) {}
+
+    func presentSmartReminderInput(anchorRectInScreen: NSRect, onSubmit: @escaping (String) -> Void, onCancel: @escaping () -> Void) {}
+
+    func presentSmartReminderInputFromGlobalShortcut(onSubmit: @escaping (String) -> Void, onCancel: @escaping () -> Void) {}
+
+    func dismissSmartReminderInput() {}
+
+    func showSmartReminderToast(
+        message: String,
+        showUndo: Bool,
+        onUndo: @escaping () -> Void,
+        onAutoDismiss: @escaping () -> Void
+    ) {}
+
+    func dismissSmartReminderToast() {}
 
     /// 对应真实流程里休息动画结束、`finishRestCycle` 调用用户传入的 `onDismissed`。
     func testing_simulateRestPresentationFinished() {

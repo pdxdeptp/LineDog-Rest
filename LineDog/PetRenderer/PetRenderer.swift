@@ -54,6 +54,10 @@ final class PetRenderer: PetRendering {
             outlineImageView.isHidden = false
             outlineImageView.contentTintColor = .black
             imageView.contentTintColor = .white
+        case .thinking:
+            outlineImageView.isHidden = false
+            outlineImageView.contentTintColor = NSColor.systemIndigo.withAlphaComponent(0.45)
+            imageView.contentTintColor = .systemIndigo
         }
     }
 

@@ -63,6 +63,8 @@ final class DeskRemindersModel: ObservableObject {
     private func performPrepare() async {
         statusMessage = nil
         do {
+            LineDogModalKeyWindowAnchor.activateEphemeralKeyWindowForSystemModal()
+            defer { LineDogModalKeyWindowAnchor.removeEphemeralKeyWindow() }
             let ok = try await backing.requestAccess()
             isAuthorized = ok
             guard ok else {

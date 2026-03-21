@@ -40,6 +40,7 @@ final class AppViewModel: ObservableObject {
     private let manualEngine: ManualTimerEngine
     private let autoEngine: AutoTimerEngine
     private let windowManager: WindowManaging
+    private let smartReminderOrchestrator: SmartReminderOrchestrator
     /// 独立倒计时提醒窗口，不经过 `WindowManager`。
     private let sevenMinuteReminder: SevenMinuteReminderController
     /// 独立小猫窗口，不经过 `WindowManager`。
@@ -48,6 +49,9 @@ final class AppViewModel: ObservableObject {
     private var wasResting = false
     private var testRestActive = false
     private var cachedStatusLine: String = "自动模式：正在对齐系统时钟…"
+    /// 智能输入等待 Gemini 时，桌宠与菜单栏显示「思考」态。
+    private var smartReminderThinkingActive = false
+    private var smartReminderShortcutObserver: NSObjectProtocol?
 
     /// - Parameters:
     ///   - bootstrapAutoEngine: 应用启动为 `true` 并立即跑自动模式；单测传 `false` 避免后台 tick。
@@ -64,6 +68,11 @@ final class AppViewModel: ObservableObject {
         self.sevenMinuteReminder = sevenMinuteReminder ?? SevenMinuteReminderController()
         self.fiveMinuteCatCompanion = fiveMinuteCatCompanion ?? FiveMinuteCatCompanionController()
         self.deskReminders = deskReminders ?? DeskRemindersModel()
+        self.smartReminderOrchestrator = SmartReminderOrchestrator(
+            apiKeyProvider: {
+                UserDefaults.standard.string(forKey: LineDogDefaults.geminiAPIKey)
+            }
+        )
         let me = manualEngine ?? ManualTimerEngine()
         let ae = autoEngine ?? AutoTimerEngine()
         self.manualEngine = me
@@ -114,6 +123,69 @@ final class AppViewModel: ObservableObject {
                 self?.objectWillChange.send()
             }
             .store(in: &cancellables)
+
+        smartReminderShortcutObserver = NotificationCenter.default.addObserver(
+            forName: LineDogBroadcastNotifications.openSmartReminderInput,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.presentSmartReminderFromGlobalShortcut()
+        }
+    }
+
+    deinit {
+        if let smartReminderShortcutObserver {
+            NotificationCenter.default.removeObserver(smartReminderShortcutObserver)
+        }
+    }
+
+    /// 桌宠右键：由 `WindowManager` 转屏幕坐标后调用。
+    func userRequestedSmartReminderInput(screenAnchor: NSRect) {
+        windowManager.presentSmartReminderInput(
+            anchorRectInScreen: screenAnchor,
+            onSubmit: { [weak self] text in
+                guard let self else { return }
+                Task { await self.processSmartReminderSubmit(text) }
+            },
+            onCancel: {}
+        )
+    }
+
+    func presentSmartReminderFromGlobalShortcut() {
+        windowManager.presentSmartReminderInputFromGlobalShortcut(
+            onSubmit: { [weak self] text in
+                guard let self else { return }
+                Task { await self.processSmartReminderSubmit(text) }
+            },
+            onCancel: {}
+        )
+    }
+
+    @MainActor
+    private func processSmartReminderSubmit(_ raw: String) async {
+        smartReminderThinkingActive = true
+        syncPetDisplayMode()
+        let result = await smartReminderOrchestrator.run(rawUserInput: raw)
+        smartReminderThinkingActive = false
+        syncPetDisplayMode()
+        guard let result else { return }
+        windowManager.showSmartReminderToast(
+            message: result.toastMessage,
+            showUndo: !result.undoItemIdentifier.isEmpty,
+            onUndo: { [weak self] in
+                guard let self, !result.undoItemIdentifier.isEmpty else { return }
+                Task { await self.performSmartReminderUndo(id: result.undoItemIdentifier) }
+            },
+            onAutoDismiss: {}
+        )
+    }
+
+    @MainActor
+    private func performSmartReminderUndo(id: String) async {
+        windowManager.applyIdlePetDisplayMode(.pausedWhiteOutline)
+        try? await Task.sleep(nanoseconds: 220_000_000)
+        try? await smartReminderOrchestrator.removeReminder(calendarItemIdentifier: id)
+        syncPetDisplayMode()
     }
 
     func startFiveMinuteCatCompanion() {
@@ -296,7 +368,9 @@ final class AppViewModel: ObservableObject {
 
     private func syncPetDisplayMode() {
         let menuMode: PetDisplayMode
-        if testRestActive || wasResting {
+        if smartReminderThinkingActive {
+            menuMode = .thinking
+        } else if testRestActive || wasResting {
             menuMode = .restingRed
         } else if isChronoSessionActive {
             menuMode = .runningBlack
@@ -305,7 +379,14 @@ final class AppViewModel: ObservableObject {
         }
         petDisplayMode = menuMode
 
-        let idleMode: PetDisplayMode = isChronoSessionActive ? .runningBlack : .pausedWhiteOutline
+        let idleMode: PetDisplayMode
+        if smartReminderThinkingActive {
+            idleMode = .thinking
+        } else if isChronoSessionActive {
+            idleMode = .runningBlack
+        } else {
+            idleMode = .pausedWhiteOutline
+        }
         windowManager.applyIdlePetDisplayMode(idleMode)
     }
 

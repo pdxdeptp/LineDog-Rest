@@ -10,22 +10,43 @@ struct MenuBarContentView: View {
     private let remindersColumnWidth: CGFloat = 300
 
     var body: some View {
-        HStack(alignment: .top, spacing: 0) {
-            remindersSidebar
-                .frame(width: remindersColumnWidth, alignment: .topLeading)
-                .padding(.trailing, 12)
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Spacer(minLength: 0)
+                Button {
+                    openLineDogSettingsWindow()
+                } label: {
+                    Image(systemName: "gearshape.fill")
+                        .font(.body)
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.borderless)
+                .help("设置…")
+                .padding(.trailing, 10)
+                .padding(.top, 8)
+            }
 
-            Divider()
+            HStack(alignment: .top, spacing: 0) {
+                remindersSidebar
+                    .frame(width: remindersColumnWidth, alignment: .topLeading)
+                    .padding(.trailing, 12)
 
-            mainControlsColumn
-                .frame(minWidth: 300, alignment: .leading)
-                .padding(.leading, 12)
+                Divider()
+
+                mainControlsColumn
+                    .frame(minWidth: 300, alignment: .leading)
+                    .padding(.leading, 12)
+            }
+            .padding(12)
         }
-        .padding(12)
         .frame(minWidth: remindersColumnWidth + 24 + 300 + 24, minHeight: 520)
         .task {
             await deskReminders.prepare()
         }
+    }
+
+    private func openLineDogSettingsWindow() {
+        LineDogSettingsWindowPresenter.present()
     }
 
     /// 左栏：仅提醒事项（系统 EventKit）。
