@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import Foundation
 
 /// 应用级协调：模式切换、计时引擎与霸屏窗口的单向数据流。
@@ -22,8 +23,14 @@ final class AppViewModel: ObservableObject {
     @Published private(set) var restBlocksClicksDuringRest: Bool
     /// 独立 7 分钟倒计时进行中（与桌宠无关）；结束后出现铃铛直至点击关闭。
     @Published private(set) var isSevenMinuteReminderRunning = false
+    /// 独立 5 分钟小猫陪伴窗口是否正在显示（渐隐结束前为 true）。
+    @Published private(set) var isFiveMinuteCatCompanionActive = false
+
+    /// 提醒事项同步（EventKit）；与菜单栏、桌宠 Popover 共用。
+    let deskReminders: DeskRemindersModel
 
     private static let restBlocksClicksDefaultsKey = "LineDog.restBlocksClicksDuringRest"
+    private var cancellables = Set<AnyCancellable>()
 
     /// 「计时中」：自动模式引擎在跑，或手动模式已点「开始专注」尚未「停止计时」。
     private var isChronoSessionActive: Bool
@@ -35,6 +42,8 @@ final class AppViewModel: ObservableObject {
     private let windowManager: WindowManaging
     /// 独立倒计时提醒窗口，不经过 `WindowManager`。
     private let sevenMinuteReminder: SevenMinuteReminderController
+    /// 独立小猫窗口，不经过 `WindowManager`。
+    private let fiveMinuteCatCompanion: FiveMinuteCatCompanionController
 
     private var wasResting = false
     private var testRestActive = false
@@ -47,10 +56,14 @@ final class AppViewModel: ObservableObject {
         manualEngine: ManualTimerEngine? = nil,
         autoEngine: AutoTimerEngine? = nil,
         bootstrapAutoEngine: Bool = true,
-        sevenMinuteReminder: SevenMinuteReminderController? = nil
+        sevenMinuteReminder: SevenMinuteReminderController? = nil,
+        fiveMinuteCatCompanion: FiveMinuteCatCompanionController? = nil,
+        deskReminders: DeskRemindersModel? = nil
     ) {
         self.windowManager = windowManager
         self.sevenMinuteReminder = sevenMinuteReminder ?? SevenMinuteReminderController()
+        self.fiveMinuteCatCompanion = fiveMinuteCatCompanion ?? FiveMinuteCatCompanionController()
+        self.deskReminders = deskReminders ?? DeskRemindersModel()
         let me = manualEngine ?? ManualTimerEngine()
         let ae = autoEngine ?? AutoTimerEngine()
         self.manualEngine = me
@@ -91,6 +104,24 @@ final class AppViewModel: ObservableObject {
         self.sevenMinuteReminder.onRunningChanged = { [weak self] running in
             self?.isSevenMinuteReminderRunning = running
         }
+        self.fiveMinuteCatCompanion.onActiveChanged = { [weak self] active in
+            self?.isFiveMinuteCatCompanionActive = active
+        }
+
+        self.deskReminders.objectWillChange
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
+    }
+
+    func startFiveMinuteCatCompanion() {
+        fiveMinuteCatCompanion.start()
+    }
+
+    func cancelFiveMinuteCatCompanion() {
+        fiveMinuteCatCompanion.cancel()
     }
 
     func startSevenMinuteReminder() {

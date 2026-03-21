@@ -46,10 +46,10 @@ final class PetRenderer: PetRendering {
             outlineImageView.isHidden = true
             imageView.contentTintColor = .systemRed
         case .runningBlack:
-            // 与暂停态相同：底层描边 + 上层填色。单层 + labelColor 在透明全屏窗上常和桌面糊在一起，表现为「小狗没了」。
+            // 底层略大的白轮廓 + 上层黑身，形成白描边；单层深色在透明窗上易与桌面糊在一起。
             outlineImageView.isHidden = false
-            outlineImageView.contentTintColor = .black
-            imageView.contentTintColor = .labelColor
+            outlineImageView.contentTintColor = .white
+            imageView.contentTintColor = .black
         case .pausedWhiteOutline:
             outlineImageView.isHidden = false
             outlineImageView.contentTintColor = .black
@@ -57,7 +57,7 @@ final class PetRenderer: PetRendering {
         }
     }
 
-    /// 暂停态描边比前景略大，形成黑边。
+    /// 底层比前景略大：计时中作白描边，暂停态作黑边。
     private static let outlineScale: CGFloat = 1.14
 
     func layoutPet(in bounds: CGRect, visualCenter: CGPoint, scale: CGFloat) {

@@ -144,6 +144,16 @@ final class WindowManager: WindowManaging {
         let d = UserDefaults.standard
         d.set(frame.origin.x, forKey: Self.idlePetOriginXKey)
         d.set(frame.origin.y, forKey: Self.idlePetOriginYKey)
+        postIdlePetScreenFrameChanged(frame)
+    }
+
+    private func postIdlePetScreenFrameChanged(_ frame: NSRect) {
+        guard Self.isApproximatelyIdleSized(frame), stageView?.isInRestPhase != true else { return }
+        NotificationCenter.default.post(
+            name: LineDogBroadcastNotifications.idlePetScreenFrameChanged,
+            object: nil,
+            userInfo: [LineDogBroadcastNotifications.idlePetScreenFrameUserInfoKey: NSValue(rect: frame)]
+        )
     }
 
     private func persistIdlePetFrameIfIdleSized() {
@@ -192,6 +202,7 @@ final class WindowManager: WindowManaging {
         view.applyNonRestPetDisplayMode(pendingIdlePetMode)
         view.needsLayout = true
         view.layoutSubtreeIfNeeded()
+        postIdlePetScreenFrameChanged(win.frame)
 
         screenObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification,
@@ -371,7 +382,7 @@ extension WindowManager: PetStageDeskMenuPresenter {
             let host = NSHostingController(rootView: MenuBarContentView(viewModel: vm))
             host.view.translatesAutoresizingMaskIntoConstraints = true
             pop.contentViewController = host
-            pop.contentSize = NSSize(width: 328, height: 460)
+            pop.contentSize = NSSize(width: 668, height: 560)
             deskMenuPopover = pop
             deskMenuHosting = host
         } else if let host = deskMenuHosting {

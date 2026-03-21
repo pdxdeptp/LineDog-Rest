@@ -4,7 +4,111 @@ import SwiftUI
 struct MenuBarContentView: View {
     @ObservedObject var viewModel: AppViewModel
 
+    private var deskReminders: DeskRemindersModel { viewModel.deskReminders }
+
+    /// 左侧提醒栏固定宽度，避免与右侧主菜单抢空间。
+    private let remindersColumnWidth: CGFloat = 300
+
     var body: some View {
+        HStack(alignment: .top, spacing: 0) {
+            remindersSidebar
+                .frame(width: remindersColumnWidth, alignment: .topLeading)
+                .padding(.trailing, 12)
+
+            Divider()
+
+            mainControlsColumn
+                .frame(minWidth: 300, alignment: .leading)
+                .padding(.leading, 12)
+        }
+        .padding(12)
+        .frame(minWidth: remindersColumnWidth + 24 + 300 + 24, minHeight: 520)
+        .task {
+            await deskReminders.prepare()
+        }
+    }
+
+    /// 左栏：仅提醒事项（系统 EventKit）。
+    private var remindersSidebar: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("提醒事项")
+                .font(.headline)
+            Text("来自系统「提醒事项」· 所选列表 · 今日未完成 · 不可在此新建")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if let msg = deskReminders.statusMessage, !deskReminders.isAuthorized {
+                Text(msg)
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if deskReminders.isAuthorized, !deskReminders.reminderLists.isEmpty {
+                Text("同步列表")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Picker("同步列表", selection: Binding(
+                    get: { deskReminders.selectedListIdentifier() ?? "" },
+                    set: { id in
+                        if !id.isEmpty {
+                            deskReminders.selectList(calendarIdentifier: id)
+                        }
+                    }
+                )) {
+                    ForEach(deskReminders.reminderLists) { list in
+                        Text(list.title).tag(list.id)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+            }
+
+            Group {
+                if deskReminders.isAuthorized {
+                    if deskReminders.items.isEmpty {
+                        Text("今日无未完成项")
+                            .font(.subheadline)
+                            .foregroundStyle(.tertiary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.vertical, 8)
+                    } else {
+                        ScrollView {
+                            LazyVStack(alignment: .leading, spacing: 8) {
+                                ForEach(deskReminders.items) { item in
+                                    HStack(alignment: .top, spacing: 8) {
+                                        Text(item.title.isEmpty ? "（无标题）" : item.title)
+                                            .font(.subheadline)
+                                            .multilineTextAlignment(.leading)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                        Button("完成") {
+                                            Task { await deskReminders.completeReminder(id: item.id) }
+                                        }
+                                        .buttonStyle(.bordered)
+                                        .controlSize(.small)
+                                    }
+                                    .padding(.vertical, 4)
+                                    Divider()
+                                }
+                            }
+                            .padding(.vertical, 4)
+                        }
+                    }
+                } else {
+                    Button("连接提醒事项…") {
+                        Task { await deskReminders.prepare() }
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }
+        .frame(maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    /// 右栏：番茄钟、小猫、7 分钟提醒等原有控制。
+    private var mainControlsColumn: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("LineDog Rest")
                 .font(.headline)
@@ -78,6 +182,25 @@ struct MenuBarContentView: View {
 
             Divider()
 
+            Text("独立 5 分钟小猫")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            Text("与线条小狗分层；小猫跟在小狗左侧（若贴边则改到右侧），5 分钟后渐隐消失。")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
+            Button("出现 5 分钟小猫") {
+                viewModel.startFiveMinuteCatCompanion()
+            }
+            .disabled(viewModel.isFiveMinuteCatCompanionActive)
+            if viewModel.isFiveMinuteCatCompanionActive {
+                Button("提前关掉小猫") {
+                    viewModel.cancelFiveMinuteCatCompanion()
+                }
+            }
+
+            Divider()
+
             Text(restBlockingHint(viewModel.restBlocksClicksDuringRest))
                 .font(.caption)
                 .foregroundStyle(.tertiary)
@@ -87,9 +210,10 @@ struct MenuBarContentView: View {
                 viewModel.quitApp()
             }
             .keyboardShortcut("q", modifiers: [.command])
+
+            Spacer(minLength: 0)
         }
-        .padding(12)
-        .frame(minWidth: 300)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
     private func restBlockingHint(_ blocks: Bool) -> String {
