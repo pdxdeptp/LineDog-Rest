@@ -50,6 +50,7 @@
 		A233 /* DeskPetMenuShortcut.swift in Sources */ = {isa = PBXBuildFile; fileRef = B233 /* DeskPetMenuShortcut.swift */; };
 		A234 /* LineDogCarbonGlobalHotKeys.swift in Sources */ = {isa = PBXBuildFile; fileRef = B234 /* LineDogCarbonGlobalHotKeys.swift */; };
 		A236 /* SmartReminderInputShortcut.swift in Sources */ = {isa = PBXBuildFile; fileRef = B236 /* SmartReminderInputShortcut.swift */; };
+		A239 /* SevenMinuteReminderShortcut.swift in Sources */ = {isa = PBXBuildFile; fileRef = B239 /* SevenMinuteReminderShortcut.swift */; };
 		A235 /* Carbon.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B235 /* Carbon.framework */; };
 		A301 /* MockWindowManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B301 /* MockWindowManager.swift */; };
 		A302 /* LineDogInteractionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B302 /* LineDogInteractionTests.swift */; };
@@ -115,6 +116,7 @@
 		B233 /* DeskPetMenuShortcut.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeskPetMenuShortcut.swift; sourceTree = "<group>"; };
 		B234 /* LineDogCarbonGlobalHotKeys.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LineDogCarbonGlobalHotKeys.swift; sourceTree = "<group>"; };
 		B236 /* SmartReminderInputShortcut.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartReminderInputShortcut.swift; sourceTree = "<group>"; };
+		B239 /* SevenMinuteReminderShortcut.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SevenMinuteReminderShortcut.swift; sourceTree = "<group>"; };
 		B301 /* MockWindowManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockWindowManager.swift; sourceTree = "<group>"; };
 		B302 /* LineDogInteractionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LineDogInteractionTests.swift; sourceTree = "<group>"; };
 		B303 /* MockRemindersEventStoreBacking.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockRemindersEventStoreBacking.swift; sourceTree = "<group>"; };
@@ -178,6 +180,7 @@
 				B233 /* DeskPetMenuShortcut.swift */,
 				B234 /* LineDogCarbonGlobalHotKeys.swift */,
 				B236 /* SmartReminderInputShortcut.swift */,
+				B239 /* SevenMinuteReminderShortcut.swift */,
 				B229 /* LineDogPresentationAnchor.swift */,
 				B20B /* Assets.xcassets */,
 			);
@@ -422,6 +425,7 @@
 				A233 /* DeskPetMenuShortcut.swift in Sources */,
 				A234 /* LineDogCarbonGlobalHotKeys.swift in Sources */,
 				A236 /* SmartReminderInputShortcut.swift in Sources */,
+				A239 /* SevenMinuteReminderShortcut.swift in Sources */,
 				A228 /* LineDogSettingsView.swift in Sources */,
 				A229 /* LineDogPresentationAnchor.swift in Sources */,
 				A230 /* SmartReminderNotesComposer.swift in Sources */,

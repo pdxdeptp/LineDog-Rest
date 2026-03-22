@@ -6,13 +6,16 @@ enum LineDogCarbonGlobalHotKeys {
     private static let signature: OSType = 0x4C44_4F47 // 'LDOG'
     private static let deskHotKeyID: UInt32 = 1
     private static let smartInputHotKeyID: UInt32 = 2
+    private static let sevenMinuteHotKeyID: UInt32 = 3
 
     private static var deskHotKeyRef: EventHotKeyRef?
     private static var smartInputHotKeyRef: EventHotKeyRef?
+    private static var sevenMinuteHotKeyRef: EventHotKeyRef?
     private static var handlerRef: EventHandlerRef?
     private static var defaultsObserver: NSObjectProtocol?
     private static var lastDeskInstalled: DeskPetMenuShortcut?
     private static var lastSmartInstalled: SmartReminderInputShortcut?
+    private static var lastSevenMinuteInstalled: SevenMinuteReminderShortcut?
 
     static func start() {
         installHandlerIfNeeded()
@@ -34,12 +37,14 @@ enum LineDogCarbonGlobalHotKeys {
         defaultsObserver = nil
         unregisterDeskHotKey()
         unregisterSmartInputHotKey()
+        unregisterSevenMinuteHotKey()
         if let handlerRef {
             RemoveEventHandler(handlerRef)
         }
         Self.handlerRef = nil
         lastDeskInstalled = nil
         lastSmartInstalled = nil
+        lastSevenMinuteInstalled = nil
     }
 
     private static func installHandlerIfNeeded() {
@@ -66,6 +71,13 @@ enum LineDogCarbonGlobalHotKeys {
             UnregisterEventHotKey(smartInputHotKeyRef)
         }
         smartInputHotKeyRef = nil
+    }
+
+    private static func unregisterSevenMinuteHotKey() {
+        if let sevenMinuteHotKeyRef {
+            UnregisterEventHotKey(sevenMinuteHotKeyRef)
+        }
+        sevenMinuteHotKeyRef = nil
     }
 
     private static func syncRegistration() {
@@ -111,6 +123,27 @@ enum LineDogCarbonGlobalHotKeys {
                 lastSmartInstalled = smart
             } else {
                 lastSmartInstalled = nil
+            }
+        }
+
+        let seven = SevenMinuteReminderShortcut.load()
+        if seven != lastSevenMinuteInstalled || sevenMinuteHotKeyRef == nil {
+            unregisterSevenMinuteHotKey()
+            var ref: EventHotKeyRef?
+            let hid = EventHotKeyID(signature: signature, id: sevenMinuteHotKeyID)
+            let status = RegisterEventHotKey(
+                UInt32(seven.keyCode),
+                lineDogCarbonModifierMask(for: seven.modifiers),
+                hid,
+                GetApplicationEventTarget(),
+                0,
+                &ref
+            )
+            if status == noErr {
+                sevenMinuteHotKeyRef = ref
+                lastSevenMinuteInstalled = seven
+            } else {
+                lastSevenMinuteInstalled = nil
             }
         }
     }
@@ -162,6 +195,13 @@ private func lineDogCarbonGlobalHotKeysCallback(
         DispatchQueue.main.async {
             NotificationCenter.default.post(
                 name: LineDogBroadcastNotifications.openSmartReminderInput,
+                object: nil
+            )
+        }
+    case 3:
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(
+                name: LineDogBroadcastNotifications.toggleSevenMinuteReminder,
                 object: nil
             )
         }

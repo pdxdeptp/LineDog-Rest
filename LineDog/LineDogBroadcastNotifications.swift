@@ -7,6 +7,8 @@ enum LineDogBroadcastNotifications {
     static let openSmartReminderInput = Notification.Name("com.linedog.openSmartReminderInput")
     /// 全局快捷键弹出桌宠菜单（与左键点桌宠相同面板）。
     static let presentDeskPetMenu = Notification.Name("com.linedog.presentDeskPetMenu")
+    /// 全局快捷键切换独立倒计时提醒（进行中则取消，否则按设置时长开始）。
+    static let toggleSevenMinuteReminder = Notification.Name("com.linedog.toggleSevenMinuteReminder")
     /// `userInfo` 中为 `NSValue` 包 `NSRect`（屏幕坐标）。
     static let idlePetScreenFrameUserInfoKey = "screenFrame"
 }

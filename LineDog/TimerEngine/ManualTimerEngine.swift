@@ -10,6 +10,8 @@ final class ManualTimerEngine: TimerEngine {
     private var tickTimer: Timer?
     private var phaseEnd: Date?
     private var isRestPhase = false
+    /// 与 `AppViewModel.formatClock` 一致：仅整秒变化时上报，减少 0.25s 定时器带来的无效 UI 刷新。
+    private var lastEmittedRemainingWholeSeconds: Int = -1
 
     /// 生产环境用默认番茄时长；测试可传入秒级时长。
     init(workDuration: TimeInterval = 25 * 60, restDuration: TimeInterval = 5 * 60) {
@@ -38,6 +40,16 @@ final class ManualTimerEngine: TimerEngine {
         isRestPhase = false
     }
 
+    /// 用户在休息霸屏上双击小狗：跳过当前休息段，进入下一轮工作段。
+    func skipRestPhaseToWork() {
+        guard tickTimer != nil, isRestPhase else { return }
+        isRestPhase = false
+        phaseEnd = Date().addingTimeInterval(workDuration)
+        lastEmittedRemainingWholeSeconds = -1
+        scheduleTick()
+        emit()
+    }
+
     /// 单测或调试：跳过工作段，直接进入休息段并派发 `.resting`（与真实 `tick` 切换后状态一致）。
     func testing_enterRestPhase(remaining: TimeInterval) {
         tickTimer?.invalidate()
@@ -60,14 +72,19 @@ final class ManualTimerEngine: TimerEngine {
         guard let end = phaseEnd else { return }
         let remaining = end.timeIntervalSinceNow
         if remaining > 0 {
-            if isRestPhase {
-                onStateChange?(.resting(remaining: remaining))
-            } else {
-                onStateChange?(.working(remaining: remaining))
+            let whole = max(0, Int(remaining.rounded(.down)))
+            if whole != lastEmittedRemainingWholeSeconds {
+                lastEmittedRemainingWholeSeconds = whole
+                if isRestPhase {
+                    onStateChange?(.resting(remaining: remaining))
+                } else {
+                    onStateChange?(.working(remaining: remaining))
+                }
             }
             return
         }
 
+        lastEmittedRemainingWholeSeconds = -1
         if isRestPhase {
             isRestPhase = false
             phaseEnd = Date().addingTimeInterval(workDuration)
@@ -77,11 +94,13 @@ final class ManualTimerEngine: TimerEngine {
             phaseEnd = Date().addingTimeInterval(restDuration)
             onStateChange?(.resting(remaining: restDuration))
         }
+        lastEmittedRemainingWholeSeconds = max(0, Int((phaseEnd?.timeIntervalSinceNow ?? 0).rounded(.down)))
     }
 
     private func emit() {
         guard let end = phaseEnd else { return }
         let remaining = max(0, end.timeIntervalSinceNow)
+        lastEmittedRemainingWholeSeconds = max(0, Int(remaining.rounded(.down)))
         if isRestPhase {
             onStateChange?(.resting(remaining: remaining))
         } else {

@@ -1,14 +1,9 @@
 import AppKit
 
-/// 固定 7 分钟倒计时 + 结束铃铛提醒。与桌宠、`WindowManager`、`PetStageView` 无引用关系，独立窗口层级。
+/// 可配置时长（默认 7 分钟）的倒计时 + 结束铃铛提醒。与桌宠、`WindowManager`、`PetStageView` 无引用关系，独立窗口层级。
 @MainActor
 final class SevenMinuteReminderController {
-    static let duration: TimeInterval = 7 * 60
-
-    /// 7 分钟倒计时正常结束时的中央面板默认说明。
-    static let defaultSevenMinuteEndMessage = "7 分钟计时结束"
-
-    /// 倒计时进行中为 `true`；仅显示铃铛等待点击时为 `false`（可再次开始新的 7 分钟）。
+    /// 倒计时进行中为 `true`；仅显示铃铛等待点击时为 `false`（可再次开始）。
     var onRunningChanged: ((Bool) -> Void)?
 
     private var countdownWindow: NSWindow?
@@ -16,6 +11,8 @@ final class SevenMinuteReminderController {
     private var reminderWindow: NSWindow?
     private var tickTimer: Timer?
     private var remainingSeconds: Int = 0
+    /// 本次 `start()` 使用的分钟数（用于结束文案；避免倒计时中途用户改设置导致文案不一致）。
+    private var startedDurationMinutes: Int = 7
     private var screenObserver: NSObjectProtocol?
     private var lastReminderMessage: String = ""
 
@@ -23,7 +20,9 @@ final class SevenMinuteReminderController {
         stopTickTimer()
         tearDownCountdownUI()
         tearDownReminderUI()
-        remainingSeconds = Int(Self.duration)
+        let minutes = Self.configuredDurationMinutes()
+        startedDurationMinutes = minutes
+        remainingSeconds = minutes * 60
         observeScreensIfNeeded()
         installCountdownWindow()
         refreshCountdownLabel()
@@ -40,9 +39,15 @@ final class SevenMinuteReminderController {
     }
 
     /// 与倒计时结束相同 UI：中央铃铛 + 文案，点击任意处关闭。
-    func presentCenterBellReminder(message: String = SevenMinuteReminderController.defaultSevenMinuteEndMessage) {
+    func presentCenterBellReminder(message: String = "计时结束") {
         observeScreensIfNeeded()
         showReminderWindow(message: message)
+    }
+
+    private static func configuredDurationMinutes() -> Int {
+        var v = UserDefaults.standard.integer(forKey: LineDogDefaults.sevenMinuteReminderDurationMinutes)
+        if v < 1 { v = 7 }
+        return min(180, v)
     }
 
     private func startTickTimer() {
@@ -74,7 +79,7 @@ final class SevenMinuteReminderController {
         stopTickTimer()
         tearDownCountdownUI()
         onRunningChanged?(false)
-        showReminderWindow(message: Self.defaultSevenMinuteEndMessage)
+        showReminderWindow(message: "\(startedDurationMinutes) 分钟计时结束")
     }
 
     private func dismissReminder() {
@@ -84,7 +89,7 @@ final class SevenMinuteReminderController {
 
     // MARK: - Countdown window（右下角，穿透鼠标）
 
-    private static let countdownSize = NSSize(width: 92, height: 34)
+    private static let countdownSize = NSSize(width: 104, height: 34)
 
     private static func countdownFrame() -> NSRect {
         let sz = countdownSize
@@ -115,7 +120,7 @@ final class SevenMinuteReminderController {
         win.ignoresMouseEvents = true
         win.hidesOnDeactivate = false
 
-        let label = NSTextField(labelWithString: "7:00")
+        let label = NSTextField(labelWithString: "0:00")
         label.font = NSFont.monospacedDigitSystemFont(ofSize: 22, weight: .semibold)
         label.textColor = NSColor.labelColor.withAlphaComponent(0.92)
         label.alignment = .center

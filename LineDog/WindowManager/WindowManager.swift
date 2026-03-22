@@ -1,6 +1,13 @@
 import AppKit
 import SwiftUI
 
+/// 桌宠 / 休息霸屏窗：默认 `NSWindow` 在仅菜单栏（accessory）应用里往往 `canBecomeKey == false`，
+/// 导致左键 `clickCount` 无法累加，**双击永远到不了 2**。休息结束依赖双击时必须可成为 key。
+private final class PetStageWindow: NSWindow {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { false }
+}
+
 /// 供 `AppViewModel` 与单元测试注入；生产环境由 `WindowManager` 实现。
 protocol WindowManaging: AnyObject {
     func dismissRestImmediately()
@@ -204,7 +211,7 @@ final class WindowManager: WindowManaging {
         let primary = Self.primaryDisplay()
         let frame = Self.resolvedIdlePetFrameForInstall()
 
-        let win = NSWindow(
+        let win = PetStageWindow(
             contentRect: frame,
             styleMask: [.borderless],
             backing: .buffered,
@@ -221,10 +228,7 @@ final class WindowManager: WindowManaging {
         win.hidesOnDeactivate = false
 
         let view = PetStageView(frame: NSRect(origin: .zero, size: frame.size))
-        view.deskMenuPresenter = deskMenuViewModel != nil ? self : nil
-        view.onIdlePetFramePersist = { [weak self] r in
-            self?.persistIdlePetFrame(r)
-        }
+        wireDeskPetCallbacks(into: view)
         win.contentView = view
         window = win
         stageView = view
@@ -267,12 +271,23 @@ final class WindowManager: WindowManaging {
         deskMenuPopover = nil
         deskMenuHosting = nil
         if let v = stageView {
-            v.deskMenuPresenter = viewModel != nil ? self : nil
-            v.onIdlePetFramePersist = { [weak self] r in
-                self?.persistIdlePetFrame(r)
-            }
+            wireDeskPetCallbacks(into: v)
         }
         applyMousePolicy()
+    }
+
+    private func wireDeskPetCallbacks(into v: PetStageView) {
+        v.deskMenuPresenter = deskMenuViewModel != nil ? self : nil
+        v.onIdlePetFramePersist = { [weak self] r in
+            self?.persistIdlePetFrame(r)
+        }
+        if deskMenuViewModel != nil {
+            v.onRestPetDoubleClickEndRest = { [weak self] in
+                self?.deskMenuViewModel?.endRestEarlyFromDeskPet()
+            }
+        } else {
+            v.onRestPetDoubleClickEndRest = nil
+        }
     }
 
     func setRestBlocksClicks(_ blocks: Bool) {
@@ -286,6 +301,7 @@ final class WindowManager: WindowManaging {
         dismissRestImmediately()
         idleFrameBeforeRest = window?.frame
         pendingDismiss = onDismissed
+        stageView?.snapshotRestPetStartStateBeforeExpandingToRest()
         expandWindowToMenuBarScreenFullFrame()
         setWindowLevel(resting: true)
         stageView?.beginRestCycle(total: duration) { [weak self] in
@@ -394,11 +410,9 @@ final class WindowManager: WindowManaging {
     private func applyMousePolicy() {
         guard let win = window else { return }
         let inRest = stageView?.isInRestPhase == true
-        if inRest && !restBlocksClicks {
-            win.ignoresMouseEvents = true
-        } else {
-            win.ignoresMouseEvents = deskMenuViewModel == nil
-        }
+        stageView?.restPassMouseThroughOutsidePet = inRest && !restBlocksClicks
+        // 绑定 `AppViewModel` 后必须能收到左键（双击小狗 / 拖桌宠）。穿透模式靠 `PetStageView.hitTest` 在非狗区返回 `nil`，不能再整窗 ignores。
+        win.ignoresMouseEvents = deskMenuViewModel == nil
     }
 
     // MARK: - 智能提醒输入 / 气泡（PRD Smart Input）

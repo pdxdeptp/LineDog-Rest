@@ -14,8 +14,17 @@ struct LineDogSettingsView: View {
     @AppStorage(LineDogDefaults.deskPetMenuShortcutModifiers) private var deskModifiersRaw: Int = DeskPetMenuShortcut.defaultModifiersStorageInt
     @AppStorage(LineDogDefaults.deskPetMenuShortcutKeyLabel) private var deskKeyLabel: String = DeskPetMenuShortcut.default.keyLabel
 
+    @AppStorage(LineDogDefaults.sevenMinuteReminderShortcutKeyCode) private var sevenKeyCode: Int = Int(SevenMinuteReminderShortcut.defaultKeyCode)
+    @AppStorage(LineDogDefaults.sevenMinuteReminderShortcutModifiers) private var sevenModifiersRaw: Int = SevenMinuteReminderShortcut.defaultModifiersStorageInt
+    @AppStorage(LineDogDefaults.sevenMinuteReminderShortcutKeyLabel) private var sevenKeyLabel: String = SevenMinuteReminderShortcut.default.keyLabel
+
     @State private var isRecordingSmartShortcut = false
     @State private var isRecordingDeskShortcut = false
+    @State private var isRecordingSevenMinuteShortcut = false
+
+    private var shortcutRecorderBusy: Bool {
+        isRecordingSmartShortcut || isRecordingDeskShortcut || isRecordingSevenMinuteShortcut
+    }
 
     private var smartShortcutModel: SmartReminderInputShortcut {
         SmartReminderInputShortcut(
@@ -30,6 +39,14 @@ struct LineDogSettingsView: View {
             keyCode: UInt16(clamping: deskKeyCode),
             modifiers: NSEvent.ModifierFlags(rawValue: UInt(clamping: max(0, deskModifiersRaw))),
             keyLabel: deskKeyLabel
+        )
+    }
+
+    private var sevenShortcutModel: SevenMinuteReminderShortcut {
+        SevenMinuteReminderShortcut(
+            keyCode: UInt16(clamping: sevenKeyCode),
+            modifiers: NSEvent.ModifierFlags(rawValue: UInt(clamping: max(0, sevenModifiersRaw))),
+            keyLabel: sevenKeyLabel
         )
     }
 
@@ -59,14 +76,14 @@ struct LineDogSettingsView: View {
                     Button(isRecordingSmartShortcut ? "等待按键…" : "修改快捷键…") {
                         isRecordingSmartShortcut = true
                     }
-                    .disabled(isRecordingDeskShortcut || isRecordingSmartShortcut)
+                    .disabled(shortcutRecorderBusy)
                     Button("恢复默认") {
                         let d = SmartReminderInputShortcut.default
                         smartKeyCode = Int(d.keyCode)
                         smartModifiersRaw = SmartReminderInputShortcut.defaultModifiersStorageInt
                         smartKeyLabel = d.keyLabel
                     }
-                    .disabled(isRecordingDeskShortcut || isRecordingSmartShortcut)
+                    .disabled(shortcutRecorderBusy)
                 }
                 Text("默认 ⌘⇧<（小于号，物理键为逗号 + Shift）。须带 ⌘ / ⌥ / ⌃ / ⇧ 之一；按 Esc 取消录制。")
                     .font(.caption)
@@ -96,14 +113,14 @@ struct LineDogSettingsView: View {
                     Button(isRecordingDeskShortcut ? "等待按键…" : "修改快捷键…") {
                         isRecordingDeskShortcut = true
                     }
-                    .disabled(isRecordingDeskShortcut || isRecordingSmartShortcut)
+                    .disabled(shortcutRecorderBusy)
                     Button("恢复默认") {
                         let d = DeskPetMenuShortcut.default
                         deskKeyCode = Int(d.keyCode)
                         deskModifiersRaw = DeskPetMenuShortcut.defaultModifiersStorageInt
                         deskKeyLabel = d.keyLabel
                     }
-                    .disabled(isRecordingDeskShortcut || isRecordingSmartShortcut)
+                    .disabled(shortcutRecorderBusy)
                 }
                 Text("默认 ⌘⇧.（句号）。录制时须带 ⌘ / ⌥ / ⌃ / ⇧ 之一；按 Esc 取消录制。")
                     .font(.caption)
@@ -121,9 +138,46 @@ struct LineDogSettingsView: View {
             } header: {
                 Text("桌宠菜单")
             }
+
+            Section {
+                HStack(alignment: .firstTextBaseline, spacing: 12) {
+                    Text(sevenShortcutModel.displayString)
+                        .font(.system(.body, design: .monospaced))
+                        .frame(minWidth: 120, alignment: .leading)
+                    Button(isRecordingSevenMinuteShortcut ? "等待按键…" : "修改快捷键…") {
+                        isRecordingSevenMinuteShortcut = true
+                    }
+                    .disabled(shortcutRecorderBusy)
+                    Button("恢复默认") {
+                        let d = SevenMinuteReminderShortcut.default
+                        sevenKeyCode = Int(d.keyCode)
+                        sevenModifiersRaw = SevenMinuteReminderShortcut.defaultModifiersStorageInt
+                        sevenKeyLabel = d.keyLabel
+                    }
+                    .disabled(shortcutRecorderBusy)
+                }
+                Text("默认 ⌘⇧M。再按一次可取消进行中的倒计时。须带 ⌘ / ⌥ / ⌃ / ⇧ 之一；按 Esc 取消录制。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                GlobalShortcutKeyRecorder(
+                    isRecording: $isRecordingSevenMinuteShortcut,
+                    onCaptured: { keyCode, modRaw, label in
+                        sevenKeyCode = Int(keyCode)
+                        sevenModifiersRaw = Int(modRaw)
+                        sevenKeyLabel = label
+                    },
+                    onCancel: {}
+                )
+                .frame(width: 0, height: 0)
+            } header: {
+                Text("独立倒计时提醒（快捷键）")
+            } footer: {
+                Text("倒计时时长在菜单栏本应用面板里调整。此处仅配置全局快捷键（默认 ⌘⇧M，再按取消）。")
+                    .font(.caption)
+            }
         }
         .formStyle(.grouped)
-        .frame(minWidth: 420, minHeight: 380)
+        .frame(minWidth: 420, minHeight: 420)
         .padding()
         .onAppear {
             let ids = Set(LineDogGeminiModelCatalog.pickerOptions.map(\.id))
@@ -241,7 +295,7 @@ enum LineDogSettingsWindowPresenter {
         NSApp.activate(ignoringOtherApps: true)
         if window == nil {
             let w = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 480, height: 420),
+                contentRect: NSRect(x: 0, y: 0, width: 480, height: 440),
                 styleMask: [.titled, .closable, .miniaturizable],
                 backing: .buffered,
                 defer: false
@@ -252,7 +306,7 @@ enum LineDogSettingsWindowPresenter {
             w.level = .floating
             let host = NSHostingController(rootView: LineDogSettingsView())
             w.contentViewController = host
-            let contentSize = NSSize(width: 480, height: 420)
+            let contentSize = NSSize(width: 480, height: 440)
             let outerSize = w.frameRect(forContentRect: NSRect(origin: .zero, size: contentSize)).size
             w.setFrame(LineDogPresentationAnchor.centeredFrame(forWindowContent: outerSize), display: false)
             window = w

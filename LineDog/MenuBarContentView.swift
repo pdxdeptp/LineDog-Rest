@@ -4,7 +4,15 @@ import SwiftUI
 struct MenuBarContentView: View {
     @ObservedObject var viewModel: AppViewModel
 
+    @AppStorage(LineDogDefaults.sevenMinuteReminderDurationMinutes) private var sevenMinuteMinutesStored = 7
+
     private var deskReminders: DeskRemindersModel { viewModel.deskReminders }
+
+    private var sevenMinuteMinutesResolved: Int {
+        let v = sevenMinuteMinutesStored
+        if v < 1 { return 7 }
+        return min(180, v)
+    }
 
     private var reminderDaySections: [DeskReminderDaySection] {
         DeskReminderDayGroups.sections(items: deskReminders.items)
@@ -13,35 +21,38 @@ struct MenuBarContentView: View {
     /// 左侧提醒栏固定宽度，避免与右侧主菜单抢空间。
     private let remindersColumnWidth: CGFloat = 300
 
+    /// 双栏外圈与右栏标题行：数值集中，避免「窗体顶边 vs 首行」只靠右栏独自撑开。
+    private enum MainPanelChrome {
+        static let horizontalPadding: CGFloat = 12
+        /// 整块内容上内边距：菜单栏 window 样式下与系统标题区拉开距离（左右栏一起生效）。
+        static let topPadding: CGFloat = 20
+        static let bottomPadding: CGFloat = 12
+    }
+
+    /// 右栏「LineDog Rest + 设置」：与下方表单解耦；上下留白只描述本行，不重复承担整块顶距。
+    private enum MainPanelHeaderLayout {
+        static let rowMinHeight: CGFloat = 44
+        static let paddingTop: CGFloat = 4
+        static let paddingBottom: CGFloat = 8
+        static let gearTapSide: CGFloat = 36
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Spacer(minLength: 0)
-                Button {
-                    openLineDogSettingsWindow()
-                } label: {
-                    Image(systemName: "gearshape.fill")
-                        .font(.body)
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.borderless)
-                .help("设置…")
-                .padding(.trailing, 10)
-                .padding(.top, 8)
-            }
-
             HStack(alignment: .top, spacing: 0) {
                 remindersSidebar
                     .frame(width: remindersColumnWidth, alignment: .topLeading)
-                    .padding(.trailing, 12)
+                    .padding(.trailing, MainPanelChrome.horizontalPadding)
 
                 Divider()
 
                 mainControlsColumn
                     .frame(minWidth: 300, alignment: .leading)
-                    .padding(.leading, 12)
+                    .padding(.leading, MainPanelChrome.horizontalPadding)
             }
-            .padding(12)
+            .padding(.horizontal, MainPanelChrome.horizontalPadding)
+            .padding(.top, MainPanelChrome.topPadding)
+            .padding(.bottom, MainPanelChrome.bottomPadding)
         }
         .frame(minWidth: remindersColumnWidth + 24 + 300 + 24, minHeight: 520)
         .task {
@@ -51,6 +62,31 @@ struct MenuBarContentView: View {
 
     private func openLineDogSettingsWindow() {
         LineDogSettingsWindowPresenter.present()
+    }
+
+    /// 与下方 `statusLine`、表单等解耦：只负责本行在右栏内的垂直居中与留白。
+    private var mainPanelHeader: some View {
+        HStack(alignment: .center, spacing: 0) {
+            Text("LineDog Rest")
+                .font(.headline)
+                .lineLimit(1)
+            Spacer(minLength: 12)
+            Button {
+                openLineDogSettingsWindow()
+            } label: {
+                Image(systemName: "gearshape.fill")
+                    .font(.headline)
+                    .imageScale(.medium)
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.borderless)
+            .help("设置…")
+            .frame(width: MainPanelHeaderLayout.gearTapSide, height: MainPanelHeaderLayout.gearTapSide)
+            .contentShape(Rectangle())
+        }
+        .frame(maxWidth: .infinity, minHeight: MainPanelHeaderLayout.rowMinHeight, alignment: .center)
+        .padding(.top, MainPanelHeaderLayout.paddingTop)
+        .padding(.bottom, MainPanelHeaderLayout.paddingBottom)
     }
 
     @ViewBuilder
@@ -173,8 +209,8 @@ struct MenuBarContentView: View {
     /// 右栏：番茄钟、小猫、7 分钟提醒等原有控制。
     private var mainControlsColumn: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("LineDog Rest")
-                .font(.headline)
+            mainPanelHeader
+
             Text(viewModel.statusLine)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
@@ -226,14 +262,18 @@ struct MenuBarContentView: View {
 
             Divider()
 
-            Text("独立 7 分钟提醒")
+            Text("独立倒计时提醒")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
-            Text("与线条小狗分层显示；倒计时在屏幕右下角，结束后屏幕中央显示铃铛与说明文字，点一下关闭。")
+            Stepper(value: $sevenMinuteMinutesStored, in: 1...180) {
+                Text("时长：\(sevenMinuteMinutesResolved) 分钟")
+            }
+            .disabled(viewModel.isSevenMinuteReminderRunning)
+            Text("与线条小狗分层显示；倒计时在屏幕右下角，结束后屏幕中央显示铃铛与说明文字，点一下关闭。全局快捷键可在设置里改（默认 ⌘⇧M，再按取消）。")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
-            Button("开始 7 分钟倒计时") {
+            Button("开始 \(sevenMinuteMinutesResolved) 分钟倒计时") {
                 viewModel.startSevenMinuteReminder()
             }
             .disabled(viewModel.isSevenMinuteReminderRunning)
@@ -281,8 +321,8 @@ struct MenuBarContentView: View {
 
     private func restBlockingHint(_ blocks: Bool) -> String {
         if blocks {
-            return "休息霸屏期间无关闭按钮；若要终止请使用下方「退出应用」。"
+            return "休息霸屏无关闭按钮；小狗从角标移到屏幕中央的全过程都可双击它提前结束休息，或使用下方「退出应用」。"
         }
-        return "已关闭阻止点击：休息时可正常使用其他窗口；终止休息仍请用菜单或「退出应用」。"
+        return "已关闭阻止点击：背后窗口可点；小狗区域仍会接住鼠标，同样可在移动中或居中后双击小狗结束休息。"
     }
 }

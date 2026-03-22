@@ -14,7 +14,8 @@ final class PetStageView: NSView {
 
     private var tickTimer: Timer?
     private var restBeganAt: Date?
-    private let growDuration: TimeInterval = 45
+    /// 从黑狗当前位置移到屏中并放大；固定 60s，与距离无关。
+    private let growDuration: TimeInterval = 60
     private let fadeOutDuration: TimeInterval = 3
     private var restTotal: TimeInterval = 5 * 60
     private var onRestComplete: (() -> Void)?
@@ -25,17 +26,36 @@ final class PetStageView: NSView {
     private static let idlePetSide: CGFloat = 100
     private static let edgeMargin: CGFloat = 16
 
-    /// 非 nil 时：常态小窗整块可点；休息全屏时仅 `petHitRect`（桌宠区域）打开菜单，其余区域仍挡点击（霸屏）。
+    /// 非 nil 时：常态小窗整块可点；休息全屏时仅 `petHitRect` 可点：单击（略晚于系统双击间隔后）打开菜单，**双击**结束休息。
     weak var deskMenuPresenter: PetStageDeskMenuPresenter?
     private var petHitRect: NSRect = .zero
+    /// `true`：休息且用户允许点击背后桌面时，仅小狗区域命中本窗，其余坐标 `hitTest` 返回 `nil` 以透传鼠标（不可再整窗 `ignoresMouseEvents`）。
+    var restPassMouseThroughOutsidePet: Bool = false
 
     /// 常态小窗拖动结束后回写并持久化窗框（屏幕坐标）。
     var onIdlePetFramePersist: ((NSRect) -> Void)?
+    /// 休息全屏时：在中央小狗上**双击**提前结束休息（与菜单里结束休息的逻辑一致）。
+    var onRestPetDoubleClickEndRest: (() -> Void)?
+
+    private var restSingleClickMenuWorkItem: DispatchWorkItem?
+    /// 上一击在狗区域内的 `mouseUp`（系统 `clickCount` 在无法 key 的窗口上常为 1，用时间+距离补判双击）。
+    private var restPetPriorMouseUpTimestamp: TimeInterval?
+    private var restPetPriorMouseUpInWindow: NSPoint?
 
     private var idleMouseDownInWindow: NSPoint = .zero
     private var idleLastScreenMouse: NSPoint?
     /// 相对 `mouseDown` 的最大位移，用于区分点击弹出菜单与拖动窗口。
     private var idleMaxDragFromDown: CGFloat = 0
+
+    /// 常态最后一次 `layoutIdlePet` 的小狗中心与绘制边长（`side = base * scale`，随用户拖动小窗而变）。
+    private var idlePetVisualCenter: CGPoint = .zero
+    private var idlePetVisualSide: CGFloat = 0
+    /// `presentRest` 扩全屏前快照：屏幕坐标中心 + 黑狗实际边长（点）。
+    private var restPendingStartCenterScreen: CGPoint?
+    private var restPendingStartPetSide: CGFloat?
+    /// 当前休息段动画用：全屏 `bounds` 下的起点中心与起点边长（在全屏 `base` 下插值到 `endSide`，保证从小到大）。
+    private var restArcStartCenterLocal: CGPoint?
+    private var restArcStartPetSide: CGFloat?
 
     var isInRestPhase: Bool { restBeganAt != nil }
 
@@ -96,8 +116,15 @@ final class PetStageView: NSView {
         needsLayout = true
     }
 
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
+        true
+    }
+
     override func hitTest(_ point: NSPoint) -> NSView? {
         guard deskMenuPresenter != nil, bounds.contains(point) else { return nil }
+        if restBeganAt != nil, restPassMouseThroughOutsidePet, !petHitRect.contains(point) {
+            return nil
+        }
         return self
     }
 
@@ -105,8 +132,19 @@ final class PetStageView: NSView {
         guard deskMenuPresenter != nil else { return }
         let pt = convert(event.locationInWindow, from: nil)
         if restBeganAt != nil {
+            window?.makeKeyAndOrderFront(nil)
             guard petHitRect.contains(pt) else { return }
-            deskMenuPresenter?.presentDeskMenu(from: self, anchorRect: petHitRect)
+            restPetClearStalePriorMouseUpIfNeeded(event.timestamp)
+            if restPetDetectDoubleClickFromPriorMouseUp(mouseDown: event) {
+                return
+            }
+            if event.clickCount >= 2 {
+                restPetClearDoubleClickTracking()
+                restSingleClickMenuWorkItem?.cancel()
+                restSingleClickMenuWorkItem = nil
+                onRestPetDoubleClickEndRest?()
+                return
+            }
             return
         }
         idleMouseDownInWindow = event.locationInWindow
@@ -145,7 +183,26 @@ final class PetStageView: NSView {
     }
 
     override func mouseUp(with event: NSEvent) {
-        guard deskMenuPresenter != nil, restBeganAt == nil else { return }
+        guard deskMenuPresenter != nil else { return }
+        let pt = convert(event.locationInWindow, from: nil)
+        if restBeganAt != nil {
+            guard petHitRect.contains(pt) else { return }
+            guard event.clickCount < 2 else { return }
+            if event.clickCount == 1 {
+                restSingleClickMenuWorkItem?.cancel()
+                restPetPriorMouseUpTimestamp = event.timestamp
+                restPetPriorMouseUpInWindow = event.locationInWindow
+                let work = DispatchWorkItem { [weak self] in
+                    guard let self, self.restBeganAt != nil else { return }
+                    self.restSingleClickMenuWorkItem = nil
+                    self.deskMenuPresenter?.presentDeskMenu(from: self, anchorRect: self.petHitRect)
+                }
+                restSingleClickMenuWorkItem = work
+                let delay = NSEvent.doubleClickInterval
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
+            }
+            return
+        }
         defer {
             idleLastScreenMouse = nil
             idleMaxDragFromDown = 0
@@ -165,9 +222,25 @@ final class PetStageView: NSView {
     }
 
     func beginRestCycle(total restSeconds: TimeInterval, onComplete: @escaping () -> Void) {
+        restSingleClickMenuWorkItem?.cancel()
+        restSingleClickMenuWorkItem = nil
+        restPetClearDoubleClickTracking()
         stopTickTimer()
         onRestComplete = onComplete
         restTotal = restSeconds
+
+        layoutSubtreeIfNeeded()
+        let b = bounds
+        if let sp = restPendingStartCenterScreen, let win = window {
+            let inWin = win.convertPoint(fromScreen: sp)
+            restArcStartCenterLocal = convert(inWin, from: nil)
+            restPendingStartCenterScreen = nil
+        } else {
+            restArcStartCenterLocal = petCornerCenter(in: b)
+        }
+        restArcStartPetSide = restPendingStartPetSide
+        restPendingStartPetSide = nil
+
         restBeganAt = Date()
         countdownLabel.isHidden = false
         pet.setDisplayMode(.restingRed)
@@ -179,8 +252,15 @@ final class PetStageView: NSView {
 
     /// 中断休息并回到右下角常态（不调用 `onRestComplete`；由 `WindowManager` 负责 `pendingDismiss`）。
     func cancelToIdle() {
+        restSingleClickMenuWorkItem?.cancel()
+        restSingleClickMenuWorkItem = nil
+        restPetClearDoubleClickTracking()
         stopTickTimer()
         restBeganAt = nil
+        restPendingStartCenterScreen = nil
+        restPendingStartPetSide = nil
+        restArcStartCenterLocal = nil
+        restArcStartPetSide = nil
         onRestComplete = nil
         countdownLabel.isHidden = true
         dimView.layer?.backgroundColor = NSColor.black.withAlphaComponent(0).cgColor
@@ -235,15 +315,15 @@ final class PetStageView: NSView {
         return CGPoint(x: x, y: y)
     }
 
-    private static func petHitRect(center: CGPoint, scale: CGFloat, in b: NSRect) -> NSRect {
+    /// - Parameter hitPadding: 休息动画全程可点区域略大于绘制，避免「点到了图但不在 rect 里」。
+    private static func petHitRect(center: CGPoint, scale: CGFloat, in b: NSRect, hitPadding: CGFloat) -> NSRect {
         let base = min(b.width, b.height) * 0.22
         let side = base * scale
-        let padding: CGFloat = 16
         return NSRect(
-            x: center.x - side / 2 - padding,
-            y: center.y - side / 2 - padding,
-            width: side + 2 * padding,
-            height: side + 2 * padding
+            x: center.x - side / 2 - hitPadding,
+            y: center.y - side / 2 - hitPadding,
+            width: side + 2 * hitPadding,
+            height: side + 2 * hitPadding
         )
     }
 
@@ -262,12 +342,24 @@ final class PetStageView: NSView {
             // 兜底：若窗框异常偏大仍按「全屏右下角」算（不应在常态出现）。
             center = petCornerCenter(in: b)
             scale = Self.idlePetSide / max(base, 1)
-            petHitRect = Self.petHitRect(center: center, scale: scale, in: b)
+            petHitRect = Self.petHitRect(center: center, scale: scale, in: b, hitPadding: 16)
         }
         pet.layoutPet(in: b, visualCenter: center, scale: scale)
+        idlePetVisualCenter = center
+        idlePetVisualSide = base * scale
         if restBeganAt == nil {
             pet.setDisplayMode(nonRestDisplayMode)
         }
+    }
+
+    /// 在 `WindowManager` 把桌宠窗扩到菜单栏屏全屏**之前**调用，使红狗从黑狗当时位置与大小起画。
+    func snapshotRestPetStartStateBeforeExpandingToRest() {
+        guard restBeganAt == nil, let win = window else { return }
+        let local = idlePetVisualCenter
+        let inWin = convert(local, to: nil)
+        let r = win.convertToScreen(NSRect(x: inWin.x, y: inWin.y, width: 0, height: 0))
+        restPendingStartCenterScreen = r.origin
+        restPendingStartPetSide = idlePetVisualSide
     }
 
     private func applyRestPhase(_ p: CGFloat) {
@@ -282,6 +374,11 @@ final class PetStageView: NSView {
             let done = onRestComplete
             onRestComplete = nil
             restBeganAt = nil
+            restArcStartCenterLocal = nil
+            restArcStartPetSide = nil
+            restPetClearDoubleClickTracking()
+            restSingleClickMenuWorkItem?.cancel()
+            restSingleClickMenuWorkItem = nil
             countdownLabel.isHidden = true
             dimView.layer?.backgroundColor = NSColor.black.withAlphaComponent(0).cgColor
             done?()
@@ -294,18 +391,48 @@ final class PetStageView: NSView {
         let dimAlpha = 0.58 * p
         dimView.layer?.backgroundColor = NSColor.black.withAlphaComponent(dimAlpha).cgColor
 
-        let corner = petCornerCenter(in: b)
-        let center = CGPoint(x: b.midX, y: b.midY)
+        let targetCenter = CGPoint(x: b.midX, y: b.midY)
+        let startCenter = restArcStartCenterLocal ?? petCornerCenter(in: b)
         let pos = CGPoint(
-            x: corner.x + (center.x - corner.x) * p,
-            y: corner.y + (center.y - corner.y) * p
+            x: startCenter.x + (targetCenter.x - startCenter.x) * p,
+            y: startCenter.y + (targetCenter.y - startCenter.y) * p
         )
         let base = min(b.width, b.height) * 0.22
-        let minScale = Self.idlePetSide / max(base, 1)
-        let maxScale: CGFloat = 1.15
-        let scale = minScale + (maxScale - minScale) * p
-        petHitRect = Self.petHitRect(center: pos, scale: scale, in: b)
+        // 用边长插值：黑狗在常态下的像素边长 → 全屏目标边长；避免「小窗 scale 数值」直接套在全屏 base 上变成从大到小。
+        let startSide = restArcStartPetSide ?? Self.idlePetSide
+        let nominalEndSide = base * 1.15
+        let endSide = max(nominalEndSide, startSide * 1.02)
+        let side = startSide + (endSide - startSide) * p
+        let scale = side / max(base, 1)
+        petHitRect = Self.petHitRect(center: pos, scale: scale, in: b, hitPadding: 52)
         pet.layoutPet(in: b, visualCenter: pos, scale: scale)
+    }
+
+    private func restPetClearDoubleClickTracking() {
+        restPetPriorMouseUpTimestamp = nil
+        restPetPriorMouseUpInWindow = nil
+    }
+
+    private func restPetClearStalePriorMouseUpIfNeeded(_ now: TimeInterval) {
+        guard let t0 = restPetPriorMouseUpTimestamp else { return }
+        if now - t0 > NSEvent.doubleClickInterval + 0.12 {
+            restPetClearDoubleClickTracking()
+        }
+    }
+
+    /// 在 `clickCount` 无法变成 2 时，用「上一次狗区内 mouseUp → 本次 mouseDown」的时间与位移判定双击。
+    private func restPetDetectDoubleClickFromPriorMouseUp(mouseDown event: NSEvent) -> Bool {
+        guard let t0 = restPetPriorMouseUpTimestamp,
+              let p0 = restPetPriorMouseUpInWindow else { return false }
+        let dt = event.timestamp - t0
+        guard dt <= NSEvent.doubleClickInterval + 0.12 else { return false }
+        let p1 = event.locationInWindow
+        guard hypot(p1.x - p0.x, p1.y - p0.y) <= 48 else { return false }
+        restPetClearDoubleClickTracking()
+        restSingleClickMenuWorkItem?.cancel()
+        restSingleClickMenuWorkItem = nil
+        onRestPetDoubleClickEndRest?()
+        return true
     }
 
     private func updateCountdown(remaining: TimeInterval) {
@@ -317,7 +444,8 @@ final class PetStageView: NSView {
 
     private func startTickTimer() {
         stopTickTimer()
-        let t = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
+        // 60Hz 会让主线程与 WindowServer 在整段休息霸屏期间持续重绘；15Hz 对 60s 位移动画仍足够顺滑。
+        let t = Timer.scheduledTimer(withTimeInterval: 1.0 / 15.0, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self, let start = self.restBeganAt else { return }
                 let elapsed = Date().timeIntervalSince(start)

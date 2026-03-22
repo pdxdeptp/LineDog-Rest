@@ -49,10 +49,13 @@ final class AppViewModel: ObservableObject {
     private var wasResting = false
     private var testRestActive = false
     private var cachedStatusLine: String = "自动模式：正在对齐系统时钟…"
+    /// 避免 `syncPetDisplayMode` 在计时器 tick 中重复调用 `WindowManager`（模式未变时）。
+    private var lastIdlePetModeAppliedToWindow: PetDisplayMode?
     /// 智能输入等待 Gemini 时，桌宠与菜单栏显示「思考」态。
     private var smartReminderThinkingActive = false
     private var smartReminderShortcutObserver: NSObjectProtocol?
     private var deskPetMenuShortcutObserver: NSObjectProtocol?
+    private var sevenMinuteShortcutObserver: NSObjectProtocol?
     /// 智能提醒写入的 `EKAlarm` 到点后弹出与 7 分钟倒计时相同的中央铃铛。
     private var smartReminderBellTasks: [String: Task<Void, Never>] = [:]
 
@@ -142,6 +145,14 @@ final class AppViewModel: ObservableObject {
         ) { [weak self] _ in
             self?.presentDeskPetMenuFromGlobalShortcut()
         }
+
+        sevenMinuteShortcutObserver = NotificationCenter.default.addObserver(
+            forName: LineDogBroadcastNotifications.toggleSevenMinuteReminder,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.toggleSevenMinuteReminderFromGlobalShortcut()
+        }
     }
 
     deinit {
@@ -150,6 +161,9 @@ final class AppViewModel: ObservableObject {
         }
         if let deskPetMenuShortcutObserver {
             NotificationCenter.default.removeObserver(deskPetMenuShortcutObserver)
+        }
+        if let sevenMinuteShortcutObserver {
+            NotificationCenter.default.removeObserver(sevenMinuteShortcutObserver)
         }
     }
 
@@ -264,6 +278,14 @@ final class AppViewModel: ObservableObject {
         sevenMinuteReminder.cancel()
     }
 
+    private func toggleSevenMinuteReminderFromGlobalShortcut() {
+        if isSevenMinuteReminderRunning {
+            cancelSevenMinuteReminder()
+        } else {
+            startSevenMinuteReminder()
+        }
+    }
+
     func setRestBlocksClicksDuringRest(_ enabled: Bool) {
         restBlocksClicksDuringRest = enabled
         UserDefaults.standard.set(enabled, forKey: Self.restBlocksClicksDefaultsKey)
@@ -344,6 +366,27 @@ final class AppViewModel: ObservableObject {
             publishStatus("自动模式：正在对齐系统时钟…")
         }
         refreshChronoChrome()
+        syncPetDisplayMode()
+    }
+
+    /// 休息全屏中央小狗**双击**：收起霸屏，并让计时引擎退出当前休息段（测试休息则走与普通结束相同的回调）。
+    func endRestEarlyFromDeskPet() {
+        if testRestActive {
+            windowManager.dismissRestImmediately()
+            return
+        }
+        windowManager.dismissRestImmediately()
+        switch mode {
+        case .manual:
+            if manualEngine.isInRestPhase {
+                manualEngine.skipRestPhaseToWork()
+            }
+        case .auto:
+            if autoEngine.isInScheduledRest {
+                autoEngine.skipScheduledRest()
+            }
+        }
+        wasResting = false
         syncPetDisplayMode()
     }
 
@@ -437,7 +480,9 @@ final class AppViewModel: ObservableObject {
         } else {
             menuMode = .pausedWhiteOutline
         }
-        petDisplayMode = menuMode
+        if petDisplayMode != menuMode {
+            petDisplayMode = menuMode
+        }
 
         let idleMode: PetDisplayMode
         if smartReminderThinkingActive {
@@ -447,7 +492,10 @@ final class AppViewModel: ObservableObject {
         } else {
             idleMode = .pausedWhiteOutline
         }
-        windowManager.applyIdlePetDisplayMode(idleMode)
+        if lastIdlePetModeAppliedToWindow != idleMode {
+            lastIdlePetModeAppliedToWindow = idleMode
+            windowManager.applyIdlePetDisplayMode(idleMode)
+        }
     }
 
     private func publishStatus(_ line: String) {

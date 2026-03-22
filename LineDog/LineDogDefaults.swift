@@ -13,4 +13,11 @@ enum LineDogDefaults {
     static let smartReminderInputShortcutKeyCode = "LineDog.smartReminderInputShortcut.keyCode"
     static let smartReminderInputShortcutModifiers = "LineDog.smartReminderInputShortcut.modifiers"
     static let smartReminderInputShortcutKeyLabel = "LineDog.smartReminderInputShortcut.keyLabel"
+
+    /// 独立倒计时长度（分钟），默认 7。
+    static let sevenMinuteReminderDurationMinutes = "LineDog.sevenMinuteReminder.durationMinutes"
+
+    static let sevenMinuteReminderShortcutKeyCode = "LineDog.sevenMinuteReminderShortcut.keyCode"
+    static let sevenMinuteReminderShortcutModifiers = "LineDog.sevenMinuteReminderShortcut.modifiers"
+    static let sevenMinuteReminderShortcutKeyLabel = "LineDog.sevenMinuteReminderShortcut.keyLabel"
 }

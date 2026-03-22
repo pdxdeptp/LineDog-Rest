@@ -227,6 +227,23 @@ final class LineDogInteractionTests: XCTestCase {
         XCTAssertGreaterThan(mock.dismissCount, d)
     }
 
+    func testEndRestEarlyFromDeskPet_manualSkipsToWork() {
+        let mock = MockWindowManager()
+        let fast = ManualTimerEngine(workDuration: 600, restDuration: 600)
+        let vm = AppViewModel(windowManager: mock, manualEngine: fast, bootstrapAutoEngine: false)
+        vm.setMode(.manual)
+        vm.startManualFocus()
+        fast.testing_enterRestPhase(remaining: 300)
+        yieldForMainActorEngineDelivery()
+        XCTAssertTrue(fast.isInRestPhase)
+        let d = mock.dismissCount
+        vm.endRestEarlyFromDeskPet()
+        XCTAssertGreaterThan(mock.dismissCount, d)
+        XCTAssertFalse(fast.isInRestPhase)
+        yieldForMainActorEngineDelivery()
+        XCTAssertEqual(vm.petDisplayMode, .runningBlack)
+    }
+
     // MARK: - AutoTimerEngine.nextHalfHourAnchor
 
     func testNextHalfHourAnchor_after1025_is1030() {

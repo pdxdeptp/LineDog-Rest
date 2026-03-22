@@ -144,14 +144,16 @@ enum DeskReminderTimeFormatter {
     static func displayString(dueDate: Date?, now: Date = Date(), calendar: Calendar = .current) -> String {
         guard let dueDate else { return "—" }
         let loc = Locale(identifier: "zh_CN")
-        if calendar.isDateInToday(dueDate) {
+        let todayStart = calendar.startOfDay(for: now)
+        if calendar.isDate(dueDate, inSameDayAs: todayStart) {
             let f = DateFormatter()
             f.locale = loc
             f.timeZone = calendar.timeZone
             f.dateFormat = "HH:mm"
             return f.string(from: dueDate)
         }
-        if calendar.isDateInTomorrow(dueDate) {
+        if let tomorrowStart = calendar.date(byAdding: .day, value: 1, to: todayStart),
+           calendar.isDate(dueDate, inSameDayAs: tomorrowStart) {
             let f = DateFormatter()
             f.locale = loc
             f.timeZone = calendar.timeZone

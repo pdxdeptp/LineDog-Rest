@@ -8,6 +8,8 @@ final class AutoTimerEngine: TimerEngine {
     private var tickTimer: Timer?
     private var phaseEnd: Date?
     private var isResting = false
+    /// 仅当剩余整秒变化时派发 `.resting`，避免每 0.25s 刷屏触发 SwiftUI / WindowServer。
+    private var lastRestingEmitWholeSeconds: Int?
 
     var isTimerRunning: Bool { tickTimer != nil }
 
@@ -25,6 +27,15 @@ final class AutoTimerEngine: TimerEngine {
         tickTimer = nil
         phaseEnd = nil
         isResting = false
+    }
+
+    /// 用户在休息霸屏上双击小狗：结束当前整点/半点休息窗口，回到等待下一锚点。
+    func skipScheduledRest() {
+        guard tickTimer != nil, isResting else { return }
+        isResting = false
+        phaseEnd = nil
+        lastRestingEmitWholeSeconds = nil
+        scheduleWatching()
     }
 
     private func scheduleWatching() {
@@ -50,12 +61,13 @@ final class AutoTimerEngine: TimerEngine {
             beginRest()
             return
         }
-        onStateChange?(.autoWatching(nextAnchor: anchor))
+        // 锚点未变；`scheduleWatching` 已派发过一次 `.autoWatching`，此处勿重复（否则约 4Hz 打满主线程与菜单栏刷新）。
     }
 
     private func beginRest() {
         isResting = true
         phaseEnd = Date().addingTimeInterval(restDuration)
+        lastRestingEmitWholeSeconds = max(0, Int(restDuration.rounded(.down)))
         onStateChange?(.resting(remaining: restDuration))
 
         tickTimer?.invalidate()
@@ -70,9 +82,14 @@ final class AutoTimerEngine: TimerEngine {
         guard let end = phaseEnd, isResting else { return }
         let remaining = end.timeIntervalSinceNow
         if remaining > 0 {
-            onStateChange?(.resting(remaining: remaining))
+            let whole = max(0, Int(remaining.rounded(.down)))
+            if whole != lastRestingEmitWholeSeconds {
+                lastRestingEmitWholeSeconds = whole
+                onStateChange?(.resting(remaining: remaining))
+            }
             return
         }
+        lastRestingEmitWholeSeconds = nil
         isResting = false
         scheduleWatching()
     }

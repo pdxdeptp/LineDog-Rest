@@ -8,6 +8,7 @@ final class LineDogAppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         UserDefaults.standard.register(defaults: [
             LineDogDefaults.geminiModelId: LineDogDefaults.defaultGeminiModelId,
+            LineDogDefaults.sevenMinuteReminderDurationMinutes: 7,
         ])
         if NSApp.activationPolicy() != .accessory {
             _ = NSApp.setActivationPolicy(.accessory)
