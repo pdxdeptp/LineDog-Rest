@@ -1,27 +1,40 @@
 import Foundation
 
+/// 应用内铃铛：每条带闹钟的提醒单独调度。
+struct SmartReminderInAppBell: Equatable {
+    let itemIdentifier: String
+    let fireDate: Date
+    let message: String
+}
+
 /// 供气泡展示：文案 + 可撤销的 `calendarItemIdentifier`（空则隐藏撤销）。
 struct SmartReminderRunResult: Equatable {
     let toastMessage: String
-    let undoItemIdentifier: String
+    /// 按创建顺序；撤销时全部删除。
+    let undoItemIdentifiers: [String]
     let wasFallback: Bool
-    /// 与写入的 `EKAlarm` 时刻一致；主线程可在该时刻弹出与 7 分钟倒计时结束相同的中央铃铛。
-    let inAppBellFireDate: Date?
-    /// 到点时中央面板展示的正文（一般为提醒标题）。
-    let inAppBellMessage: String?
+    let inAppBells: [SmartReminderInAppBell]
+    /// 多条解析时仅部分写入成功；不应清空用户输入草稿。
+    let incompleteMultiSave: Bool
+
+    /// 首条 id（单条场景与旧测试兼容）。
+    var undoItemIdentifier: String { undoItemIdentifiers.first ?? "" }
+    /// 首条铃铛（兼容旧逻辑）。
+    var inAppBellFireDate: Date? { inAppBells.first?.fireDate }
+    var inAppBellMessage: String? { inAppBells.first?.message }
 
     init(
         toastMessage: String,
-        undoItemIdentifier: String,
+        undoItemIdentifiers: [String],
         wasFallback: Bool,
-        inAppBellFireDate: Date? = nil,
-        inAppBellMessage: String? = nil
+        inAppBells: [SmartReminderInAppBell] = [],
+        incompleteMultiSave: Bool = false
     ) {
         self.toastMessage = toastMessage
-        self.undoItemIdentifier = undoItemIdentifier
+        self.undoItemIdentifiers = undoItemIdentifiers
         self.wasFallback = wasFallback
-        self.inAppBellFireDate = inAppBellFireDate
-        self.inAppBellMessage = inAppBellMessage
+        self.inAppBells = inAppBells
+        self.incompleteMultiSave = incompleteMultiSave
     }
 }
 
@@ -103,7 +116,7 @@ final class SmartReminderOrchestrator {
             listTitles: titles
         )
 
-        var parsed: LLMReminderJSONPayload?
+        var parsedList: [LLMReminderJSONPayload] = []
         if let key = apiKeyProvider(), !key.isEmpty {
             let userMsg = SmartReminderPromptBuilder.userMessage(rawInput: trimmed)
             do {
@@ -118,7 +131,11 @@ final class SmartReminderOrchestrator {
                     userText: userMsg,
                     modelRaw: jsonText
                 )
-                parsed = try? LLMReminderJSONDecoderService.decode(fromModelText: jsonText)
+                if let decoded = try? LLMReminderJSONDecoderService.decodePayloads(fromModelText: jsonText) {
+                    parsedList = decoded.filter {
+                        !$0.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    }
+                }
             } catch {
                 SmartReminderModelDebugLog.appendExchange(
                     systemPrompt: system,
@@ -130,9 +147,19 @@ final class SmartReminderOrchestrator {
 
         let defaultListId = try? await mutation.defaultCalendarForNewRemindersIdentifier()
 
-        if let p = parsed {
-            if let result = await saveParsedPayload(
-                p,
+        if !parsedList.isEmpty {
+            if parsedList.count == 1 {
+                if let result = await saveParsedPayload(
+                    parsedList[0],
+                    rawUserInput: trimmed,
+                    calendars: calendars,
+                    timeZone: tz,
+                    defaultNewRemindersId: defaultListId
+                ) {
+                    return result
+                }
+            } else if let result = await saveMultipleParsedPayloads(
+                parsedList,
                 rawUserInput: trimmed,
                 calendars: calendars,
                 timeZone: tz,
@@ -140,6 +167,12 @@ final class SmartReminderOrchestrator {
             ) {
                 return result
             }
+            // 已得到结构化 JSON 却选不到列表或 EventKit 保存失败时，不得再用整句原文当「普通备忘」冒充成功。
+            return SmartReminderRunResult(
+                toastMessage: "⚡️ 未能保存提醒（目标列表不可用或系统拒绝写入）",
+                undoItemIdentifiers: [],
+                wasFallback: true
+            )
         }
 
         var calSnapshot = calendars
@@ -158,19 +191,21 @@ final class SmartReminderOrchestrator {
     }
 
     private func saveParsedPayload(
-        _ p: LLMReminderJSONPayload,
+        _ payload: LLMReminderJSONPayload,
         rawUserInput: String,
         calendars: [(String, String, Bool)],
         timeZone: TimeZone,
         defaultNewRemindersId: String?
     ) async -> SmartReminderRunResult? {
+        let listName = Self.effectiveTargetListName(modelListName: payload.target_list_name, rawUserInput: rawUserInput)
         guard let calId = resolveCalendarIdentifier(
-            targetListName: p.target_list_name,
+            targetListName: listName,
             calendars: calendars,
             defaultNewRemindersId: defaultNewRemindersId
         ) else {
             return nil
         }
+        let p = payload.withInferredAlarmWallClock(rawUserInput: rawUserInput)
         let routine = SmartReminderRoutineInference.effectiveIsRoutine(
             llm: p.is_routine,
             rawUserInput: rawUserInput,
@@ -183,6 +218,7 @@ final class SmartReminderOrchestrator {
             rawUserInput: rawUserInput
         )
         let notes = SmartReminderNotesComposer.finalizedNotes(llmNotes: p.notes, isRoutine: routine)
+        let recurrence = Self.reminderRecurrenceSpec(from: p.recurrence)
         do {
             let id = try await mutation.createReminder(
                 title: p.title,
@@ -190,21 +226,74 @@ final class SmartReminderOrchestrator {
                 calendarIdentifier: calId,
                 dueDate: due,
                 alarmAt: alarmAt,
-                priority: clampPriority(p.priority)
+                priority: clampPriority(p.priority),
+                recurrence: recurrence
             )
-            let msg = routine ? "✅ 已添加 [日常]" : "✅ 已添加"
+            var msg = routine ? "✅ 已添加 [日常]" : "✅ 已添加"
+            if recurrence != nil {
+                msg += "（重复）"
+            }
             let trimmedTitle = p.title.trimmingCharacters(in: .whitespacesAndNewlines)
             let bellLine = trimmedTitle.isEmpty ? "提醒事项" : trimmedTitle
+            let bells: [SmartReminderInAppBell]
+            if let alarmAt {
+                bells = [SmartReminderInAppBell(itemIdentifier: id, fireDate: alarmAt, message: bellLine)]
+            } else {
+                bells = []
+            }
             return SmartReminderRunResult(
                 toastMessage: msg,
-                undoItemIdentifier: id,
+                undoItemIdentifiers: [id],
                 wasFallback: false,
-                inAppBellFireDate: alarmAt,
-                inAppBellMessage: alarmAt != nil ? bellLine : nil
+                inAppBells: bells
             )
         } catch {
             return nil
         }
+    }
+
+    private func saveMultipleParsedPayloads(
+        _ items: [LLMReminderJSONPayload],
+        rawUserInput: String,
+        calendars: [(String, String, Bool)],
+        timeZone: TimeZone,
+        defaultNewRemindersId: String?
+    ) async -> SmartReminderRunResult? {
+        var ids: [String] = []
+        var bells: [SmartReminderInAppBell] = []
+        var anyRoutine = false
+        var anyRecurrence = false
+        for p in items {
+            guard let one = await saveParsedPayload(
+                p,
+                rawUserInput: rawUserInput,
+                calendars: calendars,
+                timeZone: timeZone,
+                defaultNewRemindersId: defaultNewRemindersId
+            ) else {
+                if ids.isEmpty { return nil }
+                return SmartReminderRunResult(
+                    toastMessage: "✅ 已添加 \(ids.count) 项（另有 \(items.count - ids.count) 项未能写入）",
+                    undoItemIdentifiers: ids,
+                    wasFallback: false,
+                    inAppBells: bells,
+                    incompleteMultiSave: true
+                )
+            }
+            ids.append(contentsOf: one.undoItemIdentifiers)
+            bells.append(contentsOf: one.inAppBells)
+            anyRoutine = anyRoutine || one.toastMessage.contains("[日常]")
+            anyRecurrence = anyRecurrence || one.toastMessage.contains("（重复）")
+        }
+        var msg = "✅ 已添加 \(ids.count) 项"
+        if anyRoutine { msg += " [日常]" }
+        if anyRecurrence { msg += "（重复）" }
+        return SmartReminderRunResult(
+            toastMessage: msg,
+            undoItemIdentifiers: ids,
+            wasFallback: false,
+            inAppBells: bells
+        )
     }
 
     private func saveFallback(
@@ -220,7 +309,7 @@ final class SmartReminderOrchestrator {
         guard let calId = defId else {
             return SmartReminderRunResult(
                 toastMessage: "⚡️ 未能定位提醒列表（EventKit 未返回日历）",
-                undoItemIdentifier: "",
+                undoItemIdentifiers: [],
                 wasFallback: true
             )
         }
@@ -231,20 +320,41 @@ final class SmartReminderOrchestrator {
                 calendarIdentifier: calId,
                 dueDate: nil,
                 alarmAt: nil,
-                priority: 0
+                priority: 0,
+                recurrence: nil
             )
             return SmartReminderRunResult(
                 toastMessage: "⚡️ 存为普通备忘",
-                undoItemIdentifier: id,
+                undoItemIdentifiers: [id],
                 wasFallback: true
             )
         } catch {
             return SmartReminderRunResult(
-                toastMessage: "⚡️ 存为普通备忘",
-                undoItemIdentifier: "",
+                toastMessage: "⚡️ 无法写入提醒事项",
+                undoItemIdentifiers: [],
                 wasFallback: true
             )
         }
+    }
+
+    /// 模型常误填 `Inbox`；未点名收件箱时改回 `Reminders`，与产品默认一致。
+    private static func effectiveTargetListName(modelListName: String, rawUserInput: String) -> String {
+        let name = modelListName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard name.caseInsensitiveCompare("Inbox") == .orderedSame else {
+            return name
+        }
+        if userExplicitlyRequestedInbox(rawUserInput) {
+            return "Inbox"
+        }
+        return "Reminders"
+    }
+
+    private static func userExplicitlyRequestedInbox(_ raw: String) -> Bool {
+        let lower = raw.lowercased()
+        if lower.contains("收件箱") { return true }
+        if lower.contains("inbox") { return true }
+        if lower.contains("默认列表") { return true }
+        return false
     }
 
     private func resolveCalendarIdentifier(
@@ -275,6 +385,36 @@ final class SmartReminderOrchestrator {
     private func clampPriority(_ p: Int) -> Int {
         if [0, 1, 5, 9].contains(p) { return p }
         return 0
+    }
+
+    /// 将模型 `recurrence` 转为写入 EventKit 的规格；`frequency` 为 `none`/空则 nil。
+    private static func reminderRecurrenceSpec(from r: LLMReminderJSONPayload.RecurrenceFields?) -> ReminderRecurrenceSpec? {
+        guard let r else { return nil }
+        let raw = (r.frequency ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !raw.isEmpty, raw != "none" else { return nil }
+        let interval = max(1, r.interval ?? 1)
+        switch raw {
+        case "daily", "day":
+            return ReminderRecurrenceSpec(frequency: .daily, interval: interval, daysOfTheWeek: nil, dayOfMonth: nil)
+        case "weekly", "week":
+            return ReminderRecurrenceSpec(
+                frequency: .weekly,
+                interval: interval,
+                daysOfTheWeek: r.days_of_week,
+                dayOfMonth: nil
+            )
+        case "monthly", "month":
+            return ReminderRecurrenceSpec(
+                frequency: .monthly,
+                interval: interval,
+                daysOfTheWeek: nil,
+                dayOfMonth: r.day_of_month
+            )
+        case "yearly", "year", "annual":
+            return ReminderRecurrenceSpec(frequency: .yearly, interval: interval, daysOfTheWeek: nil, dayOfMonth: nil)
+        default:
+            return nil
+        }
     }
 
 }

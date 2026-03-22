@@ -38,6 +38,8 @@ final class MockWindowManager: WindowManaging {
 
     func presentSmartReminderInputFromGlobalShortcut(onSubmit: @escaping (String) -> Void, onCancel: @escaping () -> Void) {}
 
+    func presentDeskMenuFromGlobalShortcut() {}
+
     func dismissSmartReminderInput() {}
 
     func showSmartReminderToast(
@@ -48,6 +50,7 @@ final class MockWindowManager: WindowManaging {
     ) {}
 
     func dismissSmartReminderToast() {}
+    func clearSmartReminderInputDraftIfStillMatchesSubmittedText(_ submitted: String) {}
 
     /// 对应真实流程里休息动画结束、`finishRestCycle` 调用用户传入的 `onDismissed`。
     func testing_simulateRestPresentationFinished() {

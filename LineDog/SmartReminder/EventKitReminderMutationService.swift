@@ -40,7 +40,8 @@ final class EventKitReminderMutationService: ReminderMutationServing {
         calendarIdentifier: String,
         dueDate: Date?,
         alarmAt: Date?,
-        priority: Int
+        priority: Int,
+        recurrence: ReminderRecurrenceSpec?
     ) async throws -> String {
         try await withCheckedThrowingContinuation { cont in
             DispatchQueue.main.async {
@@ -68,12 +69,66 @@ final class EventKitReminderMutationService: ReminderMutationServing {
                     if let alarmAt {
                         rem.addAlarm(EKAlarm(absoluteDate: alarmAt))
                     }
+                    if let rules = Self.recurrenceRules(from: recurrence) {
+                        rem.recurrenceRules = rules
+                    }
                     try self.store.save(rem, commit: true)
                     cont.resume(returning: rem.calendarItemIdentifier)
                 } catch {
                     cont.resume(throwing: error)
                 }
             }
+        }
+    }
+
+    private static func recurrenceRules(from spec: ReminderRecurrenceSpec?) -> [EKRecurrenceRule]? {
+        guard let spec else { return nil }
+        let end: EKRecurrenceEnd? = nil
+        let interval = spec.interval
+        switch spec.frequency {
+        case .daily:
+            return [EKRecurrenceRule(recurrenceWith: .daily, interval: interval, end: end)]
+        case .weekly:
+            let days: [EKRecurrenceDayOfWeek] = (spec.daysOfTheWeek ?? []).compactMap { raw in
+                guard let w = EKWeekday(rawValue: raw) else { return nil }
+                return EKRecurrenceDayOfWeek(w)
+            }
+            if days.isEmpty {
+                return [EKRecurrenceRule(recurrenceWith: .weekly, interval: interval, end: end)]
+            }
+            return [
+                EKRecurrenceRule(
+                    recurrenceWith: .weekly,
+                    interval: interval,
+                    daysOfTheWeek: days,
+                    daysOfTheMonth: nil,
+                    monthsOfTheYear: nil,
+                    weeksOfTheYear: nil,
+                    daysOfTheYear: nil,
+                    setPositions: nil,
+                    end: end
+                )
+            ]
+        case .monthly:
+            var dom: [NSNumber]?
+            if let d = spec.dayOfMonth, (1...31).contains(d) {
+                dom = [NSNumber(value: d)]
+            }
+            return [
+                EKRecurrenceRule(
+                    recurrenceWith: .monthly,
+                    interval: interval,
+                    daysOfTheWeek: nil,
+                    daysOfTheMonth: dom,
+                    monthsOfTheYear: nil,
+                    weeksOfTheYear: nil,
+                    daysOfTheYear: nil,
+                    setPositions: nil,
+                    end: end
+                )
+            ]
+        case .yearly:
+            return [EKRecurrenceRule(recurrenceWith: .yearly, interval: interval, end: end)]
         }
     }
 

@@ -39,6 +39,14 @@ final class PetStageView: NSView {
 
     var isInRestPhase: Bool { restBeganAt != nil }
 
+    /// 与左键打开桌宠菜单相同的锚区（快捷键 `⌘⇧'` 用）。
+    var deskMenuShortcutAnchorRect: NSRect {
+        if restBeganAt != nil {
+            return petHitRect
+        }
+        return bounds.insetBy(dx: 4, dy: 4)
+    }
+
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         wantsLayer = true

@@ -11,17 +11,18 @@ private final class SmartReminderKeyablePanel: NSPanel {
 
 private struct SmartReminderInputPanelContent: View {
     @FocusState private var fieldFocused: Bool
-    @State private var text = ""
+    /// 由 `WindowManager` 持有，关闭面板后仍保留，下次打开继续编辑。
+    @Binding var draft: String
     let onSubmit: (String) -> Void
     let onCancel: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            TextField("用自然语言说出待办，回车添加…", text: $text)
+            TextField("用自然语言说出待办，回车添加…", text: $draft)
                 .textFieldStyle(.roundedBorder)
                 .focused($fieldFocused)
                 .frame(width: 400)
-                .onSubmit { onSubmit(text) }
+                .onSubmit { onSubmit(draft) }
             HStack {
                 Spacer(minLength: 0)
                 Button("取消") {
@@ -68,10 +69,12 @@ private struct SmartReminderToastContent: View {
 /// 单行输入与结果气泡（PRD 3）；由 `WindowManager` 在主线程调用。
 enum SmartReminderUIPanels {
     static func makeInputPanel(
+        draft: Binding<String>,
         onSubmit: @escaping (String) -> Void,
         onCancel: @escaping () -> Void
     ) -> (panel: NSPanel, host: NSHostingController<AnyView>) {
         let root = SmartReminderInputPanelContent(
+            draft: draft,
             onSubmit: onSubmit,
             onCancel: onCancel
         )

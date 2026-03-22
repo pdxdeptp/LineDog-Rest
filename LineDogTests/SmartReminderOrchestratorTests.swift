@@ -8,6 +8,36 @@ final class SmartReminderOrchestratorTests: XCTestCase {
     {"title":"发邮件","is_routine":false,"notes":null,"target_list_name":"工作","has_alarm":true,"alarm_date":{"year":2030,"month":6,"day":10,"hour":15,"minute":30},"priority":0}
     """
 
+    func testGeminiModelCatalogReadsDefaults() {
+        let suiteName = "LineDog.tests.geminiModel.\(UUID().uuidString)"
+        let d = UserDefaults(suiteName: suiteName)!
+        defer { d.removePersistentDomain(forName: suiteName) }
+        XCTAssertEqual(LineDogGeminiModelCatalog.modelIdForAPI(defaults: d), LineDogDefaults.defaultGeminiModelId)
+        d.set("gemini-2.5-pro", forKey: LineDogDefaults.geminiModelId)
+        XCTAssertEqual(LineDogGeminiModelCatalog.modelIdForAPI(defaults: d), "gemini-2.5-pro")
+        d.set("bad/name", forKey: LineDogDefaults.geminiModelId)
+        XCTAssertEqual(LineDogGeminiModelCatalog.modelIdForAPI(defaults: d), LineDogDefaults.defaultGeminiModelId)
+    }
+
+    func testDecodePayloadsFromJSONArray() throws {
+        let json = """
+        [{"title":"开chalse shwab","is_routine":false,"notes":null,"target_list_name":"Reminders","has_alarm":false,"alarm_date":{"year":2026,"month":3,"day":27,"hour":10,"minute":0},"priority":0},{"title":"去百合食品买零食","is_routine":false,"notes":null,"target_list_name":"Reminders","has_alarm":false,"alarm_date":{"year":2026,"month":3,"day":27,"hour":10,"minute":0},"priority":0}]
+        """
+        let list = try LLMReminderJSONDecoderService.decodePayloads(fromModelText: json)
+        XCTAssertEqual(list.count, 2)
+        XCTAssertEqual(list[0].title, "开chalse shwab")
+        XCTAssertEqual(list[1].title, "去百合食品买零食")
+    }
+
+    func testDecodeSingleObjectRejectsDecodeWhenMultipleInArray() throws {
+        let json = """
+        [{"title":"a","is_routine":false,"notes":null,"target_list_name":"Reminders","has_alarm":false,"priority":0},{"title":"b","is_routine":false,"notes":null,"target_list_name":"Reminders","has_alarm":false,"priority":0}]
+        """
+        XCTAssertThrowsError(try LLMReminderJSONDecoderService.decode(fromModelText: json)) { err in
+            XCTAssertEqual(err as? SmartReminderParseError, .expectedSinglePayload)
+        }
+    }
+
     func testDecodeValidJSONWithFence() throws {
         let wrapped = "```json\n\(sampleJSON)\n```"
         let p = try LLMReminderJSONDecoderService.decode(fromModelText: wrapped)
@@ -47,6 +77,74 @@ final class SmartReminderOrchestratorTests: XCTestCase {
         XCTAssertFalse(p.has_alarm)
     }
 
+    func testDecodeWeeklyRecurrenceSnakeCase() throws {
+        let json = """
+        {"title":"作业","is_routine":false,"notes":null,"target_list_name":"Reminders","has_alarm":false,"alarm_date":{"year":2026,"month":3,"day":23,"hour":23,"minute":59},"priority":0,"recurrence":{"frequency":"weekly","interval":1,"days_of_week":[1]}}
+        """
+        let p = try LLMReminderJSONDecoderService.decode(fromModelText: json)
+        XCTAssertEqual(p.recurrence?.frequency, "weekly")
+        XCTAssertEqual(p.recurrence?.interval, 1)
+        XCTAssertEqual(p.recurrence?.days_of_week, [1])
+        XCTAssertNil(p.recurrence?.day_of_month)
+    }
+
+    func testDecodeRecurrenceCamelCaseDaysOfWeek() throws {
+        let json = """
+        {"title":"x","is_routine":false,"notes":null,"target_list_name":"Reminders","has_alarm":false,"priority":0,"recurrence":{"frequency":"weekly","daysOfWeek":[2,3]}}
+        """
+        let p = try LLMReminderJSONDecoderService.decode(fromModelText: json)
+        XCTAssertEqual(p.recurrence?.days_of_week, [2, 3])
+    }
+
+    func testOrchestratorPassesWeeklyRecurrenceToMutation() async {
+        let gemini = MockGeminiRemindersClient()
+        gemini.textToReturn = """
+        {"title":"621 reflection","is_routine":false,"notes":"一次两个","target_list_name":"Reminders","has_alarm":false,"alarm_date":{"year":2026,"month":3,"day":23,"hour":23,"minute":59},"priority":0,"recurrence":{"frequency":"weekly","interval":1,"days_of_week":[1]}}
+        """
+        let mutation = MockReminderMutationService()
+        mutation.calendars = [("cal-r", "Reminders", true)]
+        mutation.defaultCalendarId = "cal-r"
+
+        let orch = SmartReminderOrchestrator(
+            gemini: gemini,
+            mutation: mutation,
+            apiKeyProvider: { "k" },
+            timeZoneLabel: "America/New_York",
+            cityRegionLabel: "X"
+        )
+
+        let r = await orch.run(rawUserInput: "每周日晚上前做 reading")
+        XCTAssertNotNil(r)
+        XCTAssertTrue(r!.toastMessage.contains("（重复）"))
+        XCTAssertEqual(mutation.lastRecurrence?.frequency, .weekly)
+        XCTAssertEqual(mutation.lastRecurrence?.daysOfTheWeek, [1])
+    }
+
+    func testOrchestratorSavesMultipleRemindersWhenModelReturnsJSONArray() async {
+        let gemini = MockGeminiRemindersClient()
+        gemini.textToReturn = """
+        [{"title":"任务甲","is_routine":false,"notes":null,"target_list_name":"Reminders","has_alarm":false,"alarm_date":{"year":2026,"month":3,"day":27,"hour":10,"minute":0},"priority":0},{"title":"任务乙","is_routine":false,"notes":null,"target_list_name":"Reminders","has_alarm":false,"alarm_date":{"year":2026,"month":3,"day":27,"hour":11,"minute":0},"priority":0}]
+        """
+        let mutation = MockReminderMutationService()
+        mutation.calendars = [("cal-r", "Reminders", true)]
+        mutation.defaultCalendarId = "cal-r"
+
+        let orch = SmartReminderOrchestrator(
+            gemini: gemini,
+            mutation: mutation,
+            apiKeyProvider: { "k" },
+            timeZoneLabel: "America/New_York",
+            cityRegionLabel: "X"
+        )
+
+        let r = await orch.run(rawUserInput: "下周五两件事")
+        XCTAssertNotNil(r)
+        XCTAssertFalse(r!.wasFallback)
+        XCTAssertTrue(r!.toastMessage.contains("2 项"))
+        XCTAssertEqual(r!.undoItemIdentifiers.count, 2)
+        XCTAssertEqual(mutation.createdTitles, ["任务甲", "任务乙"])
+    }
+
     func testOrchestratorSavesParsedReminderWhenGeminiOK() async {
         let gemini = MockGeminiRemindersClient()
         gemini.textToReturn = sampleJSON
@@ -73,6 +171,7 @@ final class SmartReminderOrchestratorTests: XCTestCase {
         XCTAssertNotNil(mutation.lastCreateDue)
         XCTAssertNotNil(mutation.lastCreateAlarm)
         XCTAssertNotNil(r!.inAppBellFireDate)
+        XCTAssertNil(mutation.lastRecurrence)
     }
 
     func testChoreHintAddsRoutineWhenLLMSaysFalse() async {
@@ -268,8 +367,61 @@ final class SmartReminderOrchestratorTests: XCTestCase {
             cityRegionLabel: "X"
         )
 
-        _ = await orch.run(rawUserInput: "x")
+        _ = await orch.run(rawUserInput: "帮我放进收件箱")
         XCTAssertEqual(mutation.lastCreateCalendarId, "def")
+    }
+
+    func testDecodeAlarmDateNullHourMinuteIsUnspecifiedPlaceholder() throws {
+        let json = """
+        {"title":"Seminar","is_routine":false,"notes":null,"target_list_name":"Reminders","has_alarm":false,"alarm_date":{"year":2026,"month":3,"day":30,"hour":null,"minute":null},"priority":0}
+        """
+        let p = try LLMReminderJSONDecoderService.decode(fromModelText: json)
+        XCTAssertTrue(p.alarm_date?.isTimeUnspecified == true)
+        XCTAssertEqual(p.alarm_date?.hour, 12)
+        XCTAssertEqual(p.alarm_date?.minute, 0)
+    }
+
+    func testWithInferredAlarmWallClockUsesTaskContent() throws {
+        let json = """
+        {"title":"Seminar","is_routine":false,"notes":null,"target_list_name":"Reminders","has_alarm":false,"alarm_date":{"year":2026,"month":3,"day":30,"hour":null,"minute":null},"priority":0}
+        """
+        let p = try LLMReminderJSONDecoderService.decode(fromModelText: json)
+        let refined = p.withInferredAlarmWallClock(rawUserInput: "")
+        XCTAssertEqual(refined.alarm_date?.isTimeUnspecified, false)
+        XCTAssertEqual(refined.alarm_date?.hour, 10)
+        XCTAssertEqual(refined.alarm_date?.minute, 0)
+    }
+
+    func testDecodeOmittedTargetListDefaultsToReminders() throws {
+        let json = """
+        {"title":"x","is_routine":false,"notes":null,"has_alarm":false,"priority":0}
+        """
+        let p = try LLMReminderJSONDecoderService.decode(fromModelText: json)
+        XCTAssertEqual(p.target_list_name, "Reminders")
+    }
+
+    func testParsedPayloadSaveFailureDoesNotFallbackToRawTitle() async {
+        let gemini = MockGeminiRemindersClient()
+        gemini.textToReturn = sampleJSON
+        let mutation = MockReminderMutationService()
+        mutation.calendars = [("cal-work", "工作", true)]
+        mutation.defaultCalendarId = "cal-work"
+        mutation.createReminderError = NSError(domain: "test", code: 1)
+
+        let orch = SmartReminderOrchestrator(
+            gemini: gemini,
+            mutation: mutation,
+            apiKeyProvider: { "k" },
+            timeZoneLabel: "UTC",
+            cityRegionLabel: "X"
+        )
+
+        let raw = "明天下午三点半发邮件"
+        let r = await orch.run(rawUserInput: raw)
+        XCTAssertNotNil(r)
+        XCTAssertTrue(r!.toastMessage.contains("未能保存"))
+        XCTAssertTrue(r!.undoItemIdentifier.isEmpty)
+        XCTAssertNil(mutation.lastCreateTitle)
     }
 }
 
@@ -293,12 +445,16 @@ private final class MockGeminiRemindersClient: GeminiRemindersGenerating {
 private final class MockReminderMutationService: ReminderMutationServing {
     var calendars: [(String, String, Bool)] = []
     var defaultCalendarId: String?
+    private(set) var createdTitles: [String] = []
     private(set) var lastCreateTitle: String?
     private(set) var lastCreateNotes: String?
     private(set) var lastCreateCalendarId: String?
     private(set) var lastCreateDue: Date?
     private(set) var lastCreateAlarm: Date?
     private(set) var lastCreatePriority: Int?
+    private(set) var lastRecurrence: ReminderRecurrenceSpec?
+    /// 非 nil 时 `createReminder` 抛错（模拟 EventKit 保存失败）。
+    var createReminderError: Error?
     private var nextId = 1
 
     func fetchReminderCalendarsForMutation() async throws -> [(String, String, Bool)] {
@@ -315,14 +471,20 @@ private final class MockReminderMutationService: ReminderMutationServing {
         calendarIdentifier: String,
         dueDate: Date?,
         alarmAt: Date?,
-        priority: Int
+        priority: Int,
+        recurrence: ReminderRecurrenceSpec?
     ) async throws -> String {
+        if let createReminderError {
+            throw createReminderError
+        }
+        createdTitles.append(title)
         lastCreateTitle = title
         lastCreateNotes = notes
         lastCreateCalendarId = calendarIdentifier
         lastCreateDue = dueDate
         lastCreateAlarm = alarmAt
         lastCreatePriority = priority
+        lastRecurrence = recurrence
         defer { nextId += 1 }
         return "mock-id-\(nextId)"
     }

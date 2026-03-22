@@ -52,6 +52,7 @@ final class AppViewModel: ObservableObject {
     /// 智能输入等待 Gemini 时，桌宠与菜单栏显示「思考」态。
     private var smartReminderThinkingActive = false
     private var smartReminderShortcutObserver: NSObjectProtocol?
+    private var deskPetMenuShortcutObserver: NSObjectProtocol?
     /// 智能提醒写入的 `EKAlarm` 到点后弹出与 7 分钟倒计时相同的中央铃铛。
     private var smartReminderBellTasks: [String: Task<Void, Never>] = [:]
 
@@ -133,12 +134,27 @@ final class AppViewModel: ObservableObject {
         ) { [weak self] _ in
             self?.presentSmartReminderFromGlobalShortcut()
         }
+
+        deskPetMenuShortcutObserver = NotificationCenter.default.addObserver(
+            forName: LineDogBroadcastNotifications.presentDeskPetMenu,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.presentDeskPetMenuFromGlobalShortcut()
+        }
     }
 
     deinit {
         if let smartReminderShortcutObserver {
             NotificationCenter.default.removeObserver(smartReminderShortcutObserver)
         }
+        if let deskPetMenuShortcutObserver {
+            NotificationCenter.default.removeObserver(deskPetMenuShortcutObserver)
+        }
+    }
+
+    private func presentDeskPetMenuFromGlobalShortcut() {
+        windowManager.presentDeskMenuFromGlobalShortcut()
     }
 
     /// 桌宠右键：由 `WindowManager` 转屏幕坐标后调用。
@@ -174,31 +190,38 @@ final class AppViewModel: ObservableObject {
         smartReminderThinkingActive = false
         syncPetDisplayMode()
         guard let result else { return }
+        let savedOK = !result.undoItemIdentifiers.isEmpty && !result.incompleteMultiSave
+        if savedOK {
+            windowManager.clearSmartReminderInputDraftIfStillMatchesSubmittedText(raw)
+        }
         windowManager.showSmartReminderToast(
             message: result.toastMessage,
-            showUndo: !result.undoItemIdentifier.isEmpty,
+            showUndo: !result.undoItemIdentifiers.isEmpty,
             onUndo: { [weak self] in
-                guard let self, !result.undoItemIdentifier.isEmpty else { return }
-                Task { await self.performSmartReminderUndo(id: result.undoItemIdentifier) }
+                guard let self, !result.undoItemIdentifiers.isEmpty else { return }
+                Task { await self.performSmartReminderUndo(ids: result.undoItemIdentifiers) }
             },
             onAutoDismiss: {}
         )
-        if !result.undoItemIdentifier.isEmpty, let fire = result.inAppBellFireDate {
-            let bellText = result.inAppBellMessage ?? "提醒事项"
+        for bell in result.inAppBells {
             scheduleSmartReminderInAppBell(
-                itemId: result.undoItemIdentifier,
-                fireDate: fire,
-                message: bellText
+                itemId: bell.itemIdentifier,
+                fireDate: bell.fireDate,
+                message: bell.message
             )
         }
     }
 
     @MainActor
-    private func performSmartReminderUndo(id: String) async {
-        cancelSmartReminderInAppBell(forItemId: id)
+    private func performSmartReminderUndo(ids: [String]) async {
+        for id in ids {
+            cancelSmartReminderInAppBell(forItemId: id)
+        }
         windowManager.applyIdlePetDisplayMode(.pausedWhiteOutline)
         try? await Task.sleep(nanoseconds: 220_000_000)
-        try? await smartReminderOrchestrator.removeReminder(calendarItemIdentifier: id)
+        for id in ids {
+            try? await smartReminderOrchestrator.removeReminder(calendarItemIdentifier: id)
+        }
         syncPetDisplayMode()
     }
 

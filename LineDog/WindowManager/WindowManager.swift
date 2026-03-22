@@ -15,6 +15,8 @@ protocol WindowManaging: AnyObject {
     func presentSmartReminderInput(anchorRectInScreen: NSRect, onSubmit: @escaping (String) -> Void, onCancel: @escaping () -> Void)
     /// 无桌宠框时（或未安装窗）：用菜单栏屏可见区底部中点上方。
     func presentSmartReminderInputFromGlobalShortcut(onSubmit: @escaping (String) -> Void, onCancel: @escaping () -> Void)
+    /// 全局快捷键：锚在桌宠上与左键相同，弹出 `MenuBarContentView`。
+    func presentDeskMenuFromGlobalShortcut()
     func dismissSmartReminderInput()
     func showSmartReminderToast(
         message: String,
@@ -23,6 +25,8 @@ protocol WindowManaging: AnyObject {
         onAutoDismiss: @escaping () -> Void
     )
     func dismissSmartReminderToast()
+    /// 提醒已成功写入后调用：仅当草稿仍与本次提交原文一致时清空（避免异步返回时覆盖用户新开面板后的输入）。
+    func clearSmartReminderInputDraftIfStillMatchesSubmittedText(_ submitted: String)
 }
 
 /// 模块 2：常态为**仅桌宠大小**的透明小窗（可拖动，位置持久化）；休息时扩展为菜单栏屏全屏霸屏。同一只 `PetStageView`。
@@ -58,6 +62,8 @@ final class WindowManager: WindowManaging {
     private var smartInputClickAwayMonitor: Any?
     private var smartToastPanel: NSPanel?
     private var smartToastDismiss: Timer?
+    /// 智能输入框草稿：点外部 / Esc /「取消」关闭后面板不丢字；回车提交成功后清空。
+    private var smartReminderInputDraft: String = ""
 
     init() {
         // SwiftUI + 仅 MenuBarExtra 时，`AppViewModel` 初始化可能早于应用完成启动；窗口层级未就绪会导致「有进程但桌宠窗从未真正出现」。
@@ -454,7 +460,12 @@ final class WindowManager: WindowManaging {
         let anchor = anchorRectInScreen.width > 1 && anchorRectInScreen.height > 1
             ? anchorRectInScreen
             : Self.defaultSmartInputAnchorInScreen()
+        let draftBinding = Binding<String>(
+            get: { [weak self] in self?.smartReminderInputDraft ?? "" },
+            set: { [weak self] newValue in self?.smartReminderInputDraft = newValue }
+        )
         let (panel, _) = SmartReminderUIPanels.makeInputPanel(
+            draft: draftBinding,
             onSubmit: { [weak self] text in
                 guard let self else { return }
                 self.teardownSmartInputPanel(invokeUserCancel: false)
@@ -482,9 +493,20 @@ final class WindowManager: WindowManaging {
         onSubmit: @escaping (String) -> Void,
         onCancel: @escaping () -> Void
     ) {
+        // 与桌宠菜单快捷键一致：已打开时再按同一全局快捷键则关闭（等同 Esc / 取消）。
+        if smartInputPanel != nil {
+            teardownSmartInputPanel(invokeUserCancel: true)
+            return
+        }
         installPetWindowIfNeeded()
         let anchor = window.map { $0.frame } ?? Self.defaultSmartInputAnchorInScreen()
         presentSmartReminderInput(anchorRectInScreen: anchor, onSubmit: onSubmit, onCancel: onCancel)
+    }
+
+    func presentDeskMenuFromGlobalShortcut() {
+        installPetWindowIfNeeded()
+        guard let stage = stageView, deskMenuViewModel != nil else { return }
+        presentDeskMenu(from: stage, anchorRect: stage.deskMenuShortcutAnchorRect)
     }
 
     func dismissSmartReminderInput() {
@@ -526,6 +548,12 @@ final class WindowManager: WindowManaging {
         smartToastDismiss = nil
         smartToastPanel?.close()
         smartToastPanel = nil
+    }
+
+    func clearSmartReminderInputDraftIfStillMatchesSubmittedText(_ submitted: String) {
+        if smartReminderInputDraft == submitted {
+            smartReminderInputDraft = ""
+        }
     }
 
     private static func defaultSmartInputAnchorInScreen() -> NSRect {

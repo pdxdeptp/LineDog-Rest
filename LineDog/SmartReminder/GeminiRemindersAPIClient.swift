@@ -18,15 +18,13 @@ protocol GeminiRemindersGenerating: AnyObject {
 }
 
 final class GeminiRemindersAPIClient: GeminiRemindersGenerating {
-    /// 轻量快速模型（PRD：Gemini 家族快速 API）。
-    private let modelName = "gemini-2.0-flash"
-
     func generateStructuredReminderJSON(
         systemPrompt: String,
         userText: String,
         apiKey: String,
         timeoutSeconds: TimeInterval
     ) async throws -> String {
+        let modelName = LineDogGeminiModelCatalog.modelIdForAPI()
         let encKey = apiKey.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? apiKey
         let urlStr = "https://generativelanguage.googleapis.com/v1beta/models/\(modelName):generateContent?key=\(encKey)"
         guard let url = URL(string: urlStr) else { throw GeminiRemindersAPIError.invalidURL }
