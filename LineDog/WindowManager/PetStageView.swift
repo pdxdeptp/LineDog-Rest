@@ -46,6 +46,8 @@ final class PetStageView: NSView {
     private var idleLastScreenMouse: NSPoint?
     /// 相对 `mouseDown` 的最大位移，用于区分点击弹出菜单与拖动窗口。
     private var idleMaxDragFromDown: CGFloat = 0
+    /// 双击狗结束休息后，下一次 `mouseUp` 已落在常态分支；否则会误触发 `presentDeskMenu`。
+    private var suppressDeskMenuOnNextIdleMouseUp = false
 
     /// 常态最后一次 `layoutIdlePet` 的小狗中心与绘制边长（`side = base * scale`，随用户拖动小窗而变）。
     private var idlePetVisualCenter: CGPoint = .zero
@@ -139,14 +141,12 @@ final class PetStageView: NSView {
                 return
             }
             if event.clickCount >= 2 {
-                restPetClearDoubleClickTracking()
-                restSingleClickMenuWorkItem?.cancel()
-                restSingleClickMenuWorkItem = nil
-                onRestPetDoubleClickEndRest?()
+                performRestPetDoubleClickDismiss()
                 return
             }
             return
         }
+        suppressDeskMenuOnNextIdleMouseUp = false
         idleMouseDownInWindow = event.locationInWindow
         idleLastScreenMouse = NSEvent.mouseLocation
         idleMaxDragFromDown = 0
@@ -203,6 +203,12 @@ final class PetStageView: NSView {
             }
             return
         }
+        if suppressDeskMenuOnNextIdleMouseUp {
+            suppressDeskMenuOnNextIdleMouseUp = false
+            idleLastScreenMouse = nil
+            idleMaxDragFromDown = 0
+            return
+        }
         defer {
             idleLastScreenMouse = nil
             idleMaxDragFromDown = 0
@@ -222,6 +228,7 @@ final class PetStageView: NSView {
     }
 
     func beginRestCycle(total restSeconds: TimeInterval, onComplete: @escaping () -> Void) {
+        suppressDeskMenuOnNextIdleMouseUp = false
         restSingleClickMenuWorkItem?.cancel()
         restSingleClickMenuWorkItem = nil
         restPetClearDoubleClickTracking()
@@ -252,6 +259,8 @@ final class PetStageView: NSView {
 
     /// 中断休息并回到右下角常态（不调用 `onRestComplete`；由 `WindowManager` 负责 `pendingDismiss`）。
     func cancelToIdle() {
+        // 勿在此重置 `suppressDeskMenuOnNextIdleMouseUp`：`performRestPetDoubleClickDismiss` 先设 true 再调
+        // `dismissRestImmediately`→本方法，若清掉则紧随其后的 `mouseUp` 会误开桌宠菜单。
         restSingleClickMenuWorkItem?.cancel()
         restSingleClickMenuWorkItem = nil
         restPetClearDoubleClickTracking()
@@ -428,11 +437,16 @@ final class PetStageView: NSView {
         guard dt <= NSEvent.doubleClickInterval + 0.12 else { return false }
         let p1 = event.locationInWindow
         guard hypot(p1.x - p0.x, p1.y - p0.y) <= 48 else { return false }
+        performRestPetDoubleClickDismiss()
+        return true
+    }
+
+    private func performRestPetDoubleClickDismiss() {
         restPetClearDoubleClickTracking()
         restSingleClickMenuWorkItem?.cancel()
         restSingleClickMenuWorkItem = nil
+        suppressDeskMenuOnNextIdleMouseUp = true
         onRestPetDoubleClickEndRest?()
-        return true
     }
 
     private func updateCountdown(remaining: TimeInterval) {
