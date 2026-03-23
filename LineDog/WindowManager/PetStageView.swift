@@ -29,13 +29,16 @@ final class PetStageView: NSView {
     /// 非 nil 时：常态小窗整块可点；休息全屏时仅 `petHitRect` 可点：单击（略晚于系统双击间隔后）打开菜单，**双击**结束休息。
     weak var deskMenuPresenter: PetStageDeskMenuPresenter?
     private var petHitRect: NSRect = .zero
-    /// `true`：休息且用户允许点击背后桌面时，仅小狗区域命中本窗，其余坐标 `hitTest` 返回 `nil` 以透传鼠标（不可再整窗 `ignoresMouseEvents`）。
-    var restPassMouseThroughOutsidePet: Bool = false
+    /// 用户设置：休息全屏且红狗已到屏中后，是否拦截小狗区域外的点击（与 `AppViewModel.restBlocksClicksDuringRest` 同步）。
+    /// 在「移向中央」动画进行期间（`growDuration` 内）始终对狗外区域透传，避免一开始就挡住正在进行的操作。
+    var restUserBlocksClicksOutsidePet: Bool = true
 
     /// 常态小窗拖动结束后回写并持久化窗框（屏幕坐标）。
     var onIdlePetFramePersist: ((NSRect) -> Void)?
     /// 休息全屏时：在中央小狗上**双击**提前结束休息（与菜单里结束休息的逻辑一致）。
     var onRestPetDoubleClickEndRest: (() -> Void)?
+    /// 每帧休息布局后由 `WindowManager` 同步 `NSWindow.ignoresMouseEvents`（仅靠根视图 `hitTest`→`nil` 在 `.screenSaver` 等层级上可能仍吞点击）。
+    var onRestPhaseGeometryChanged: (() -> Void)?
 
     private var restSingleClickMenuWorkItem: DispatchWorkItem?
     /// 上一击在狗区域内的 `mouseUp`（系统 `clickCount` 在无法 key 的窗口上常为 1，用时间+距离补判双击）。
@@ -60,6 +63,17 @@ final class PetStageView: NSView {
     private var restArcStartPetSide: CGFloat?
 
     var isInRestPhase: Bool { restBeganAt != nil }
+
+    /// 红狗「移到屏中」动画是否已结束（与 `hitTest` / 休息穿透策略一致）。
+    var restApproachAnimationComplete: Bool {
+        guard let t = restBeganAt else { return true }
+        return Date().timeIntervalSince(t) >= growDuration
+    }
+
+    /// `petHitRect` 转为窗口基坐标，供与 `NSEvent.mouseLocation`（屏幕坐标）对照。
+    var petHitRectInWindowBaseCoordinates: NSRect {
+        convert(petHitRect, to: nil)
+    }
 
     /// 与左键打开桌宠菜单相同的锚区（快捷键 `⌘⇧'` 用）。
     var deskMenuShortcutAnchorRect: NSRect {
@@ -123,9 +137,23 @@ final class PetStageView: NSView {
     }
 
     override func hitTest(_ point: NSPoint) -> NSView? {
-        guard deskMenuPresenter != nil, bounds.contains(point) else { return nil }
-        if restBeganAt != nil, restPassMouseThroughOutsidePet, !petHitRect.contains(point) {
-            return nil
+        guard deskMenuPresenter != nil else { return nil }
+        // 文档称 `point` 在父视图坐标系；与 `mouseDown` 一致时，应得到与 `NSEvent.locationInWindow` 相同的**窗口基坐标**再 `convert(_, from: nil)` 到局部。
+        let locationInWindow: NSPoint
+        if let sv = superview {
+            locationInWindow = sv.convert(point, to: nil)
+        } else {
+            locationInWindow = point
+        }
+        let local = convert(locationInWindow, from: nil)
+        guard bounds.contains(local) else { return nil }
+        if let start = restBeganAt {
+            let elapsed = Date().timeIntervalSince(start)
+            let approachComplete = elapsed >= growDuration
+            let passThroughOutsidePet = !restUserBlocksClicksOutsidePet || !approachComplete
+            if passThroughOutsidePet, !petHitRect.contains(local) {
+                return nil
+            }
         }
         return self
     }
@@ -372,6 +400,7 @@ final class PetStageView: NSView {
     }
 
     private func applyRestPhase(_ p: CGFloat) {
+        defer { onRestPhaseGeometryChanged?() }
         let b = bounds
         guard b.width > 1, b.height > 1 else { return }
         guard let start = restBeganAt else { return }

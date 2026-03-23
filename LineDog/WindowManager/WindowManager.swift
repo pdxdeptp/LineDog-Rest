@@ -281,6 +281,9 @@ final class WindowManager: WindowManaging {
         v.onIdlePetFramePersist = { [weak self] r in
             self?.persistIdlePetFrame(r)
         }
+        v.onRestPhaseGeometryChanged = { [weak self] in
+            self?.syncPetRestWindowMousePolicy()
+        }
         if deskMenuViewModel != nil {
             v.onRestPetDoubleClickEndRest = { [weak self] in
                 self?.deskMenuViewModel?.endRestEarlyFromDeskPet()
@@ -351,11 +354,15 @@ final class WindowManager: WindowManaging {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.12, execute: item)
     }
 
-    /// 把 `contentView` 贴齐 `contentLayoutRect`，避免多屏下窗框变了但 `bounds` 仍为零或错位。
+    /// 把 `contentView` 贴满父视图（主题框内的 clip 区）。仅用 `contentLayoutRect` 时，在新系统上可能与 `frame` 有环带差，点击会落在 `PetStageView` 外仍被本窗吞掉，表现为「穿透失效」。
     private func syncContentViewToWindowLayout() {
         guard let win = window, let cv = win.contentView else { return }
         cv.autoresizingMask = [.width, .height]
-        cv.frame = win.contentLayoutRect
+        if let parent = cv.superview {
+            cv.frame = parent.bounds
+        } else {
+            cv.frame = win.contentLayoutRect
+        }
     }
 
     private func repositionToPrimaryDisplay() {
@@ -409,10 +416,37 @@ final class WindowManager: WindowManaging {
 
     private func applyMousePolicy() {
         guard let win = window else { return }
-        let inRest = stageView?.isInRestPhase == true
-        stageView?.restPassMouseThroughOutsidePet = inRest && !restBlocksClicks
-        // 绑定 `AppViewModel` 后必须能收到左键（双击小狗 / 拖桌宠）。穿透模式靠 `PetStageView.hitTest` 在非狗区返回 `nil`，不能再整窗 ignores。
-        win.ignoresMouseEvents = deskMenuViewModel == nil
+        stageView?.restUserBlocksClicksOutsidePet = restBlocksClicks
+        guard deskMenuViewModel != nil else {
+            win.ignoresMouseEvents = true
+            return
+        }
+        if stageView?.isInRestPhase == true {
+            syncPetRestWindowMousePolicy()
+            return
+        }
+        win.ignoresMouseEvents = false
+    }
+
+    /// 休息且允许「狗外穿透」时：光标不在狗的屏幕命中区内则整窗 `ignoresMouseEvents = true`（系统级穿透）；在狗上则关闭，以便单击菜单 / 双击结束。
+    private func syncPetRestWindowMousePolicy() {
+        guard let win = window, let stage = stageView else { return }
+        guard deskMenuViewModel != nil else {
+            win.ignoresMouseEvents = true
+            return
+        }
+        guard stage.isInRestPhase else {
+            win.ignoresMouseEvents = false
+            return
+        }
+        let liberalPassThrough = !restBlocksClicks || !stage.restApproachAnimationComplete
+        if !liberalPassThrough {
+            win.ignoresMouseEvents = false
+            return
+        }
+        let petInWindow = stage.petHitRectInWindowBaseCoordinates
+        let petScreen = win.convertToScreen(petInWindow)
+        win.ignoresMouseEvents = !petScreen.contains(NSEvent.mouseLocation)
     }
 
     // MARK: - 智能提醒输入 / 气泡（PRD Smart Input）
