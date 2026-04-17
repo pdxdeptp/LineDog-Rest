@@ -14,6 +14,13 @@ final class MockRemindersEventStoreBacking: RemindersEventStoreBacking {
     var completeDelayNanos: UInt64 = 0
     var fetchDelayNanos: UInt64 = 0
 
+    var detailsById: [String: ReminderEditDetail] = [:]
+    private(set) var loadCallOrder: [String] = []
+    private(set) var savedDetails: [ReminderEditDetail] = []
+    var saveErrors: [String: Error] = [:]
+    private(set) var deleteCallOrder: [String] = []
+    var deleteErrors: [String: Error] = [:]
+
     func requestAccess() async throws -> Bool {
         if let requestAccessError { throw requestAccessError }
         return requestAccessResult
@@ -40,5 +47,48 @@ final class MockRemindersEventStoreBacking: RemindersEventStoreBacking {
         if let e = completeErrors[calendarItemIdentifier] {
             throw e
         }
+    }
+
+    func loadReminderDetail(calendarItemIdentifier: String) async throws -> ReminderEditDetail {
+        loadCallOrder.append(calendarItemIdentifier)
+        if let d = detailsById[calendarItemIdentifier] {
+            return d
+        }
+        guard let item = fetchResult.first(where: { $0.id == calendarItemIdentifier }) else {
+            throw NSError(domain: "MockReminders", code: 1, userInfo: [NSLocalizedDescriptionKey: "not found"])
+        }
+        return ReminderEditDetail(
+            calendarItemIdentifier: item.calendarItemIdentifier,
+            title: item.title,
+            notesPlain: "",
+            isRoutine: item.hasRoutineTag,
+            dueDate: item.dueDate,
+            includesTimeInDueDate: false
+        )
+    }
+
+    func saveReminderDetail(_ detail: ReminderEditDetail) async throws {
+        if let e = saveErrors[detail.calendarItemIdentifier] {
+            throw e
+        }
+        savedDetails.append(detail)
+        detailsById[detail.calendarItemIdentifier] = detail
+        if let idx = fetchResult.firstIndex(where: { $0.id == detail.calendarItemIdentifier }) {
+            fetchResult[idx] = ReminderDisplayItem(
+                calendarItemIdentifier: detail.calendarItemIdentifier,
+                title: detail.title,
+                dueDate: detail.dueDate,
+                hasRoutineTag: detail.isRoutine
+            )
+        }
+    }
+
+    func deleteReminder(calendarItemIdentifier: String) async throws {
+        if let e = deleteErrors[calendarItemIdentifier] {
+            throw e
+        }
+        deleteCallOrder.append(calendarItemIdentifier)
+        fetchResult.removeAll { $0.id == calendarItemIdentifier }
+        detailsById.removeValue(forKey: calendarItemIdentifier)
     }
 }

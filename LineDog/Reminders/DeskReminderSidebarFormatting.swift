@@ -131,9 +131,10 @@ enum DeskReminderSidebarMerger {
 
 /// 列表卡片时间列：当天仅时刻；明天带前缀；同周 `EEE HH:mm`；否则短日期。
 enum DeskReminderTimeFormatter {
-    /// 「计划」行内：只显示 `HH:mm`；无截止为「—」。
-    static func timeOnly(dueDate: Date?, calendar: Calendar = .current) -> String {
+    /// 「计划」行内：有具体时刻显示 `HH:mm`；仅日期型显示「全天」；无截止为「—」。
+    static func timeOnly(dueDate: Date?, hasExplicitTime: Bool = true, calendar: Calendar = .current) -> String {
         guard let dueDate else { return "—" }
+        guard hasExplicitTime else { return "全天" }
         let f = DateFormatter()
         f.locale = Locale(identifier: "zh_CN")
         f.timeZone = calendar.timeZone

@@ -73,4 +73,25 @@ final class RemindersSyncCoordinator {
         }
         onItemsChanged?(items)
     }
+
+    func loadReminderDetail(calendarItemIdentifier: String) async throws -> ReminderEditDetail {
+        try await backing.loadReminderDetail(calendarItemIdentifier: calendarItemIdentifier)
+    }
+
+    func saveReminderDetail(_ detail: ReminderEditDetail) async throws {
+        try await backing.saveReminderDetail(detail)
+        await reloadFromEventKit()
+    }
+
+    func deleteReminder(id: String) async {
+        items.removeAll { $0.id == id }
+        onItemsChanged?(items)
+        do {
+            try await backing.deleteReminder(calendarItemIdentifier: id)
+            await reloadFromEventKit()
+        } catch {
+            await reloadFromEventKit()
+        }
+        onItemsChanged?(items)
+    }
 }

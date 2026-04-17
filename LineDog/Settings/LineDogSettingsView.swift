@@ -18,12 +18,17 @@ struct LineDogSettingsView: View {
     @AppStorage(LineDogDefaults.sevenMinuteReminderShortcutModifiers) private var sevenModifiersRaw: Int = SevenMinuteReminderShortcut.defaultModifiersStorageInt
     @AppStorage(LineDogDefaults.sevenMinuteReminderShortcutKeyLabel) private var sevenKeyLabel: String = SevenMinuteReminderShortcut.default.keyLabel
 
+    @AppStorage(LineDogDefaults.resetIdlePetShortcutKeyCode) private var resetPetKeyCode: Int = Int(ResetIdlePetPositionShortcut.defaultKeyCode)
+    @AppStorage(LineDogDefaults.resetIdlePetShortcutModifiers) private var resetPetModifiersRaw: Int = ResetIdlePetPositionShortcut.defaultModifiersStorageInt
+    @AppStorage(LineDogDefaults.resetIdlePetShortcutKeyLabel) private var resetPetKeyLabel: String = ResetIdlePetPositionShortcut.default.keyLabel
+
     @State private var isRecordingSmartShortcut = false
     @State private var isRecordingDeskShortcut = false
     @State private var isRecordingSevenMinuteShortcut = false
+    @State private var isRecordingResetPetShortcut = false
 
     private var shortcutRecorderBusy: Bool {
-        isRecordingSmartShortcut || isRecordingDeskShortcut || isRecordingSevenMinuteShortcut
+        isRecordingSmartShortcut || isRecordingDeskShortcut || isRecordingSevenMinuteShortcut || isRecordingResetPetShortcut
     }
 
     private var smartShortcutModel: SmartReminderInputShortcut {
@@ -47,6 +52,14 @@ struct LineDogSettingsView: View {
             keyCode: UInt16(clamping: sevenKeyCode),
             modifiers: NSEvent.ModifierFlags(rawValue: UInt(clamping: max(0, sevenModifiersRaw))),
             keyLabel: sevenKeyLabel
+        )
+    }
+
+    private var resetPetShortcutModel: ResetIdlePetPositionShortcut {
+        ResetIdlePetPositionShortcut(
+            keyCode: UInt16(clamping: resetPetKeyCode),
+            modifiers: NSEvent.ModifierFlags(rawValue: UInt(clamping: max(0, resetPetModifiersRaw))),
+            keyLabel: resetPetKeyLabel
         )
     }
 
@@ -141,6 +154,40 @@ struct LineDogSettingsView: View {
 
             Section {
                 HStack(alignment: .firstTextBaseline, spacing: 12) {
+                    Text(resetPetShortcutModel.displayString)
+                        .font(.system(.body, design: .monospaced))
+                        .frame(minWidth: 120, alignment: .leading)
+                    Button(isRecordingResetPetShortcut ? "等待按键…" : "修改快捷键…") {
+                        isRecordingResetPetShortcut = true
+                    }
+                    .disabled(shortcutRecorderBusy)
+                    Button("恢复默认") {
+                        let d = ResetIdlePetPositionShortcut.default
+                        resetPetKeyCode = Int(d.keyCode)
+                        resetPetModifiersRaw = ResetIdlePetPositionShortcut.defaultModifiersStorageInt
+                        resetPetKeyLabel = d.keyLabel
+                    }
+                    .disabled(shortcutRecorderBusy)
+                }
+                Text("一键把桌宠移回菜单栏屏可见区右下角（与面板里按钮相同）。默认 ⌘⇧R；须带 ⌘ / ⌥ / ⌃ / ⇧ 之一；按 Esc 取消录制。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                GlobalShortcutKeyRecorder(
+                    isRecording: $isRecordingResetPetShortcut,
+                    onCaptured: { keyCode, modRaw, label in
+                        resetPetKeyCode = Int(keyCode)
+                        resetPetModifiersRaw = Int(modRaw)
+                        resetPetKeyLabel = label
+                    },
+                    onCancel: {}
+                )
+                .frame(width: 0, height: 0)
+            } header: {
+                Text("桌宠回到右下角")
+            }
+
+            Section {
+                HStack(alignment: .firstTextBaseline, spacing: 12) {
                     Text(sevenShortcutModel.displayString)
                         .font(.system(.body, design: .monospaced))
                         .frame(minWidth: 120, alignment: .leading)
@@ -177,7 +224,7 @@ struct LineDogSettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(minWidth: 420, minHeight: 420)
+        .frame(minWidth: 420, minHeight: 480)
         .padding()
         .onAppear {
             let ids = Set(LineDogGeminiModelCatalog.pickerOptions.map(\.id))

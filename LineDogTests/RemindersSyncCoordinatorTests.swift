@@ -107,4 +107,55 @@ final class RemindersSyncCoordinatorTests: XCTestCase {
         ]
         XCTAssertEqual(RemindersDefaultListResolver.preferredCalendarId(from: lists), "e")
     }
+
+    func testDeleteReminder_callsBackingAndReloads() async {
+        let mock = MockRemindersEventStoreBacking()
+        let pref = RemindersSelectedListPreference(defaults: testDefaults)
+        pref.selectedCalendarIdentifier = "cal"
+        let item = ReminderDisplayItem(calendarItemIdentifier: "d1", title: "Del")
+        mock.fetchResult = [item]
+        let c = RemindersSyncCoordinator(backing: mock, preference: pref, debounceInterval: 0.05)
+        await c.reloadFromEventKit()
+        XCTAssertEqual(mock.fetchCallCount, 1)
+        XCTAssertEqual(c.items.count, 1)
+
+        await c.deleteReminder(id: "d1")
+        XCTAssertEqual(mock.deleteCallOrder, ["d1"])
+        XCTAssertEqual(mock.fetchCallCount, 2)
+        XCTAssertTrue(c.items.isEmpty)
+    }
+
+    func testDeleteReminder_onFailure_restoresViaReload() async {
+        let mock = MockRemindersEventStoreBacking()
+        let pref = RemindersSelectedListPreference(defaults: testDefaults)
+        pref.selectedCalendarIdentifier = "cal"
+        let item = ReminderDisplayItem(calendarItemIdentifier: "d1", title: "Del")
+        mock.fetchResult = [item]
+        mock.deleteErrors["d1"] = NSError(domain: "t", code: 2)
+        let c = RemindersSyncCoordinator(backing: mock, preference: pref, debounceInterval: 0.05)
+        await c.reloadFromEventKit()
+        await c.deleteReminder(id: "d1")
+        XCTAssertEqual(c.items.count, 1)
+        XCTAssertEqual(c.items.first?.id, "d1")
+    }
+
+    func testSaveReminderDetail_callsBackingAndReloads() async throws {
+        let mock = MockRemindersEventStoreBacking()
+        let pref = RemindersSelectedListPreference(defaults: testDefaults)
+        pref.selectedCalendarIdentifier = "cal"
+        let item = ReminderDisplayItem(calendarItemIdentifier: "s1", title: "Old")
+        mock.fetchResult = [item]
+        let c = RemindersSyncCoordinator(backing: mock, preference: pref, debounceInterval: 0.05)
+        await c.reloadFromEventKit()
+        XCTAssertEqual(mock.fetchCallCount, 1)
+
+        var detail = try await c.loadReminderDetail(calendarItemIdentifier: "s1")
+        XCTAssertEqual(mock.loadCallOrder, ["s1"])
+        detail.title = "New"
+        try await c.saveReminderDetail(detail)
+        XCTAssertEqual(mock.savedDetails.count, 1)
+        XCTAssertEqual(mock.savedDetails.first?.title, "New")
+        XCTAssertEqual(mock.fetchCallCount, 2)
+        XCTAssertEqual(c.items.first?.title, "New")
+    }
 }

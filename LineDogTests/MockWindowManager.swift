@@ -9,6 +9,7 @@ final class MockWindowManager: WindowManaging {
     private(set) var presentCount = 0
     private(set) var lastPresentDuration: TimeInterval?
     private(set) var idleModesApplied: [PetDisplayMode] = []
+    private(set) var resetIdlePetPositionCount = 0
 
     private var pendingUserDismiss: (() -> Void)?
 
@@ -33,6 +34,10 @@ final class MockWindowManager: WindowManaging {
     func bindDeskPetMenu(viewModel: AppViewModel?) {}
 
     func setRestBlocksClicks(_ blocks: Bool) {}
+
+    func resetIdlePetPositionToDefaultCorner() {
+        resetIdlePetPositionCount += 1
+    }
 
     func presentSmartReminderInput(anchorRectInScreen: NSRect, onSubmit: @escaping (String) -> Void, onCancel: @escaping () -> Void) {}
 

@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// 控制面板 UI：同时用于 `MenuBarExtra` 与右下角桌宠的 `NSPopover`（`WindowManager`），改此处即可两边同步。
@@ -6,12 +7,27 @@ struct MenuBarContentView: View {
 
     @AppStorage(LineDogDefaults.sevenMinuteReminderDurationMinutes) private var sevenMinuteMinutesStored = 7
 
+    @AppStorage(LineDogDefaults.resetIdlePetShortcutKeyCode) private var resetPetKeyCode: Int = Int(ResetIdlePetPositionShortcut.defaultKeyCode)
+    @AppStorage(LineDogDefaults.resetIdlePetShortcutModifiers) private var resetPetModifiersRaw: Int = ResetIdlePetPositionShortcut.defaultModifiersStorageInt
+    @AppStorage(LineDogDefaults.resetIdlePetShortcutKeyLabel) private var resetPetKeyLabel: String = ResetIdlePetPositionShortcut.default.keyLabel
+
     private var deskReminders: DeskRemindersModel { viewModel.deskReminders }
+
+    @State private var reminderUnderEdit: ReminderDisplayItem?
+    @State private var deleteConfirmationId: String?
 
     private var sevenMinuteMinutesResolved: Int {
         let v = sevenMinuteMinutesStored
         if v < 1 { return 7 }
         return min(180, v)
+    }
+
+    private var resetPetShortcutDisplay: String {
+        ResetIdlePetPositionShortcut(
+            keyCode: UInt16(clamping: resetPetKeyCode),
+            modifiers: NSEvent.ModifierFlags(rawValue: UInt(clamping: max(0, resetPetModifiersRaw))),
+            keyLabel: resetPetKeyLabel
+        ).displayString
     }
 
     private var reminderDaySections: [DeskReminderDaySection] {
@@ -24,8 +40,8 @@ struct MenuBarContentView: View {
     /// 双栏外圈与右栏标题行：数值集中，避免「窗体顶边 vs 首行」只靠右栏独自撑开。
     private enum MainPanelChrome {
         static let horizontalPadding: CGFloat = 12
-        /// 整块内容上内边距：菜单栏 window 样式下与系统标题区拉开距离（左右栏一起生效）。
-        static let topPadding: CGFloat = 20
+        /// 整块内容上内边距。顶部留白唯一控制点，改此处即可（不要在 ScrollView 上加 ignoresSafeArea，否则会被抵消）。
+        static let topPadding: CGFloat = 16
         static let bottomPadding: CGFloat = 12
     }
 
@@ -54,7 +70,30 @@ struct MenuBarContentView: View {
             .padding(.top, MainPanelChrome.topPadding)
             .padding(.bottom, MainPanelChrome.bottomPadding)
         }
-        .frame(minWidth: remindersColumnWidth + 24 + 300 + 24, minHeight: 520)
+        .frame(minWidth: remindersColumnWidth + 24 + 300 + 24, minHeight: 556)
+        .sheet(item: $reminderUnderEdit) { item in
+            DeskReminderEditSheet(item: item, deskReminders: deskReminders)
+        }
+        .confirmationDialog(
+            "确认删除这条提醒？",
+            isPresented: Binding(
+                get: { deleteConfirmationId != nil },
+                set: { if !$0 { deleteConfirmationId = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("删除", role: .destructive) {
+                if let id = deleteConfirmationId {
+                    Task { await deskReminders.deleteReminder(id: id) }
+                }
+                deleteConfirmationId = nil
+            }
+            Button("取消", role: .cancel) {
+                deleteConfirmationId = nil
+            }
+        } message: {
+            Text("将从系统「提醒事项」中移除。")
+        }
         .task {
             await deskReminders.prepare()
         }
@@ -91,7 +130,7 @@ struct MenuBarContentView: View {
 
     @ViewBuilder
     private func deskReminderRow(_ item: ReminderDisplayItem) -> some View {
-        let timeText = DeskReminderTimeFormatter.timeOnly(dueDate: item.dueDate)
+        let timeText = DeskReminderTimeFormatter.timeOnly(dueDate: item.dueDate, hasExplicitTime: item.hasExplicitTime)
         HStack(alignment: .center, spacing: 10) {
             Button {
                 Task { await deskReminders.completeReminder(id: item.id) }
@@ -109,7 +148,7 @@ struct MenuBarContentView: View {
                 .multilineTextAlignment(.leading)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            HStack(spacing: 6) {
+            HStack(spacing: 4) {
                 if item.hasRoutineTag {
                     Text(LineDogRoutineTag.marker)
                         .font(.caption.weight(.semibold))
@@ -118,11 +157,51 @@ struct MenuBarContentView: View {
                 Text(timeText)
                     .font(.subheadline.weight(.medium).monospacedDigit())
                     .foregroundStyle(.secondary)
+                    .frame(minWidth: timeText == "全天" ? 28 : 36, alignment: .trailing)
+
+                Menu {
+                    Button("编辑…") {
+                        deskReminders.clearMutationMessage()
+                        reminderUnderEdit = item
+                    }
+                    Button("推迟到明天") {
+                        Task { await deskReminders.postponeReminderToTomorrow(id: item.id) }
+                    }
+                    Button("推迟 7 天") {
+                        Task { await deskReminders.postponeReminder(id: item.id, addingDays: 7) }
+                    }
+                    Divider()
+                    Button("删除…", role: .destructive) {
+                        deleteConfirmationId = item.id
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .font(.body)
+                        .foregroundStyle(.secondary)
+                }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+                .help("更多")
             }
-            .frame(minWidth: 44, alignment: .trailing)
         }
         .padding(.vertical, 8)
         .padding(.horizontal, 2)
+        .contextMenu {
+            Button("编辑…") {
+                deskReminders.clearMutationMessage()
+                reminderUnderEdit = item
+            }
+            Button("推迟到明天") {
+                Task { await deskReminders.postponeReminderToTomorrow(id: item.id) }
+            }
+            Button("推迟 7 天") {
+                Task { await deskReminders.postponeReminder(id: item.id, addingDays: 7) }
+            }
+            Divider()
+            Button("删除…", role: .destructive) {
+                deleteConfirmationId = item.id
+            }
+        }
         Divider()
     }
 
@@ -132,10 +211,17 @@ struct MenuBarContentView: View {
             Text("计划")
                 .font(.title2.bold())
                 .foregroundStyle(.red)
-            Text("所选列表 · 今日「#日常」· 七日内 · 按日期分组 · 不可在此新建")
+            Text("所选列表 · 今日「#日常」· 七日内 · 按日期分组 · 可编辑 / 推迟 / 删除；新建请用智能输入。")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
+
+            if let mut = deskReminders.mutationMessage, !mut.isEmpty {
+                Text(mut)
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
             if let msg = deskReminders.statusMessage, !deskReminders.isAuthorized {
                 Text(msg)
@@ -164,51 +250,49 @@ struct MenuBarContentView: View {
                 .pickerStyle(.menu)
             }
 
-            Group {
-                if deskReminders.isAuthorized {
-                    if deskReminders.items.isEmpty {
-                        Text("当前窗口内无待办")
-                            .font(.subheadline)
-                            .foregroundStyle(.tertiary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.vertical, 8)
-                    } else {
-                        ScrollView {
-                            LazyVStack(alignment: .leading, spacing: 0) {
-                                ForEach(Array(reminderDaySections.enumerated()), id: \.element.id) { idx, section in
-                                    VStack(alignment: .leading, spacing: 0) {
-                                        Text(section.headerTitle)
-                                            .font(.subheadline.weight(.semibold))
-                                            .foregroundStyle(.primary)
-                                            .padding(.top, idx == 0 ? 2 : 12)
-                                            .padding(.bottom, 6)
-                                        Divider()
-                                            .opacity(0.45)
-                                        ForEach(section.items) { item in
-                                            deskReminderRow(item)
-                                        }
+            if deskReminders.isAuthorized {
+                if deskReminders.items.isEmpty {
+                    Text("当前窗口内无待办")
+                        .font(.subheadline)
+                        .foregroundStyle(.tertiary)
+                        .frame(maxWidth: .infinity, alignment: .topLeading)
+                        .padding(.vertical, 8)
+                } else {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 0) {
+                            ForEach(Array(reminderDaySections.enumerated()), id: \.element.id) { idx, section in
+                                VStack(alignment: .leading, spacing: 0) {
+                                    Text(section.headerTitle)
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(.primary)
+                                        .padding(.top, idx == 0 ? 2 : 12)
+                                        .padding(.bottom, 6)
+                                    Divider()
+                                        .opacity(0.45)
+                                    ForEach(section.items) { item in
+                                        deskReminderRow(item)
                                     }
                                 }
                             }
-                            .padding(.vertical, 4)
                         }
-                        .frame(height: 260)
+                        .padding(.vertical, 4)
                     }
-                } else {
-                    Button("连接提醒事项…") {
-                        Task { await deskReminders.prepare() }
-                    }
-                    .buttonStyle(.borderedProminent)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
+            } else {
+                Button("连接提醒事项…") {
+                    Task { await deskReminders.prepare() }
+                }
+                .buttonStyle(.borderedProminent)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
-        .frame(maxHeight: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 
-    /// 右栏：番茄钟、小猫、7 分钟提醒等原有控制。
+    /// 右栏：番茄钟、小猫、7 分钟提醒等原有控制（内容可滚动，高度由左栏决定）。
     private var mainControlsColumn: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        ScrollView {
+        VStack(alignment: .leading, spacing: 8) {
             mainPanelHeader
 
             Text(viewModel.statusLine)
@@ -251,6 +335,11 @@ struct MenuBarContentView: View {
             Button("立即开始休息（测试）") {
                 viewModel.startTestRestNow()
             }
+
+            Button("桌宠回到右下角（\(resetPetShortcutDisplay)）") {
+                viewModel.resetIdlePetPositionFromUserAction()
+            }
+            .help("将小狗窗口移回菜单栏所在屏可见区右下角并保存；休息霸屏时无效。快捷键可在设置中修改。")
 
             Toggle(isOn: Binding(
                 get: { viewModel.restBlocksClicksDuringRest },
@@ -314,9 +403,11 @@ struct MenuBarContentView: View {
             }
             .keyboardShortcut("q", modifiers: [.command])
 
-            Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .padding(.bottom, 8)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        } // end ScrollView
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private func restBlockingHint(_ blocks: Bool) -> String {

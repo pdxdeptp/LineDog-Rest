@@ -34,11 +34,16 @@ protocol WindowManaging: AnyObject {
     func dismissSmartReminderToast()
     /// 提醒已成功写入后调用：仅当草稿仍与本次提交原文一致时清空（避免异步返回时覆盖用户新开面板后的输入）。
     func clearSmartReminderInputDraftIfStillMatchesSubmittedText(_ submitted: String)
+    /// 常态桌宠窗回到菜单栏屏可见区右下角并写入 UserDefaults；休息霸屏中不执行。
+    func resetIdlePetPositionToDefaultCorner()
 }
 
 /// 模块 2：常态为**仅桌宠大小**的透明小窗（可拖动，位置持久化）；休息时扩展为菜单栏屏全屏霸屏。同一只 `PetStageView`。
 @MainActor
 final class WindowManager: WindowManaging {
+    /// 桌宠 `NSWindow.identifier`，供 `NSApplicationDelegate.applicationShouldHandleReopen` 等前置窗口。
+    static let deskPetWindowIdentifier = "com.linedog.deskPetStage"
+
     private var window: NSWindow?
     private var stageView: PetStageView?
     private weak var deskMenuViewModel: AppViewModel?
@@ -218,6 +223,7 @@ final class WindowManager: WindowManaging {
             defer: false,
             screen: primary.screen
         )
+        win.identifier = NSUserInterfaceItemIdentifier(Self.deskPetWindowIdentifier)
         win.alphaValue = 1
         win.isOpaque = false
         win.backgroundColor = .clear
@@ -317,6 +323,20 @@ final class WindowManager: WindowManaging {
     func applyIdlePetDisplayMode(_ mode: PetDisplayMode) {
         pendingIdlePetMode = mode
         stageView?.applyNonRestPetDisplayMode(mode)
+    }
+
+    func resetIdlePetPositionToDefaultCorner() {
+        installPetWindowIfNeeded()
+        guard let win = window, let stage = stageView else { return }
+        guard !stage.isInRestPhase else { return }
+        let target = Self.clampIdlePetFrameToScreens(Self.defaultIdlePetWindowFrame())
+        win.setFrame(target, display: true)
+        syncContentViewToWindowLayout()
+        stage.needsLayout = true
+        stage.layoutSubtreeIfNeeded()
+        persistIdlePetFrame(target)
+        applyMousePolicy()
+        win.orderFrontRegardless()
     }
 
     func dismissRestImmediately() {

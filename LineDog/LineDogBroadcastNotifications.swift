@@ -9,6 +9,8 @@ enum LineDogBroadcastNotifications {
     static let presentDeskPetMenu = Notification.Name("com.linedog.presentDeskPetMenu")
     /// 全局快捷键切换独立倒计时提醒（进行中则取消，否则按设置时长开始）。
     static let toggleSevenMinuteReminder = Notification.Name("com.linedog.toggleSevenMinuteReminder")
+    /// 全局快捷键：常态桌宠窗回到菜单栏屏可见区右下角并持久化（休息霸屏中忽略）。
+    static let resetIdlePetPositionToDefault = Notification.Name("com.linedog.resetIdlePetPositionToDefault")
     /// `userInfo` 中为 `NSValue` 包 `NSRect`（屏幕坐标）。
     static let idlePetScreenFrameUserInfoKey = "screenFrame"
 }

@@ -32,6 +32,8 @@
 		A219 /* RemindersSyncCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B219 /* RemindersSyncCoordinator.swift */; };
 		A21A /* EventKitRemindersBacking.swift in Sources */ = {isa = PBXBuildFile; fileRef = B21A /* EventKitRemindersBacking.swift */; };
 		A21B /* DeskRemindersModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B21B /* DeskRemindersModel.swift */; };
+		A21C /* ReminderEditDetail.swift in Sources */ = {isa = PBXBuildFile; fileRef = B21C /* ReminderEditDetail.swift */; };
+		A21D /* DeskReminderEditSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B21D /* DeskReminderEditSheet.swift */; };
 		A220 /* LLMReminderJSONPayload.swift in Sources */ = {isa = PBXBuildFile; fileRef = B220 /* LLMReminderJSONPayload.swift */; };
 		A221 /* ReminderMutationServing.swift in Sources */ = {isa = PBXBuildFile; fileRef = B221 /* ReminderMutationServing.swift */; };
 		A222 /* SmartReminderPromptBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = B222 /* SmartReminderPromptBuilder.swift */; };
@@ -51,6 +53,8 @@
 		A234 /* LineDogCarbonGlobalHotKeys.swift in Sources */ = {isa = PBXBuildFile; fileRef = B234 /* LineDogCarbonGlobalHotKeys.swift */; };
 		A236 /* SmartReminderInputShortcut.swift in Sources */ = {isa = PBXBuildFile; fileRef = B236 /* SmartReminderInputShortcut.swift */; };
 		A239 /* SevenMinuteReminderShortcut.swift in Sources */ = {isa = PBXBuildFile; fileRef = B239 /* SevenMinuteReminderShortcut.swift */; };
+		A23A /* ResetIdlePetPositionShortcut.swift in Sources */ = {isa = PBXBuildFile; fileRef = B23A /* ResetIdlePetPositionShortcut.swift */; };
+		A23B /* LineDogDockIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = B23B /* LineDogDockIcon.swift */; };
 		A235 /* Carbon.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B235 /* Carbon.framework */; };
 		A301 /* MockWindowManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B301 /* MockWindowManager.swift */; };
 		A302 /* LineDogInteractionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B302 /* LineDogInteractionTests.swift */; };
@@ -98,6 +102,8 @@
 		B219 /* RemindersSyncCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemindersSyncCoordinator.swift; sourceTree = "<group>"; };
 		B21A /* EventKitRemindersBacking.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventKitRemindersBacking.swift; sourceTree = "<group>"; };
 		B21B /* DeskRemindersModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeskRemindersModel.swift; sourceTree = "<group>"; };
+		B21C /* ReminderEditDetail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderEditDetail.swift; sourceTree = "<group>"; };
+		B21D /* DeskReminderEditSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeskReminderEditSheet.swift; sourceTree = "<group>"; };
 		B220 /* LLMReminderJSONPayload.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMReminderJSONPayload.swift; sourceTree = "<group>"; };
 		B221 /* ReminderMutationServing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderMutationServing.swift; sourceTree = "<group>"; };
 		B222 /* SmartReminderPromptBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartReminderPromptBuilder.swift; sourceTree = "<group>"; };
@@ -117,6 +123,8 @@
 		B234 /* LineDogCarbonGlobalHotKeys.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LineDogCarbonGlobalHotKeys.swift; sourceTree = "<group>"; };
 		B236 /* SmartReminderInputShortcut.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartReminderInputShortcut.swift; sourceTree = "<group>"; };
 		B239 /* SevenMinuteReminderShortcut.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SevenMinuteReminderShortcut.swift; sourceTree = "<group>"; };
+		B23A /* ResetIdlePetPositionShortcut.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResetIdlePetPositionShortcut.swift; sourceTree = "<group>"; };
+		B23B /* LineDogDockIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LineDogDockIcon.swift; sourceTree = "<group>"; };
 		B301 /* MockWindowManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockWindowManager.swift; sourceTree = "<group>"; };
 		B302 /* LineDogInteractionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LineDogInteractionTests.swift; sourceTree = "<group>"; };
 		B303 /* MockRemindersEventStoreBacking.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockRemindersEventStoreBacking.swift; sourceTree = "<group>"; };
@@ -181,6 +189,8 @@
 				B234 /* LineDogCarbonGlobalHotKeys.swift */,
 				B236 /* SmartReminderInputShortcut.swift */,
 				B239 /* SevenMinuteReminderShortcut.swift */,
+				B23A /* ResetIdlePetPositionShortcut.swift */,
+				B23B /* LineDogDockIcon.swift */,
 				B229 /* LineDogPresentationAnchor.swift */,
 				B20B /* Assets.xcassets */,
 			);
@@ -266,6 +276,8 @@
 				B219 /* RemindersSyncCoordinator.swift */,
 				B21A /* EventKitRemindersBacking.swift */,
 				B21B /* DeskRemindersModel.swift */,
+				B21C /* ReminderEditDetail.swift */,
+				B21D /* DeskReminderEditSheet.swift */,
 				B231 /* DeskReminderSidebarFormatting.swift */,
 			);
 			path = Reminders;
@@ -412,6 +424,8 @@
 				A219 /* RemindersSyncCoordinator.swift in Sources */,
 				A21A /* EventKitRemindersBacking.swift in Sources */,
 				A21B /* DeskRemindersModel.swift in Sources */,
+				A21C /* ReminderEditDetail.swift in Sources */,
+				A21D /* DeskReminderEditSheet.swift in Sources */,
 				A220 /* LLMReminderJSONPayload.swift in Sources */,
 				A221 /* ReminderMutationServing.swift in Sources */,
 				A222 /* SmartReminderPromptBuilder.swift in Sources */,
@@ -426,6 +440,8 @@
 				A234 /* LineDogCarbonGlobalHotKeys.swift in Sources */,
 				A236 /* SmartReminderInputShortcut.swift in Sources */,
 				A239 /* SevenMinuteReminderShortcut.swift in Sources */,
+				A23A /* ResetIdlePetPositionShortcut.swift in Sources */,
+				A23B /* LineDogDockIcon.swift in Sources */,
 				A228 /* LineDogSettingsView.swift in Sources */,
 				A229 /* LineDogPresentationAnchor.swift in Sources */,
 				A230 /* SmartReminderNotesComposer.swift in Sources */,
@@ -593,7 +609,6 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "LineDog Rest";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
-				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSRemindersUsageDescription = "LineDog 仅在您选择的列表中读取与勾选今日待办，与系统「提醒事项」同步。";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -623,7 +638,6 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "LineDog Rest";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
-				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSRemindersUsageDescription = "LineDog 仅在您选择的列表中读取与勾选今日待办，与系统「提醒事项」同步。";
 				LD_RUNPATH_SEARCH_PATHS = (

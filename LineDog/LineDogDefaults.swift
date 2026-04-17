@@ -20,4 +20,8 @@ enum LineDogDefaults {
     static let sevenMinuteReminderShortcutKeyCode = "LineDog.sevenMinuteReminderShortcut.keyCode"
     static let sevenMinuteReminderShortcutModifiers = "LineDog.sevenMinuteReminderShortcut.modifiers"
     static let sevenMinuteReminderShortcutKeyLabel = "LineDog.sevenMinuteReminderShortcut.keyLabel"
+
+    static let resetIdlePetShortcutKeyCode = "LineDog.resetIdlePetShortcut.keyCode"
+    static let resetIdlePetShortcutModifiers = "LineDog.resetIdlePetShortcut.modifiers"
+    static let resetIdlePetShortcutKeyLabel = "LineDog.resetIdlePetShortcut.keyLabel"
 }

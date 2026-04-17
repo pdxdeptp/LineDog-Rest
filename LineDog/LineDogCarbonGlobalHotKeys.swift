@@ -1,21 +1,24 @@
 import AppKit
 import Carbon.HIToolbox
 
-/// Carbon `RegisterEventHotKey`：桌宠菜单（id 1）与智能输入（id 2）。不依赖「辅助功能」。
+/// Carbon `RegisterEventHotKey`：桌宠菜单（id 1）、智能输入（id 2）、独立倒计时（id 3）、桌宠复位（id 4）。不依赖「辅助功能」。
 enum LineDogCarbonGlobalHotKeys {
     private static let signature: OSType = 0x4C44_4F47 // 'LDOG'
     private static let deskHotKeyID: UInt32 = 1
     private static let smartInputHotKeyID: UInt32 = 2
     private static let sevenMinuteHotKeyID: UInt32 = 3
+    private static let resetIdlePetHotKeyID: UInt32 = 4
 
     private static var deskHotKeyRef: EventHotKeyRef?
     private static var smartInputHotKeyRef: EventHotKeyRef?
     private static var sevenMinuteHotKeyRef: EventHotKeyRef?
+    private static var resetIdlePetHotKeyRef: EventHotKeyRef?
     private static var handlerRef: EventHandlerRef?
     private static var defaultsObserver: NSObjectProtocol?
     private static var lastDeskInstalled: DeskPetMenuShortcut?
     private static var lastSmartInstalled: SmartReminderInputShortcut?
     private static var lastSevenMinuteInstalled: SevenMinuteReminderShortcut?
+    private static var lastResetIdlePetInstalled: ResetIdlePetPositionShortcut?
 
     static func start() {
         installHandlerIfNeeded()
@@ -38,6 +41,7 @@ enum LineDogCarbonGlobalHotKeys {
         unregisterDeskHotKey()
         unregisterSmartInputHotKey()
         unregisterSevenMinuteHotKey()
+        unregisterResetIdlePetHotKey()
         if let handlerRef {
             RemoveEventHandler(handlerRef)
         }
@@ -45,6 +49,7 @@ enum LineDogCarbonGlobalHotKeys {
         lastDeskInstalled = nil
         lastSmartInstalled = nil
         lastSevenMinuteInstalled = nil
+        lastResetIdlePetInstalled = nil
     }
 
     private static func installHandlerIfNeeded() {
@@ -78,6 +83,13 @@ enum LineDogCarbonGlobalHotKeys {
             UnregisterEventHotKey(sevenMinuteHotKeyRef)
         }
         sevenMinuteHotKeyRef = nil
+    }
+
+    private static func unregisterResetIdlePetHotKey() {
+        if let resetIdlePetHotKeyRef {
+            UnregisterEventHotKey(resetIdlePetHotKeyRef)
+        }
+        resetIdlePetHotKeyRef = nil
     }
 
     private static func syncRegistration() {
@@ -146,6 +158,27 @@ enum LineDogCarbonGlobalHotKeys {
                 lastSevenMinuteInstalled = nil
             }
         }
+
+        let resetPet = ResetIdlePetPositionShortcut.load()
+        if resetPet != lastResetIdlePetInstalled || resetIdlePetHotKeyRef == nil {
+            unregisterResetIdlePetHotKey()
+            var ref: EventHotKeyRef?
+            let hid = EventHotKeyID(signature: signature, id: resetIdlePetHotKeyID)
+            let status = RegisterEventHotKey(
+                UInt32(resetPet.keyCode),
+                lineDogCarbonModifierMask(for: resetPet.modifiers),
+                hid,
+                GetApplicationEventTarget(),
+                0,
+                &ref
+            )
+            if status == noErr {
+                resetIdlePetHotKeyRef = ref
+                lastResetIdlePetInstalled = resetPet
+            } else {
+                lastResetIdlePetInstalled = nil
+            }
+        }
     }
 }
 
@@ -202,6 +235,13 @@ private func lineDogCarbonGlobalHotKeysCallback(
         DispatchQueue.main.async {
             NotificationCenter.default.post(
                 name: LineDogBroadcastNotifications.toggleSevenMinuteReminder,
+                object: nil
+            )
+        }
+    case 4:
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(
+                name: LineDogBroadcastNotifications.resetIdlePetPositionToDefault,
                 object: nil
             )
         }

@@ -56,6 +56,7 @@ final class AppViewModel: ObservableObject {
     private var smartReminderShortcutObserver: NSObjectProtocol?
     private var deskPetMenuShortcutObserver: NSObjectProtocol?
     private var sevenMinuteShortcutObserver: NSObjectProtocol?
+    private var resetIdlePetShortcutObserver: NSObjectProtocol?
     /// 智能提醒写入的 `EKAlarm` 到点后弹出与 7 分钟倒计时相同的中央铃铛。
     private var smartReminderBellTasks: [String: Task<Void, Never>] = [:]
 
@@ -153,6 +154,14 @@ final class AppViewModel: ObservableObject {
         ) { [weak self] _ in
             self?.toggleSevenMinuteReminderFromGlobalShortcut()
         }
+
+        resetIdlePetShortcutObserver = NotificationCenter.default.addObserver(
+            forName: LineDogBroadcastNotifications.resetIdlePetPositionToDefault,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.resetIdlePetPositionFromUserAction()
+        }
     }
 
     deinit {
@@ -164,6 +173,9 @@ final class AppViewModel: ObservableObject {
         }
         if let sevenMinuteShortcutObserver {
             NotificationCenter.default.removeObserver(sevenMinuteShortcutObserver)
+        }
+        if let resetIdlePetShortcutObserver {
+            NotificationCenter.default.removeObserver(resetIdlePetShortcutObserver)
         }
     }
 
@@ -284,6 +296,11 @@ final class AppViewModel: ObservableObject {
         } else {
             startSevenMinuteReminder()
         }
+    }
+
+    /// 菜单或全局快捷键：常态桌宠回到菜单栏屏可见区右下角（休息霸屏中由 `WindowManager` 忽略）。
+    func resetIdlePetPositionFromUserAction() {
+        windowManager.resetIdlePetPositionToDefaultCorner()
     }
 
     func setRestBlocksClicksDuringRest(_ enabled: Bool) {

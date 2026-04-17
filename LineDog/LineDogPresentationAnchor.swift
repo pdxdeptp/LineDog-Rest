@@ -1,5 +1,37 @@
 import AppKit
 
+// #region agent log
+enum LineDogAgentDebugNDJSON {
+    static let sessionId = "00efd9"
+    static let path = "/Users/cpt/Public/LineDog/.cursor/debug-00efd9.log"
+
+    static func log(hypothesisId: String, location: String, message: String, data: [String: String] = [:], runId: String = "run1") {
+        let ts = Int(Date().timeIntervalSince1970 * 1000)
+        var dict: [String: Any] = [
+            "sessionId": sessionId,
+            "runId": runId,
+            "hypothesisId": hypothesisId,
+            "location": location,
+            "message": message,
+            "timestamp": ts
+        ]
+        if !data.isEmpty { dict["data"] = data }
+        guard let j = try? JSONSerialization.data(withJSONObject: dict),
+              let line = String(data: j, encoding: .utf8) else { return }
+        let bytes = (line + "\n").data(using: .utf8) ?? Data()
+        if FileManager.default.fileExists(atPath: path) {
+            if let h = FileHandle(forUpdatingAtPath: path) {
+                h.seekToEndOfFile()
+                h.write(bytes)
+                h.closeFile()
+            }
+        } else {
+            FileManager.default.createFile(atPath: path, contents: bytes, attributes: nil)
+        }
+    }
+}
+// #endregion
+
 /// 桌宠常态小窗在**屏幕坐标**下的 frame，供设置窗、系统权限 sheet 等与小狗同屏显示。
 /// 由 `WindowManager` 在常态小窗位置变化时更新（休息全屏阶段不更新，沿用上次常态位置）。
 @MainActor
@@ -50,10 +82,16 @@ enum LineDogPresentationAnchor {
 
 // MARK: - 系统权限 / TCC sheet 锚定
 
+/// `.borderless` `NSWindow` 默认 `canBecomeKeyWindow == false`；子类覆写以消除 `makeKeyWindow` 系统警告。
+private final class LineDogEphemeralKeyWindow: NSWindow {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { false }
+}
+
 /// `EKEventStore.requestAccess` 等系统弹窗往往跟随**关键窗口**所在屏；LSUIElement 下用透明临时窗占位。
 @MainActor
 enum LineDogModalKeyWindowAnchor {
-    private static var window: NSWindow?
+    private static var window: LineDogEphemeralKeyWindow?
 
     static func activateEphemeralKeyWindowForSystemModal() {
         NSApp.activate(ignoringOtherApps: true)
@@ -69,7 +107,7 @@ enum LineDogModalKeyWindowAnchor {
             height: side
         )
         if window == nil {
-            let w = NSWindow(
+            let w = LineDogEphemeralKeyWindow(
                 contentRect: r,
                 styleMask: [.borderless],
                 backing: .buffered,
@@ -87,7 +125,28 @@ enum LineDogModalKeyWindowAnchor {
             window = w
         }
         window?.setFrame(r, display: true)
+        // #region agent log
+        LineDogAgentDebugNDJSON.log(
+            hypothesisId: "H1-postfix",
+            location: "LineDogPresentationAnchor.swift:activateEphemeralKeyWindowForSystemModal",
+            message: "before_makeKeyAndOrderFront",
+            data: [
+                "canBecomeKey": "\(window?.canBecomeKey ?? false)",
+                "windowClass": "\(type(of: window as AnyObject))"
+            ],
+            runId: "post-fix"
+        )
+        // #endregion
         window?.makeKeyAndOrderFront(nil)
+        // #region agent log
+        LineDogAgentDebugNDJSON.log(
+            hypothesisId: "H1-postfix",
+            location: "LineDogPresentationAnchor.swift:activateEphemeralKeyWindowForSystemModal",
+            message: "after_makeKeyAndOrderFront",
+            data: ["isKeyWindow": "\(window?.isKeyWindow ?? false)"],
+            runId: "post-fix"
+        )
+        // #endregion
     }
 
     static func removeEphemeralKeyWindow() {
