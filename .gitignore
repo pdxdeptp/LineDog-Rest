@@ -6,3 +6,4 @@ xcuserdata/
 *.xccheckout
 .swiftpm/
 .DS_Store
+.cursor/
