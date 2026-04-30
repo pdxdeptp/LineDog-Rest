@@ -349,6 +349,14 @@ struct MenuBarContentView: View {
             }
             .help("打开时休息全屏会挡住背后窗口的鼠标操作（默认）；关闭时休息画面仍在，但可正常使用桌面。")
 
+            Toggle(isOn: Binding(
+                get: { viewModel.restDoubleClickEndsRest },
+                set: { viewModel.setRestDoubleClickEndsRest($0) }
+            )) {
+                Text("单击 20 下桌宠可提前结束休息")
+            }
+            .help("开启时休息霸屏期间连续单击屏幕中央小狗 20 下（每次间隔 ≤ 3 秒）即可提前结束休息（默认）；关闭后点击无效，只能等计时自然结束。")
+
             Divider()
 
             Text("独立倒计时提醒")

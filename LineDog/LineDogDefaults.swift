@@ -24,4 +24,7 @@ enum LineDogDefaults {
     static let resetIdlePetShortcutKeyCode = "LineDog.resetIdlePetShortcut.keyCode"
     static let resetIdlePetShortcutModifiers = "LineDog.resetIdlePetShortcut.modifiers"
     static let resetIdlePetShortcutKeyLabel = "LineDog.resetIdlePetShortcut.keyLabel"
+
+    /// 休息霸屏期间连续单击桌宠 20 下可提前结束休息（默认开）。
+    static let restDoubleClickEndsRest = "LineDog.restDoubleClickEndsRest"
 }

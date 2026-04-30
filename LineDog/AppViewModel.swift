@@ -21,6 +21,8 @@ final class AppViewModel: ObservableObject {
     @Published private(set) var showResumeChronoButton = false
     /// 休息全屏时是否拦截鼠标（默认开）；关则休息时仍可正常点击背后桌面与应用。
     @Published private(set) var restBlocksClicksDuringRest: Bool
+    /// 休息霸屏期间连续单击桌宠 20 下可提前结束休息（默认开）。
+    @Published private(set) var restDoubleClickEndsRest: Bool
     /// 独立 7 分钟倒计时进行中（与桌宠无关）；结束后出现铃铛直至点击关闭。
     @Published private(set) var isSevenMinuteReminderRunning = false
     /// 独立 5 分钟小猫陪伴窗口是否正在显示（渐隐结束前为 true）。
@@ -30,6 +32,7 @@ final class AppViewModel: ObservableObject {
     let deskReminders: DeskRemindersModel
 
     private static let restBlocksClicksDefaultsKey = "LineDog.restBlocksClicksDuringRest"
+    private static let restDoubleClickEndsRestDefaultsKey = LineDogDefaults.restDoubleClickEndsRest
     private var cancellables = Set<AnyCancellable>()
 
     /// 「计时中」：自动模式引擎在跑，或手动模式已点「开始专注」尚未「停止计时」。
@@ -89,6 +92,11 @@ final class AppViewModel: ObservableObject {
             self.restBlocksClicksDuringRest = true
         } else {
             self.restBlocksClicksDuringRest = UserDefaults.standard.bool(forKey: Self.restBlocksClicksDefaultsKey)
+        }
+        if UserDefaults.standard.object(forKey: Self.restDoubleClickEndsRestDefaultsKey) == nil {
+            self.restDoubleClickEndsRest = true
+        } else {
+            self.restDoubleClickEndsRest = UserDefaults.standard.bool(forKey: Self.restDoubleClickEndsRestDefaultsKey)
         }
 
         // Timer 回调在主 RunLoop 线程上执行，但不在 MainActor 任务上下文中；
@@ -309,6 +317,11 @@ final class AppViewModel: ObservableObject {
         windowManager.setRestBlocksClicks(enabled)
     }
 
+    func setRestDoubleClickEndsRest(_ enabled: Bool) {
+        restDoubleClickEndsRest = enabled
+        UserDefaults.standard.set(enabled, forKey: Self.restDoubleClickEndsRestDefaultsKey)
+    }
+
     private enum Source { case manual, auto }
 
     func setMode(_ newMode: Mode) {
@@ -386,8 +399,10 @@ final class AppViewModel: ObservableObject {
         syncPetDisplayMode()
     }
 
-    /// 休息全屏中央小狗**双击**：收起霸屏，并让计时引擎退出当前休息段（测试休息则走与普通结束相同的回调）。
+    /// 休息全屏中央小狗**连续单击 20 下**：收起霸屏，并让计时引擎退出当前休息段（测试休息则走与普通结束相同的回调）。
+    /// 若用户在设置中关闭「单击 20 下桌宠结束休息」，本函数直接返回。
     func endRestEarlyFromDeskPet() {
+        guard restDoubleClickEndsRest else { return }
         if testRestActive {
             windowManager.dismissRestImmediately()
             return

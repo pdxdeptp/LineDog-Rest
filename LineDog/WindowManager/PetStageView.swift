@@ -35,15 +35,17 @@ final class PetStageView: NSView {
 
     /// 常态小窗拖动结束后回写并持久化窗框（屏幕坐标）。
     var onIdlePetFramePersist: ((NSRect) -> Void)?
-    /// 休息全屏时：在中央小狗上**双击**提前结束休息（与菜单里结束休息的逻辑一致）。
+    /// 休息全屏时：连续单击中央小狗 20 下提前结束休息（与菜单里结束休息的逻辑一致）。
     var onRestPetDoubleClickEndRest: (() -> Void)?
     /// 每帧休息布局后由 `WindowManager` 同步 `NSWindow.ignoresMouseEvents`（仅靠根视图 `hitTest`→`nil` 在 `.screenSaver` 等层级上可能仍吞点击）。
     var onRestPhaseGeometryChanged: (() -> Void)?
 
     private var restSingleClickMenuWorkItem: DispatchWorkItem?
-    /// 上一击在狗区域内的 `mouseUp`（系统 `clickCount` 在无法 key 的窗口上常为 1，用时间+距离补判双击）。
-    private var restPetPriorMouseUpTimestamp: TimeInterval?
-    private var restPetPriorMouseUpInWindow: NSPoint?
+    /// 休息期间在狗身上的累计单击次数；连续点击间隔 ≤ `restPetClickResetInterval` 时累加，达 20 下结束休息。
+    private var restPetClickCount = 0
+    private var restPetLastClickAt: TimeInterval = 0
+    private static let restPetClickThreshold = 20
+    private static let restPetClickResetInterval: TimeInterval = 3.0
 
     private var idleMouseDownInWindow: NSPoint = .zero
     private var idleLastScreenMouse: NSPoint?
@@ -177,14 +179,6 @@ final class PetStageView: NSView {
             // #endregion
             window?.makeKeyAndOrderFront(nil)
             guard petHitRect.contains(pt) else { return }
-            restPetClearStalePriorMouseUpIfNeeded(event.timestamp)
-            if restPetDetectDoubleClickFromPriorMouseUp(mouseDown: event) {
-                return
-            }
-            if event.clickCount >= 2 {
-                performRestPetDoubleClickDismiss()
-                return
-            }
             return
         }
         suppressDeskMenuOnNextIdleMouseUp = false
@@ -228,19 +222,15 @@ final class PetStageView: NSView {
         let pt = convert(event.locationInWindow, from: nil)
         if restBeganAt != nil {
             guard petHitRect.contains(pt) else { return }
-            guard event.clickCount < 2 else { return }
-            if event.clickCount == 1 {
-                restSingleClickMenuWorkItem?.cancel()
-                restPetPriorMouseUpTimestamp = event.timestamp
-                restPetPriorMouseUpInWindow = event.locationInWindow
-                let work = DispatchWorkItem { [weak self] in
-                    guard let self, self.restBeganAt != nil else { return }
-                    self.restSingleClickMenuWorkItem = nil
-                    self.deskMenuPresenter?.presentDeskMenu(from: self, anchorRect: self.petHitRect)
-                }
-                restSingleClickMenuWorkItem = work
-                let delay = NSEvent.doubleClickInterval
-                DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
+            if event.timestamp - restPetLastClickAt > Self.restPetClickResetInterval {
+                restPetClickCount = 0
+            }
+            restPetLastClickAt = event.timestamp
+            restPetClickCount += 1
+            if restPetClickCount >= Self.restPetClickThreshold {
+                restPetClickCount = 0
+                suppressDeskMenuOnNextIdleMouseUp = true
+                onRestPetDoubleClickEndRest?()
             }
             return
         }
@@ -272,7 +262,8 @@ final class PetStageView: NSView {
         suppressDeskMenuOnNextIdleMouseUp = false
         restSingleClickMenuWorkItem?.cancel()
         restSingleClickMenuWorkItem = nil
-        restPetClearDoubleClickTracking()
+        restPetClickCount = 0
+        restPetLastClickAt = 0
         stopTickTimer()
         onRestComplete = onComplete
         restTotal = restSeconds
@@ -304,7 +295,8 @@ final class PetStageView: NSView {
         // `dismissRestImmediately`→本方法，若清掉则紧随其后的 `mouseUp` 会误开桌宠菜单。
         restSingleClickMenuWorkItem?.cancel()
         restSingleClickMenuWorkItem = nil
-        restPetClearDoubleClickTracking()
+        restPetClickCount = 0
+        restPetLastClickAt = 0
         stopTickTimer()
         restBeganAt = nil
         restPendingStartCenterScreen = nil
@@ -427,7 +419,8 @@ final class PetStageView: NSView {
             restBeganAt = nil
             restArcStartCenterLocal = nil
             restArcStartPetSide = nil
-            restPetClearDoubleClickTracking()
+            restPetClickCount = 0
+            restPetLastClickAt = 0
             restSingleClickMenuWorkItem?.cancel()
             restSingleClickMenuWorkItem = nil
             countdownLabel.isHidden = true
@@ -457,38 +450,6 @@ final class PetStageView: NSView {
         let scale = side / max(base, 1)
         petHitRect = Self.petHitRect(center: pos, scale: scale, in: b, hitPadding: 52)
         pet.layoutPet(in: b, visualCenter: pos, scale: scale)
-    }
-
-    private func restPetClearDoubleClickTracking() {
-        restPetPriorMouseUpTimestamp = nil
-        restPetPriorMouseUpInWindow = nil
-    }
-
-    private func restPetClearStalePriorMouseUpIfNeeded(_ now: TimeInterval) {
-        guard let t0 = restPetPriorMouseUpTimestamp else { return }
-        if now - t0 > NSEvent.doubleClickInterval + 0.12 {
-            restPetClearDoubleClickTracking()
-        }
-    }
-
-    /// 在 `clickCount` 无法变成 2 时，用「上一次狗区内 mouseUp → 本次 mouseDown」的时间与位移判定双击。
-    private func restPetDetectDoubleClickFromPriorMouseUp(mouseDown event: NSEvent) -> Bool {
-        guard let t0 = restPetPriorMouseUpTimestamp,
-              let p0 = restPetPriorMouseUpInWindow else { return false }
-        let dt = event.timestamp - t0
-        guard dt <= NSEvent.doubleClickInterval + 0.12 else { return false }
-        let p1 = event.locationInWindow
-        guard hypot(p1.x - p0.x, p1.y - p0.y) <= 48 else { return false }
-        performRestPetDoubleClickDismiss()
-        return true
-    }
-
-    private func performRestPetDoubleClickDismiss() {
-        restPetClearDoubleClickTracking()
-        restSingleClickMenuWorkItem?.cancel()
-        restSingleClickMenuWorkItem = nil
-        suppressDeskMenuOnNextIdleMouseUp = true
-        onRestPetDoubleClickEndRest?()
     }
 
     private func updateCountdown(remaining: TimeInterval) {
