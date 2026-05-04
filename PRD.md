@@ -1,8 +1,8 @@
 
-### PRD: Mac 桌面端「线条小狗」护眼桌宠 (LineDog Rest)
+### PRD: Mac 桌面端「线条小狗」护眼桌宠 (MalDaze Rest)
 
 #### 1. 产品概述
-* **产品名称**: LineDog Rest
+* **产品名称**: MalDaze Rest
 * **产品定位**: 一款弱交互、强提醒的 Mac 状态栏/桌面后台应用：番茄休息节奏 + 可选的自然语言提醒写入。
 * **核心目标**: 通过不可忽略的全屏动画，推动「工作 / 休息」护眼循环；并支持用口语快速创建系统「提醒事项」。
 
@@ -58,6 +58,6 @@
 
 * **模块 1: `TimerEngine`** — `TimerEngine` 协议；`ManualTimerEngine` / `AutoTimerEngine` 统一产出 `TimeState`。
 * **模块 2: `WindowManager`** — 桌宠 `NSWindow` 生命周期、休息霸屏、智能输入/Toast `NSPanel`、与 `PetStageView` 协同。
-* **模块 3: `PetRenderer`** — 桌宠静态图/SF Symbol 布局与配色态（运行黑 / 休息红 / 暂停白描边 / 智能输入思考态等）。
+* **模块 3: `PetRenderer`** — 桌宠 GIF 动画播放与布局；按 `PetDisplayMode` 从 `LineDog/` 目录加载对应线条小狗动画（idle / breakPrompt+breakRunning / sleeping / focusGuard），支持多变体随机轮换。
 * **模块 4: `SmartReminder/`** — Prompt、Gemini 客户端、JSON 解析（含数组）、Orchestrator、EventKit 写入、推断时刻、调试日志等。
-* **模块 5: 全局快捷键** — `LineDogCarbonGlobalHotKeys`（Carbon `RegisterEventHotKey`）+ 设置内持久化键位。
+* **模块 5: 全局快捷键** — `MalDazeCarbonGlobalHotKeys`（Carbon `RegisterEventHotKey`）+ 设置内持久化键位。
