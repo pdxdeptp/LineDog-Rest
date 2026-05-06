@@ -20,6 +20,15 @@ final class PetStageView: NSView {
     private var breakRunBeganAt: Date?
     /// 跑屏模式的总时长。
     private var breakRunTotal: TimeInterval = 0
+    /// 跑屏模式：点击桌宠的累计次数（3秒内3次提前结束）。
+    private var breakRunPetClickCount = 0
+    private var breakRunPetLastClickAt: TimeInterval = 0
+    private static let breakRunPetClickThreshold = 3
+    private static let breakRunPetClickWindow: TimeInterval = 3.0
+    /// 跑屏模式：点击倒计时标签的累计次数（点20次提前结束）。
+    private var breakRunCountdownClickCount = 0
+    private var breakRunCountdownLastClickAt: TimeInterval = 0
+    private static let breakRunCountdownClickThreshold = 20
     /// 从黑狗当前位置移到屏中并放大；固定 60s，与距离无关。
     private let growDuration: TimeInterval = 60
     private let fadeOutDuration: TimeInterval = 3
@@ -145,7 +154,7 @@ final class PetStageView: NSView {
         addSubview(breakRunCountdownLabel)
         NSLayoutConstraint.activate([
             breakRunCountdownLabel.centerXAnchor.constraint(equalTo: centerXAnchor),
-            breakRunCountdownLabel.centerYAnchor.constraint(equalTo: centerYAnchor, constant: -38)
+            breakRunCountdownLabel.centerYAnchor.constraint(equalTo: centerYAnchor, constant: +38)
         ])
     }
 
@@ -181,6 +190,11 @@ final class PetStageView: NSView {
             if passThroughOutsidePet, !petHitRect.contains(local) {
                 return nil
             }
+        } else if breakRunBeganAt != nil {
+            // 跑屏模式：接受桌宠区域或倒计时标签区域的点击。
+            let inPet = petHitRect.contains(local)
+            let inCountdown = !breakRunCountdownLabel.isHidden && breakRunCountdownLabel.frame.contains(local)
+            guard inPet || inCountdown else { return nil }
         } else {
             // 常态：只有点在宠物图标范围内才拦截，透明边缘穿透到桌面。
             guard petHitRect.contains(local) else { return nil }
@@ -248,10 +262,33 @@ final class PetStageView: NSView {
     override func mouseUp(with event: NSEvent) {
         guard deskMenuPresenter != nil else { return }
         let pt = convert(event.locationInWindow, from: nil)
-        // 跑屏休息模式：点击桌宠区域直接结束休息
+        // 跑屏休息模式：3秒内点桌宠3次，或点倒计时标签20次，提前结束
         if breakRunBeganAt != nil {
-            guard petHitRect.contains(pt) else { return }
-            onRestPetDoubleClickEndRest?()
+            let inPet = petHitRect.contains(pt)
+            let inCountdown = !breakRunCountdownLabel.isHidden && breakRunCountdownLabel.frame.contains(pt)
+            if inPet {
+                if event.timestamp - breakRunPetLastClickAt > Self.breakRunPetClickWindow {
+                    breakRunPetClickCount = 0
+                }
+                breakRunPetLastClickAt = event.timestamp
+                breakRunPetClickCount += 1
+                if breakRunPetClickCount >= Self.breakRunPetClickThreshold {
+                    breakRunPetClickCount = 0
+                    breakRunCountdownClickCount = 0
+                    onRestPetDoubleClickEndRest?()
+                }
+            } else if inCountdown {
+                if event.timestamp - breakRunCountdownLastClickAt > Self.restPetClickResetInterval {
+                    breakRunCountdownClickCount = 0
+                }
+                breakRunCountdownLastClickAt = event.timestamp
+                breakRunCountdownClickCount += 1
+                if breakRunCountdownClickCount >= Self.breakRunCountdownClickThreshold {
+                    breakRunPetClickCount = 0
+                    breakRunCountdownClickCount = 0
+                    onRestPetDoubleClickEndRest?()
+                }
+            }
             return
         }
         if restBeganAt != nil {
@@ -329,6 +366,11 @@ final class PetStageView: NSView {
     func beginBreakRunDisplay(total: TimeInterval) {
         breakRunBeganAt = Date()
         breakRunTotal = total
+        breakRunPetClickCount = 0
+        breakRunPetLastClickAt = 0
+        breakRunCountdownClickCount = 0
+        breakRunCountdownLastClickAt = 0
+        countdownLabel.isHidden = true
         breakRunCountdownLabel.isHidden = false
         updateBreakRunCountdown(remaining: total)
         pet.setDisplayMode(.runningBlack)
@@ -346,6 +388,10 @@ final class PetStageView: NSView {
     func cancelBreakRunToIdle() {
         breakRunBeganAt = nil
         breakRunTotal = 0
+        breakRunPetClickCount = 0
+        breakRunPetLastClickAt = 0
+        breakRunCountdownClickCount = 0
+        breakRunCountdownLastClickAt = 0
         breakRunCountdownLabel.isHidden = true
         layoutIdlePet()
     }
@@ -362,6 +408,10 @@ final class PetStageView: NSView {
         restBeganAt = nil
         // 同时清理跑屏状态（若两种模式之一正在运行）
         breakRunBeganAt = nil
+        breakRunPetClickCount = 0
+        breakRunPetLastClickAt = 0
+        breakRunCountdownClickCount = 0
+        breakRunCountdownLastClickAt = 0
         breakRunCountdownLabel.isHidden = true
         restPendingStartCenterScreen = nil
         restPendingStartPetSide = nil

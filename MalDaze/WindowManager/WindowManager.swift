@@ -63,6 +63,10 @@ final class WindowManager: WindowManaging {
     private let breakRunController = BreakRunController()
     /// 跑屏倒计时更新定时器（1 Hz，更新 PetStageView 的小标签）。
     private var breakRunCountdownTimer: Timer?
+    /// 跑屏1分钟后展示遮罩的延迟任务。
+    private var breakRunShieldWorkItem: DispatchWorkItem?
+    /// 跑屏1分钟后展示的全屏半透明遮罩窗口（阻止用户点击桌面）。
+    private var breakRunShieldWindow: NSPanel?
 
     /// 进入休息全屏前一刻的常态小窗框，用于结束后回到原位置（与 `UserDefaults` 一致）。
     private var idleFrameBeforeRest: NSRect?
@@ -116,6 +120,8 @@ final class WindowManager: WindowManaging {
     deinit {
         idleCursorTrackTimer?.invalidate()
         breakRunCountdownTimer?.invalidate()
+        breakRunShieldWorkItem?.cancel()
+        breakRunShieldWindow?.orderOut(nil)
         if let launchObserver {
             NotificationCenter.default.removeObserver(launchObserver)
         }
@@ -366,6 +372,7 @@ final class WindowManager: WindowManaging {
         let callback = pendingDismiss
         pendingDismiss = nil
         // 同时停止跑屏（若正在跑屏模式）
+        hideBreakRunShield()
         stopBreakRunCountdownTimer()
         breakRunController.stop()
         stageView?.cancelToIdle()
@@ -383,13 +390,15 @@ final class WindowManager: WindowManaging {
     func presentBreakRun(duration: TimeInterval, onDismissed: @escaping () -> Void) {
         deskMenuPopover?.close()
         installPetWindowIfNeeded()
-        // 清理任何可能残留的霸屏状态（不触发 onDismissed 回调）
+        // 清理任何可能残留的霸屏/跑屏状态（不触发 onDismissed 回调）
+        hideBreakRunShield()
         stopBreakRunCountdownTimer()
         breakRunController.stop()
         stageView?.cancelToIdle()
         setWindowLevel(resting: false)
 
         guard let win = window, let stage = stageView else { return }
+        idleFrameBeforeRest = win.frame          // 记住出发前位置，结束后动画返回
         pendingDismiss = onDismissed
         stage.beginBreakRunDisplay(total: duration)
 
@@ -405,16 +414,52 @@ final class WindowManager: WindowManaging {
     }
 
     private func finishBreakRun() {
+        hideBreakRunShield()
         stopBreakRunCountdownTimer()
-        stageView?.cancelBreakRunToIdle()
+        breakRunController.stop()
+
         let cb = pendingDismiss
         pendingDismiss = nil
-        cb?()
-        applyMousePolicy()
+        cb?()      // 立即通知 AppViewModel，让计时引擎恢复正常
+
+        // 慢慢飞回休息开始前的位置（1秒缓动动画）
+        let target: NSRect
+        if let r = idleFrameBeforeRest, Self.isApproximatelyIdleSized(r) {
+            target = Self.clampIdlePetFrameToScreens(r)
+            idleFrameBeforeRest = nil
+        } else {
+            target = Self.resolvedIdlePetFrameForInstall()
+            idleFrameBeforeRest = nil
+        }
+        NSAnimationContext.runAnimationGroup({ ctx in
+            ctx.duration = 1.0
+            ctx.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            window?.animator().setFrame(target, display: true)
+        }, completionHandler: { [weak self] in
+            guard let self else { return }
+            stageView?.cancelBreakRunToIdle()
+            window?.level = .floating
+            syncContentViewToWindowLayout()
+            stageView?.needsLayout = true
+            stageView?.layoutSubtreeIfNeeded()
+            applyMousePolicy()
+            window?.orderFrontRegardless()
+            persistIdlePetFrame(target)
+        })
     }
 
     private func startBreakRunCountdownTimer(duration: TimeInterval) {
         stopBreakRunCountdownTimer()
+
+        // 60秒后展示半透明遮罩，阻止用户点击桌面
+        if duration > 60 {
+            let item = DispatchWorkItem { [weak self] in
+                Task { @MainActor [weak self] in self?.showBreakRunShield() }
+            }
+            breakRunShieldWorkItem = item
+            DispatchQueue.main.asyncAfter(deadline: .now() + 60, execute: item)
+        }
+
         let startDate = Date()
         let t = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
@@ -431,6 +476,39 @@ final class WindowManager: WindowManaging {
     private func stopBreakRunCountdownTimer() {
         breakRunCountdownTimer?.invalidate()
         breakRunCountdownTimer = nil
+        breakRunShieldWorkItem?.cancel()
+        breakRunShieldWorkItem = nil
+    }
+
+    // MARK: - 跑屏遮罩（1分钟后阻止点击桌面）
+
+    private func showBreakRunShield() {
+        guard breakRunShieldWindow == nil else { return }
+        guard let screen = NSScreen.main ?? NSScreen.screens.first else { return }
+        // 遮罩层级比 .screenSaver(1000) 低1级，桌宠窗升到 .screenSaver 后可接收点击
+        let shieldLevel = NSWindow.Level(rawValue: Int(NSWindow.Level.screenSaver.rawValue) - 1)
+        let panel = NSPanel(
+            contentRect: screen.frame,
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: false
+        )
+        panel.backgroundColor = NSColor.black.withAlphaComponent(0.20)
+        panel.isOpaque = false
+        panel.hasShadow = false
+        panel.level = shieldLevel
+        panel.ignoresMouseEvents = false
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        panel.orderFrontRegardless()
+        breakRunShieldWindow = panel
+        // 桌宠窗升到 .screenSaver，保证在遮罩之上仍可点击
+        window?.level = .screenSaver
+        window?.orderFrontRegardless()
+    }
+
+    private func hideBreakRunShield() {
+        breakRunShieldWindow?.orderOut(nil)
+        breakRunShieldWindow = nil
     }
 
     private func finishRestCycle() {
