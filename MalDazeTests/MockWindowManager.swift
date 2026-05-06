@@ -27,6 +27,13 @@ final class MockWindowManager: WindowManaging {
         presentCount += 1
     }
 
+    func presentBreakRun(duration: TimeInterval, onDismissed: @escaping () -> Void) {
+        dismissRestImmediately()
+        pendingUserDismiss = onDismissed
+        lastPresentDuration = duration
+        presentCount += 1
+    }
+
     func applyIdlePetDisplayMode(_ mode: PetDisplayMode) {
         idleModesApplied.append(mode)
     }

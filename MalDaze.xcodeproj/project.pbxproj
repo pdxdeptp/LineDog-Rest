@@ -16,6 +16,7 @@
 		A207 /* AutoTimerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B207 /* AutoTimerEngine.swift */; };
 		A208 /* PetRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B208 /* PetRenderer.swift */; };
 		A20A /* WindowManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20A /* WindowManager.swift */; };
+		A2BC /* BreakRunController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2BC /* BreakRunController.swift */; };
 		A20B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B20B /* Assets.xcassets */; };
 		A240 /* LineDog in Resources */ = {isa = PBXBuildFile; fileRef = B240 /* LineDog */; };
 		A20D /* PetStageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20D /* PetStageView.swift */; };
@@ -88,6 +89,7 @@
 		B207 /* AutoTimerEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoTimerEngine.swift; sourceTree = "<group>"; };
 		B208 /* PetRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetRenderer.swift; sourceTree = "<group>"; };
 		B20A /* WindowManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowManager.swift; sourceTree = "<group>"; };
+		B2BC /* BreakRunController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BreakRunController.swift; sourceTree = "<group>"; };
 		B20B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B20D /* PetStageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetStageView.swift; sourceTree = "<group>"; };
 		B20E /* PetDisplayMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetDisplayMode.swift; sourceTree = "<group>"; };
@@ -235,6 +237,7 @@
 			isa = PBXGroup;
 			children = (
 				B20A /* WindowManager.swift */,
+				B2BC /* BreakRunController.swift */,
 				B211 /* MenuBarNSScreen.swift */,
 				B20D /* PetStageView.swift */,
 			);
@@ -427,6 +430,7 @@
 				A207 /* AutoTimerEngine.swift in Sources */,
 				A208 /* PetRenderer.swift in Sources */,
 				A20A /* WindowManager.swift in Sources */,
+				A2BC /* BreakRunController.swift in Sources */,
 				A20D /* PetStageView.swift in Sources */,
 				A211 /* MenuBarNSScreen.swift in Sources */,
 				A212 /* SevenMinuteReminderController.swift in Sources */,

@@ -36,6 +36,11 @@ struct MenuBarDogLabel: View {
                 .font(.system(size: iconSize))
                 .symbolRenderingMode(.monochrome)
                 .foregroundStyle(.indigo)
+        case .breakRunning:
+            Image(systemName: "pawprint.fill")
+                .font(.system(size: iconSize))
+                .symbolRenderingMode(.monochrome)
+                .foregroundStyle(.primary)
         }
     }
 }

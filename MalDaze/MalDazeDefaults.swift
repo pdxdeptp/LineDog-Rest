@@ -32,4 +32,13 @@ enum MalDazeDefaults {
     static let hydrationReminderEnabled = "MalDaze.hydrationReminder.enabled"
     /// 喝水提醒间隔（分钟），默认 90，范围 15–240。
     static let hydrationReminderIntervalMinutes = "MalDaze.hydrationReminder.intervalMinutes"
+    /// 安静时段开关：启用后在指定时间段内不弹喝水提醒（默认关）。
+    static let hydrationQuietHoursEnabled = "MalDaze.hydrationReminder.quietHoursEnabled"
+    /// 安静时段开始时间（距 0:00 的分钟数），默认 1260 = 21:00。
+    static let hydrationQuietStartMinutes = "MalDaze.hydrationReminder.quietStartMinutes"
+    /// 安静时段结束/恢复时间（距 0:00 的分钟数），默认 480 = 08:00。
+    static let hydrationQuietResumeMinutes = "MalDaze.hydrationReminder.quietResumeMinutes"
+
+    /// 休息打断风格："fullscreen"（默认霸屏）或 "breakRun"（跑屏漫游）。
+    static let breakInterruptStyle = "MalDaze.breakInterruptStyle"
 }

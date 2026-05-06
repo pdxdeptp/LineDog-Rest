@@ -1,12 +1,34 @@
 import AppKit
 import SwiftUI
 
+// MARK: - Card style for section grouping
+
+private struct CardGroupBoxStyle: GroupBoxStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            configuration.label
+                .padding(.bottom, 6)
+            configuration.content
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.controlBackgroundColor), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .strokeBorder(Color(.separatorColor).opacity(0.5), lineWidth: 0.5)
+        )
+    }
+}
+
 /// 控制面板 UI：同时用于 `MenuBarExtra` 与右下角桌宠的 `NSPopover`（`WindowManager`），改此处即可两边同步。
 struct MenuBarContentView: View {
     @ObservedObject var viewModel: AppViewModel
 
     @AppStorage(MalDazeDefaults.sevenMinuteReminderDurationMinutes) private var sevenMinuteMinutesStored = 7
     @AppStorage(MalDazeDefaults.hydrationReminderIntervalMinutes) private var hydrationIntervalStored = 90
+    @AppStorage(MalDazeDefaults.hydrationQuietHoursEnabled) private var hydrationQuietHoursEnabled = false
+    @AppStorage(MalDazeDefaults.hydrationQuietStartMinutes) private var hydrationQuietStartMinutes = 1260
+    @AppStorage(MalDazeDefaults.hydrationQuietResumeMinutes) private var hydrationQuietResumeMinutes = 480
 
     @AppStorage(MalDazeDefaults.resetIdlePetShortcutKeyCode) private var resetPetKeyCode: Int = Int(ResetIdlePetPositionShortcut.defaultKeyCode)
     @AppStorage(MalDazeDefaults.resetIdlePetShortcutModifiers) private var resetPetModifiersRaw: Int = ResetIdlePetPositionShortcut.defaultModifiersStorageInt
@@ -27,6 +49,21 @@ struct MenuBarContentView: View {
         let v = hydrationIntervalStored
         if v < 15 { return 90 }
         return min(240, v)
+    }
+
+    // MARK: - Quiet hours date helpers
+
+    private func minutesToDate(_ totalMinutes: Int) -> Date {
+        var comps = Calendar.current.dateComponents([.year, .month, .day], from: Date())
+        comps.hour   = totalMinutes / 60
+        comps.minute = totalMinutes % 60
+        comps.second = 0
+        return Calendar.current.date(from: comps) ?? Date()
+    }
+
+    private func dateToMinutes(_ date: Date) -> Int {
+        let cal = Calendar.current
+        return cal.component(.hour, from: date) * 60 + cal.component(.minute, from: date)
     }
 
     private var resetPetShortcutDisplay: String {
@@ -299,161 +336,335 @@ struct MenuBarContentView: View {
     /// 右栏：番茄钟、小猫、7 分钟提醒等原有控制（内容可滚动，高度由左栏决定）。
     private var mainControlsColumn: some View {
         ScrollView {
-        VStack(alignment: .leading, spacing: 8) {
-            mainPanelHeader
+            VStack(alignment: .leading, spacing: 10) {
+                mainPanelHeader
 
-            Text(viewModel.statusLine)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: 280, alignment: .leading)
+                statusChip
 
-            Divider()
+                timerSection
 
-            Picker("模式", selection: Binding(
-                get: { viewModel.mode },
-                set: { viewModel.setMode($0) }
-            )) {
-                ForEach(AppViewModel.Mode.allCases, id: \.self) { m in
-                    Text(m.rawValue).tag(m)
+                countdownSection
+
+                hydrationSection
+
+                catSection
+
+                Divider()
+                    .padding(.top, 2)
+
+                Text(restBlockingHint(viewModel.restBlocksClicksDuringRest))
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Button("退出应用…") {
+                    viewModel.quitApp()
                 }
+                .buttonStyle(.bordered)
+                .keyboardShortcut("q", modifiers: [.command])
             }
-            .pickerStyle(.segmented)
-
-            HStack {
-                Button("开始专注（25 分钟）") {
-                    viewModel.startManualFocus()
-                }
-                .disabled(viewModel.mode != .manual)
-                .keyboardShortcut("s", modifiers: [.command])
-            }
-
-            if viewModel.showResumeChronoButton {
-                Button("恢复计时") {
-                    viewModel.resumeTimers()
-                }
-            } else {
-                Button("停止计时") {
-                    viewModel.stopTimers()
-                }
-                .disabled(!viewModel.canStopChronoButton)
-            }
-
-            Button("立即开始休息（测试）") {
-                viewModel.startTestRestNow()
-            }
-
-            Button("桌宠回到右下角（\(resetPetShortcutDisplay)）") {
-                viewModel.resetIdlePetPositionFromUserAction()
-            }
-            .help("将小狗窗口移回菜单栏所在屏可见区右下角并保存；休息霸屏时无效。快捷键可在设置中修改。")
-
-            Toggle(isOn: Binding(
-                get: { viewModel.restBlocksClicksDuringRest },
-                set: { viewModel.setRestBlocksClicksDuringRest($0) }
-            )) {
-                Text("休息期间阻止点击桌面")
-            }
-            .help("打开时休息全屏会挡住背后窗口的鼠标操作（默认）；关闭时休息画面仍在，但可正常使用桌面。")
-
-            Toggle(isOn: Binding(
-                get: { viewModel.restDoubleClickEndsRest },
-                set: { viewModel.setRestDoubleClickEndsRest($0) }
-            )) {
-                Text("单击 20 下桌宠可提前结束休息")
-            }
-            .help("开启时休息霸屏期间连续单击屏幕中央小狗 20 下（每次间隔 ≤ 3 秒）即可提前结束休息（默认）；关闭后点击无效，只能等计时自然结束。")
-
-            Divider()
-
-            Text("独立倒计时提醒")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-            Stepper(value: $sevenMinuteMinutesStored, in: 1...180) {
-                Text("时长：\(sevenMinuteMinutesResolved) 分钟")
-            }
-            .disabled(viewModel.isSevenMinuteReminderRunning)
-            Text("与线条小狗分层显示；倒计时在屏幕右下角，结束后屏幕中央显示铃铛与说明文字，点一下关闭。全局快捷键可在设置里改（默认 ⌘⇧M，再按取消）。")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
-                .fixedSize(horizontal: false, vertical: true)
-            Button("开始 \(sevenMinuteMinutesResolved) 分钟倒计时") {
-                viewModel.startSevenMinuteReminder()
-            }
-            .disabled(viewModel.isSevenMinuteReminderRunning)
-            if viewModel.isSevenMinuteReminderRunning {
-                Button("取消倒计时") {
-                    viewModel.cancelSevenMinuteReminder()
-                }
-            }
-
-            Divider()
-
-            Text("喝水提醒")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-            Text("按设定间隔弹出提醒，点「已喝水 💧」重新计时，点「稍后提醒」15 分钟后再提醒。")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
-                .fixedSize(horizontal: false, vertical: true)
-            Toggle(isOn: Binding(
-                get: { viewModel.isHydrationReminderEnabled },
-                set: { viewModel.setHydrationReminderEnabled($0) }
-            )) {
-                Text("开启喝水提醒")
-            }
-            Stepper(
-                value: $hydrationIntervalStored,
-                in: 15...240,
-                step: 15,
-                onEditingChanged: { editing in
-                    if !editing { viewModel.setHydrationReminderInterval(hydrationIntervalStored) }
-                }
-            ) {
-                Text("间隔：\(hydrationIntervalResolved) 分钟")
-            }
-            .disabled(!viewModel.isHydrationReminderEnabled)
-
-            Button("立即触发喝水提醒（测试）") {
-                viewModel.testFireHydrationReminder()
-            }
-
-            Divider()
-
-            Text("独立 5 分钟小猫")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-            Text("与线条小狗分层；小猫跟在小狗左侧（若贴边则改到右侧），5 分钟后渐隐消失。")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
-                .fixedSize(horizontal: false, vertical: true)
-            Button("出现 5 分钟小猫") {
-                viewModel.startFiveMinuteCatCompanion()
-            }
-            .disabled(viewModel.isFiveMinuteCatCompanionActive)
-            if viewModel.isFiveMinuteCatCompanionActive {
-                Button("提前关掉小猫") {
-                    viewModel.cancelFiveMinuteCatCompanion()
-                }
-            }
-
-            Divider()
-
-            Text(restBlockingHint(viewModel.restBlocksClicksDuringRest))
-                .font(.caption)
-                .foregroundStyle(.tertiary)
-                .fixedSize(horizontal: false, vertical: true)
-
-            Button("退出应用…") {
-                viewModel.quitApp()
-            }
-            .keyboardShortcut("q", modifiers: [.command])
-
+            .padding(.bottom, 8)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
-        .padding(.bottom, 8)
-        .frame(maxWidth: .infinity, alignment: .topLeading)
-        } // end ScrollView
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    // MARK: – Status chip
+
+    private var isResting: Bool { viewModel.petDisplayMode == .restingRed }
+
+    private var statusChip: some View {
+        HStack(spacing: 7) {
+            Circle()
+                .fill(isResting ? Color.orange : Color.green)
+                .frame(width: 8, height: 8)
+            Text(viewModel.statusLine)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(isResting ? Color.orange : Color.green)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            (isResting ? Color.orange : Color.green).opacity(0.10),
+            in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+        )
+    }
+
+    // MARK: – Timer section
+
+    private var timerSection: some View {
+        GroupBox {
+            VStack(alignment: .leading, spacing: 8) {
+                Picker("模式", selection: Binding(
+                    get: { viewModel.mode },
+                    set: { viewModel.setMode($0) }
+                )) {
+                    ForEach(AppViewModel.Mode.allCases, id: \.self) { m in
+                        Text(m.rawValue).tag(m)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                HStack(spacing: 8) {
+                    Button("开始专注（25 分钟）") {
+                        viewModel.startManualFocus()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(viewModel.mode != .manual)
+                    .keyboardShortcut("s", modifiers: [.command])
+
+                    if viewModel.showResumeChronoButton {
+                        Button("恢复计时") {
+                            viewModel.resumeTimers()
+                        }
+                        .buttonStyle(.bordered)
+                    } else {
+                        Button("停止计时") {
+                            viewModel.stopTimers()
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(!viewModel.canStopChronoButton)
+                    }
+                }
+
+                Divider()
+
+                Toggle(isOn: Binding(
+                    get: { viewModel.restBlocksClicksDuringRest },
+                    set: { viewModel.setRestBlocksClicksDuringRest($0) }
+                )) {
+                    Text("休息期间阻止点击桌面")
+                        .font(.subheadline)
+                }
+                .toggleStyle(.switch)
+                .help("打开时休息全屏会挡住背后窗口的鼠标操作（默认）；关闭时休息画面仍在，但可正常使用桌面。")
+
+                Toggle(isOn: Binding(
+                    get: { viewModel.restDoubleClickEndsRest },
+                    set: { viewModel.setRestDoubleClickEndsRest($0) }
+                )) {
+                    Text("单击 20 下桌宠可提前结束休息")
+                        .font(.subheadline)
+                }
+                .toggleStyle(.switch)
+                .help("开启时休息霸屏期间连续单击屏幕中央小狗 20 下（每次间隔 ≤ 3 秒）即可提前结束休息（默认）；关闭后点击无效，只能等计时自然结束。")
+
+                Divider()
+
+                Picker("休息风格", selection: Binding(
+                    get: { viewModel.breakInterruptStyle },
+                    set: { viewModel.setBreakInterruptStyle($0) }
+                )) {
+                    Text("霸屏（强）").tag(AppViewModel.BreakInterruptStyle.fullscreen)
+                    Text("跑屏（轻）").tag(AppViewModel.BreakInterruptStyle.breakRun)
+                }
+                .pickerStyle(.segmented)
+                .help("霸屏：休息时全屏渐暗，小狗居中。跑屏：小狗在桌面漫游，不遮挡工作内容（PawPal 风格）。")
+
+                HStack(spacing: 8) {
+                    Button("桌宠归位（\(resetPetShortcutDisplay)）") {
+                        viewModel.resetIdlePetPositionFromUserAction()
+                    }
+                    .buttonStyle(.bordered)
+                    .help("将小狗窗口移回菜单栏所在屏可见区右下角并保存；休息霸屏时无效。快捷键可在设置中修改。")
+
+                    Button("立即休息（测试）") {
+                        viewModel.startTestRestNow()
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(.secondary)
+                }
+            }
+        } label: {
+            Label("专注计时", systemImage: "timer")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.primary)
+                .textCase(nil)
+        }
+        .groupBoxStyle(CardGroupBoxStyle())
+    }
+
+    // MARK: – Countdown section
+
+    private var countdownSection: some View {
+        GroupBox {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Stepper(value: $sevenMinuteMinutesStored, in: 1...180) {
+                        Text("时长：\(sevenMinuteMinutesResolved) 分钟")
+                            .font(.subheadline)
+                    }
+                    .disabled(viewModel.isSevenMinuteReminderRunning)
+
+                    HStack(spacing: 8) {
+                        Button("开始 \(sevenMinuteMinutesResolved) 分钟倒计时") {
+                            viewModel.startSevenMinuteReminder()
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(viewModel.isSevenMinuteReminderRunning)
+
+                        if viewModel.isSevenMinuteReminderRunning {
+                            Button("取消") {
+                                viewModel.cancelSevenMinuteReminder()
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(.secondary)
+                        }
+                    }
+                }
+
+                Text("倒计时显示在右下角，结束后铃铛居中提示，点一下关闭。快捷键默认 ⌘⇧M，可在设置里改。")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: 100, alignment: .leading)
+            }
+        } label: {
+            Label("倒计时提醒", systemImage: "bell")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.primary)
+                .textCase(nil)
+        }
+        .groupBoxStyle(CardGroupBoxStyle())
+    }
+
+    // MARK: – Hydration section
+
+    private var hydrationSection: some View {
+        GroupBox {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Toggle(isOn: Binding(
+                        get: { viewModel.isHydrationReminderEnabled },
+                        set: { viewModel.setHydrationReminderEnabled($0) }
+                    )) {
+                        Text("开启喝水提醒")
+                            .font(.subheadline)
+                    }
+                    .toggleStyle(.switch)
+
+                    Stepper(
+                        value: $hydrationIntervalStored,
+                        in: 15...240,
+                        step: 15,
+                        onEditingChanged: { editing in
+                            if !editing { viewModel.setHydrationReminderInterval(hydrationIntervalStored) }
+                        }
+                    ) {
+                        Text("间隔：\(hydrationIntervalResolved) 分钟")
+                            .font(.subheadline)
+                    }
+                    .disabled(!viewModel.isHydrationReminderEnabled)
+
+                    Divider()
+
+                    Toggle(isOn: $hydrationQuietHoursEnabled) {
+                        Text("开启安静时段")
+                            .font(.subheadline)
+                    }
+                    .toggleStyle(.switch)
+                    .disabled(!viewModel.isHydrationReminderEnabled)
+
+                    HStack(spacing: 6) {
+                        Text("停止")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        DatePicker(
+                            "",
+                            selection: Binding(
+                                get: { minutesToDate(hydrationQuietStartMinutes) },
+                                set: { hydrationQuietStartMinutes = dateToMinutes($0) }
+                            ),
+                            displayedComponents: .hourAndMinute
+                        )
+                        .labelsHidden()
+                        .datePickerStyle(.compact)
+                    }
+                    .disabled(!viewModel.isHydrationReminderEnabled || !hydrationQuietHoursEnabled)
+
+                    HStack(spacing: 6) {
+                        Text("恢复")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        DatePicker(
+                            "",
+                            selection: Binding(
+                                get: { minutesToDate(hydrationQuietResumeMinutes) },
+                                set: { hydrationQuietResumeMinutes = dateToMinutes($0) }
+                            ),
+                            displayedComponents: .hourAndMinute
+                        )
+                        .labelsHidden()
+                        .datePickerStyle(.compact)
+                    }
+                    .disabled(!viewModel.isHydrationReminderEnabled || !hydrationQuietHoursEnabled)
+
+                    Button("立即触发（测试）") {
+                        viewModel.testFireHydrationReminder()
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(.secondary)
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("弹出提醒后：「已喝水 💧」重新开始计时，「稍后提醒」15 分钟后再次提醒。")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    Text("安静时段内计时器照常运行，到点静默跳过，并在恢复时间后自动弹出下一次提醒。")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: 100, alignment: .leading)
+            }
+        } label: {
+            Label("喝水提醒", systemImage: "drop.fill")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.primary)
+                .textCase(nil)
+        }
+        .groupBoxStyle(CardGroupBoxStyle())
+    }
+
+    // MARK: – Cat companion section
+
+    private var catSection: some View {
+        GroupBox {
+            HStack(alignment: .top, spacing: 12) {
+                HStack(spacing: 8) {
+                    Button("召唤小猫") {
+                        viewModel.startFiveMinuteCatCompanion()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(viewModel.isFiveMinuteCatCompanionActive)
+
+                    if viewModel.isFiveMinuteCatCompanionActive {
+                        Button("提前关掉") {
+                            viewModel.cancelFiveMinuteCatCompanion()
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(.secondary)
+                    }
+                }
+
+                Text("与线条小狗分层显示；小猫出现在小狗左侧（贴边时改到右侧），5 分钟后渐隐消失。")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: 100, alignment: .leading)
+            }
+        } label: {
+            Label("5 分钟小猫", systemImage: "pawprint.fill")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.primary)
+                .textCase(nil)
+        }
+        .groupBoxStyle(CardGroupBoxStyle())
     }
 
     private func restBlockingHint(_ blocks: Bool) -> String {

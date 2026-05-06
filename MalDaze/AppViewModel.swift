@@ -10,6 +10,12 @@ final class AppViewModel: ObservableObject {
         case auto = "整点 / 半点"
     }
 
+    /// 休息打断风格：`fullscreen`（默认霸屏）或 `breakRun`（PawPal 风格跑屏漫游）。
+    enum BreakInterruptStyle: String {
+        case fullscreen = "fullscreen"
+        case breakRun   = "breakRun"
+    }
+
     @Published private(set) var mode: Mode = .auto
     @Published private(set) var statusLine: String = "自动模式：正在对齐系统时钟…"
     /// 状态栏小狗与「休息中」红态；与桌宠非休息配色同步。
@@ -29,6 +35,8 @@ final class AppViewModel: ObservableObject {
     @Published private(set) var isFiveMinuteCatCompanionActive = false
     /// 喝水提醒已调度（计时中或浮层待操作）为 true；开关关闭或调用 cancel 后变 false。
     @Published private(set) var isHydrationReminderEnabled: Bool
+    /// 休息打断风格，持久化到 UserDefaults。
+    @Published private(set) var breakInterruptStyle: BreakInterruptStyle
 
     /// 提醒事项同步（EventKit）；与菜单栏、桌宠 Popover 共用。
     let deskReminders: DeskRemindersModel
@@ -84,6 +92,8 @@ final class AppViewModel: ObservableObject {
         self.fiveMinuteCatCompanion = fiveMinuteCatCompanion ?? FiveMinuteCatCompanionController()
         self.hydrationReminder = hydrationReminder ?? HydrationReminderController()
         self.isHydrationReminderEnabled = UserDefaults.standard.bool(forKey: MalDazeDefaults.hydrationReminderEnabled)
+        let rawStyle = UserDefaults.standard.string(forKey: MalDazeDefaults.breakInterruptStyle) ?? ""
+        self.breakInterruptStyle = BreakInterruptStyle(rawValue: rawStyle) ?? .fullscreen
         self.deskReminders = deskReminders ?? DeskRemindersModel()
         self.smartReminderOrchestrator = SmartReminderOrchestrator(
             apiKeyProvider: {
@@ -464,8 +474,9 @@ final class AppViewModel: ObservableObject {
     func startTestRestNow() {
         testRestActive = true
         syncPetDisplayMode()
-        statusLine = "【测试】休息霸屏中（约 5 分钟）…"
-        windowManager.presentRest(duration: 5 * 60) { [weak self] in
+        let modeLabel = breakInterruptStyle == .breakRun ? "跑屏" : "霸屏"
+        statusLine = "【测试】休息\(modeLabel)中（约 5 分钟）…"
+        presentRestWithCurrentStyle(duration: 5 * 60) { [weak self] in
             guard let self else { return }
             // 必须在主线程同步执行：`WindowManager` / 单测 Mock 会在同一拍调用此回调，
             // 若再包一层 `Task` 会导致测试与 UI 在霸屏结束瞬间读到陈旧状态。
@@ -474,6 +485,22 @@ final class AppViewModel: ObservableObject {
             self.resumeEngineRestOverlayIfNeeded()
             self.syncPetDisplayMode()
         }
+    }
+
+    /// 根据当前 `breakInterruptStyle` 路由到对应休息入口。
+    private func presentRestWithCurrentStyle(duration: TimeInterval, onDismissed: @escaping () -> Void) {
+        switch breakInterruptStyle {
+        case .fullscreen:
+            windowManager.presentRest(duration: duration, onDismissed: onDismissed)
+        case .breakRun:
+            windowManager.presentBreakRun(duration: duration, onDismissed: onDismissed)
+        }
+    }
+
+    /// 用户在设置中更改休息打断风格。
+    func setBreakInterruptStyle(_ style: BreakInterruptStyle) {
+        breakInterruptStyle = style
+        UserDefaults.standard.set(style.rawValue, forKey: MalDazeDefaults.breakInterruptStyle)
     }
 
     func quitApp() {
@@ -486,14 +513,14 @@ final class AppViewModel: ObservableObject {
         case .manual:
             if manualEngine.isTimerRunning && manualEngine.isInRestPhase {
                 wasResting = true
-                windowManager.presentRest(duration: 5 * 60) { }
+                presentRestWithCurrentStyle(duration: 5 * 60) { }
             } else {
                 wasResting = false
             }
         case .auto:
             if autoEngine.isTimerRunning && autoEngine.isInScheduledRest {
                 wasResting = true
-                windowManager.presentRest(duration: 5 * 60) { }
+                presentRestWithCurrentStyle(duration: 5 * 60) { }
             } else {
                 wasResting = false
             }
@@ -522,7 +549,7 @@ final class AppViewModel: ObservableObject {
             if !wasResting {
                 wasResting = true
                 if !testRestActive {
-                    windowManager.presentRest(duration: 5 * 60) { }
+                    presentRestWithCurrentStyle(duration: 5 * 60, onDismissed: { })
                 }
             }
         case .autoWatching(let next):

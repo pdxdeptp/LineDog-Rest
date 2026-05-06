@@ -11,9 +11,15 @@ final class PetStageView: NSView {
     private let dimView = NSView()
     private let pet = PetRenderer()
     private let countdownLabel = NSTextField(labelWithString: "5:00")
+    /// 跑屏模式下显示的迷你倒计时标签（位于视图中部）。
+    private let breakRunCountdownLabel = NSTextField(labelWithString: "5:00")
 
     private var tickTimer: Timer?
     private var restBeganAt: Date?
+    /// 跑屏模式（breakRun）的开始时间；非 nil 时表示正在跑屏。
+    private var breakRunBeganAt: Date?
+    /// 跑屏模式的总时长。
+    private var breakRunTotal: TimeInterval = 0
     /// 从黑狗当前位置移到屏中并放大；固定 60s，与距离无关。
     private let growDuration: TimeInterval = 60
     private let fadeOutDuration: TimeInterval = 3
@@ -65,6 +71,8 @@ final class PetStageView: NSView {
     private var restArcStartPetSide: CGFloat?
 
     var isInRestPhase: Bool { restBeganAt != nil }
+    /// 跑屏休息模式进行中（与 `isInRestPhase` 互斥）。
+    var isInBreakRunPhase: Bool { breakRunBeganAt != nil }
 
     /// 红狗「移到屏中」动画是否已结束（与 `hitTest` / 休息穿透策略一致）。
     var restApproachAnimationComplete: Bool {
@@ -118,6 +126,26 @@ final class PetStageView: NSView {
         NSLayoutConstraint.activate([
             countdownLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 32),
             countdownLabel.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -32)
+        ])
+
+        breakRunCountdownLabel.translatesAutoresizingMaskIntoConstraints = false
+        breakRunCountdownLabel.font = NSFont.monospacedDigitSystemFont(ofSize: 14, weight: .bold)
+        breakRunCountdownLabel.textColor = .white
+        breakRunCountdownLabel.alignment = .center
+        breakRunCountdownLabel.isEditable = false
+        breakRunCountdownLabel.isSelectable = false
+        breakRunCountdownLabel.drawsBackground = false
+        breakRunCountdownLabel.isBordered = false
+        breakRunCountdownLabel.wantsLayer = true
+        breakRunCountdownLabel.layer?.shadowColor = NSColor.black.cgColor
+        breakRunCountdownLabel.layer?.shadowOffset = CGSize(width: 0, height: 1)
+        breakRunCountdownLabel.layer?.shadowRadius = 4
+        breakRunCountdownLabel.layer?.shadowOpacity = 0.9
+        breakRunCountdownLabel.isHidden = true
+        addSubview(breakRunCountdownLabel)
+        NSLayoutConstraint.activate([
+            breakRunCountdownLabel.centerXAnchor.constraint(equalTo: centerXAnchor),
+            breakRunCountdownLabel.centerYAnchor.constraint(equalTo: centerYAnchor, constant: -38)
         ])
     }
 
@@ -220,6 +248,12 @@ final class PetStageView: NSView {
     override func mouseUp(with event: NSEvent) {
         guard deskMenuPresenter != nil else { return }
         let pt = convert(event.locationInWindow, from: nil)
+        // 跑屏休息模式：点击桌宠区域直接结束休息
+        if breakRunBeganAt != nil {
+            guard petHitRect.contains(pt) else { return }
+            onRestPetDoubleClickEndRest?()
+            return
+        }
         if restBeganAt != nil {
             guard petHitRect.contains(pt) else { return }
             if event.timestamp - restPetLastClickAt > Self.restPetClickResetInterval {
@@ -289,6 +323,33 @@ final class PetStageView: NSView {
         startTickTimer()
     }
 
+    // MARK: - 跑屏模式（breakRun）
+
+    /// 进入跑屏显示状态：显示迷你倒计时，切换为跑步配色。不驱动窗口位置（由 `BreakRunController` 负责）。
+    func beginBreakRunDisplay(total: TimeInterval) {
+        breakRunBeganAt = Date()
+        breakRunTotal = total
+        breakRunCountdownLabel.isHidden = false
+        updateBreakRunCountdown(remaining: total)
+        pet.setDisplayMode(.runningBlack)
+    }
+
+    /// 更新跑屏倒计时标签（由 `BreakRunController` 的 1s 定时器调用）。
+    func updateBreakRunCountdown(remaining: TimeInterval) {
+        let totalSecs = max(0, Int(floor(remaining)))
+        let m = totalSecs / 60
+        let s = totalSecs % 60
+        breakRunCountdownLabel.stringValue = String(format: "%d:%02d", m, s)
+    }
+
+    /// 跑屏结束/中断，恢复常态显示。
+    func cancelBreakRunToIdle() {
+        breakRunBeganAt = nil
+        breakRunTotal = 0
+        breakRunCountdownLabel.isHidden = true
+        layoutIdlePet()
+    }
+
     /// 中断休息并回到右下角常态（不调用 `onRestComplete`；由 `WindowManager` 负责 `pendingDismiss`）。
     func cancelToIdle() {
         // 勿在此重置 `suppressDeskMenuOnNextIdleMouseUp`：`performRestPetDoubleClickDismiss` 先设 true 再调
@@ -299,6 +360,9 @@ final class PetStageView: NSView {
         restPetLastClickAt = 0
         stopTickTimer()
         restBeganAt = nil
+        // 同时清理跑屏状态（若两种模式之一正在运行）
+        breakRunBeganAt = nil
+        breakRunCountdownLabel.isHidden = true
         restPendingStartCenterScreen = nil
         restPendingStartPetSide = nil
         restArcStartCenterLocal = nil
