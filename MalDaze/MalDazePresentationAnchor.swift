@@ -2,8 +2,8 @@ import AppKit
 
 // #region agent log
 enum MalDazeAgentDebugNDJSON {
-    static let sessionId = "00efd9"
-    static let path = "/Users/cpt/Public/MalDaze/.cursor/debug-00efd9.log"
+    static let sessionId = "b74a09"
+    static let path = "/Users/cpt/Public/MalDaze/.cursor/debug-b74a09.log"
 
     static func log(hypothesisId: String, location: String, message: String, data: [String: String] = [:], runId: String = "run1") {
         let ts = Int(Date().timeIntervalSince1970 * 1000)

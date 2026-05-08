@@ -8,6 +8,50 @@ private final class PetStageWindow: NSWindow {
     override var canBecomeMain: Bool { false }
 }
 
+/// 跑屏模式固定在屏幕左下角的倒计时视图；点击 20 次可提前结束休息。
+private final class BreakRunCountdownView: NSView {
+    let label = NSTextField(labelWithString: "5:00")
+    var onTwentyClicks: (() -> Void)?
+    private var clickCount = 0
+    private var lastClickAt: TimeInterval = 0
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        wantsLayer = true
+        layer?.backgroundColor = NSColor.black.withAlphaComponent(0.52).cgColor
+        layer?.cornerRadius = 10
+        layer?.masksToBounds = true
+
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.font = NSFont.monospacedDigitSystemFont(ofSize: 48, weight: .semibold)
+        label.textColor = .white
+        label.alignment = .center
+        label.isEditable = false
+        label.isSelectable = false
+        label.drawsBackground = false
+        label.isBordered = false
+        addSubview(label)
+        NSLayoutConstraint.activate([
+            label.centerXAnchor.constraint(equalTo: centerXAnchor),
+            label.centerYAnchor.constraint(equalTo: centerYAnchor)
+        ])
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    override func mouseDown(with event: NSEvent) {
+        if event.timestamp - lastClickAt > 3.0 { clickCount = 0 }
+        lastClickAt = event.timestamp
+        clickCount += 1
+        if clickCount >= 20 {
+            clickCount = 0
+            onTwentyClicks?()
+        }
+    }
+}
+
 /// 供 `AppViewModel` 与单元测试注入；生产环境由 `WindowManager` 实现。
 protocol WindowManaging: AnyObject {
     func dismissRestImmediately()
@@ -51,6 +95,12 @@ final class WindowManager: WindowManaging {
     private weak var deskMenuViewModel: AppViewModel?
     private var deskMenuPopover: NSPopover?
     private var deskMenuHosting: NSHostingController<MenuBarContentView>?
+    /// Custom transient-dismiss monitor (replaces NSPopover.behavior = .transient).
+    private var transientMonitor: Any?
+    private var dismissObservers: [NSObjectProtocol] = []
+    /// 启动后对 deskMenuPopover 做一次静默预热（alpha=0），提前触发 SwiftUI 首次 layout。
+    private var isPrewarming = false
+    private var prewarmCloseWorkItem: DispatchWorkItem?
     private var pendingDismiss: (() -> Void)?
     private var screenObserver: NSObjectProtocol?
     private var primaryDisplayObserver: NSObjectProtocol?
@@ -67,6 +117,9 @@ final class WindowManager: WindowManaging {
     private var breakRunShieldWorkItem: DispatchWorkItem?
     /// 跑屏1分钟后展示的全屏半透明遮罩窗口（阻止用户点击桌面）。
     private var breakRunShieldWindow: NSPanel?
+    /// 跑屏模式全程显示在屏幕左下角的独立倒计时面板（与遮罩无关）。
+    private var breakRunCountdownPanel: NSPanel?
+    private var breakRunCountdownView: BreakRunCountdownView?
 
     /// 进入休息全屏前一刻的常态小窗框，用于结束后回到原位置（与 `UserDefaults` 一致）。
     private var idleFrameBeforeRest: NSRect?
@@ -121,7 +174,9 @@ final class WindowManager: WindowManaging {
         idleCursorTrackTimer?.invalidate()
         breakRunCountdownTimer?.invalidate()
         breakRunShieldWorkItem?.cancel()
+        prewarmCloseWorkItem?.cancel()
         breakRunShieldWindow?.orderOut(nil)
+        breakRunCountdownPanel?.orderOut(nil)
         if let launchObserver {
             NotificationCenter.default.removeObserver(launchObserver)
         }
@@ -147,7 +202,7 @@ final class WindowManager: WindowManaging {
         return (s, s.frame)
     }
 
-    private static let idlePetSize = NSSize(width: 132, height: 132)
+    private static let idlePetSize = NSSize(width: 150, height: 150)
     private static let idlePetOriginXKey = "MalDaze.idlePetOriginX"
     private static let idlePetOriginYKey = "MalDaze.idlePetOriginY"
 
@@ -254,12 +309,15 @@ final class WindowManager: WindowManaging {
         win.contentView = view
         window = win
         stageView = view
-        applyMousePolicy()
         win.orderFrontRegardless()
         syncContentViewToWindowLayout()
         view.applyNonRestPetDisplayMode(pendingIdlePetMode)
         view.needsLayout = true
         view.layoutSubtreeIfNeeded()
+        // applyMousePolicy 必须在 layoutSubtreeIfNeeded 之后：layout() → layoutIdlePet() 会
+        // 计算 petHitRect；若提前调用，petHitRect == .zero，syncIdleWindowMousePolicy 会把
+        // ignoresMouseEvents 设为 true，导致启动后首次点击穿透到桌面无响应。
+        applyMousePolicy()
         postIdlePetScreenFrameChanged(win.frame)
 
         screenObserver = NotificationCenter.default.addObserver(
@@ -298,7 +356,7 @@ final class WindowManager: WindowManaging {
         // Pre-warm the popover so SwiftUI renders on startup, not on first click.
         if let vm = viewModel {
             let pop = NSPopover()
-            pop.behavior = .transient
+            pop.behavior = .applicationDefined
             pop.animates = false
             let host = NSHostingController(rootView: MenuBarContentView(viewModel: vm))
             host.view.translatesAutoresizingMaskIntoConstraints = true
@@ -308,6 +366,12 @@ final class WindowManager: WindowManaging {
             deskMenuHosting = host
         }
         applyMousePolicy()
+        // 0.15s 后启动静默预热：App 初始化稳定后再 show，避免与启动期的激活/失活事件冲突。
+        if deskMenuPopover != nil {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+                self?.prewarmDeskMenuIfNeeded()
+            }
+        }
     }
 
     private func wireDeskPetCallbacks(into v: PetStageView) {
@@ -371,17 +435,50 @@ final class WindowManager: WindowManaging {
         deskMenuPopover?.close()
         let callback = pendingDismiss
         pendingDismiss = nil
+
         // 同时停止跑屏（若正在跑屏模式）
         hideBreakRunShield()
+        hideBreakRunCountdownPanel()
         stopBreakRunCountdownTimer()
+        // 记录是否正在跑屏，以及出发前帧（stop() 之前检查）
+        let wasBreakRun = breakRunController.isRunning
+        let savedIdleFrame = idleFrameBeforeRest
+        if wasBreakRun { idleFrameBeforeRest = nil }
         breakRunController.stop()
         stageView?.cancelToIdle()
         setWindowLevel(resting: false)
-        callback?()
-        // 霸屏模式需要缩回小窗；跑屏模式窗口本就是小窗，直接对齐到当前位置即可
+
+        // #region agent log
+        MalDazeAgentDebugNDJSON.log(hypothesisId: "H-dismiss", location: "WindowManager.dismissRestImmediately", message: "dismiss_branch", data: ["wasBreakRun": "\(wasBreakRun)", "savedIdleFrame": "\(savedIdleFrame as Any)", "window_frame": "\(window?.frame ?? .zero)"])
+        // #endregion
+
         if let wf = window?.frame, !Self.isApproximatelyIdleSized(wf) {
+            // 霸屏模式：先通知 AppViewModel，再缩回小窗
+            callback?()
             shrinkWindowToIdlePetFrame()
+        } else if wasBreakRun, let r = savedIdleFrame, Self.isApproximatelyIdleSized(r) {
+            // 跑屏模式：动画飞回出发前位置，动画结束后再通知 AppViewModel
+            let target = Self.clampIdlePetFrameToScreens(r)
+            NSAnimationContext.runAnimationGroup({ ctx in
+                ctx.duration = 1.0
+                ctx.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                self.window?.animator().setFrame(target, display: true)
+            }, completionHandler: { [weak self] in
+                guard let self else { return }
+                // #region agent log
+                MalDazeAgentDebugNDJSON.log(hypothesisId: "H-dismiss", location: "WindowManager.dismissRestImmediately.completion", message: "breakrun_animation_done", data: ["final_frame": "\(self.window?.frame ?? .zero)"])
+                // #endregion
+                syncContentViewToWindowLayout()
+                stageView?.needsLayout = true
+                stageView?.layoutSubtreeIfNeeded()
+                applyMousePolicy()
+                window?.orderFrontRegardless()
+                persistIdlePetFrame(target)
+                callback?()
+            })
         } else {
+            // 跑屏但无出发前帧记录，或其他情况
+            callback?()
             applyMousePolicy()
             window?.orderFrontRegardless()
         }
@@ -392,6 +489,7 @@ final class WindowManager: WindowManaging {
         installPetWindowIfNeeded()
         // 清理任何可能残留的霸屏/跑屏状态（不触发 onDismissed 回调）
         hideBreakRunShield()
+        hideBreakRunCountdownPanel()
         stopBreakRunCountdownTimer()
         breakRunController.stop()
         stageView?.cancelToIdle()
@@ -409,42 +507,52 @@ final class WindowManager: WindowManaging {
 
         // 1 Hz 倒计时更新
         startBreakRunCountdownTimer(duration: duration)
+        // 屏幕左下角固定倒计时面板（全跑屏期间显示）
+        showBreakRunCountdownPanel(duration: duration)
         applyMousePolicy()
         win.orderFrontRegardless()
     }
 
     private func finishBreakRun() {
         hideBreakRunShield()
+        hideBreakRunCountdownPanel()
         stopBreakRunCountdownTimer()
         breakRunController.stop()
+        // 立即重置 view 状态（不再响应跑屏点击），动画期间 pet 已是常态小图标
+        stageView?.cancelBreakRunToIdle()
+        window?.level = .floating
 
         let cb = pendingDismiss
         pendingDismiss = nil
-        cb?()      // 立即通知 AppViewModel，让计时引擎恢复正常
 
-        // 慢慢飞回休息开始前的位置（1秒缓动动画）
+        // 慢慢飞回休息开始前的位置（1秒缓动动画）；cb?() 必须在动画结束后调用，
+        // 否则 resumeEngineRestOverlayIfNeeded 会立即再启动一轮跑屏并取消当前动画。
         let target: NSRect
         if let r = idleFrameBeforeRest, Self.isApproximatelyIdleSized(r) {
             target = Self.clampIdlePetFrameToScreens(r)
-            idleFrameBeforeRest = nil
         } else {
             target = Self.resolvedIdlePetFrameForInstall()
-            idleFrameBeforeRest = nil
         }
+        idleFrameBeforeRest = nil
+        // #region agent log
+        MalDazeAgentDebugNDJSON.log(hypothesisId: "H-animate", location: "WindowManager.finishBreakRun", message: "animation_start", data: ["target": "\(target)", "window_frame": "\(window?.frame ?? .zero)"])
+        // #endregion
         NSAnimationContext.runAnimationGroup({ ctx in
             ctx.duration = 1.0
             ctx.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
             window?.animator().setFrame(target, display: true)
         }, completionHandler: { [weak self] in
             guard let self else { return }
-            stageView?.cancelBreakRunToIdle()
-            window?.level = .floating
+            // #region agent log
+            MalDazeAgentDebugNDJSON.log(hypothesisId: "H-animate", location: "WindowManager.finishBreakRun.completion", message: "animation_done", data: ["final_frame": "\(self.window?.frame ?? .zero)"])
+            // #endregion
             syncContentViewToWindowLayout()
             stageView?.needsLayout = true
             stageView?.layoutSubtreeIfNeeded()
             applyMousePolicy()
             window?.orderFrontRegardless()
             persistIdlePetFrame(target)
+            cb?()
         })
     }
 
@@ -463,10 +571,11 @@ final class WindowManager: WindowManaging {
         let startDate = Date()
         let t = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
-                guard let self, let stage = self.stageView else { return }
+                guard let self else { return }
                 let elapsed = Date().timeIntervalSince(startDate)
                 let remaining = max(0, duration - elapsed)
-                stage.updateBreakRunCountdown(remaining: remaining)
+                stageView?.updateBreakRunCountdown(remaining: remaining)
+                updateBreakRunCountdownPanel(remaining: remaining)
             }
         }
         RunLoop.main.add(t, forMode: .common)
@@ -485,8 +594,8 @@ final class WindowManager: WindowManaging {
     private func showBreakRunShield() {
         guard breakRunShieldWindow == nil else { return }
         guard let screen = NSScreen.main ?? NSScreen.screens.first else { return }
-        // 遮罩层级比 .screenSaver(1000) 低1级，桌宠窗升到 .screenSaver 后可接收点击
-        let shieldLevel = NSWindow.Level(rawValue: Int(NSWindow.Level.screenSaver.rawValue) - 1)
+        // 遮罩层级比 .screenSaver(1000) 低2级；倒计时面板在 screenSaver-1 确保在遮罩之上
+        let shieldLevel = NSWindow.Level(rawValue: Int(NSWindow.Level.screenSaver.rawValue) - 2)
         let panel = NSPanel(
             contentRect: screen.frame,
             styleMask: [.borderless, .nonactivatingPanel],
@@ -504,11 +613,65 @@ final class WindowManager: WindowManaging {
         // 桌宠窗升到 .screenSaver，保证在遮罩之上仍可点击
         window?.level = .screenSaver
         window?.orderFrontRegardless()
+        // 遮罩出现后停止光标追踪定时器：定时器每100ms会把窗口设为 ignoresMouseEvents=true
+        // 导致点击穿透到遮罩被吸收，宠物再也无法被点击。改为永久可点击，hitTest 负责过滤非宠物区域。
+        stopIdleCursorTracking()
+        window?.ignoresMouseEvents = false
+        // 确保倒计时面板在遮罩之上（level 已是 screenSaver-1 > 遮罩 screenSaver-2）
+        breakRunCountdownPanel?.orderFrontRegardless()
     }
 
     private func hideBreakRunShield() {
         breakRunShieldWindow?.orderOut(nil)
         breakRunShieldWindow = nil
+    }
+
+    // MARK: - 跑屏固定倒计时面板（屏幕左下角）
+
+    private func showBreakRunCountdownPanel(duration: TimeInterval) {
+        hideBreakRunCountdownPanel()
+        guard let screen = MenuBarNSScreen.screen ?? NSScreen.screens.first else { return }
+        let vf = screen.visibleFrame
+        let panelSize = NSSize(width: 200, height: 72)
+        let origin = NSPoint(x: vf.minX + 32, y: vf.minY + 32)
+        let panel = NSPanel(
+            contentRect: NSRect(origin: origin, size: panelSize),
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: false
+        )
+        panel.backgroundColor = .clear
+        panel.isOpaque = false
+        panel.hasShadow = false
+        // level = screenSaver-1（999）；遮罩在 screenSaver-2（998），pet 在 screenSaver（1000）
+        panel.level = NSWindow.Level(rawValue: Int(NSWindow.Level.screenSaver.rawValue) - 1)
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        panel.ignoresMouseEvents = false
+
+        let cv = BreakRunCountdownView(frame: NSRect(origin: .zero, size: panelSize))
+        cv.onTwentyClicks = { [weak self] in
+            Task { @MainActor [weak self] in
+                self?.deskMenuViewModel?.endRestEarlyFromDeskPet()
+            }
+        }
+        panel.contentView = cv
+        panel.orderFrontRegardless()
+        breakRunCountdownPanel = panel
+        breakRunCountdownView = cv
+
+        let total = max(0, Int(floor(duration)))
+        cv.label.stringValue = String(format: "%d:%02d", total / 60, total % 60)
+    }
+
+    private func hideBreakRunCountdownPanel() {
+        breakRunCountdownPanel?.orderOut(nil)
+        breakRunCountdownPanel = nil
+        breakRunCountdownView = nil
+    }
+
+    private func updateBreakRunCountdownPanel(remaining: TimeInterval) {
+        let total = max(0, Int(floor(remaining)))
+        breakRunCountdownView?.label.stringValue = String(format: "%d:%02d", total / 60, total % 60)
     }
 
     private func finishRestCycle() {
@@ -828,11 +991,46 @@ extension WindowManager: PetStageDeskMenuPresenter {
         vm.userRequestedSmartReminderInput(screenAnchor: screenAnchor)
     }
 
+    /// 启动后悄悄 show 一次 Popover（alphaValue=0，ignoresMouseEvents=true），
+    /// 触发 SwiftUI 首次 layout，使用户第一次点击桌宠时面板能瞬间出现。
+    ///
+    /// - 预热窗口完全透明且不拦截鼠标，用户不会察觉。
+    /// - 0.4s 后自动关闭；用户若在预热期间点击，由 `presentDeskMenu` 中止预热并立即展示面板。
+    private func prewarmDeskMenuIfNeeded() {
+        guard !isPrewarming,
+              let pop = deskMenuPopover,
+              let stage = stageView,
+              !pop.isShown else { return }
+
+        isPrewarming = true
+        // 锚点用整个 stage 区域，位置无关紧要（窗口不可见）。
+        pop.show(relativeTo: stage.bounds, of: stage, preferredEdge: .minY)
+        if let win = pop.contentViewController?.view.window {
+            win.alphaValue = 0
+            win.ignoresMouseEvents = true
+        }
+
+        let item = DispatchWorkItem { [weak self] in
+            guard let self, self.isPrewarming else { return }
+            self.isPrewarming = false
+            self.prewarmCloseWorkItem = nil
+            // 关闭前重置，确保复用同一 NSWindow 时下次 show 能正常接收鼠标。
+            if let pop = self.deskMenuPopover,
+               let win = pop.contentViewController?.view.window {
+                win.ignoresMouseEvents = false
+            }
+            self.deskMenuPopover?.close()
+        }
+        prewarmCloseWorkItem = item
+        // 0.4s 足够 DatePicker 等重型组件完成首次 layout（实测约 200-400ms）。
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: item)
+    }
+
     func presentDeskMenu(from stage: PetStageView, anchorRect: NSRect) {
         guard let vm = deskMenuViewModel else { return }
         if deskMenuPopover == nil {
             let pop = NSPopover()
-            pop.behavior = .transient
+            pop.behavior = .applicationDefined
             pop.animates = false   // 关掉内置缩放/滑入动画，改用手动淡入淡出
             let host = NSHostingController(rootView: MenuBarContentView(viewModel: vm))
             host.view.translatesAutoresizingMaskIntoConstraints = true
@@ -845,29 +1043,32 @@ extension WindowManager: PetStageDeskMenuPresenter {
         }
         guard let pop = deskMenuPopover else { return }
         if pop.isShown {
-            // 淡出后关闭
-            if let win = pop.contentViewController?.view.window {
-                NSAnimationContext.runAnimationGroup({ ctx in
-                    ctx.duration = 0.10
-                    ctx.timingFunction = CAMediaTimingFunction(name: .easeIn)
-                    win.animator().alphaValue = 0
-                }, completionHandler: {
-                    pop.close()
-                    win.alphaValue = 1   // 重置，下次显示时不受影响
-                })
+            if isPrewarming {
+                // 用户在预热期间点击：中止预热，关闭不可见的预热窗口，走正常 show 路径。
+                prewarmCloseWorkItem?.cancel()
+                prewarmCloseWorkItem = nil
+                isPrewarming = false
+                if let win = pop.contentViewController?.view.window {
+                    win.ignoresMouseEvents = false
+                }
+                pop.close()   // 同步关闭，无动画（窗口本就 alpha=0）
+                // fall through → 正常 show
             } else {
-                pop.close()
+                // 已正常显示 → 淡出关闭
+                closePopoverWithFade()
+                return
             }
-            return
         }
-        // 推迟到下一个 RunLoop 再 show，确保当前 mouseUp 事件完全处理完毕。
-        // 这样 NSPopover 的 transient 监听不会把开启本次弹窗的 mouseUp 误判为"外部点击"而立即关闭。
+        // 推迟到下一个 RunLoop 再 show，确保当前 mouseUp 事件完全处理完毕，
+        // 避免与事件分发产生竞争。激活 App 使面板立即可交互。
         let capturedAnchor = anchorRect
         DispatchQueue.main.async { [weak self, weak pop, weak stage] in
-            guard let pop, !pop.isShown, let stage else { return }
+            guard let self, let pop, !pop.isShown, let stage else { return }
+            NSApp.activate(ignoringOtherApps: true)
             pop.show(relativeTo: capturedAnchor, of: stage, preferredEdge: .minY)
             // 淡入：先透明，再动画到不透明
             if let win = pop.contentViewController?.view.window {
+                win.ignoresMouseEvents = false   // 预热复用同一 NSWindow 时重置
                 win.alphaValue = 0
                 NSAnimationContext.runAnimationGroup { ctx in
                     ctx.duration = 0.14
@@ -876,9 +1077,86 @@ extension WindowManager: PetStageDeskMenuPresenter {
                 }
             }
             // 若预热时没有同步 rootView，此处确保视图与最新 viewModel 绑定
-            if let host = self?.deskMenuHosting, let vm = self?.deskMenuViewModel {
+            if let host = self.deskMenuHosting, let vm = self.deskMenuViewModel {
                 host.rootView = MenuBarContentView(viewModel: vm)
             }
+            // 安装自定义 dismiss 监视器（替代 .transient 的内置监视器）
+            self.installPopoverDismissMonitor()
+        }
+    }
+
+    // MARK: - 自定义 Popover Dismiss 监视器
+
+    /// 安装全局鼠标点击监视器 + App 失活监视器，替代 NSPopover.behavior = .transient。
+    ///
+    /// 使用 .applicationDefined 而非 .transient 的原因：
+    /// 1. acceptsFirstMouse + App 非 frontmost 时的首次点击会产生系统级 App Activation Event，
+    ///    .transient 的内置监视器会把该事件误判为"外部点击"而立即关闭面板。
+    /// 2. petHitRect 在几何上位于 Popover 窗口之外，.transient 监视器会把每次点击宠物都判定
+    ///    为"外部点击"，导致 toggle 逻辑失效并触发约 1 秒的 NSPopover 内部冷却。
+    private func installPopoverDismissMonitor() {
+        tearDownPopoverDismissMonitor()
+
+        // Global monitor 只接收发往**其他**应用的事件；发往本 App 的点击（宠物、面板内部）不触发此回调。
+        transientMonitor = NSEvent.addGlobalMonitorForEvents(
+            matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]
+        ) { [weak self] _ in
+            guard let self, let pop = self.deskMenuPopover, pop.isShown else {
+                self?.tearDownPopoverDismissMonitor()
+                return
+            }
+            // 安全网：确认点击确实在面板窗口外（正常情况全局监视器不会收到面板内的事件）
+            if let popWin = pop.contentViewController?.view.window,
+               popWin.frame.contains(NSEvent.mouseLocation) {
+                return
+            }
+            self.closePopoverWithFade()
+        }
+
+        let nc = NotificationCenter.default
+        // 1. App 失活 → 关闭面板
+        dismissObservers.append(nc.addObserver(
+            forName: NSApplication.didResignActiveNotification,
+            object: nil, queue: .main
+        ) { [weak self] _ in
+            self?.closePopoverWithFade()
+        })
+        // 2. 面板以任何路径关闭（直接 close()、bindDeskPetMenu 重建等）→ 清理 monitor
+        if let pop = deskMenuPopover {
+            dismissObservers.append(nc.addObserver(
+                forName: NSPopover.didCloseNotification,
+                object: pop, queue: .main
+            ) { [weak self] _ in
+                self?.tearDownPopoverDismissMonitor()
+            })
+        }
+    }
+
+    private func tearDownPopoverDismissMonitor() {
+        if let m = transientMonitor {
+            NSEvent.removeMonitor(m)
+            transientMonitor = nil
+        }
+        dismissObservers.forEach { NotificationCenter.default.removeObserver($0) }
+        dismissObservers = []
+    }
+
+    /// 淡出后关闭面板（与 isShown 切换路径共用）。
+    /// Monitor 在此处立即拆除，防止动画期间重复触发。
+    private func closePopoverWithFade() {
+        tearDownPopoverDismissMonitor()
+        guard let pop = deskMenuPopover, pop.isShown else { return }
+        if let win = pop.contentViewController?.view.window {
+            NSAnimationContext.runAnimationGroup({ ctx in
+                ctx.duration = 0.10
+                ctx.timingFunction = CAMediaTimingFunction(name: .easeIn)
+                win.animator().alphaValue = 0
+            }, completionHandler: {
+                pop.close()
+                win.alphaValue = 1   // 重置，下次显示时不受影响
+            })
+        } else {
+            pop.close()
         }
     }
 }

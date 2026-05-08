@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MalDaze · 喝水提醒弹窗（触发时）UI 方案</title>
+  <style>
+    :root {
+      --bg: #1a1a1e;
+      --bg2: #2c2c32;
+      --panel: rgba(255,255,255,.96);
+      --panel-dark: rgba(44,44,50,.94);
+      --text: #1d1d1f;
+      --text-on-dark: #f5f5f7;
+      --text2: #6e6e73;
+      --sep: rgba(0,0,0,.1);
+      --blue: #0a84ff;
+      --blue-soft: #e8f4ff;
+      --green: #34c759;
+      --radius: 18px;
+      --shadow: 0 4px 24px rgba(0,0,0,.18), 0 0 1px rgba(0,0,0,.08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+      background: linear-gradient(165deg, var(--bg) 0%, #3a3a42 50%, var(--bg2) 100%);
+      color: var(--text-on-dark);
+      padding: 32px 24px 56px;
+      min-height: 100vh;
+    }
+    h1 {
+      font-size: 1.4rem;
+      font-weight: 600;
+      margin: 0 0 8px;
+      letter-spacing: -0.02em;
+    }
+    .note {
+      color: rgba(255,255,255,.65);
+      font-size: 0.88rem;
+      max-width: 52em;
+      line-height: 1.5;
+      margin-bottom: 28px;
+    }
+    .note code {
+      background: rgba(255,255,255,.1);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.82em;
+    }
+    .toc {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 40px;
+    }
+    .toc a {
+      padding: 8px 14px;
+      background: rgba(255,255,255,.12);
+      border-radius: 999px;
+      color: #fff;
+      text-decoration: none;
+      font-size: 0.82rem;
+      font-weight: 500;
+      border: 1px solid rgba(255,255,255,.15);
+    }
+    .toc a:hover { background: rgba(255,255,255,.2); }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 28px;
+      align-items: start;
+    }
+    section { scroll-margin-top: 20px; }
+    section h2 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin: 0 0 6px;
+      color: #fff;
+    }
+    section .blurb {
+      font-size: 0.78rem;
+      color: rgba(255,255,255,.55);
+      margin: 0 0 14px;
+      max-width: 36em;
+      line-height: 1.45;
+    }
+    /* —— 弹窗卡片（居中示意） —— */
+    .stage {
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 20px;
+      background: rgba(0,0,0,.25);
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,.08);
+      min-height: 280px;
+    }
+    .popup {
+      background: var(--panel);
+      color: var(--text);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      border: 1px solid var(--sep);
+      width: 100%;
+      max-width: 300px;
+      padding: 22px 22px 20px;
+      text-align: center;
+    }
+    .popup.wide { max-width: 360px; }
+    .icon-wrap {
+      width: 64px;
+      height: 64px;
+      margin: 0 auto 14px;
+      border-radius: 16px;
+      background: linear-gradient(145deg, #5ac8fa, #0a84ff);
+      display: grid;
+      place-items: center;
+      font-size: 30px;
+    }
+    .icon-wrap.sm { width: 52px; height: 52px; font-size: 26px; border-radius: 14px; }
+    .msg {
+      font-size: 1.05rem;
+      font-weight: 600;
+      line-height: 1.4;
+      margin: 0 0 18px;
+      letter-spacing: -0.01em;
+    }
+    .msg.sm { font-size: 0.95rem; }
+    /* 现状（缩小示意）：小按钮 */
+    .btn-row-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .btn {
+      width: 100%;
+      min-height: 48px;
+      border-radius: 12px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .btn-primary {
+      background: var(--blue);
+      color: #fff;
+    }
+    .btn-primary:hover { filter: brightness(1.06); }
+    .btn-secondary {
+      background: #f2f2f7;
+      color: var(--text);
+      border: 1px solid var(--sep);
+      font-weight: 500;
+    }
+    .btn-secondary:hover { background: #e8e8ed; }
+    /* 现状：32px 高 */
+    .btn-tiny {
+      min-height: 32px;
+      font-size: 0.82rem;
+      border-radius: 8px;
+    }
+    .btn-row-h {
+      display: flex;
+      gap: 10px;
+    }
+    .btn-row-h .btn { flex: 1; }
+    .label-compare {
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: rgba(0,0,0,.45);
+      margin-bottom: 10px;
+      text-align: left;
+    }
+    /* 深色弹窗 */
+    .popup.dark {
+      background: var(--panel-dark);
+      color: var(--text-on-dark);
+      border-color: rgba(255,255,255,.12);
+    }
+    .popup.dark .btn-secondary {
+      background: rgba(255,255,255,.12);
+      color: #fff;
+      border-color: rgba(255,255,255,.2);
+    }
+    .popup.dark .btn-secondary:hover { background: rgba(255,255,255,.18); }
+    .popup.dark .msg { color: #fff; }
+    /* 水纹底 */
+    .popup.water-bg {
+      background:
+        radial-gradient(ellipse 120% 80% at 50% -20%, rgba(90,200,250,.35), transparent 55%),
+        var(--panel);
+    }
+    .snooze-link {
+      margin-top: 12px;
+      font-size: 0.85rem;
+      color: var(--text2);
+      background: none;
+      border: none;
+      cursor: pointer;
+      text-decoration: underline;
+      font-family: inherit;
+      padding: 8px;
+    }
+    .current-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    @media (max-width: 720px) {
+      .current-row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <h1>喝水提醒 · 触发时弹窗（非菜单设置）</h1>
+  <p class="note">对应实现：<code>HydrationReminderController.swift</code>（<code>showReminderWindow</code>）。当前实装约为：卡片宽约 220–280pt、按钮高度 <strong>32pt</strong>、图标区 52pt。下面是几种「把主操作变大、层次更清晰」的 HTML 示意。</p>
+
+  <nav class="toc">
+    <a href="#compare">现状 vs 加大</a>
+    <a href="#a">方案 A · 双大按钮纵排</a>
+    <a href="#b">方案 B · 横排双按钮</a>
+    <a href="#c">方案 C · 主按钮 + 文字稍后</a>
+    <a href="#d">方案 D · 深色浮层</a>
+  </nav>
+
+  <section id="compare">
+    <h2>对照：现行尺度 vs 建议最小尺度</h2>
+    <p class="blurb">左：模拟当前 32px 按钮 + 52px 图标；右：主按钮 ≥48pt、次要 ≥44pt，符合「可点目标」习惯。</p>
+    <div class="current-row">
+      <div class="stage">
+        <div class="popup" style="max-width:280px;">
+          <div class="label-compare">近似当前 AppKit</div>
+          <div class="icon-wrap sm">💧</div>
+          <p class="msg sm">喝水喝水喝水！💧</p>
+          <div class="btn-row-stack">
+            <button type="button" class="btn btn-primary btn-tiny">已喝水 💧</button>
+            <button type="button" class="btn btn-secondary btn-tiny">稍后提醒</button>
+          </div>
+        </div>
+      </div>
+      <div class="stage">
+        <div class="popup wide water-bg">
+          <div class="label-compare">建议基线</div>
+          <div class="icon-wrap">💧</div>
+          <p class="msg">喝水喝水喝水！💧</p>
+          <div class="btn-row-stack">
+            <button type="button" class="btn btn-primary">已喝水 💧</button>
+            <button type="button" class="btn btn-secondary">15 分钟后提醒</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="grid" style="margin-top:36px;">
+    <section id="a">
+      <h2>方案 A · 纵排双大按钮（推荐）</h2>
+      <p class="blurb">与现交互一致，只做尺度与留白：卡片加宽约 320–360pt，主按钮用强调色，副按钮灰底描边。</p>
+      <div class="stage">
+        <div class="popup wide water-bg">
+          <div class="icon-wrap">💧</div>
+          <p class="msg">*舔舔嘴唇* 🤍 时间喝水～</p>
+          <div class="btn-row-stack">
+            <button type="button" class="btn btn-primary">已喝水 💧</button>
+            <button type="button" class="btn btn-secondary">稍后提醒</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="b">
+      <h2>方案 B · 横排双按钮</h2>
+      <p class="blurb">适合更宽的卡片：左「稍后」、右「已喝」主色（或反之按你偏好）。注意窄屏时仍可退回纵排。</p>
+      <div class="stage">
+        <div class="popup wide">
+          <div class="icon-wrap">💧</div>
+          <p class="msg">主人，喝水啦～</p>
+          <div class="btn-row-h">
+            <button type="button" class="btn btn-secondary">稍后</button>
+            <button type="button" class="btn btn-primary">已喝水 💧</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="c">
+      <h2>方案 C · 单一主按钮 + 次要文字链</h2>
+      <p class="blurb">减少「两个大块」竞争：主路径只有「已喝水」；「稍后」降为文字按钮，点击区域仍给足 padding（≥44px 热区）。</p>
+      <div class="stage">
+        <div class="popup wide water-bg">
+          <div class="icon-wrap">💧</div>
+          <p class="msg">我是一个小渴鬼🤔，你也应该喝点水？</p>
+          <button type="button" class="btn btn-primary">已喝水 💧</button>
+          <button type="button" class="snooze-link">稍后再提醒我</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="d">
+      <h2>方案 D · 深色卡片</h2>
+      <p class="blurb">在浅色桌面壁纸上对比更强；实现时可用 <code>NSVisualEffectView</code> 或深色半透底 + 浅色字。</p>
+      <div class="stage">
+        <div class="popup wide dark">
+          <div class="icon-wrap" style="background:linear-gradient(145deg,#64d2ff,#0a84ff);">💧</div>
+          <p class="msg">时间喝水～ 💧</p>
+          <div class="btn-row-stack">
+            <button type="button" class="btn btn-primary">已喝水</button>
+            <button type="button" class="btn btn-secondary">稍后提醒（15 分钟）</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <p class="note" style="margin-top:40px;">路径：<code>docs/hydration-reminder-popup-mockups.html</code>。若要落代码，主要改 <code>buttonH</code>、<code>reminderMaxTextWidth</code>、<code>reminderIconSide</code>，以及是否给「已喝水」设 <code>NSColor.controlAccentColor</code> 边框样式。</p>
+</body>
+</html>

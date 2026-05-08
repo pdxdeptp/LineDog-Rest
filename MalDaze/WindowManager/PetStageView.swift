@@ -38,7 +38,7 @@ final class PetStageView: NSView {
     /// 非休息时的配色（由 `WindowManager` 与「开始专注 / 停止计时」同步）。
     private var nonRestDisplayMode: PetDisplayMode = .runningBlack
 
-    private static let idlePetSide: CGFloat = 100
+    private static let idlePetSide: CGFloat = 120
     private static let edgeMargin: CGFloat = 16
 
     /// 非 nil 时：常态小窗整块可点；休息全屏时仅 `petHitRect` 可点：单击（略晚于系统双击间隔后）打开菜单，**双击**结束休息。
@@ -371,7 +371,8 @@ final class PetStageView: NSView {
         breakRunCountdownClickCount = 0
         breakRunCountdownLastClickAt = 0
         countdownLabel.isHidden = true
-        breakRunCountdownLabel.isHidden = false
+        // 倒计时已移至 WindowManager 的独立屏幕左下角面板，此处不再显示随桌宠移动的小标签
+        breakRunCountdownLabel.isHidden = true
         updateBreakRunCountdown(remaining: total)
         pet.setDisplayMode(.runningBlack)
     }
@@ -493,7 +494,7 @@ final class PetStageView: NSView {
             // 常态小窗：桌宠居中，点击区域与视觉图标大小一致。
             center = CGPoint(x: b.midX, y: b.midY)
             scale = Self.idlePetSide / max(base, 1)
-            let hitSide: CGFloat = 50
+            let hitSide: CGFloat = 65
             let half = hitSide / 2
             petHitRect = NSRect(x: center.x - half, y: center.y - half,
                                 width: hitSide, height: hitSide)

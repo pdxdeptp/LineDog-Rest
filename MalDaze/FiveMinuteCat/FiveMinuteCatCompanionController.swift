@@ -5,13 +5,13 @@ import AppKit
 final class FiveMinuteCatCompanionController {
     static let presenceDuration: TimeInterval = 5 * 60
     private static let fadeOutDuration: TimeInterval = 3
-    private static let catSide: CGFloat = 56
-    private static let gapFromDog: CGFloat = 8
+    private static let catSide: CGFloat = 64
+    private static let gapFromDog: CGFloat = 9
     /// 与 `WindowManager` 持久化键一致，仅用于首帧定位（随后跟通知更新）。
     private static let dogOriginXKey = "MalDaze.idlePetOriginX"
     private static let dogOriginYKey = "MalDaze.idlePetOriginY"
-    private static let dogWidth: CGFloat = 132
-    private static let dogHeight: CGFloat = 132
+    private static let dogWidth: CGFloat = 150
+    private static let dogHeight: CGFloat = 150
 
     var onActiveChanged: ((Bool) -> Void)?
 

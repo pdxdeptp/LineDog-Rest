@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MalDaze · 喝水提醒 UI 方案</title>
+  <style>
+    :root {
+      --bg: #f4f5f7;
+      --panel: #ffffff;
+      --text: #1d1d1f;
+      --text2: #6e6e73;
+      --text3: #86868b;
+      --sep: rgba(0,0,0,.08);
+      --accent: #007aff;
+      --water: #0a84ff;
+      --water-soft: #e8f4ff;
+      --radius: 12px;
+      --radius-sm: 8px;
+      --shadow: 0 1px 3px rgba(0,0,0,.06), 0 8px 24px rgba(0,0,0,.04);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.45;
+      padding: 24px 20px 48px;
+    }
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin: 0 0 8px;
+      letter-spacing: -0.02em;
+    }
+    .sub {
+      color: var(--text2);
+      font-size: 0.9rem;
+      max-width: 52em;
+      margin-bottom: 28px;
+    }
+    .toc {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 32px;
+    }
+    .toc a {
+      display: inline-block;
+      padding: 8px 14px;
+      background: var(--panel);
+      border-radius: 999px;
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 0.85rem;
+      font-weight: 500;
+      border: 1px solid var(--sep);
+      box-shadow: var(--shadow);
+    }
+    .toc a:hover { background: var(--water-soft); }
+    section.scheme {
+      margin-bottom: 48px;
+      scroll-margin-top: 16px;
+    }
+    section.scheme h2 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin: 0 0 6px;
+    }
+    section.scheme .blurb {
+      font-size: 0.85rem;
+      color: var(--text2);
+      max-width: 56em;
+      margin: 0 0 16px;
+    }
+    /* Shared card shell (mock popover width ~560 inner) */
+    .card {
+      max-width: 520px;
+      background: var(--panel);
+      border-radius: var(--radius);
+      border: 1px solid var(--sep);
+      box-shadow: var(--shadow);
+      padding: 16px 18px 18px;
+    }
+    .card-h {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--sep);
+    }
+    .card-h .icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: linear-gradient(145deg, #5ac8fa 0%, #0a84ff 100%);
+      display: grid;
+      place-items: center;
+      font-size: 18px;
+    }
+    .card-h h3 { margin: 0; font-size: 1rem; font-weight: 600; }
+    .card-h span { font-size: 0.75rem; color: var(--text3); display: block; margin-top: 2px; }
+
+    /* Large switch row */
+    .row-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      min-height: 48px;
+      padding: 8px 0;
+    }
+    .row-toggle .label { font-size: 0.95rem; font-weight: 500; }
+    .row-toggle .hint { font-size: 0.75rem; color: var(--text3); margin-top: 2px; }
+    .switch {
+      position: relative;
+      width: 51px;
+      height: 31px;
+      flex-shrink: 0;
+      background: #e9e9eb;
+      border-radius: 999px;
+      cursor: pointer;
+    }
+    .switch.on { background: #34c759; }
+    .switch::after {
+      content: "";
+      position: absolute;
+      width: 27px;
+      height: 27px;
+      background: #fff;
+      border-radius: 50%;
+      top: 2px;
+      left: 2px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.2);
+    }
+    .switch.on::after { left: 22px; }
+
+    /* Chip interval */
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 4px;
+    }
+    .chip {
+      min-height: 40px;
+      padding: 0 14px;
+      border-radius: 10px;
+      border: 1.5px solid var(--sep);
+      background: #fafafa;
+      font-size: 0.85rem;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      cursor: pointer;
+    }
+    .chip.active {
+      border-color: var(--water);
+      background: var(--water-soft);
+      color: #0066cc;
+    }
+    .chip:disabled { opacity: .45; pointer-events: none; }
+
+    .stepper-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 6px;
+    }
+    .stepper {
+      display: flex;
+      align-items: center;
+      border: 1.5px solid var(--sep);
+      border-radius: 10px;
+      overflow: hidden;
+      background: #fafafa;
+    }
+    .stepper button {
+      width: 44px;
+      height: 44px;
+      border: none;
+      background: transparent;
+      font-size: 1.25rem;
+      cursor: pointer;
+      color: var(--accent);
+    }
+    .stepper button:hover { background: rgba(0,122,255,.08); }
+    .stepper .val {
+      min-width: 100px;
+      text-align: center;
+      font-weight: 600;
+      font-size: 0.95rem;
+      padding: 0 8px;
+    }
+
+    .btn-test {
+      margin-top: 14px;
+      width: 100%;
+      min-height: 44px;
+      border-radius: 10px;
+      border: 1.5px solid var(--sep);
+      background: #fafafa;
+      font-size: 0.9rem;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .btn-test:hover { background: #f0f0f0; }
+
+    .help {
+      margin-top: 14px;
+      padding: 12px 14px;
+      background: #f8f8fa;
+      border-radius: var(--radius-sm);
+      font-size: 0.78rem;
+      color: var(--text2);
+      line-height: 1.5;
+    }
+
+    .quiet-block {
+      margin-top: 12px;
+      padding: 14px;
+      background: #fafbfc;
+      border-radius: var(--radius-sm);
+      border: 1px dashed var(--sep);
+    }
+    .time-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-height: 44px;
+      margin-top: 8px;
+    }
+    .time-row label { width: 44px; font-size: 0.85rem; color: var(--text2); }
+    .time-input {
+      flex: 1;
+      min-height: 40px;
+      border: 1.5px solid var(--sep);
+      border-radius: 8px;
+      padding: 0 12px;
+      font-size: 0.9rem;
+      background: #fff;
+    }
+
+    /* Scheme B - list rows */
+    .list-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 52px;
+      padding: 10px 12px;
+      margin: 0 -6px;
+      border-radius: 10px;
+    }
+    .list-row:hover { background: rgba(0,0,0,.03); }
+    .list-row .left .t { font-weight: 500; font-size: 0.92rem; }
+    .list-row .left .s { font-size: 0.75rem; color: var(--text3); margin-top: 2px; }
+
+    /* Scheme C - hero */
+    .hero {
+      text-align: center;
+      padding: 20px 16px 16px;
+      background: linear-gradient(180deg, #e3f2ff 0%, #fff 70%);
+      border-radius: var(--radius) var(--radius) 0 0;
+      margin: -16px -18px 14px;
+    }
+    .hero .big-drop {
+      font-size: 48px;
+      line-height: 1;
+      margin-bottom: 8px;
+    }
+    .hero p { margin: 0; font-size: 0.88rem; color: var(--text2); }
+
+    /* Scheme D - pill test full width primary */
+    .btn-primary {
+      width: 100%;
+      min-height: 48px;
+      border-radius: 12px;
+      border: none;
+      background: var(--water);
+      color: #fff;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 12px;
+    }
+    .btn-primary:hover { filter: brightness(1.05); }
+
+    .badge { font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--text3); margin-bottom: 6px; }
+  </style>
+</head>
+<body>
+  <h1>喝水提醒 · UI 改版方向</h1>
+  <p class="sub">以下为静态 HTML 示意，用于对比布局与触控尺度。建议实装时：开关最小高度 ≥44pt、主操作按钮全宽或双列大按钮、间隔用 Stepper ± 或分段 Chip 二选一避免双控件竞争。</p>
+
+  <nav class="toc">
+    <a href="#a">方案 A · 信息分层</a>
+    <a href="#b">方案 B · 设置列表</a>
+    <a href="#c">方案 C · 轻量头图</a>
+    <a href="#d">方案 D · 双主按钮</a>
+  </nav>
+
+  <!-- A -->
+  <section class="scheme" id="a">
+    <h2>方案 A · 信息分层（推荐）</h2>
+    <p class="blurb">主开关独占一行、字号略大；间隔用 <strong>大号 Stepper</strong>（± 44×44）；安静时段收进浅底块，时间用「伪输入框」表达可点区域更大。右侧说明改为卡片底部通栏，避免窄栏挤字。</p>
+    <div class="card">
+      <div class="card-h">
+        <div class="icon">💧</div>
+        <div>
+          <h3>喝水提醒</h3>
+          <span>按间隔弹出，安静时段内静默跳过</span>
+        </div>
+      </div>
+      <div class="row-toggle">
+        <div>
+          <div class="label">开启喝水提醒</div>
+          <div class="hint">关闭后不再弹窗</div>
+        </div>
+        <div class="switch on" aria-hidden="true"></div>
+      </div>
+      <div class="badge" style="margin-top:12px;">提醒间隔</div>
+      <div class="stepper-row">
+        <div class="stepper">
+          <button type="button" aria-label="减少">−</button>
+          <div class="val">90 分钟</div>
+          <button type="button" aria-label="增加">+</button>
+        </div>
+      </div>
+      <div class="quiet-block">
+        <div class="row-toggle" style="min-height:44px;padding-top:0;">
+          <div>
+            <div class="label">安静时段</div>
+            <div class="hint">到点不弹窗，计时继续</div>
+          </div>
+          <div class="switch on"></div>
+        </div>
+        <div class="time-row">
+          <label>停止</label>
+          <input class="time-input" type="text" value="21:00" readonly />
+        </div>
+        <div class="time-row">
+          <label>恢复</label>
+          <input class="time-input" type="text" value="08:00" readonly />
+        </div>
+      </div>
+      <button type="button" class="btn-test">立即触发（测试）</button>
+      <div class="help">
+        弹出后点「已喝水 💧」会重新开始计时；「稍后提醒」约 15 分钟后再提示。安静时段结束后会自动恢复下一次弹窗。
+      </div>
+    </div>
+  </section>
+
+  <!-- B -->
+  <section class="scheme" id="b">
+    <h2>方案 B · 类「设置」列表行</h2>
+    <p class="blurb">每行 ≥52px 高，左侧标题+副标题，右侧控件；间隔用 <strong>Chip 分段</strong>（30 / 60 / 90 / 120）+「更多」展开 Stepper，适合选项固定、减少误触。</p>
+    <div class="card">
+      <div class="card-h">
+        <div class="icon">💧</div>
+        <div><h3>喝水提醒</h3><span>快捷预设 + 安静时段</span></div>
+      </div>
+      <div class="list-row">
+        <div class="left">
+          <div class="t">开启提醒</div>
+          <div class="s">在菜单栏与桌宠面板中统一管理</div>
+        </div>
+        <div class="switch on"></div>
+      </div>
+      <div style="padding:8px 6px 4px;">
+        <div class="label" style="margin-bottom:8px;">间隔（预设）</div>
+        <div class="chips">
+          <span class="chip">30</span>
+          <span class="chip">60</span>
+          <span class="chip active">90</span>
+          <span class="chip">120</span>
+          <span class="chip">自定义…</span>
+        </div>
+      </div>
+      <div class="list-row">
+        <div class="left">
+          <div class="t">安静时段</div>
+          <div class="s">21:00 – 08:00</div>
+        </div>
+        <div class="switch on"></div>
+      </div>
+      <button type="button" class="btn-test">立即触发（测试）</button>
+      <div class="help">说明文字同上，通栏显示更易扫读。</div>
+    </div>
+  </section>
+
+  <!-- C -->
+  <section class="scheme" id="c">
+    <h2>方案 C · 轻量头图 + 大块开关</h2>
+    <p class="blurb">顶部淡化渐变 + 水滴，强化「喝水」心智；下面全部控件保持 A 的尺寸，适合作为营销感略强、但仍功能优先的版本。</p>
+    <div class="card" style="padding-top:0;overflow:hidden;">
+      <div class="hero">
+        <div class="big-drop">💧</div>
+        <p>记得补水，保持专注节奏</p>
+      </div>
+      <div style="padding:0 18px 18px;">
+        <div class="row-toggle">
+          <div><div class="label">开启喝水提醒</div></div>
+          <div class="switch on"></div>
+        </div>
+        <div class="stepper-row">
+          <div class="stepper">
+            <button type="button">−</button>
+            <div class="val">90 分钟</div>
+            <button type="button">+</button>
+          </div>
+        </div>
+        <div class="row-toggle" style="border-top:1px solid var(--sep);margin-top:8px;">
+          <div><div class="label">安静时段</div><div class="hint">21:00 → 08:00</div></div>
+          <div class="switch on"></div>
+        </div>
+        <button type="button" class="btn-test">立即触发（测试）</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- D -->
+  <section class="scheme" id="d">
+    <h2>方案 D · 测试操作升格</h2>
+    <p class="blurb">「测试」与说明同级：主按钮用品牌色吸引注意力（仍标为测试，避免误触生产）；次要操作用描边按钮。适合经常需要验证弹窗行为的用户。</p>
+    <div class="card">
+      <div class="card-h">
+        <div class="icon">💧</div>
+        <div><h3>喝水提醒</h3><span>间隔与安静时段</span></div>
+      </div>
+      <div class="row-toggle">
+        <div><div class="label">开启喝水提醒</div></div>
+        <div class="switch on"></div>
+      </div>
+      <div class="stepper-row">
+        <div class="stepper">
+          <button type="button">−</button>
+          <div class="val">90 分钟</div>
+          <button type="button">+</button>
+        </div>
+      </div>
+      <div class="quiet-block">
+        <div class="row-toggle" style="padding:0;min-height:40px;">
+          <div class="label">安静时段</div>
+          <div class="switch on"></div>
+        </div>
+        <div class="time-row"><label>停止</label><input class="time-input" value="21:00" readonly /></div>
+        <div class="time-row"><label>恢复</label><input class="time-input" value="08:00" readonly /></div>
+      </div>
+      <button type="button" class="btn-primary">立即预览提醒（测试）</button>
+      <button type="button" class="btn-test" style="margin-top:8px;">恢复默认间隔</button>
+      <div class="help">主按钮 48px 高；若担心误触，可二次确认或长按测试。</div>
+    </div>
+  </section>
+
+  <p class="sub" style="margin-top:32px;">打开本文件：<code>docs/hydration-reminder-ui-mockups.html</code>（本地双击或用浏览器打开）。实装 SwiftUI 时可优先对齐方案 A 的信息架构与 44pt 触控目标。</p>
+</body>
+</html>
