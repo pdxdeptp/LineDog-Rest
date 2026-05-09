@@ -61,8 +61,8 @@ struct AssistantResource: Codable, Identifiable {
 
 struct ChatResponse: Codable {
     let threadId: String
-    let response: String
-    let proposal: String?
+    let response: String?   // null when backend returns a proposal instead of text
+    let proposal: ChatProposal?
 
     enum CodingKeys: String, CodingKey {
         case threadId = "thread_id"
@@ -70,13 +70,71 @@ struct ChatResponse: Codable {
     }
 }
 
+struct ChatProposal: Codable {
+    let description: String
+    let changes: [AnyCodable]
+    let affectsDeadline: Bool
+    let summaryForUser: String
+
+    enum CodingKeys: String, CodingKey {
+        case description, changes
+        case affectsDeadline  = "affects_deadline"
+        case summaryForUser   = "summary_for_user"
+    }
+}
+
 struct IngestionDraft: Codable {
     let threadId: String
-    let draft: String
+    let draft: IngestionDraftDetail
 
     enum CodingKeys: String, CodingKey {
         case threadId = "thread_id"
         case draft
+    }
+}
+
+struct IngestionDraftDetail: Codable {
+    let resourceTitle: String
+    let resourceType: String
+    let totalEstimatedHours: Double
+    let unitCount: Int
+    let optionA: [[String: AnyCodable]]
+    let optionB: [[String: AnyCodable]]
+
+    enum CodingKeys: String, CodingKey {
+        case resourceTitle       = "resource_title"
+        case resourceType        = "resource_type"
+        case totalEstimatedHours = "total_estimated_hours"
+        case unitCount           = "unit_count"
+        case optionA             = "option_a"
+        case optionB             = "option_b"
+    }
+}
+
+// Wrapper to handle mixed-type JSON values in schedule arrays
+struct AnyCodable: Codable {
+    let value: Any
+
+    init(_ value: Any) { self.value = value }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let v = try? container.decode(Bool.self)   { value = v }
+        else if let v = try? container.decode(Int.self)    { value = v }
+        else if let v = try? container.decode(Double.self) { value = v }
+        else if let v = try? container.decode(String.self) { value = v }
+        else { value = NSNull() }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch value {
+        case let v as Bool:   try container.encode(v)
+        case let v as Int:    try container.encode(v)
+        case let v as Double: try container.encode(v)
+        case let v as String: try container.encode(v)
+        default:              try container.encodeNil()
+        }
     }
 }
 
@@ -91,8 +149,8 @@ final class AssistantAPIClient {
 
     private init() {
         let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest  = 8
-        config.timeoutIntervalForResource = 15
+        config.timeoutIntervalForRequest  = 120
+        config.timeoutIntervalForResource = 300
         session = URLSession(configuration: config)
     }
 

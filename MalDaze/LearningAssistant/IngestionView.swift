@@ -68,6 +68,7 @@ struct IngestionView: View {
                 // 草稿区
                 if let draft = vm.ingestionDraft {
                     draftSection(draft)
+                        .transition(.opacity)
                 }
 
                 Spacer(minLength: 0)
@@ -78,24 +79,50 @@ struct IngestionView: View {
 
     // MARK: - Draft Section
 
-    private func draftSection(_ draft: String) -> some View {
+    private func draftSection(_ draft: IngestionDraftDetail) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Label("生成草稿", systemImage: "doc.text")
                 .font(.footnote.weight(.semibold))
                 .foregroundStyle(.primary)
 
-            Text(draft)
-                .font(.callout)
-                .foregroundStyle(.primary)
-                .textSelection(.enabled)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(8)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .strokeBorder(Color(.separatorColor).opacity(0.4), lineWidth: 0.5)
-                )
+            // Summary info
+            VStack(alignment: .leading, spacing: 4) {
+                Text(draft.resourceTitle)
+                    .font(.callout.weight(.semibold))
+                HStack(spacing: 12) {
+                    Label("\(draft.unitCount) 集/章", systemImage: "list.number")
+                    Label(String(format: "%.1f 小时", draft.totalEstimatedHours), systemImage: "clock")
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+            .padding(8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(.controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .strokeBorder(Color(.separatorColor).opacity(0.4), lineWidth: 0.5)
+            )
+
+            // Option picker
+            HStack(spacing: 0) {
+                ForEach(["A", "B"], id: \.self) { opt in
+                    let label = opt == "A" ? "方案 A（填空档）" : "方案 B（均匀铺开）"
+                    Button(label) { vm.selectedOption = opt }
+                        .frame(maxWidth: .infinity)
+                        .buttonStyle(.plain)
+                        .padding(.vertical, 6)
+                        .background(vm.selectedOption == opt ? Color.accentColor.opacity(0.15) : Color.clear)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 0)
+                                .strokeBorder(Color.accentColor.opacity(vm.selectedOption == opt ? 0.4 : 0.1),
+                                              lineWidth: 0.5)
+                        )
+                        .font(.caption.weight(vm.selectedOption == opt ? .semibold : .regular))
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color(.separatorColor).opacity(0.4), lineWidth: 0.5))
 
             HStack(spacing: 8) {
                 Button("确认写入") {

@@ -24,9 +24,9 @@ final class LearningAssistantViewModel: ObservableObject {
     @Published var isOffline: Bool                = false
     @Published var threadId: String?              = nil
 
-    /// Ingestion 草稿（rawString from API）
-    @Published var ingestionDraft: String?    = nil
-    @Published var ingestionThreadId: String? = nil
+    @Published var ingestionDraft: IngestionDraftDetail? = nil
+    @Published var ingestionThreadId: String?            = nil
+    @Published var selectedOption: String                = "A"
 
     @Published var todayTotalMinutes: Int  = 0
     @Published var todayHighlights: String = ""
@@ -115,8 +115,9 @@ final class LearningAssistantViewModel: ObservableObject {
         do {
             let resp     = try await api.sendMessage(message: text, threadId: threadId)
             threadId     = resp.threadId
-            chatMessages.append(ChatMessage(role: .assistant, text: resp.response))
-            currentProposal = resp.proposal
+            let displayText = resp.response ?? resp.proposal?.summaryForUser ?? "收到，正在处理…"
+            chatMessages.append(ChatMessage(role: .assistant, text: displayText))
+            currentProposal = resp.proposal?.summaryForUser
             isOffline = false
         } catch {
             isOffline = true
@@ -150,16 +151,18 @@ final class LearningAssistantViewModel: ObservableObject {
                                                                speedFactor: speedFactor)
             ingestionDraft    = draft.draft
             ingestionThreadId = draft.threadId
+            selectedOption    = "A"
             isOffline         = false
         } catch {
             isOffline = true
         }
     }
 
-    func confirmIngestion(confirmed: Bool) async {
+    func confirmIngestion(confirmed: Bool, option: String? = nil) async {
         guard let tid = ingestionThreadId else { return }
         do {
-            try await api.confirmIngestion(threadId: tid, confirmed: confirmed, selectedOption: nil)
+            try await api.confirmIngestion(threadId: tid, confirmed: confirmed,
+                                           selectedOption: confirmed ? (option ?? selectedOption) : nil)
             ingestionDraft    = nil
             ingestionThreadId = nil
             if confirmed { await fetchTodayBriefing() }
