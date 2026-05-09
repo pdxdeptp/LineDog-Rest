@@ -1041,7 +1041,7 @@ extension WindowManager: PetStageDeskMenuPresenter {
         let popover = NSPopover()
         popover.contentSize = MenuBarContentView.controlPanelPreferredContentSize
         popover.behavior = .applicationDefined
-        popover.animates = true
+        popover.animates = false
         popover.contentViewController = NSHostingController(
             rootView: makeDeskPetControlPanelRootView(viewModel: vm)
         )
@@ -1069,6 +1069,14 @@ extension WindowManager: PetStageDeskMenuPresenter {
             guard let self, let stage, let popover, !popover.isShown else { return }
             NSApp.activate(ignoringOtherApps: true)
             popover.show(relativeTo: anchorRect, of: stage, preferredEdge: .maxY)
+            if let w = popover.contentViewController?.view.window {
+                w.alphaValue = 0
+                NSAnimationContext.runAnimationGroup { ctx in
+                    ctx.duration = 0.14
+                    ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                    w.animator().alphaValue = 1
+                }
+            }
             self.installPopoverDismissMonitor()
         }
     }
@@ -1131,9 +1139,21 @@ extension WindowManager: PetStageDeskMenuPresenter {
         dismissObservers = []
     }
 
-    /// 收起 popover（NSPopover 自带淡出动画）。
+    /// 收起 popover（手动淡出，与旧 NSPanel 时代的 closeDeskMenuPanelWithFade 行为一致）。
     private func closeDeskMenuPopover() {
         tearDownPopoverDismissMonitor()
-        deskMenuPopover?.close()
+        guard let popover = deskMenuPopover, popover.isShown,
+              let w = popover.contentViewController?.view.window else {
+            deskMenuPopover?.close()
+            return
+        }
+        NSAnimationContext.runAnimationGroup({ ctx in
+            ctx.duration = 0.10
+            ctx.timingFunction = CAMediaTimingFunction(name: .easeIn)
+            w.animator().alphaValue = 0
+        }, completionHandler: { [weak popover, weak w] in
+            popover?.close()
+            w?.alphaValue = 1
+        })
     }
 }
