@@ -118,6 +118,12 @@ START → Plan → Gather → Propose ──→ Human Review → Execute → END
   - 端口空闲 → spawn `.venv/bin/uvicorn`，退出时 kill
 - Morning Agent 定时触发：APScheduler 在后端进程内每天 8:00 执行，同时后端启动时检查 events 表补触发当日漏跑的 briefing
 
+> **[Bug 修复 2026-05-09]** 冷启动后桌宠一直显示"助手离线"，原因两个：
+>
+> 1. **路径发现失效**：`findBackendDir()` 通过 .app 同级目录向上搜索 6 层，但 Xcode 把 .app 放在 `DerivedData/.../Debug/`，6 层只能走到 `Xcode/`，永远到不了项目根 `/Users/cpt/Public/MalDaze/`，导致 `findBackendDir()` 返回 `nil`，后端从未启动。**修复**：新增层 2，读取 `DerivedData/<Name>-<hash>/info.plist` 中的 `WorkspacePath` 字段，取其父目录作为项目根，再拼接 `assistant_backend/`。开发期下可靠定位。
+>
+> 2. **启动竞态**：ViewModel 在 `init()` 里立即请求后端，而 uvicorn 需要数秒（冷启动可达 15s）才能就绪，导致 `ECONNREFUSED → isOffline = true`，且无自动重试。**修复**：spawn 后轮询端口（每 1s，最多 30s），就绪后发 `backendDidBecomeReady` 通知；ViewModel 收到通知再首次 fetch，期间显示"后端启动中…"。
+
 **理由**：生产期桌宠基本常开（开机自启），后端生命周期与桌宠绑定足够可靠。端口检测解决了开发期手动 uvicorn 与桌宠并存的冲突问题。
 
 **原 Option C 脚本保留**（`scripts/com.maldaze.backend.plist` 等）但不安装，作备选。

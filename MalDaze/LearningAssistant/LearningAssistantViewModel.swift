@@ -34,13 +34,37 @@ final class LearningAssistantViewModel: ObservableObject {
     @Published var isFetchingBriefing = false
     @Published var isSendingMessage   = false
     @Published var isIngesting        = false
+    /// 后端进程启动中（还未收到就绪通知）；区别于运行期离线。
+    @Published var isConnecting: Bool = true
 
     private let api = AssistantAPIClient.shared
+    private var readyObserver: Any?
 
     // MARK: - Init
 
     init() {
-        Task { await fetchTodayBriefing() }
+        readyObserver = NotificationCenter.default.addObserver(
+            forName: .backendDidBecomeReady,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            Task { @MainActor [weak self] in
+                guard let self, self.isConnecting else { return }
+                self.isConnecting = false
+                await self.fetchTodayBriefing()
+            }
+        }
+
+        // 若通知在订阅前已发出（后端早于视图初始化就绪），直接开始 fetch。
+        if BackendProcessManager.shared.isReady {
+            isConnecting = false
+            Task { await fetchTodayBriefing() }
+        }
+    }
+
+    deinit {
+        if let readyObserver { NotificationCenter.default.removeObserver(readyObserver) }
     }
 
     // MARK: - Briefing
@@ -54,6 +78,7 @@ final class LearningAssistantViewModel: ObservableObject {
             todayTotalMinutes = briefing.totalMinutes
             todayHighlights   = briefing.highlights
             isOffline         = false
+            isConnecting      = false
         } catch {
             isOffline = true
         }

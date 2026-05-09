@@ -29,7 +29,9 @@ struct AssistantPanelView: View {
 
             Divider()
 
-            if vm.isOffline {
+            if vm.isConnecting {
+                connectingPlaceholder
+            } else if vm.isOffline {
                 offlinePlaceholder
             } else {
                 tabContent
@@ -58,6 +60,21 @@ struct AssistantPanelView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
+    }
+
+    // MARK: - Connecting
+
+    private var connectingPlaceholder: some View {
+        VStack(spacing: 10) {
+            Spacer()
+            ProgressView()
+                .controlSize(.small)
+            Text("后端启动中…")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            Spacer()
+        }
+        .frame(maxWidth: .infinity)
     }
 
     // MARK: - Offline
