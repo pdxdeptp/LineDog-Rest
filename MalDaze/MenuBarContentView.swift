@@ -22,37 +22,8 @@ extension EnvironmentValues {
 }
 
 extension MenuBarContentView {
-    /// 与 `body` 的 `frame(minWidth:minHeight:)` 一致，另加底部留白画指向桌宠的小三角。
     static var deskPetPanelContentSize: NSSize {
-        NSSize(width: 300 + 280 + 300 + 3 * 24, height: 556 + 10)
-    }
-}
-
-/// 底部小三角：贴在面板右下角附近，尖端向下（指向桌宠）。
-private struct DeskPetMenuPopoverTail: View {
-    var body: some View {
-        Path { path in
-            let w: CGFloat = 20
-            let h: CGFloat = 9
-            path.move(to: CGPoint(x: 0, y: 0))
-            path.addLine(to: CGPoint(x: w, y: 0))
-            path.addLine(to: CGPoint(x: w * 0.52, y: h))
-            path.closeSubpath()
-        }
-        .fill(.regularMaterial)
-        .overlay {
-            Path { path in
-                let w: CGFloat = 20
-                let h: CGFloat = 9
-                path.move(to: CGPoint(x: 0, y: 0))
-                path.addLine(to: CGPoint(x: w, y: 0))
-                path.addLine(to: CGPoint(x: w * 0.52, y: h))
-                path.closeSubpath()
-            }
-            .stroke(Color(nsColor: .separatorColor).opacity(0.45), lineWidth: 0.5)
-        }
-        .frame(width: 20, height: 9)
-        .accessibilityHidden(true)
+        NSSize(width: 300 + 280 + 300 + 3 * 24, height: 556)
     }
 }
 
@@ -93,6 +64,8 @@ struct MenuBarContentView: View {
 
     @AppStorage(MalDazeDefaults.pomodoroWorkDurationMinutes) private var pomodoroWorkMinutesStored = 25
     @AppStorage(MalDazeDefaults.pomodoroRestDurationMinutes) private var pomodoroRestMinutesStored = 5
+
+    @AppStorage(MalDazeDefaults.idlePetIconSidePoints) private var idlePetIconSideStored = MalDazeDefaults.idlePetIconSideDefault
 
     private var deskReminders: DeskRemindersModel { viewModel.deskReminders }
 
@@ -178,6 +151,11 @@ struct MenuBarContentView: View {
         static let gearTapSide: CGFloat = 36
     }
 
+    /// 仅作用于下方 `Toggle` + `.switch` 的打开态轨道色；不改 segmented、普通按钮的 tint。
+    private enum SwitchOnTrackTint {
+        static let paleBlue = Color(red: 0.45, green: 0.72, blue: 0.98)
+    }
+
     var body: some View {
         let chrome = VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top, spacing: 0) {
@@ -210,26 +188,7 @@ struct MenuBarContentView: View {
             minHeight: 556
         )
 
-        Group {
-            if deskMenuPresentation == .deskPetFloatingPanel {
-                chrome
-                    .padding(.bottom, 10)
-                    .background {
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(.regularMaterial)
-                    }
-                    .overlay(alignment: .bottomTrailing) {
-                        DeskPetMenuPopoverTail()
-                            // 贴近第三栏（主控区）右缘：略小于最外圈 padding，避免顶到窗体圆角裁切。
-                            .padding(.trailing, MainPanelChrome.horizontalPadding + 6)
-                            .padding(.bottom, 2)
-                    }
-                    .compositingGroup()
-                    .shadow(color: .black.opacity(0.22), radius: 18, y: 8)
-            } else {
-                chrome
-            }
-        }
+        chrome
         .sheet(item: $reminderUnderEdit) { item in
             DeskReminderEditSheet(item: item, deskReminders: deskReminders)
         }
@@ -285,6 +244,22 @@ struct MenuBarContentView: View {
         .frame(maxWidth: .infinity, minHeight: MainPanelHeaderLayout.rowMinHeight, alignment: .center)
         .padding(.top, MainPanelHeaderLayout.paddingTop)
         .padding(.bottom, MainPanelHeaderLayout.paddingBottom)
+    }
+
+    /// 仅桌宠浮动面板：调整常态图标边长（与透明小窗、点击命中区同步）。
+    private var deskPetIconSizeSection: some View {
+        GroupBox {
+            Stepper(value: $idlePetIconSideStored, in: MalDazeDefaults.idlePetIconSideMin...MalDazeDefaults.idlePetIconSideMax, step: 4) {
+                Text("桌宠图标边长：\(idlePetIconSideStored) pt")
+                    .font(.subheadline)
+            }
+            .help("调大后桌宠更清晰，透明窗口与可点击区域会一起变大。")
+            .onChange(of: idlePetIconSideStored) { _ in
+                scheduleViewModelWork { viewModel.applyIdlePetIconSideFromUserDefaults() }
+            }
+        } label: {
+            Label("桌宠外观", systemImage: "pawprint")
+        }
     }
 
     @ViewBuilder
@@ -455,6 +430,10 @@ struct MenuBarContentView: View {
             VStack(alignment: .leading, spacing: 10) {
                 mainPanelHeader
 
+                if deskMenuPresentation == .deskPetFloatingPanel {
+                    deskPetIconSizeSection
+                }
+
                 statusChip
 
                 timerSection
@@ -571,6 +550,7 @@ struct MenuBarContentView: View {
                         .font(.subheadline)
                 }
                 .toggleStyle(.switch)
+                .tint(SwitchOnTrackTint.paleBlue)
                 .help("打开时休息全屏会挡住背后窗口的鼠标操作（默认）；关闭时休息画面仍在，但可正常使用桌面。")
 
                 Toggle(isOn: Binding(
@@ -581,6 +561,7 @@ struct MenuBarContentView: View {
                         .font(.subheadline)
                 }
                 .toggleStyle(.switch)
+                .tint(SwitchOnTrackTint.paleBlue)
                 .help("开启时休息霸屏期间连续单击屏幕中央小狗 20 下（每次间隔 ≤ 3 秒）即可提前结束休息（默认）；关闭后点击无效，只能等计时自然结束。")
 
                 Divider()
@@ -682,6 +663,7 @@ struct MenuBarContentView: View {
                             .font(.subheadline)
                     }
                     .toggleStyle(.switch)
+                    .tint(SwitchOnTrackTint.paleBlue)
 
                     Stepper(
                         value: $hydrationIntervalStored,
@@ -705,6 +687,7 @@ struct MenuBarContentView: View {
                             .font(.subheadline)
                     }
                     .toggleStyle(.switch)
+                    .tint(SwitchOnTrackTint.paleBlue)
                     .disabled(!viewModel.isHydrationReminderEnabled)
 
                     HStack(spacing: 6) {

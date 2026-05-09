@@ -13,6 +13,7 @@ final class MalDazeAppDelegate: NSObject, NSApplicationDelegate {
             MalDazeDefaults.sevenMinuteReminderDurationMinutes: 7,
             MalDazeDefaults.pomodoroWorkDurationMinutes: 25,
             MalDazeDefaults.pomodoroRestDurationMinutes: 5,
+            MalDazeDefaults.idlePetIconSidePoints: MalDazeDefaults.idlePetIconSideDefault,
         ])
         if NSApp.activationPolicy() != .regular {
             _ = NSApp.setActivationPolicy(.regular)

@@ -3,6 +3,14 @@ import SwiftUI
 
 /// 设置窗口：Gemini API Key、全局快捷键等。
 struct MalDazeSettingsView: View {
+    // 学习助手后端 LLM
+    @AppStorage(MalDazeDefaults.backendLLMProvider)    private var backendProvider    = MalDazeDefaults.defaultBackendLLMProvider
+    @AppStorage(MalDazeDefaults.backendLLMModel)       private var backendModel       = MalDazeDefaults.defaultBackendLLMModel
+    @AppStorage(MalDazeDefaults.backendGeminiAPIKey)   private var backendGeminiKey   = ""
+    @AppStorage(MalDazeDefaults.backendOpenAIAPIKey)   private var backendOpenAIKey   = ""
+    @AppStorage(MalDazeDefaults.backendDeepSeekAPIKey) private var backendDeepSeekKey = ""
+
+    // 桌宠智能输入（勿改）
     @AppStorage(MalDazeDefaults.geminiAPIKey) private var geminiAPIKey = ""
     @AppStorage(MalDazeDefaults.geminiModelId) private var geminiModelId = MalDazeDefaults.defaultGeminiModelId
 
@@ -65,6 +73,43 @@ struct MalDazeSettingsView: View {
 
     var body: some View {
         Form {
+            Section {
+                LabeledContent("服务商") {
+                    Picker("", selection: $backendProvider) {
+                        Text("Google Gemini").tag("gemini")
+                        Text("OpenAI").tag("openai")
+                        Text("DeepSeek").tag("deepseek")
+                    }
+                    .labelsHidden().pickerStyle(.menu).frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .onChange(of: backendProvider) { newProvider in
+                    backendModel = BackendLLMCatalog.defaultModel(for: newProvider)
+                }
+                LabeledContent("模型") {
+                    Picker("", selection: $backendModel) {
+                        ForEach(BackendLLMCatalog.models(for: backendProvider), id: \.id) { m in
+                            Text(m.label).tag(m.id)
+                        }
+                    }
+                    .labelsHidden().pickerStyle(.menu).frame(maxWidth: .infinity, alignment: .leading)
+                }
+                switch backendProvider {
+                case "openai":
+                    SecureField("OpenAI API Key", text: $backendOpenAIKey)
+                        .textFieldStyle(.roundedBorder)
+                case "deepseek":
+                    SecureField("DeepSeek API Key", text: $backendDeepSeekKey)
+                        .textFieldStyle(.roundedBorder)
+                default:
+                    SecureField("Gemini API Key", text: $backendGeminiKey)
+                        .textFieldStyle(.roundedBorder)
+                }
+                Text("重启桌宠后生效。API Key 仅保存在本机 UserDefaults。")
+                    .font(.caption).foregroundStyle(.secondary)
+            } header: {
+                Text("学习助手 LLM")
+            }
+
             Section {
                 SecureField("Gemini API Key", text: $geminiAPIKey)
                     .textFieldStyle(.roundedBorder)
@@ -223,20 +268,91 @@ struct MalDazeSettingsView: View {
                     .font(.caption)
             }
         }
+        .overlay(alignment: .topLeading) {
+            // `onExitCommand` 在系统设置窗 / Form 里往往收不到 Esc，会落到系统里变成「咚」一声。
+            // 本地监视器在快捷键录制之后注册，`GlobalShortcutKeyRecorder` 会先消费 Esc。
+            SettingsEscapeKeyMonitor(shortcutRecorderBusy: shortcutRecorderBusy)
+                .frame(width: 0, height: 0)
+                .allowsHitTesting(false)
+        }
         .formStyle(.grouped)
         .frame(minWidth: 420, minHeight: 480)
         .padding()
-        .onExitCommand {
-            // Esc：关闭设置窗。录制快捷键时由 `GlobalShortcutKeyRecorder` 先拦截 Esc，此处不会误关。
-            guard !shortcutRecorderBusy else { return }
-            NSApp.keyWindow?.performClose(nil)
-        }
         .onAppear {
             let ids = Set(MalDazeGeminiModelCatalog.pickerOptions.map(\.id))
             if !ids.contains(geminiModelId) {
                 geminiModelId = MalDazeDefaults.defaultGeminiModelId
             }
         }
+    }
+}
+
+// MARK: - Esc 关闭设置窗（AppKit 本地监视器）
+
+private struct SettingsEscapeKeyMonitor: NSViewRepresentable {
+    var shortcutRecorderBusy: Bool
+
+    func makeNSView(context: Context) -> SettingsEscapeHostView {
+        let v = SettingsEscapeHostView()
+        v.shortcutRecorderBusy = shortcutRecorderBusy
+        return v
+    }
+
+    func updateNSView(_ nsView: SettingsEscapeHostView, context: Context) {
+        nsView.shortcutRecorderBusy = shortcutRecorderBusy
+    }
+
+    static func dismantleNSView(_ nsView: SettingsEscapeHostView, coordinator: ()) {
+        nsView.teardown()
+    }
+}
+
+private final class SettingsEscapeHostView: NSView {
+    var shortcutRecorderBusy = false
+
+    private var keyDownMonitor: Any?
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if window != nil {
+            installKeyDownMonitorIfNeeded()
+        } else {
+            removeKeyDownMonitor()
+        }
+    }
+
+    deinit {
+        if let keyDownMonitor {
+            NSEvent.removeMonitor(keyDownMonitor)
+        }
+    }
+
+    func teardown() {
+        removeKeyDownMonitor()
+    }
+
+    private func installKeyDownMonitorIfNeeded() {
+        guard keyDownMonitor == nil, window != nil else { return }
+        keyDownMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self else { return event }
+            guard let target = self.window, target.isVisible else { return event }
+            guard NSApp.keyWindow === target else { return event }
+            guard event.keyCode == 53 else { return event }
+            if self.shortcutRecorderBusy {
+                return event
+            }
+            DispatchQueue.main.async {
+                target.performClose(nil)
+            }
+            return nil
+        }
+    }
+
+    private func removeKeyDownMonitor() {
+        if let keyDownMonitor {
+            NSEvent.removeMonitor(keyDownMonitor)
+        }
+        keyDownMonitor = nil
     }
 }
 
@@ -333,6 +449,39 @@ private struct GlobalShortcutKeyRecorder: NSViewRepresentable {
 
         private static let modifierOnlyKeyCodes: Set<UInt16> = [55, 56, 57, 58, 59, 60, 61, 62]
     }
+}
+
+// MARK: - 后端 LLM 模型目录
+
+enum BackendLLMCatalog {
+    struct Model { let id: String; let label: String }
+
+    static func models(for provider: String) -> [Model] {
+        switch provider {
+        case "openai":
+            return [
+                Model(id: "gpt-5.5",      label: "GPT-5.5"),
+                Model(id: "gpt-5.4",      label: "GPT-5.4"),
+                Model(id: "gpt-5.4-mini", label: "GPT-5.4 mini"),
+            ]
+        case "deepseek":
+            return [
+                Model(id: "deepseek-v4-pro",   label: "DeepSeek V4 Pro"),
+                Model(id: "deepseek-v4-flash", label: "DeepSeek V4 Flash"),
+            ]
+        default: // gemini
+            return [
+                Model(id: "gemini-3.1-pro-preview", label: "Gemini 3.1 Pro (Preview)"),
+                Model(id: "gemini-3.1-flash-lite",  label: "Gemini 3.1 Flash Lite"),
+                Model(id: "gemini-3-flash-preview",  label: "Gemini 3 Flash (Preview)"),
+                Model(id: "gemini-2.5-pro",          label: "Gemini 2.5 Pro"),
+                Model(id: "gemini-2.5-flash",        label: "Gemini 2.5 Flash"),
+                Model(id: "gemini-2.5-flash-lite",   label: "Gemini 2.5 Flash Lite"),
+            ]
+        }
+    }
+
+    static func defaultModel(for provider: String) -> String { models(for: provider)[0].id }
 }
 
 // MARK: - 独立设置窗（LSUIElement 下 `showSettingsWindow:` 往往无效）

@@ -1,6 +1,16 @@
 import Foundation
 
 enum MalDazeDefaults {
+    // 学习助手后端 LLM 配置
+    static let backendLLMProvider    = "MalDaze.backend.llmProvider"    // "gemini"|"openai"|"deepseek"
+    static let backendLLMModel       = "MalDaze.backend.llmModel"
+    static let backendGeminiAPIKey   = "MalDaze.backend.geminiAPIKey"
+    static let backendOpenAIAPIKey   = "MalDaze.backend.openAIAPIKey"
+    static let backendDeepSeekAPIKey = "MalDaze.backend.deepSeekAPIKey"
+    static let defaultBackendLLMProvider = "gemini"
+    static let defaultBackendLLMModel    = "gemini-2.5-flash"
+
+    // 桌宠智能输入（Smart Reminder）— 勿改
     static let geminiAPIKey = "MalDaze.geminiAPIKey"
     /// `generateContent` 路径中的模型 ID，如 `gemini-2.5-flash`。
     static let geminiModelId = "MalDaze.geminiModelId"
@@ -46,4 +56,15 @@ enum MalDazeDefaults {
 
     /// 休息打断风格："fullscreen"（默认霸屏）或 "breakRun"（跑屏漫游）。
     static let breakInterruptStyle = "MalDaze.breakInterruptStyle"
+
+    /// 常态桌宠图标绘制边长（点），与桌宠透明小窗边长联动；未写入时按默认 120。
+    static let idlePetIconSidePoints = "MalDaze.idlePetIconSidePoints"
+    static let idlePetIconSideMin = 72
+    static let idlePetIconSideMax = 180
+    static let idlePetIconSideDefault = 120
+
+    static func clampedIdlePetIconSidePoints(stored: Int) -> Int {
+        let base = stored == 0 ? idlePetIconSideDefault : stored
+        return min(max(base, idlePetIconSideMin), idlePetIconSideMax)
+    }
 }

@@ -393,6 +393,11 @@ final class AppViewModel: ObservableObject {
         windowManager.resetIdlePetPositionToDefaultCorner()
     }
 
+    /// 桌宠图标边长（UserDefaults）变更后刷新小窗与命中区。
+    func applyIdlePetIconSideFromUserDefaults() {
+        windowManager.applyIdlePetIconSideFromUserDefaults()
+    }
+
     func setRestBlocksClicksDuringRest(_ enabled: Bool) {
         restBlocksClicksDuringRest = enabled
         UserDefaults.standard.set(enabled, forKey: Self.restBlocksClicksDefaultsKey)

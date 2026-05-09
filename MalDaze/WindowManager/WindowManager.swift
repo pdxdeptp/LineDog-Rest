@@ -19,11 +19,11 @@ private final class BreakRunCountdownView: NSView {
         super.init(frame: frame)
         wantsLayer = true
         layer?.backgroundColor = NSColor.black.withAlphaComponent(0.52).cgColor
-        layer?.cornerRadius = 10
+        layer?.cornerRadius = 15
         layer?.masksToBounds = true
 
         label.translatesAutoresizingMaskIntoConstraints = false
-        label.font = NSFont.monospacedDigitSystemFont(ofSize: 48, weight: .semibold)
+        label.font = NSFont.monospacedDigitSystemFont(ofSize: 72, weight: .semibold)
         label.textColor = .white
         label.alignment = .center
         label.isEditable = false
@@ -84,6 +84,8 @@ protocol WindowManaging: AnyObject {
     func clearSmartReminderInputDraftIfStillMatchesSubmittedText(_ submitted: String)
     /// 常态桌宠窗回到菜单栏屏可见区右下角并写入 UserDefaults；休息霸屏中不执行。
     func resetIdlePetPositionToDefaultCorner()
+    /// `MalDazeDefaults.idlePetIconSidePoints` 变更后：按新边长调整桌宠小窗与命中区。
+    func applyIdlePetIconSideFromUserDefaults()
 }
 
 extension WindowManaging {
@@ -107,6 +109,8 @@ final class WindowManager: WindowManaging {
     private var deskMenuHosting: NSHostingController<AnyView>?
     /// Custom transient-dismiss monitor（原 `.transient` Popover 行为）。
     private var transientMonitor: Any?
+    /// 桌宠浮动菜单：Esc 关闭（与 `SmartReminder` 输入框的 Esc 监听同理，用本地监视器吃掉按键避免系统咚声）。
+    private var deskMenuEscMonitor: Any?
     private var dismissObservers: [NSObjectProtocol] = []
     /// 启动后对 `deskMenuPanel` 做一次静默预热（alpha=0），提前触发 SwiftUI 首次 layout。
     private var isPrewarming = false
@@ -212,14 +216,29 @@ final class WindowManager: WindowManaging {
         return (s, s.frame)
     }
 
-    private static let idlePetSize = NSSize(width: 150, height: 150)
     private static let idlePetOriginXKey = "MalDaze.idlePetOriginX"
     private static let idlePetOriginYKey = "MalDaze.idlePetOriginY"
+    /// 图标与透明窗边界的留白（单侧）；原 150×150 窗内约 120pt 图标 → 每侧 15。
+    private static let idlePetWindowMarginEachSide: CGFloat = 15
+
+    private static func resolvedIdlePetIconSidePoints() -> CGFloat {
+        let raw = UserDefaults.standard.integer(forKey: MalDazeDefaults.idlePetIconSidePoints)
+        return CGFloat(MalDazeDefaults.clampedIdlePetIconSidePoints(stored: raw))
+    }
+
+    private static func idlePetWindowSideLength() -> CGFloat {
+        resolvedIdlePetIconSidePoints() + 2 * idlePetWindowMarginEachSide
+    }
+
+    private static func idlePetWindowSize() -> NSSize {
+        let s = idlePetWindowSideLength()
+        return NSSize(width: s, height: s)
+    }
 
     /// 首次启动：菜单栏屏可见区右下角默认位。
     private static func defaultIdlePetWindowFrame() -> NSRect {
-        let w = idlePetSize.width
-        let h = idlePetSize.height
+        let w = idlePetWindowSize().width
+        let h = idlePetWindowSize().height
         guard let s = MenuBarNSScreen.screen ?? NSScreen.screens.first else {
             return NSRect(x: 100, y: 100, width: w, height: h)
         }
@@ -237,16 +256,19 @@ final class WindowManager: WindowManaging {
         else { return nil }
         let x = d.double(forKey: idlePetOriginXKey)
         let y = d.double(forKey: idlePetOriginYKey)
-        return NSRect(x: x, y: y, width: idlePetSize.width, height: idlePetSize.height)
+        let sz = idlePetWindowSize()
+        return NSRect(x: x, y: y, width: sz.width, height: sz.height)
     }
 
     private static func isApproximatelyIdleSized(_ rect: NSRect) -> Bool {
-        abs(rect.width - idlePetSize.width) < 24 && abs(rect.height - idlePetSize.height) < 24
+        let target = idlePetWindowSideLength()
+        return abs(rect.width - target) < 24 && abs(rect.height - target) < 24
     }
 
     /// 至少与某块屏的 `frame` 有足够交集则保留位置（支持副屏）；完全离开所有屏则退回默认角。
     private static func clampIdlePetFrameToScreens(_ rect: NSRect) -> NSRect {
-        let r = NSRect(origin: rect.origin, size: idlePetSize)
+        let sz = idlePetWindowSize()
+        let r = NSRect(origin: rect.origin, size: sz)
         let union = NSScreen.screens.reduce(CGRect.null) { $0.union($1.frame) }
         let inter = union.intersection(r)
         if inter.width >= 32, inter.height >= 32 {
@@ -390,6 +412,7 @@ final class WindowManager: WindowManaging {
         } else {
             v.onRestPetDoubleClickEndRest = nil
         }
+        v.idlePetIconSidePoints = Self.resolvedIdlePetIconSidePoints()
     }
 
     func setRestBlocksClicks(_ blocks: Bool) {
@@ -422,6 +445,7 @@ final class WindowManager: WindowManaging {
         installPetWindowIfNeeded()
         guard let win = window, let stage = stageView else { return }
         guard !stage.isInRestPhase else { return }
+        stage.idlePetIconSidePoints = Self.resolvedIdlePetIconSidePoints()
         let target = Self.clampIdlePetFrameToScreens(Self.defaultIdlePetWindowFrame())
         win.setFrame(target, display: true)
         syncContentViewToWindowLayout()
@@ -430,6 +454,27 @@ final class WindowManager: WindowManaging {
         persistIdlePetFrame(target)
         applyMousePolicy()
         win.orderFrontRegardless()
+    }
+
+    func applyIdlePetIconSideFromUserDefaults() {
+        installPetWindowIfNeeded()
+        guard let win = window, let stage = stageView else { return }
+        guard !stage.isInRestPhase, !stage.isInBreakRunPhase else { return }
+        let iconSide = Self.resolvedIdlePetIconSidePoints()
+        stage.idlePetIconSidePoints = iconSide
+        let sideLen = Self.idlePetWindowSideLength()
+        var f = win.frame
+        let anchor = CGPoint(x: f.midX, y: f.midY)
+        f.size = NSSize(width: sideLen, height: sideLen)
+        f.origin.x = anchor.x - f.width / 2
+        f.origin.y = anchor.y - f.height / 2
+        let clamped = Self.clampIdlePetFrameToScreens(f)
+        win.setFrame(clamped, display: true)
+        syncContentViewToWindowLayout()
+        stage.needsLayout = true
+        stage.layoutSubtreeIfNeeded()
+        persistIdlePetFrameIfIdleSized()
+        applyMousePolicy()
     }
 
     func dismissRestImmediately(bringIdlePetWindowToFront: Bool) {
@@ -635,8 +680,8 @@ final class WindowManager: WindowManaging {
         hideBreakRunCountdownPanel()
         guard let screen = MenuBarNSScreen.screen ?? NSScreen.screens.first else { return }
         let vf = screen.visibleFrame
-        let panelSize = NSSize(width: 200, height: 72)
-        let origin = NSPoint(x: vf.minX + 32, y: vf.minY + 32)
+        let panelSize = NSSize(width: 300, height: 108)
+        let origin = NSPoint(x: vf.minX + 48, y: vf.minY + 48)
         let panel = NSPanel(
             contentRect: NSRect(origin: origin, size: panelSize),
             styleMask: [.borderless, .nonactivatingPanel],
@@ -1010,10 +1055,21 @@ extension WindowManager: PetStageDeskMenuPresenter {
         panel.level = .floating
         panel.backgroundColor = .clear
         panel.isOpaque = false
-        panel.hasShadow = false
+        panel.hasShadow = true
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.hidesOnDeactivate = false
         panel.isMovableByWindowBackground = false
+
+        // 与 MenuBarExtra 同款：NSVisualEffectView(.popover) 提供系统级毛玻璃背景与圆角，
+        // 取代原先在 SwiftUI 层手绘的 RoundedRectangle + .regularMaterial。
+        let effectView = NSVisualEffectView(frame: NSRect(origin: .zero, size: size))
+        effectView.material = .popover
+        effectView.blendingMode = .behindWindow
+        effectView.state = .active
+        effectView.wantsLayer = true
+        effectView.layer?.cornerRadius = 12
+        effectView.layer?.masksToBounds = true
+        panel.contentView = effectView
 
         let host = NSHostingController(
             rootView: AnyView(
@@ -1022,8 +1078,9 @@ extension WindowManager: PetStageDeskMenuPresenter {
             )
         )
         host.view.translatesAutoresizingMaskIntoConstraints = true
-        host.view.frame = NSRect(origin: .zero, size: size)
-        panel.contentViewController = host
+        host.view.frame = effectView.bounds
+        host.view.autoresizingMask = [.width, .height]
+        effectView.addSubview(host.view)
         panel.setContentSize(size)
 
         deskMenuPanel = panel
@@ -1164,6 +1221,16 @@ extension WindowManager: PetStageDeskMenuPresenter {
             self.closeDeskMenuPanelWithFade()
         }
 
+        deskMenuEscMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self else { return event }
+            guard event.keyCode == 53 else { return event }
+            guard let panel = self.deskMenuPanel, panel.isVisible else { return event }
+            // 智能输入面板自己处理 Esc；避免抢它的取消语义。
+            guard self.smartInputPanel == nil else { return event }
+            self.closeDeskMenuPanelWithFade()
+            return nil
+        }
+
         let nc = NotificationCenter.default
         dismissObservers.append(nc.addObserver(
             forName: NSApplication.didResignActiveNotification,
@@ -1177,6 +1244,10 @@ extension WindowManager: PetStageDeskMenuPresenter {
         if let m = transientMonitor {
             NSEvent.removeMonitor(m)
             transientMonitor = nil
+        }
+        if let m = deskMenuEscMonitor {
+            NSEvent.removeMonitor(m)
+            deskMenuEscMonitor = nil
         }
         dismissObservers.forEach { NotificationCenter.default.removeObserver($0) }
         dismissObservers = []
