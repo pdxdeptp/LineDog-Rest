@@ -1,6 +1,61 @@
 import AppKit
 import SwiftUI
 
+// MARK: - 桌宠浮动面板 vs 菜单栏：仅桌宠场景绘制底部指向标
+
+enum MalDazeDeskMenuPresentation: Equatable {
+    /// `MenuBarExtra` 等系统容器自带外观，不画小角。
+    case menuBarExtra
+    /// 桌宠旁独立浮动窗：底部右侧小三角指向桌宠。
+    case deskPetFloatingPanel
+}
+
+private struct MalDazeDeskMenuPresentationKey: EnvironmentKey {
+    static let defaultValue: MalDazeDeskMenuPresentation = .menuBarExtra
+}
+
+extension EnvironmentValues {
+    var maldazeDeskMenuPresentation: MalDazeDeskMenuPresentation {
+        get { self[MalDazeDeskMenuPresentationKey.self] }
+        set { self[MalDazeDeskMenuPresentationKey.self] = newValue }
+    }
+}
+
+extension MenuBarContentView {
+    /// 与 `body` 的 `frame(minWidth:minHeight:)` 一致，另加底部留白画指向桌宠的小三角。
+    static var deskPetPanelContentSize: NSSize {
+        NSSize(width: 300 + 280 + 300 + 3 * 24, height: 556 + 10)
+    }
+}
+
+/// 底部小三角：贴在面板右下角附近，尖端向下（指向桌宠）。
+private struct DeskPetMenuPopoverTail: View {
+    var body: some View {
+        Path { path in
+            let w: CGFloat = 20
+            let h: CGFloat = 9
+            path.move(to: CGPoint(x: 0, y: 0))
+            path.addLine(to: CGPoint(x: w, y: 0))
+            path.addLine(to: CGPoint(x: w * 0.52, y: h))
+            path.closeSubpath()
+        }
+        .fill(.regularMaterial)
+        .overlay {
+            Path { path in
+                let w: CGFloat = 20
+                let h: CGFloat = 9
+                path.move(to: CGPoint(x: 0, y: 0))
+                path.addLine(to: CGPoint(x: w, y: 0))
+                path.addLine(to: CGPoint(x: w * 0.52, y: h))
+                path.closeSubpath()
+            }
+            .stroke(Color(nsColor: .separatorColor).opacity(0.45), lineWidth: 0.5)
+        }
+        .frame(width: 20, height: 9)
+        .accessibilityHidden(true)
+    }
+}
+
 // MARK: - Card style for section grouping
 
 private struct CardGroupBoxStyle: GroupBoxStyle {
@@ -20,9 +75,11 @@ private struct CardGroupBoxStyle: GroupBoxStyle {
     }
 }
 
-/// 控制面板 UI：同时用于 `MenuBarExtra` 与右下角桌宠的 `NSPopover`（`WindowManager`），改此处即可两边同步。
+/// 控制面板 UI：同时用于 `MenuBarExtra` 与右下角桌宠浮动窗（`WindowManager`），改此处即可两边同步。
 struct MenuBarContentView: View {
     @ObservedObject var viewModel: AppViewModel
+
+    @Environment(\.maldazeDeskMenuPresentation) private var deskMenuPresentation
 
     @AppStorage(MalDazeDefaults.sevenMinuteReminderDurationMinutes) private var sevenMinuteMinutesStored = 7
     @AppStorage(MalDazeDefaults.hydrationReminderIntervalMinutes) private var hydrationIntervalStored = 90
@@ -33,6 +90,9 @@ struct MenuBarContentView: View {
     @AppStorage(MalDazeDefaults.resetIdlePetShortcutKeyCode) private var resetPetKeyCode: Int = Int(ResetIdlePetPositionShortcut.defaultKeyCode)
     @AppStorage(MalDazeDefaults.resetIdlePetShortcutModifiers) private var resetPetModifiersRaw: Int = ResetIdlePetPositionShortcut.defaultModifiersStorageInt
     @AppStorage(MalDazeDefaults.resetIdlePetShortcutKeyLabel) private var resetPetKeyLabel: String = ResetIdlePetPositionShortcut.default.keyLabel
+
+    @AppStorage(MalDazeDefaults.pomodoroWorkDurationMinutes) private var pomodoroWorkMinutesStored = 25
+    @AppStorage(MalDazeDefaults.pomodoroRestDurationMinutes) private var pomodoroRestMinutesStored = 5
 
     private var deskReminders: DeskRemindersModel { viewModel.deskReminders }
 
@@ -49,6 +109,18 @@ struct MenuBarContentView: View {
         let v = hydrationIntervalStored
         if v < 15 { return 90 }
         return min(240, v)
+    }
+
+    private var pomodoroWorkMinutesResolved: Int {
+        let v = pomodoroWorkMinutesStored
+        if v < 5 { return 25 }
+        return min(120, v)
+    }
+
+    private var pomodoroRestMinutesResolved: Int {
+        let v = pomodoroRestMinutesStored
+        if v < 1 { return 5 }
+        return min(60, v)
     }
 
     // MARK: - Quiet hours date helpers
@@ -78,10 +150,19 @@ struct MenuBarContentView: View {
         DeskReminderDayGroups.sections(items: deskReminders.items)
     }
 
+    /// 推迟到 RunLoop 下一拍，避免 `Picker` / `Toggle` / `onChange` 在视图更新周期内同步调用 `AppViewModel` 触发
+    /// 「Publishing changes from within view updates」，并可能导致 `MenuBarExtra` 控制窗被系统收起。
+    private func scheduleViewModelWork(_ work: @escaping () -> Void) {
+        DispatchQueue.main.async(execute: work)
+    }
+
     /// 左侧提醒栏固定宽度，避免与右侧主菜单抢空间。
     private let remindersColumnWidth: CGFloat = 300
 
-    /// 双栏外圈与右栏标题行：数值集中，避免「窗体顶边 vs 首行」只靠右栏独自撑开。
+    /// 中间学习助手栏固定宽度。
+    private let assistantColumnWidth: CGFloat = 280
+
+    /// 三栏外圈与右栏标题行：数值集中，避免「窗体顶边 vs 首行」只靠右栏独自撑开。
     private enum MainPanelChrome {
         static let horizontalPadding: CGFloat = 12
         /// 整块内容上内边距。顶部留白唯一控制点，改此处即可（不要在 ScrollView 上加 ignoresSafeArea，否则会被抵消）。
@@ -98,14 +179,24 @@ struct MenuBarContentView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        let chrome = VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top, spacing: 0) {
+                // 左栏：提醒事项
                 remindersSidebar
                     .frame(width: remindersColumnWidth, alignment: .topLeading)
                     .padding(.trailing, MainPanelChrome.horizontalPadding)
 
                 Divider()
 
+                // 中栏：学习助手
+                VStack(alignment: .leading, spacing: 0) {
+                    AssistantPanelView()
+                }
+                .frame(width: assistantColumnWidth, alignment: .topLeading)
+
+                Divider()
+
+                // 右栏：番茄钟、小猫等原有控制
                 mainControlsColumn
                     .frame(minWidth: 300, alignment: .leading)
                     .padding(.leading, MainPanelChrome.horizontalPadding)
@@ -114,7 +205,31 @@ struct MenuBarContentView: View {
             .padding(.top, MainPanelChrome.topPadding)
             .padding(.bottom, MainPanelChrome.bottomPadding)
         }
-        .frame(minWidth: remindersColumnWidth + 24 + 300 + 24, minHeight: 556)
+        .frame(
+            minWidth: remindersColumnWidth + assistantColumnWidth + 300 + 3 * 24,
+            minHeight: 556
+        )
+
+        Group {
+            if deskMenuPresentation == .deskPetFloatingPanel {
+                chrome
+                    .padding(.bottom, 10)
+                    .background {
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(.regularMaterial)
+                    }
+                    .overlay(alignment: .bottomTrailing) {
+                        DeskPetMenuPopoverTail()
+                            // 贴近第三栏（主控区）右缘：略小于最外圈 padding，避免顶到窗体圆角裁切。
+                            .padding(.trailing, MainPanelChrome.horizontalPadding + 6)
+                            .padding(.bottom, 2)
+                    }
+                    .compositingGroup()
+                    .shadow(color: .black.opacity(0.22), radius: 18, y: 8)
+            } else {
+                chrome
+            }
+        }
         .sheet(item: $reminderUnderEdit) { item in
             DeskReminderEditSheet(item: item, deskReminders: deskReminders)
         }
@@ -281,7 +396,8 @@ struct MenuBarContentView: View {
                 Picker("同步列表", selection: Binding(
                     get: { deskReminders.selectedListIdentifier() ?? "" },
                     set: { id in
-                        if !id.isEmpty {
+                        guard !id.isEmpty else { return }
+                        scheduleViewModelWork {
                             deskReminders.selectList(calendarIdentifier: id)
                         }
                     }
@@ -400,7 +516,9 @@ struct MenuBarContentView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Picker("模式", selection: Binding(
                     get: { viewModel.mode },
-                    set: { viewModel.setMode($0) }
+                    set: { newMode in
+                        scheduleViewModelWork { viewModel.setMode(newMode) }
+                    }
                 )) {
                     ForEach(AppViewModel.Mode.allCases, id: \.self) { m in
                         Text(m.rawValue).tag(m)
@@ -408,8 +526,21 @@ struct MenuBarContentView: View {
                 }
                 .pickerStyle(.segmented)
 
+                Stepper(value: $pomodoroRestMinutesStored, in: 1...60, step: 1) {
+                    Text("休息时长：\(pomodoroRestMinutesResolved) 分钟")
+                        .font(.subheadline)
+                }
+                .help("手动番茄与「整点 / 半点」模式下的休息段长度；霸屏 / 跑屏与计时器一致。")
+
+                Stepper(value: $pomodoroWorkMinutesStored, in: 5...120, step: 1) {
+                    Text("专注间隔（仅手动）：\(pomodoroWorkMinutesResolved) 分钟")
+                        .font(.subheadline)
+                }
+                .disabled(viewModel.mode != .manual)
+                .help("仅「手动番茄」下每段专注长度；整点模式仍按系统时钟对齐，不受此项影响。")
+
                 HStack(spacing: 8) {
-                    Button("开始专注（25 分钟）") {
+                    Button("开始专注（\(pomodoroWorkMinutesResolved) 分钟）") {
                         viewModel.startManualFocus()
                     }
                     .buttonStyle(.borderedProminent)
@@ -434,7 +565,7 @@ struct MenuBarContentView: View {
 
                 Toggle(isOn: Binding(
                     get: { viewModel.restBlocksClicksDuringRest },
-                    set: { viewModel.setRestBlocksClicksDuringRest($0) }
+                    set: { v in scheduleViewModelWork { viewModel.setRestBlocksClicksDuringRest(v) } }
                 )) {
                     Text("休息期间阻止点击桌面")
                         .font(.subheadline)
@@ -444,7 +575,7 @@ struct MenuBarContentView: View {
 
                 Toggle(isOn: Binding(
                     get: { viewModel.restDoubleClickEndsRest },
-                    set: { viewModel.setRestDoubleClickEndsRest($0) }
+                    set: { v in scheduleViewModelWork { viewModel.setRestDoubleClickEndsRest(v) } }
                 )) {
                     Text("单击 20 下桌宠可提前结束休息")
                         .font(.subheadline)
@@ -456,7 +587,7 @@ struct MenuBarContentView: View {
 
                 Picker("休息风格", selection: Binding(
                     get: { viewModel.breakInterruptStyle },
-                    set: { viewModel.setBreakInterruptStyle($0) }
+                    set: { v in scheduleViewModelWork { viewModel.setBreakInterruptStyle(v) } }
                 )) {
                     Text("霸屏（强）").tag(AppViewModel.BreakInterruptStyle.fullscreen)
                     Text("跑屏（轻）").tag(AppViewModel.BreakInterruptStyle.breakRun)
@@ -477,6 +608,12 @@ struct MenuBarContentView: View {
                     .buttonStyle(.bordered)
                     .tint(.secondary)
                 }
+            }
+            .onChange(of: pomodoroRestMinutesStored) { _ in
+                scheduleViewModelWork { viewModel.syncPomodoroDurationsFromDefaults() }
+            }
+            .onChange(of: pomodoroWorkMinutesStored) { _ in
+                scheduleViewModelWork { viewModel.syncPomodoroDurationsFromDefaults() }
             }
         } label: {
             Label("专注计时", systemImage: "timer")
@@ -539,7 +676,7 @@ struct MenuBarContentView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Toggle(isOn: Binding(
                         get: { viewModel.isHydrationReminderEnabled },
-                        set: { viewModel.setHydrationReminderEnabled($0) }
+                        set: { v in scheduleViewModelWork { viewModel.setHydrationReminderEnabled(v) } }
                     )) {
                         Text("开启喝水提醒")
                             .font(.subheadline)
@@ -551,7 +688,9 @@ struct MenuBarContentView: View {
                         in: 15...240,
                         step: 15,
                         onEditingChanged: { editing in
-                            if !editing { viewModel.setHydrationReminderInterval(hydrationIntervalStored) }
+                            if !editing {
+                                scheduleViewModelWork { viewModel.setHydrationReminderInterval(hydrationIntervalStored) }
+                            }
                         }
                     ) {
                         Text("间隔：\(hydrationIntervalResolved) 分钟")

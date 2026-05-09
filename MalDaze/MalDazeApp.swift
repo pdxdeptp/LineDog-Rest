@@ -8,6 +8,7 @@ struct MalDazeApp: App {
     var body: some Scene {
         MenuBarExtra {
             MenuBarContentView(viewModel: viewModel)
+                .interactiveDismissDisabled(true)
         } label: {
             MenuBarDogLabel(mode: viewModel.petDisplayMode)
         }

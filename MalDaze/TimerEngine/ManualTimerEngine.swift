@@ -4,8 +4,8 @@ import Foundation
 final class ManualTimerEngine: TimerEngine {
     var onStateChange: ((TimeState) -> Void)?
 
-    private let workDuration: TimeInterval
-    private let restDuration: TimeInterval
+    private var workDuration: TimeInterval
+    private var restDuration: TimeInterval
 
     private var tickTimer: Timer?
     private var phaseEnd: Date?
@@ -19,11 +19,23 @@ final class ManualTimerEngine: TimerEngine {
         self.restDuration = restDuration
     }
 
+    /// 更新下一段工作 / 休息所用时长（当前正在进行的相位仍按进入该相位时的 `phaseEnd` 计时）。
+    func setPhaseDurations(work: TimeInterval, rest: TimeInterval) {
+        workDuration = work
+        restDuration = rest
+    }
+
     /// 计时器是否在跑（未点「停止计时」且 `start()` 已调用）。
     var isTimerRunning: Bool { tickTimer != nil }
 
     /// 当前是否处于休息段（`start()` 之后的 5 分钟休息内）。 
     var isInRestPhase: Bool { isRestPhase }
+
+    /// 若计时器在跑且处于休息段，返回距该段结束剩余时间；否则为 0（用于测试休息结束后恢复霸屏时长）。
+    var restPhaseRemainingOrZero: TimeInterval {
+        guard tickTimer != nil, isRestPhase, let end = phaseEnd else { return 0 }
+        return max(0, end.timeIntervalSinceNow)
+    }
 
     func start() {
         stop()

@@ -14,6 +14,11 @@ enum MalDazeDefaults {
     static let smartReminderInputShortcutModifiers = "MalDaze.smartReminderInputShortcut.modifiers"
     static let smartReminderInputShortcutKeyLabel = "MalDaze.smartReminderInputShortcut.keyLabel"
 
+    /// 手动番茄：专注段长度（分钟），默认 25，范围 5–120。
+    static let pomodoroWorkDurationMinutes = "MalDaze.pomodoro.workDurationMinutes"
+    /// 手动 / 整点模式：休息段长度（分钟），默认 5，范围 1–60。
+    static let pomodoroRestDurationMinutes = "MalDaze.pomodoro.restDurationMinutes"
+
     /// 独立倒计时长度（分钟），默认 7。
     static let sevenMinuteReminderDurationMinutes = "MalDaze.sevenMinuteReminder.durationMinutes"
 

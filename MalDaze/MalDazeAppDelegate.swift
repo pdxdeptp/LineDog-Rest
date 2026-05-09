@@ -7,9 +7,12 @@ final class MalDazeAppDelegate: NSObject, NSApplicationDelegate {
     private var globalMalDazeKeyMonitor: Any?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        BackendProcessManager.shared.start()
         UserDefaults.standard.register(defaults: [
             MalDazeDefaults.geminiModelId: MalDazeDefaults.defaultGeminiModelId,
             MalDazeDefaults.sevenMinuteReminderDurationMinutes: 7,
+            MalDazeDefaults.pomodoroWorkDurationMinutes: 25,
+            MalDazeDefaults.pomodoroRestDurationMinutes: 5,
         ])
         if NSApp.activationPolicy() != .regular {
             _ = NSApp.setActivationPolicy(.regular)
@@ -33,6 +36,7 @@ final class MalDazeAppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        BackendProcessManager.shared.stop()
         MalDazeCarbonGlobalHotKeys.stop()
         if let globalMalDazeKeyMonitor {
             NSEvent.removeMonitor(globalMalDazeKeyMonitor)

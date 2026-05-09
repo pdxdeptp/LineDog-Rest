@@ -43,6 +43,19 @@ final class AppViewModel: ObservableObject {
 
     private static let restBlocksClicksDefaultsKey = "MalDaze.restBlocksClicksDuringRest"
     private static let restDoubleClickEndsRestDefaultsKey = MalDazeDefaults.restDoubleClickEndsRest
+
+    /// 与菜单栏 Stepper 一致：5…120 分钟，非法或未写入时默认 25。
+    static func clampedPomodoroWorkMinutes(_ stored: Int) -> Int {
+        if stored < 5 { return 25 }
+        return min(120, stored)
+    }
+
+    /// 与菜单栏 Stepper 一致：1…60 分钟，非法或未写入时默认 5。
+    static func clampedPomodoroRestMinutes(_ stored: Int) -> Int {
+        if stored < 1 { return 5 }
+        return min(60, stored)
+    }
+
     private var cancellables = Set<AnyCancellable>()
 
     /// 「计时中」：自动模式引擎在跑，或手动模式已点「开始专注」尚未「停止计时」。
@@ -100,8 +113,16 @@ final class AppViewModel: ObservableObject {
                 UserDefaults.standard.string(forKey: MalDazeDefaults.geminiAPIKey)
             }
         )
-        let me = manualEngine ?? ManualTimerEngine()
-        let ae = autoEngine ?? AutoTimerEngine()
+        let ud = UserDefaults.standard
+        let wMin = Self.clampedPomodoroWorkMinutes(ud.integer(forKey: MalDazeDefaults.pomodoroWorkDurationMinutes))
+        let rMin = Self.clampedPomodoroRestMinutes(ud.integer(forKey: MalDazeDefaults.pomodoroRestDurationMinutes))
+        ud.set(wMin, forKey: MalDazeDefaults.pomodoroWorkDurationMinutes)
+        ud.set(rMin, forKey: MalDazeDefaults.pomodoroRestDurationMinutes)
+        let me = manualEngine ?? ManualTimerEngine(
+            workDuration: TimeInterval(wMin * 60),
+            restDuration: TimeInterval(rMin * 60)
+        )
+        let ae = autoEngine ?? AutoTimerEngine(restDuration: TimeInterval(rMin * 60))
         self.manualEngine = me
         self.autoEngine = ae
         self.isChronoSessionActive = bootstrapAutoEngine
@@ -196,6 +217,21 @@ final class AppViewModel: ObservableObject {
         }
     }
 
+    /// 从 `UserDefaults` 同步番茄工作/休息时长到两个引擎（面板 Stepper 与设置改动后调用）。
+    func syncPomodoroDurationsFromDefaults() {
+        let ud = UserDefaults.standard
+        let wMin = Self.clampedPomodoroWorkMinutes(ud.integer(forKey: MalDazeDefaults.pomodoroWorkDurationMinutes))
+        let rMin = Self.clampedPomodoroRestMinutes(ud.integer(forKey: MalDazeDefaults.pomodoroRestDurationMinutes))
+        ud.set(wMin, forKey: MalDazeDefaults.pomodoroWorkDurationMinutes)
+        ud.set(rMin, forKey: MalDazeDefaults.pomodoroRestDurationMinutes)
+        manualEngine.setPhaseDurations(work: TimeInterval(wMin * 60), rest: TimeInterval(rMin * 60))
+        autoEngine.setRestDuration(TimeInterval(rMin * 60))
+    }
+
+    private func resolvedRestDurationSecondsFromDefaults() -> TimeInterval {
+        TimeInterval(Self.clampedPomodoroRestMinutes(UserDefaults.standard.integer(forKey: MalDazeDefaults.pomodoroRestDurationMinutes)) * 60)
+    }
+
     deinit {
         let h = hydrationReminder
         Task { @MainActor in h.cancel() }
@@ -243,10 +279,7 @@ final class AppViewModel: ObservableObject {
     private func processSmartReminderSubmit(_ raw: String) async {
         smartReminderThinkingActive = true
         syncPetDisplayMode()
-        let result = await smartReminderOrchestrator.run(
-            rawUserInput: raw,
-            uiSelectedReminderListCalendarId: deskReminders.selectedListIdentifier()
-        )
+        let result = await smartReminderOrchestrator.run(rawUserInput: raw)
         smartReminderThinkingActive = false
         syncPetDisplayMode()
         guard let result else { return }
@@ -377,7 +410,7 @@ final class AppViewModel: ObservableObject {
         mode = newMode
         manualEngine.stop()
         autoEngine.stop()
-        windowManager.dismissRestImmediately()
+        windowManager.dismissRestImmediately(bringIdlePetWindowToFront: false)
         wasResting = false
         testRestActive = false
         chronoSessionSuspendedByUser = false
@@ -398,7 +431,7 @@ final class AppViewModel: ObservableObject {
     func startManualFocus() {
         guard mode == .manual else { return }
         autoEngine.stop()
-        windowManager.dismissRestImmediately()
+        windowManager.dismissRestImmediately(bringIdlePetWindowToFront: false)
         wasResting = false
         testRestActive = false
         chronoSessionSuspendedByUser = false
@@ -413,7 +446,7 @@ final class AppViewModel: ObservableObject {
         guard isChronoSessionActive else { return }
         manualEngine.stop()
         autoEngine.stop()
-        windowManager.dismissRestImmediately()
+        windowManager.dismissRestImmediately(bringIdlePetWindowToFront: false)
         wasResting = false
         testRestActive = false
         isChronoSessionActive = false
@@ -431,7 +464,7 @@ final class AppViewModel: ObservableObject {
     func resumeTimers() {
         guard chronoSessionSuspendedByUser else { return }
         chronoSessionSuspendedByUser = false
-        windowManager.dismissRestImmediately()
+        windowManager.dismissRestImmediately(bringIdlePetWindowToFront: false)
         wasResting = false
         testRestActive = false
 
@@ -475,8 +508,10 @@ final class AppViewModel: ObservableObject {
         testRestActive = true
         syncPetDisplayMode()
         let modeLabel = breakInterruptStyle == .breakRun ? "跑屏" : "霸屏"
-        statusLine = "【测试】休息\(modeLabel)中（约 5 分钟）…"
-        presentRestWithCurrentStyle(duration: 5 * 60) { [weak self] in
+        let restSec = resolvedRestDurationSecondsFromDefaults()
+        let restMin = max(1, Int((restSec / 60).rounded(.down)))
+        statusLine = "【测试】休息\(modeLabel)中（约 \(restMin) 分钟）…"
+        presentRestWithCurrentStyle(duration: restSec) { [weak self] in
             guard let self else { return }
             // 必须在主线程同步执行：`WindowManager` / 单测 Mock 会在同一拍调用此回调，
             // 若再包一层 `Task` 会导致测试与 UI 在霸屏结束瞬间读到陈旧状态。
@@ -512,15 +547,25 @@ final class AppViewModel: ObservableObject {
         switch mode {
         case .manual:
             if manualEngine.isTimerRunning && manualEngine.isInRestPhase {
-                wasResting = true
-                presentRestWithCurrentStyle(duration: 5 * 60) { }
+                let remaining = manualEngine.restPhaseRemainingOrZero
+                if remaining > 0 {
+                    wasResting = true
+                    presentRestWithCurrentStyle(duration: remaining) { }
+                } else {
+                    wasResting = false
+                }
             } else {
                 wasResting = false
             }
         case .auto:
             if autoEngine.isTimerRunning && autoEngine.isInScheduledRest {
-                wasResting = true
-                presentRestWithCurrentStyle(duration: 5 * 60) { }
+                let remaining = autoEngine.scheduledRestRemainingOrZero
+                if remaining > 0 {
+                    wasResting = true
+                    presentRestWithCurrentStyle(duration: remaining) { }
+                } else {
+                    wasResting = false
+                }
             } else {
                 wasResting = false
             }
@@ -549,7 +594,7 @@ final class AppViewModel: ObservableObject {
             if !wasResting {
                 wasResting = true
                 if !testRestActive {
-                    presentRestWithCurrentStyle(duration: 5 * 60, onDismissed: { })
+                    presentRestWithCurrentStyle(duration: max(1, remaining), onDismissed: { })
                 }
             }
         case .autoWatching(let next):

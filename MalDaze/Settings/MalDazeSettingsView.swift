@@ -226,6 +226,11 @@ struct MalDazeSettingsView: View {
         .formStyle(.grouped)
         .frame(minWidth: 420, minHeight: 480)
         .padding()
+        .onExitCommand {
+            // Esc：关闭设置窗。录制快捷键时由 `GlobalShortcutKeyRecorder` 先拦截 Esc，此处不会误关。
+            guard !shortcutRecorderBusy else { return }
+            NSApp.keyWindow?.performClose(nil)
+        }
         .onAppear {
             let ids = Set(MalDazeGeminiModelCatalog.pickerOptions.map(\.id))
             if !ids.contains(geminiModelId) {

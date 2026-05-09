@@ -13,7 +13,7 @@ final class MockWindowManager: WindowManaging {
 
     private var pendingUserDismiss: (() -> Void)?
 
-    func dismissRestImmediately() {
+    func dismissRestImmediately(bringIdlePetWindowToFront: Bool) {
         let cb = pendingUserDismiss
         pendingUserDismiss = nil
         cb?()
