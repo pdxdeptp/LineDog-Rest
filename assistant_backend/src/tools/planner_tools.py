@@ -15,6 +15,13 @@ from ..db.plan_md import read_plan_md, snapshot_to_db, write_plan_md
 from ..db import queries
 
 
+async def get_tasks_by_date(db: aiosqlite.Connection, date_str: str) -> list[dict]:
+    """Return tasks scheduled on date_str (ISO format), including id and title."""
+    from ..db.queries import get_tasks_by_date as _q
+    from datetime import date as _date
+    return await _q(db, _date.fromisoformat(date_str))
+
+
 async def get_current_plan(db: aiosqlite.Connection, plan_path: str) -> str:
     """Return the full text of plan.md."""
     return await read_plan_md(plan_path)

@@ -44,7 +44,6 @@ class IngestionState(TypedDict, total=False):
     speed_factor: float    # default 1.0
 
     # Populated during graph execution
-    handler_class: Any
     resource: ResourceStructure | None
 
     # Capacity analysis
@@ -172,16 +171,10 @@ def _schedule_option_b(
 # Graph nodes
 # ---------------------------------------------------------------------------
 
-async def dispatch_handler(state: IngestionState) -> IngestionState:
-    url = state["url"]
-    handler_cls = dispatch(url)
-    return {**state, "handler_class": handler_cls}
-
-
 async def fetch_structure(state: IngestionState) -> IngestionState:
-    handler_cls = state["handler_class"]
     url = state["url"]
     try:
+        handler_cls = dispatch(url)
         handler = handler_cls(url)
         resource = await handler.fetch()
     except Exception as exc:
@@ -326,6 +319,10 @@ async def write_to_db(state: IngestionState) -> IngestionState:
 
         await db.commit()
         await insert_event(db, "resource_added", {"resource_id": resource_id, "title": resource.title})
+        # Invalidate today's morning briefing cache so the next GET reflects the new tasks
+        today_key = f"briefing_{date.today().isoformat()}"
+        await db.execute("DELETE FROM system_state WHERE key = ?", (today_key,))
+        await db.commit()
 
     return {**state, "resource_id": resource_id}
 
@@ -336,15 +333,13 @@ async def write_to_db(state: IngestionState) -> IngestionState:
 
 def _build_graph() -> StateGraph:
     builder = StateGraph(IngestionState)
-    builder.add_node("dispatch_handler", dispatch_handler)
     builder.add_node("fetch_structure", fetch_structure)
     builder.add_node("estimate_time", estimate_time)
     builder.add_node("check_capacity", check_capacity_node)
     builder.add_node("present_draft", present_draft)
     builder.add_node("write_to_db", write_to_db)
 
-    builder.add_edge(START, "dispatch_handler")
-    builder.add_edge("dispatch_handler", "fetch_structure")
+    builder.add_edge(START, "fetch_structure")
     builder.add_edge("fetch_structure", "estimate_time")
     builder.add_edge("estimate_time", "check_capacity")
     builder.add_edge("check_capacity", "present_draft")

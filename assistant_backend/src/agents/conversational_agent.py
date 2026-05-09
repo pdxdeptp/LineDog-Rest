@@ -32,6 +32,7 @@ from ..tools.planner_tools import (
     get_current_plan,
     get_resource_progress,
     get_task_stats,
+    get_tasks_by_date,
     rewrite_plan,
     update_tasks,
 )
@@ -86,6 +87,7 @@ _PLAN_SYSTEM_PROMPT = """你是 MalDaze 学习助手的对话规划器，负责�
 
 ## 可用读工具
 
+- get_tasks_by_date: 获取指定日期的任务列表（含 id、title、target_minutes、scheduled_date），需要 date 参数（ISO 格式 YYYY-MM-DD）。**当用户要求对某天的任务做任何变更时，必须先调用此工具获取 task_id。**
 - get_current_plan: 读取 plan.md 全文
 - get_task_stats: 获取任务完成统计（period: today/this_week/last_week）
 - get_resource_progress: 获取资料进度（需要 resource_id）
@@ -98,6 +100,7 @@ _PLAN_SYSTEM_PROMPT = """你是 MalDaze 学习助手的对话规划器，负责�
   "intent": "<意图描述，中文>",
   "tools_needed": ["tool_name", ...],
   "tool_params": {
+    "get_tasks_by_date": {"date": "YYYY-MM-DD"},
     "get_task_stats": {"period": "today"},
     "check_capacity": {"start": "YYYY-MM-DD", "end": "YYYY-MM-DD"},
     "get_resource_progress": {"resource_id": 1}
@@ -197,7 +200,10 @@ async def gather_node(state: PlannerState) -> dict:
 
     async def _call_tool(name: str) -> tuple[str, Any]:
         async with get_db() as db:
-            if name == "get_current_plan":
+            if name == "get_tasks_by_date":
+                p = params.get("get_tasks_by_date", {})
+                result = await get_tasks_by_date(db, p.get("date", today_str))
+            elif name == "get_current_plan":
                 result = await get_current_plan(db, PLAN_MD_PATH)
             elif name == "get_task_stats":
                 p = params.get("get_task_stats", {})
@@ -302,15 +308,25 @@ def route_after_propose(state: PlannerState) -> str:
     """Route back to gather if more data is needed (max 1 extra iteration)."""
     if state.get("needs_more_data") and state.get("gather_iterations", 0) < 1:
         return "gather"
+    proposal = state.get("proposal") or {}
+    if not proposal.get("changes"):
+        return "respond"
     return "human_review"
 
 
+async def respond_node(state: PlannerState) -> dict:
+    """Return a conversational text reply when there are no changes to confirm."""
+    proposal = state.get("proposal") or {}
+    text = proposal.get("summary_for_user") or proposal.get("description") or "好的，已了解。"
+    msg = AIMessage(content=text)
+    return {"messages": state.get("messages", []) + [msg]}
+
+
 async def human_review_node(state: PlannerState) -> dict:
-    """Pause execution and wait for user confirmation via LangGraph interrupt."""
-    # interrupt() suspends the graph and returns the proposal to the caller.
-    # When the graph is resumed with confirm_proposal(), user_confirmed is injected.
-    user_decision = interrupt(state.get("proposal"))
-    return {"user_confirmed": user_decision}
+    """Gate node: graph pauses BEFORE this node via interrupt_before=["human_review"].
+    When confirm_proposal() resumes with {"user_confirmed": bool}, that value is
+    already applied to state before this node runs — nothing to do here."""
+    return {}
 
 
 async def execute_node(state: PlannerState) -> dict:
@@ -383,6 +399,7 @@ def create_planner_graph():
     builder.add_node("plan", plan_node)
     builder.add_node("gather", gather_node)
     builder.add_node("propose", propose_node)
+    builder.add_node("respond", respond_node)
     builder.add_node("human_review", human_review_node)
     builder.add_node("execute", execute_node)
 
@@ -392,8 +409,9 @@ def create_planner_graph():
     builder.add_conditional_edges(
         "propose",
         route_after_propose,
-        {"gather": "gather", "human_review": "human_review"},
+        {"gather": "gather", "respond": "respond", "human_review": "human_review"},
     )
+    builder.add_edge("respond", END)
     builder.add_edge("human_review", "execute")
     builder.add_edge("execute", END)
 
@@ -490,17 +508,17 @@ async def confirm_proposal(thread_id: str, confirmed: bool) -> dict:
     graph = _get_graph()
     config = {"configurable": {"thread_id": thread_id}}
 
-    # Resume by passing the user's decision as the interrupt value
+    # With interrupt_before=["human_review"], resume requires:
+    # 1. update_state to inject the user's decision into the paused state
+    # 2. astream(None, config) to continue execution from the interrupt point
+    await graph.aupdate_state(config, {"user_confirmed": confirmed}, as_node="human_review")
+
     final_state: dict = {}
-    async for event in graph.astream(
-        {"user_confirmed": confirmed},
-        config=config,
-    ):
+    async for event in graph.astream(None, config=config):
         final_state = event
 
     snapshot = graph.get_state(config)
     current = snapshot.values if snapshot else {}
-    messages = current.get("messages", [])
     pending = current.get("pending_changes", [])
 
     if confirmed:

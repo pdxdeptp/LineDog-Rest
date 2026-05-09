@@ -225,3 +225,32 @@ async def test_9_6_morning_briefing_idempotent(db):
         count = (await cur.fetchone())[0]
     # We didn't call run_morning_agent above, just tested the cache layer
     assert count == 0, "No briefing event should exist (we only tested cache logic)"
+
+
+# ---------------------------------------------------------------------------
+# Bug 3b — get_tasks_by_date planner tool
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_planner_tool_get_tasks_by_date_returns_ids(db):
+    """
+    get_tasks_by_date planner tool 应返回含 id 字段的任务列表，
+    让 LLM 能生成有效的 reschedule action。
+    """
+    from src.tools.planner_tools import get_tasks_by_date as planner_get_tasks_by_date
+
+    tomorrow = (date.today() + timedelta(days=1)).isoformat()
+    await db.execute(
+        "INSERT INTO tasks (resource_id, title, task_kind, target_minutes, scheduled_date, originally_scheduled_date, priority)"
+        " VALUES (1, '二分查找练习', 'time', 30, ?, ?, 0)",
+        (tomorrow, tomorrow),
+    )
+    await db.commit()
+
+    tasks = await planner_get_tasks_by_date(db, tomorrow)
+
+    assert len(tasks) == 1
+    assert tasks[0]["id"] is not None, "task must expose id so LLM can generate reschedule actions"
+    assert tasks[0]["title"] == "二分查找练习"
+    assert tasks[0]["scheduled_date"] == tomorrow
+    assert tasks[0]["target_minutes"] == 30
