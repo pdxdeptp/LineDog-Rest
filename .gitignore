@@ -1,5 +1,6 @@
 DerivedData/
 build/
+*.profraw
 smart_reminder_model_debug.log
 *.xcuserstate
 xcuserdata/
