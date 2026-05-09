@@ -37,12 +37,13 @@ final class LearningAssistantViewModel: ObservableObject {
     /// 后端进程启动中（还未收到就绪通知）；区别于运行期离线。
     @Published var isConnecting: Bool = true
 
-    private let api = AssistantAPIClient.shared
+    private let api: any AssistantAPIClientProtocol
     private var readyObserver: Any?
 
     // MARK: - Init
 
-    init() {
+    init(api: any AssistantAPIClientProtocol = AssistantAPIClient.shared) {
+        self.api = api
         readyObserver = NotificationCenter.default.addObserver(
             forName: .backendDidBecomeReady,
             object: nil,
@@ -97,7 +98,7 @@ final class LearningAssistantViewModel: ObservableObject {
 
     func completeTask(_ task: AssistantTask) async {
         do {
-            try await api.completeTask(id: task.id)
+            try await api.completeTask(id: task.id, actualMinutes: nil)
             // Optimistic update: mark locally while re-fetching
             await fetchTodayBriefing()
         } catch {

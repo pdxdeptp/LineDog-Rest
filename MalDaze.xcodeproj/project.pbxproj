@@ -76,6 +76,8 @@
 		A406 /* ChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B406 /* ChatView.swift */; };
 		A407 /* IngestionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B407 /* IngestionView.swift */; };
 		A409 /* BackendProcessManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B409 /* BackendProcessManager.swift */; };
+		A40A /* AssistantAPIClientProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = B40A /* AssistantAPIClientProtocol.swift */; };
+		A310 /* LearningAssistantTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B310 /* LearningAssistantTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -160,6 +162,8 @@
 		B406 /* ChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatView.swift; sourceTree = "<group>"; };
 		B407 /* IngestionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IngestionView.swift; sourceTree = "<group>"; };
 		B409 /* BackendProcessManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendProcessManager.swift; sourceTree = "<group>"; };
+		B40A /* AssistantAPIClientProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssistantAPIClientProtocol.swift; sourceTree = "<group>"; };
+		B310 /* LearningAssistantTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningAssistantTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -275,6 +279,7 @@
 				B307 /* DeskReminderTimeFormatterTests.swift */,
 				B308 /* DeskReminderSidebarMergerTests.swift */,
 				B309 /* ControlPanelPresentationTests.swift */,
+				B310 /* LearningAssistantTests.swift */,
 			);
 			path = MalDazeTests;
 			sourceTree = "<group>";
@@ -357,6 +362,7 @@
 				B406 /* ChatView.swift */,
 				B407 /* IngestionView.swift */,
 				B409 /* BackendProcessManager.swift */,
+				B40A /* AssistantAPIClientProtocol.swift */,
 			);
 			path = LearningAssistant;
 			sourceTree = "<group>";
@@ -510,6 +516,7 @@
 				A406 /* ChatView.swift in Sources */,
 				A407 /* IngestionView.swift in Sources */,
 				A409 /* BackendProcessManager.swift in Sources */,
+				A40A /* AssistantAPIClientProtocol.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -526,6 +533,7 @@
 				A307 /* DeskReminderTimeFormatterTests.swift in Sources */,
 				A308 /* DeskReminderSidebarMergerTests.swift in Sources */,
 				A309 /* ControlPanelPresentationTests.swift in Sources */,
+				A310 /* LearningAssistantTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
