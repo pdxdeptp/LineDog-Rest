@@ -1,11 +1,13 @@
 ## ADDED Requirements
 
 ### Requirement: 开机触发，每天一次
-系统 SHALL 通过 macOS LaunchAgent 在用户登录后精确触发一次 Morning Agent，调用后端 `POST /api/morning-briefing`。同一日历日内重复触发 SHALL 被后端幂等处理（检查当日是否已生成 briefing）。
+系统 SHALL 在桌宠启动时由 `BackendProcessManager` spawn 后端（若端口未占用），APScheduler 在后端进程内每天 8:00 触发一次 Morning Agent，调用 `POST /api/morning-briefing`。同一日历日内重复触发 SHALL 被后端幂等处理（检查当日是否已生成 briefing）。
 
-#### Scenario: 首次登录触发
-- **WHEN** 用户开机或用户会话登录后 LaunchAgent 触发
-- **THEN** 后端检查今日是否已运行 Morning Agent；若未运行，执行完整流程
+> **[实施后修订 2026-05-08]** 触发机制从 LaunchAgent 改为 Swift AppDelegate spawn + APScheduler，见 design.md 决策 5。
+
+#### Scenario: 桌宠启动触发
+- **WHEN** 用户打开桌宠，BackendProcessManager 探测 8765 端口空闲并 spawn 后端
+- **THEN** 后端启动后 APScheduler 在 8:00 触发 Morning Agent；若启动时 8:00 已过且当日 briefing 未生成，则立即补触发
 
 #### Scenario: 重复触发幂等
 - **WHEN** 同一天内 `/api/morning-briefing` 被多次调用
@@ -37,9 +39,9 @@ Morning Agent SHALL 生成今日任务摘要，包含：任务列表（含各任
 - **WHEN** Morning Agent 完成摘要生成
 - **THEN** 后端通过 API 响应或推送通知，将摘要数据发送给 MalDaze 前端，前端更新助手面板中栏显示
 
-#### Scenario: pending_weekly_review 检查
-- **WHEN** Morning Agent 启动时，`system_state.pending_weekly_review = 'true'`
-- **THEN** 系统 SHALL 先运行 Weekly Review Agent，完成后清除 flag，再继续生成今日摘要
+#### Scenario: Weekly Review 补触发检查
+- **WHEN** Morning Agent 启动时
+- **THEN** 系统查询 events 表，若上周日（最近一个周日）不存在 `event_type = 'weekly_review_done'` 的记录，Graph 优先执行 Weekly Review 子图，完成后继续生成今日摘要；若记录已存在则跳过
 
 ---
 

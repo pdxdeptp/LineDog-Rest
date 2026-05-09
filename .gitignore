@@ -8,3 +8,11 @@ xcuserdata/
 .DS_Store
 .cursor/
 .superpowers/
+
+# Learning Assistant backend
+assistant_backend/.env
+assistant_backend/learning.db
+assistant_backend/plan.md
+assistant_backend/.venv/
+assistant_backend/**/__pycache__/
+assistant_backend/**/*.pyc

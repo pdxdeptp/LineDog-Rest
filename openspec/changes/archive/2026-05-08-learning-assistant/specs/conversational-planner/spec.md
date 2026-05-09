@@ -1,39 +1,39 @@
 ## ADDED Requirements
 
-### Requirement: ReAct 风格工具调用架构
-Conversational Planner SHALL 使用 LLM-as-Planner 模式：LLM 接收用户消息和可用工具列表，自主决定调用哪些工具及顺序，循环执行直至任务完成或触发人工审核。系统 SHALL NOT 使用硬编码 intent → subgraph 路由。
+### Requirement: 固定骨架 + 有限回退架构
+Conversational Planner SHALL 使用固定 Graph 拓扑：Plan → Gather（并行）→ Propose → Human Review → Execute。路由权归 Graph，LLM 仅决策各节点内容。Propose 节点在信息不足时可回退 Gather 至多一次，由 `gather_iterations` 计数器强制上限。系统 SHALL NOT 使用 ReAct 风格的自由循环路由。
 
 #### Scenario: 单意图处理
 - **WHEN** 用户输入"把今天的八股换成项目时间"
-- **THEN** LLM 自主调用 `get_task_stats`（查今日任务）→ `update_tasks`（swap）→ `present_proposal`（展示 diff 给用户确认）
+- **THEN** Plan 节点识别意图并确定需要调用 `get_task_stats`；Gather 节点并行执行读工具；Propose 节点生成 swap 变更提案；Graph 路由至 Human Review 等待用户确认；用户确认后 Execute 节点写入
 
 #### Scenario: 组合意图处理
 - **WHEN** 用户输入"我想摆了，同时把下周的八股减半"
-- **THEN** LLM 调用多个工具组合处理，生成包含两项变更的单一提案，一次请求用户确认
+- **THEN** Plan 节点识别组合意图，Gather 并行调用多个读工具，Propose 生成包含两项变更的单一提案，一次 Human Review 请求用户确认
+
+#### Scenario: 信息不足回退
+- **WHEN** Propose 节点判断 Gather 返回的数据不足以生成完整提案，且 gather_iterations < 1
+- **THEN** Graph 路由回 Gather 节点补充读取，gather_iterations + 1；若 gather_iterations 已达上限则继续用现有信息生成提案
 
 ---
 
 ### Requirement: 标准工具集
-系统 SHALL 提供以下工具供 Conversational Planner 调用：
+系统 SHALL 提供以下工具供 Conversational Planner 的 Gather 节点并行调用（读工具）和 Execute 节点写入（写工具）：
 
-| 工具 | 签名 | 说明 |
-|------|------|------|
-| `get_current_plan` | `() → str` | 读取 plan.md 全文 |
-| `get_task_stats` | `(period: str) → dict` | 查询完成率、任务分布（period: today/this_week/last_week） |
-| `get_resource_progress` | `(resource_id: int) → dict` | 某资料当前进度（completed/total units） |
-| `check_capacity` | `(start: date, end: date) → dict` | 该时间段每日剩余可用工时 |
-| `update_tasks` | `(patch: list) → dict` | 增删改任务（不直接写库，生成待确认变更集） |
-| `rewrite_plan` | `(content: str) → None` | 更新 plan.md（在 apply 阶段执行） |
-| `present_proposal` | `(diff: dict) → None` | 触发 LangGraph interrupt，将变更摘要推送用户审核 |
-| `apply_confirmed_change` | `() → None` | 用户确认后真正写入 DB 和 plan.md |
+| 工具 | 签名 | 阶段 | 说明 |
+|------|------|------|------|
+| `get_current_plan` | `() → str` | Gather | 读取 plan.md 全文 |
+| `get_task_stats` | `(period: str) → dict` | Gather | 查询完成率、任务分布（period: today/this_week/last_week） |
+| `get_resource_progress` | `(resource_id: int) → dict` | Gather | 某资料当前进度（completed/total units） |
+| `check_capacity` | `(start: date, end: date) → dict` | Gather | 该时间段每日剩余可用工时 |
+| `update_tasks` | `(patch: list) → dict` | Execute | 增删改任务，用户确认后真正写入 DB |
+| `rewrite_plan` | `(content: str) → None` | Execute | 更新 plan.md，用户确认后执行 |
 
-#### Scenario: 工具调用循环
-- **WHEN** LLM 决定需要更多信息
-- **THEN** LLM 调用读类工具（get_*、check_*），获得结果后继续推理，直到形成完整变更方案
+`present_proposal` 和 `apply_confirmed_change` 是 Graph 节点（Human Review 和 Execute），不是 LLM 可调工具。
 
 #### Scenario: 写操作必须经用户确认
-- **WHEN** LLM 形成变更方案后
-- **THEN** 系统 SHALL 调用 `present_proposal` 暂停流程（LangGraph interrupt），向用户展示变更摘要，等待 [确认] 或 [取消]；用户取消时不修改任何数据
+- **WHEN** Propose 节点生成变更提案后
+- **THEN** Graph 路由至 Human Review 节点（LangGraph interrupt），向用户展示变更摘要，等待 [确认] 或 [取消]；用户取消时不修改任何数据；用户确认后 Graph 路由至 Execute 节点执行写入
 
 ---
 

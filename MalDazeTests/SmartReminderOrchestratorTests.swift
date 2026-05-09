@@ -291,7 +291,7 @@ final class SmartReminderOrchestratorTests: XCTestCase {
         XCTAssertEqual(mutation.lastCreateNotes, "饭后\n#日常")
     }
 
-    func testEmptyApiKeyFallsBackToRawTitle() async {
+    func testEmptyApiKeyShowsErrorAndDoesNotCreateReminder() async {
         let gemini = MockGeminiRemindersClient()
         gemini.textToReturn = sampleJSON
         let mutation = MockReminderMutationService()
@@ -308,14 +308,12 @@ final class SmartReminderOrchestratorTests: XCTestCase {
 
         let r = await orch.run(rawUserInput: "原始整句备忘")
         XCTAssertNotNil(r)
-        XCTAssertTrue(r!.wasFallback)
-        XCTAssertEqual(r!.toastMessage, "⚡️ 存为普通备忘")
-        XCTAssertEqual(mutation.lastCreateTitle, "原始整句备忘")
-        XCTAssertNil(mutation.lastCreateDue)
-        XCTAssertNil(mutation.lastCreateAlarm)
+        XCTAssertFalse(r!.wasFallback)
+        XCTAssertEqual(r!.toastMessage, "⚡️ 请先在设置中填写 Gemini API Key")
+        XCTAssertNil(mutation.lastCreateTitle)
     }
 
-    func testGeminiFailureFallsBack() async {
+    func testGeminiFailureShowsErrorAndDoesNotCreateReminder() async {
         let gemini = MockGeminiRemindersClient()
         gemini.shouldThrow = true
         let mutation = MockReminderMutationService()
@@ -332,9 +330,9 @@ final class SmartReminderOrchestratorTests: XCTestCase {
 
         let r = await orch.run(rawUserInput: "网络会挂的句子")
         XCTAssertNotNil(r)
-        XCTAssertTrue(r!.wasFallback)
-        XCTAssertEqual(mutation.lastCreateTitle, "网络会挂的句子")
-        XCTAssertEqual(r!.toastMessage, "⚡️ 存为普通备忘")
+        XCTAssertFalse(r!.wasFallback)
+        XCTAssertNil(mutation.lastCreateTitle)
+        XCTAssertTrue(r!.toastMessage.hasPrefix("⚡️ 智能提醒请求失败："))
     }
 
     func testRunReturnsNilForWhitespaceOnly() async {

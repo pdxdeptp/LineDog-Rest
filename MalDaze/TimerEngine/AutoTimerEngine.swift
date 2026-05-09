@@ -1,10 +1,19 @@
 import Foundation
 
-/// 模式 B：每逢时钟 `:00` 与 `:30` 触发 5 分钟休息；其余时间处于等待下一锚点状态。
+/// 模式 B：每逢时钟 `:00` 与 `:30` 触发休息；其余时间处于等待下一锚点状态。
 final class AutoTimerEngine: TimerEngine {
     var onStateChange: ((TimeState) -> Void)?
 
-    private let restDuration: TimeInterval = 5 * 60
+    private var restDuration: TimeInterval
+
+    init(restDuration: TimeInterval = 5 * 60) {
+        self.restDuration = restDuration
+    }
+
+    /// 更新下一次进入休息段时的时长（当前休息窗口仍按既有 `phaseEnd` 结束）。
+    func setRestDuration(_ duration: TimeInterval) {
+        restDuration = duration
+    }
     private var tickTimer: Timer?
     private var phaseEnd: Date?
     private var isResting = false
@@ -15,6 +24,12 @@ final class AutoTimerEngine: TimerEngine {
 
     /// 是否处于整点/半点触发的休息窗口内。
     var isInScheduledRest: Bool { isResting }
+
+    /// 若处于整点/半点休息窗口内，返回距该窗口结束剩余时间；否则为 0。
+    var scheduledRestRemainingOrZero: TimeInterval {
+        guard tickTimer != nil, isResting, let end = phaseEnd else { return 0 }
+        return max(0, end.timeIntervalSinceNow)
+    }
 
     func start() {
         stop()

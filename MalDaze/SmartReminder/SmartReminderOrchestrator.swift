@@ -70,7 +70,7 @@ private enum SmartReminderAlarmRouting {
     }
 }
 
-/// LLM → EventKit 编排；失败静默降级为纯文本标题（PRD 4.3）。
+/// LLM → EventKit 编排；解析或请求失败时向用户报错，不再写入「纯标题」降级提醒。
 @MainActor
 final class SmartReminderOrchestrator {
     private let gemini: GeminiRemindersGenerating
@@ -99,8 +99,7 @@ final class SmartReminderOrchestrator {
     }
 
     /// 空输入返回 `nil`（不弹气泡）。
-    /// - Parameter uiSelectedReminderListCalendarId: 左侧已选列表 id；在 EventKit 枚举偶发为空时作最后兜底。
-    func run(rawUserInput: String, uiSelectedReminderListCalendarId: String? = nil) async -> SmartReminderRunResult? {
+    func run(rawUserInput: String) async -> SmartReminderRunResult? {
         let trimmed = rawUserInput.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
 
@@ -116,50 +115,59 @@ final class SmartReminderOrchestrator {
             listTitles: titles
         )
 
+        guard let key = apiKeyProvider(), !key.isEmpty else {
+            return SmartReminderRunResult(
+                toastMessage: "⚡️ 请先在设置中填写 Gemini API Key",
+                undoItemIdentifiers: [],
+                wasFallback: false
+            )
+        }
+
+        let userMsg = SmartReminderPromptBuilder.userMessage(rawInput: trimmed)
         var parsedList: [LLMReminderJSONPayload] = []
-        if let key = apiKeyProvider(), !key.isEmpty {
-            let userMsg = SmartReminderPromptBuilder.userMessage(rawInput: trimmed)
-            do {
-                let jsonText = try await gemini.generateStructuredReminderJSON(
-                    systemPrompt: system,
-                    userText: userMsg,
-                    apiKey: key,
-                    timeoutSeconds: timeoutSeconds
-                )
-                SmartReminderModelDebugLog.appendExchange(
-                    systemPrompt: system,
-                    userText: userMsg,
-                    modelRaw: jsonText
-                )
-                if let decoded = try? LLMReminderJSONDecoderService.decodePayloads(fromModelText: jsonText) {
-                    parsedList = decoded.filter {
-                        !$0.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                    }
+        do {
+            let jsonText = try await gemini.generateStructuredReminderJSON(
+                systemPrompt: system,
+                userText: userMsg,
+                apiKey: key,
+                timeoutSeconds: timeoutSeconds
+            )
+            SmartReminderModelDebugLog.appendExchange(
+                systemPrompt: system,
+                userText: userMsg,
+                modelRaw: jsonText
+            )
+            if let decoded = try? LLMReminderJSONDecoderService.decodePayloads(fromModelText: jsonText) {
+                parsedList = decoded.filter {
+                    !$0.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 }
-            } catch {
-                SmartReminderModelDebugLog.appendExchange(
-                    systemPrompt: system,
-                    userText: userMsg,
-                    modelRaw: "[请求失败] \(error.localizedDescription)"
-                )
             }
+        } catch {
+            SmartReminderModelDebugLog.appendExchange(
+                systemPrompt: system,
+                userText: userMsg,
+                modelRaw: "[请求失败] \(error.localizedDescription)"
+            )
+            return SmartReminderRunResult(
+                toastMessage: "⚡️ 智能提醒请求失败：\(error.localizedDescription)",
+                undoItemIdentifiers: [],
+                wasFallback: false
+            )
+        }
+
+        guard !parsedList.isEmpty else {
+            return SmartReminderRunResult(
+                toastMessage: "⚡️ 未能解析为有效提醒，请换种说法后重试",
+                undoItemIdentifiers: [],
+                wasFallback: false
+            )
         }
 
         let defaultListId = try? await mutation.defaultCalendarForNewRemindersIdentifier()
 
-        if !parsedList.isEmpty {
-            if parsedList.count == 1 {
-                if let result = await saveParsedPayload(
-                    parsedList[0],
-                    rawUserInput: trimmed,
-                    calendars: calendars,
-                    timeZone: tz,
-                    defaultNewRemindersId: defaultListId
-                ) {
-                    return result
-                }
-            } else if let result = await saveMultipleParsedPayloads(
-                parsedList,
+        if parsedList.count == 1 {
+            if let result = await saveParsedPayload(
+                parsedList[0],
                 rawUserInput: trimmed,
                 calendars: calendars,
                 timeZone: tz,
@@ -167,22 +175,19 @@ final class SmartReminderOrchestrator {
             ) {
                 return result
             }
-            // 已得到结构化 JSON 却选不到列表或 EventKit 保存失败时，不得再用整句原文当「普通备忘」冒充成功。
-            return SmartReminderRunResult(
-                toastMessage: "⚡️ 未能保存提醒（目标列表不可用或系统拒绝写入）",
-                undoItemIdentifiers: [],
-                wasFallback: true
-            )
+        } else if let result = await saveMultipleParsedPayloads(
+            parsedList,
+            rawUserInput: trimmed,
+            calendars: calendars,
+            timeZone: tz,
+            defaultNewRemindersId: defaultListId
+        ) {
+            return result
         }
-
-        var calSnapshot = calendars
-        if calSnapshot.isEmpty {
-            calSnapshot = (try? await mutation.fetchReminderCalendarsForMutation()) ?? []
-        }
-        return await saveFallback(
-            rawTitle: trimmed,
-            calendars: calSnapshot,
-            uiSelectedListCalendarId: uiSelectedReminderListCalendarId
+        return SmartReminderRunResult(
+            toastMessage: "⚡️ 未能保存提醒（目标列表不可用或系统拒绝写入）",
+            undoItemIdentifiers: [],
+            wasFallback: false
         )
     }
 
@@ -294,47 +299,6 @@ final class SmartReminderOrchestrator {
             wasFallback: false,
             inAppBells: bells
         )
-    }
-
-    private func saveFallback(
-        rawTitle: String,
-        calendars: [(String, String, Bool)],
-        uiSelectedListCalendarId: String?
-    ) async -> SmartReminderRunResult {
-        let defId =
-            (try? await mutation.defaultCalendarForNewRemindersIdentifier())
-                ?? calendars.first(where: { $0.2 })?.0
-                ?? calendars.first?.0
-                ?? uiSelectedListCalendarId
-        guard let calId = defId else {
-            return SmartReminderRunResult(
-                toastMessage: "⚡️ 未能定位提醒列表（EventKit 未返回日历）",
-                undoItemIdentifiers: [],
-                wasFallback: true
-            )
-        }
-        do {
-            let id = try await mutation.createReminder(
-                title: rawTitle,
-                notes: nil,
-                calendarIdentifier: calId,
-                dueDate: nil,
-                alarmAt: nil,
-                priority: 0,
-                recurrence: nil
-            )
-            return SmartReminderRunResult(
-                toastMessage: "⚡️ 存为普通备忘",
-                undoItemIdentifiers: [id],
-                wasFallback: true
-            )
-        } catch {
-            return SmartReminderRunResult(
-                toastMessage: "⚡️ 无法写入提醒事项",
-                undoItemIdentifiers: [],
-                wasFallback: true
-            )
-        }
     }
 
     /// 模型常误填 `Inbox`；未点名收件箱时改回 `Reminders`，与产品默认一致。

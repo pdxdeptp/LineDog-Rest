@@ -13,7 +13,7 @@ final class MockWindowManager: WindowManaging {
 
     private var pendingUserDismiss: (() -> Void)?
 
-    func dismissRestImmediately() {
+    func dismissRestImmediately(bringIdlePetWindowToFront: Bool) {
         let cb = pendingUserDismiss
         pendingUserDismiss = nil
         cb?()
@@ -63,6 +63,8 @@ final class MockWindowManager: WindowManaging {
 
     func dismissSmartReminderToast() {}
     func clearSmartReminderInputDraftIfStillMatchesSubmittedText(_ submitted: String) {}
+
+    func applyIdlePetIconSideFromUserDefaults() {}
 
     /// 对应真实流程里休息动画结束、`finishRestCycle` 调用用户传入的 `onDismissed`。
     func testing_simulateRestPresentationFinished() {

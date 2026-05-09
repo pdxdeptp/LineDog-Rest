@@ -38,8 +38,14 @@ final class PetStageView: NSView {
     /// 非休息时的配色（由 `WindowManager` 与「开始专注 / 停止计时」同步）。
     private var nonRestDisplayMode: PetDisplayMode = .runningBlack
 
-    private static let idlePetSide: CGFloat = 120
+    /// 常态桌宠图标目标边长（pt），与 `MalDazeDefaults.idlePetIconSidePoints` 同步；影响绘制与 `petHitRect`。
+    var idlePetIconSidePoints: CGFloat = 120 {
+        didSet { needsLayout = true }
+    }
+
     private static let edgeMargin: CGFloat = 16
+    /// 常态命中区相对 `PetRenderer` 图像框边长的比例。GIF 在框内按比例缩放，四周透明仍占满框，全框可点会感觉比「看见的狗」大一圈。
+    private static let idlePetHitRectSideFactor: CGFloat = 0.6
 
     /// 非 nil 时：常态小窗整块可点；休息全屏时仅 `petHitRect` 可点：单击（略晚于系统双击间隔后）打开菜单，**双击**结束休息。
     weak var deskMenuPresenter: PetStageDeskMenuPresenter?
@@ -449,7 +455,7 @@ final class PetStageView: NSView {
     }
 
     private func petCornerCenter(in b: NSRect) -> CGPoint {
-        let side = Self.idlePetSide
+        let side = idlePetIconSidePoints
         let m = Self.edgeMargin
         let fallback = CGPoint(x: b.maxX - m - side / 2, y: b.minY + m + side / 2)
         guard let win = window,
@@ -491,18 +497,29 @@ final class PetStageView: NSView {
         let scale: CGFloat
         let base = min(b.width, b.height) * 0.22
         if b.width < 400 {
-            // 常态小窗：桌宠居中，点击区域与视觉图标大小一致。
+            // 常态小窗：与 `PetRenderer.layoutPet` 同一 center / scale；命中区略小于图像框，对齐肉眼主体。
             center = CGPoint(x: b.midX, y: b.midY)
-            scale = Self.idlePetSide / max(base, 1)
-            let hitSide: CGFloat = 65
-            let half = hitSide / 2
-            petHitRect = NSRect(x: center.x - half, y: center.y - half,
-                                width: hitSide, height: hitSide)
+            scale = idlePetIconSidePoints / max(base, 1)
+            let layoutSide = base * scale
+            let hitSide = layoutSide * Self.idlePetHitRectSideFactor
+            petHitRect = NSRect(
+                x: center.x - hitSide / 2,
+                y: center.y - hitSide / 2,
+                width: hitSide,
+                height: hitSide
+            )
         } else {
             // 兜底：若窗框异常偏大仍按「全屏右下角」算（不应在常态出现）。
             center = petCornerCenter(in: b)
-            scale = Self.idlePetSide / max(base, 1)
-            petHitRect = Self.petHitRect(center: center, scale: scale, in: b, hitPadding: 16)
+            scale = idlePetIconSidePoints / max(base, 1)
+            let layoutSide = base * scale
+            let hitSide = layoutSide * Self.idlePetHitRectSideFactor
+            petHitRect = NSRect(
+                x: center.x - hitSide / 2,
+                y: center.y - hitSide / 2,
+                width: hitSide,
+                height: hitSide
+            )
         }
         pet.layoutPet(in: b, visualCenter: center, scale: scale)
         idlePetVisualCenter = center
@@ -561,7 +578,7 @@ final class PetStageView: NSView {
         )
         let base = min(b.width, b.height) * 0.22
         // 用边长插值：黑狗在常态下的像素边长 → 全屏目标边长；避免「小窗 scale 数值」直接套在全屏 base 上变成从大到小。
-        let startSide = restArcStartPetSide ?? Self.idlePetSide
+        let startSide = restArcStartPetSide ?? idlePetIconSidePoints
         let nominalEndSide = base * 1.15
         let endSide = max(nominalEndSide, startSide * 1.02)
         let side = startSide + (endSide - startSide) * p

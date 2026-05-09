@@ -108,17 +108,32 @@ START → Plan → Gather → Propose ──→ Human Review → Execute → END
 
 ---
 
-### 决策 5：Morning Agent 触发 — macOS LaunchAgent
+### 决策 5：Morning Agent 触发 — Swift spawn（Option B + 端口检测）
 
-**选择**：`~/Library/LaunchAgents/` 中注册 plist，`RunAtLoad` + `StartCalendarInterval` 每天首次登录时调用后端 `/morning-briefing` 端点；后端同时检查 `pending_weekly_review` flag。
+> **[实施后修订 2026-05-08]** 原设计选 Option C（双 LaunchAgent），实施后评估认为 LaunchAgent 在高频开发期间干扰严重（KeepAlive 会不断重启被 kill 的进程），且生产期桌宠基本常开，Option B 已足够。改为 Option B 并加端口检测。
 
-**备选方案放弃原因**：Swift AppDelegate `applicationDidFinishLaunching` — 仅在 App 启动时触发，用户可能打开电脑但不点桌宠；`NSWorkspace` wake notification — 每次唤醒屏幕都触发，一天可能触发十几次。LaunchAgent 由系统管理，一天精确一次。
+**当前实现**：`MalDaze/LearningAssistant/BackendProcessManager.swift`
+- `applicationDidFinishLaunching` 时：TCP 探测 127.0.0.1:8765（0.5s 超时）
+  - 端口已占用（手动 uvicorn 开发模式）→ 不介入，退出时也不 kill
+  - 端口空闲 → spawn `.venv/bin/uvicorn`，退出时 kill
+- Morning Agent 定时触发：APScheduler 在后端进程内每天 8:00 执行，同时后端启动时检查 events 表补触发当日漏跑的 briefing
+
+**理由**：生产期桌宠基本常开（开机自启），后端生命周期与桌宠绑定足够可靠。端口检测解决了开发期手动 uvicorn 与桌宠并存的冲突问题。
+
+**原 Option C 脚本保留**（`scripts/com.maldaze.backend.plist` 等）但不安装，作备选。
+
+**备选方案放弃原因**：
+- Option A（单 LaunchAgent 兼管两件事）：morning call 时机难以精确，需要轮询等 FastAPI 就绪
+- Option C（双 LaunchAgent）：开发期 KeepAlive 与手动开发服务器冲突，需频繁 launchctl unload/load
+- Swift AppDelegate 无端口检测：开发时手动 uvicorn 与 App spawn 冲突，导致端口占用报错
 
 ---
 
-### 决策 6：Weekly Review 离线补偿
+### 决策 6：Weekly Review 离线补偿 — events 表查询，不使用 flag
 
-**选择**：APScheduler 于周日 20:00 尝试触发；若后端未运行，写入 `system_state` 的 `pending_weekly_review = true`。每次 Morning Agent 启动时检查该 flag，若为 true 则先运行 Weekly Review Graph，完成后清除 flag。
+**选择**：APScheduler 于周日 20:00 尝试触发。若后端未运行（APScheduler 不在），不写任何 flag——因为 APScheduler 进程本身不存在，无法执行写入。离线补偿改由 Morning Agent 主动检测：每次启动时查询 events 表，若上周日（最近一个周日日期）不存在 `event_type = 'weekly_review_done'` 记录，则优先执行 Weekly Review 子图再继续今日流程。
+
+**理由**：APScheduler 运行在 FastAPI 进程内，后端离线时它无法执行任何操作，写 flag 的逻辑本身就不可能运行。以 events 表作为真相来源更正确：`weekly_review_done` 存在 = 复盘已完成，不存在 = 需要补触发。这个机制同时处理了"后端离线"和"用户取消复盘"两种情况。
 
 ---
 
