@@ -1,6 +1,6 @@
 # 学习助手 — 新用户验收汇报
 
-> 执行日期：2026-05-09 | 后端版本：main 分支当前
+> 执行日期：2026-05-09 | 后端版本：main 分支当前 | 前端补充验证：2026-05-09
 
 ---
 
@@ -109,13 +109,59 @@ POST /api/chat/confirm {"confirmed":true}
 
 ---
 
-## 下一步
+---
 
-按优先级排序：
+## 前端补充验证发现的 Bug（3 个，已修复）
 
-1. **立即修复：** Bug 3（对话无文字回复）— 核心交互功能缺失，用户无法使用对话功能
-2. **人工确认：** 前端空状态（0-3）、前端任务列表显示（2-3）、前端"助手离线"提示（5-1）
-3. **UX 优化（非阻断）：** 无效 URL 时给出更友好的错误提示，而非返回以 URL 为名的草稿
+> 背景：后端 curl 测试 19/19 PASS 后，用户从 Swift 前端实际操作，点击「分析」按钮后
+> 2 秒内跳出「助手已离线」。curl 验证不覆盖客户端 JSON 解码路径。
+
+### Bug A：前端 IngestionDraft 模型不匹配 🔴（已修复）
+
+**现象：** 点击「分析」按钮约 2 秒后立即显示「助手已离线」。
+
+**根因：** `IngestionDraft.draft` 类型为 `String`，但后端实际返回 JSON 对象。
+`AssistantAPIClient.decode()` 将所有 `JSONDecoder` 错误归一转换为 `AssistantOfflineError`，导致解码失败被误判为离线。
+
+**修复：**
+- 新增 `IngestionDraftDetail` 结构体（`resourceTitle`, `resourceType`, `totalEstimatedHours`, `unitCount`, `optionA`, `optionB`）
+- `IngestionDraft.draft` 类型从 `String` 改为 `IngestionDraftDetail`
+- `ChatResponse.response` 从 `String` 改为 `String?`（后端返回 proposal 时 response 为 null）
+- 新增 `ChatProposal` 结构体取代原来的 `String?` proposal 字段
+
+**影响文件：** `MalDaze/LearningAssistant/AssistantAPIClient.swift`
+
+---
+
+### Bug B：前端请求超时（LLM 调用）🔴（已修复）
+
+**现象：** LLM 推理耗时 30-60 秒，但 `URLSession` 超时设置仅 8 秒，必然超时。
+
+**修复：** `timeoutIntervalForRequest` 从 8s → 120s；`timeoutIntervalForResource` 从 15s → 300s。
+
+**影响文件：** `MalDaze/LearningAssistant/AssistantAPIClient.swift`
+
+---
+
+### Bug C：前端草稿展示仍为原始字符串 🟡（已修复）
+
+**现象：** 即使解码成功，草稿区也只显示原始字符串，用户无法区分方案 A/B。
+
+**修复：**
+- `LearningAssistantViewModel.ingestionDraft` 类型从 `String?` 改为 `IngestionDraftDetail?`
+- `IngestionView.draftSection` 改为结构化展示：资料名、集数/章节数、估算工时
+- 新增方案 A（填空档）/ B（均匀铺开）选择器，`selectedOption` 随确认写入传给后端
+
+**影响文件：** `MalDaze/LearningAssistant/IngestionView.swift`, `LearningAssistantViewModel.swift`
+
+---
+
+## 下一步（待人工验证）
+
+1. **端到端前端验证：** 启动 App，输入 Bilibili/GitHub URL，点击「分析」—— 应正确展示草稿（资料名 + 方案选择器），不再出现「助手已离线」
+2. **方案选择验证：** 选择方案 B，确认写入，验证 DB 中 tasks 按均匀铺开排列
+3. **对话前端验证：** 输入「今天有什么任务」，验证对话框有文字回复
+4. **UX 优化（非阻断）：** 无效 URL 时给出更友好的错误提示，而非返回以 URL 为名的草稿
 
 ---
 
