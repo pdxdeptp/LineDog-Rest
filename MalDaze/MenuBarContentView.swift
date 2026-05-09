@@ -1,28 +1,8 @@
 import AppKit
 import SwiftUI
 
-// MARK: - 桌宠浮动面板 vs 菜单栏：仅桌宠场景绘制底部指向标
-
-enum MalDazeDeskMenuPresentation: Equatable {
-    /// `MenuBarExtra` 等系统容器自带外观，不画小角。
-    case menuBarExtra
-    /// 桌宠旁独立浮动窗：底部右侧小三角指向桌宠。
-    case deskPetFloatingPanel
-}
-
-private struct MalDazeDeskMenuPresentationKey: EnvironmentKey {
-    static let defaultValue: MalDazeDeskMenuPresentation = .menuBarExtra
-}
-
-extension EnvironmentValues {
-    var maldazeDeskMenuPresentation: MalDazeDeskMenuPresentation {
-        get { self[MalDazeDeskMenuPresentationKey.self] }
-        set { self[MalDazeDeskMenuPresentationKey.self] = newValue }
-    }
-}
-
 extension MenuBarContentView {
-    static var deskPetPanelContentSize: NSSize {
+    static var controlPanelPreferredContentSize: NSSize {
         NSSize(width: 300 + 280 + 300 + 3 * 24, height: 556)
     }
 }
@@ -50,8 +30,6 @@ private struct CardGroupBoxStyle: GroupBoxStyle {
 struct MenuBarContentView: View {
     @ObservedObject var viewModel: AppViewModel
 
-    @Environment(\.maldazeDeskMenuPresentation) private var deskMenuPresentation
-
     @AppStorage(MalDazeDefaults.sevenMinuteReminderDurationMinutes) private var sevenMinuteMinutesStored = 7
     @AppStorage(MalDazeDefaults.hydrationReminderIntervalMinutes) private var hydrationIntervalStored = 90
     @AppStorage(MalDazeDefaults.hydrationQuietHoursEnabled) private var hydrationQuietHoursEnabled = false
@@ -64,8 +42,6 @@ struct MenuBarContentView: View {
 
     @AppStorage(MalDazeDefaults.pomodoroWorkDurationMinutes) private var pomodoroWorkMinutesStored = 25
     @AppStorage(MalDazeDefaults.pomodoroRestDurationMinutes) private var pomodoroRestMinutesStored = 5
-
-    @AppStorage(MalDazeDefaults.idlePetIconSidePoints) private var idlePetIconSideStored = MalDazeDefaults.idlePetIconSideDefault
 
     private var deskReminders: DeskRemindersModel { viewModel.deskReminders }
 
@@ -246,22 +222,6 @@ struct MenuBarContentView: View {
         .padding(.bottom, MainPanelHeaderLayout.paddingBottom)
     }
 
-    /// 仅桌宠浮动面板：调整常态图标边长（与透明小窗、点击命中区同步）。
-    private var deskPetIconSizeSection: some View {
-        GroupBox {
-            Stepper(value: $idlePetIconSideStored, in: MalDazeDefaults.idlePetIconSideMin...MalDazeDefaults.idlePetIconSideMax, step: 4) {
-                Text("桌宠图标边长：\(idlePetIconSideStored) pt")
-                    .font(.subheadline)
-            }
-            .help("调大后桌宠更清晰，透明窗口与可点击区域会一起变大。")
-            .onChange(of: idlePetIconSideStored) { _ in
-                scheduleViewModelWork { viewModel.applyIdlePetIconSideFromUserDefaults() }
-            }
-        } label: {
-            Label("桌宠外观", systemImage: "pawprint")
-        }
-    }
-
     @ViewBuilder
     private func deskReminderRow(_ item: ReminderDisplayItem) -> some View {
         let timeText = DeskReminderTimeFormatter.timeOnly(dueDate: item.dueDate, hasExplicitTime: item.hasExplicitTime)
@@ -429,10 +389,6 @@ struct MenuBarContentView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
                 mainPanelHeader
-
-                if deskMenuPresentation == .deskPetFloatingPanel {
-                    deskPetIconSizeSection
-                }
 
                 statusChip
 

@@ -21,6 +21,7 @@ struct MalDazeSettingsView: View {
     @AppStorage(MalDazeDefaults.deskPetMenuShortcutKeyCode) private var deskKeyCode: Int = Int(DeskPetMenuShortcut.defaultKeyCode)
     @AppStorage(MalDazeDefaults.deskPetMenuShortcutModifiers) private var deskModifiersRaw: Int = DeskPetMenuShortcut.defaultModifiersStorageInt
     @AppStorage(MalDazeDefaults.deskPetMenuShortcutKeyLabel) private var deskKeyLabel: String = DeskPetMenuShortcut.default.keyLabel
+    @AppStorage(MalDazeDefaults.idlePetIconSidePoints) private var idlePetIconSideStored = MalDazeDefaults.idlePetIconSideDefault
 
     @AppStorage(MalDazeDefaults.sevenMinuteReminderShortcutKeyCode) private var sevenKeyCode: Int = Int(SevenMinuteReminderShortcut.defaultKeyCode)
     @AppStorage(MalDazeDefaults.sevenMinuteReminderShortcutModifiers) private var sevenModifiersRaw: Int = SevenMinuteReminderShortcut.defaultModifiersStorageInt
@@ -198,6 +199,17 @@ struct MalDazeSettingsView: View {
             }
 
             Section {
+                Stepper(value: $idlePetIconSideStored, in: MalDazeDefaults.idlePetIconSideMin...MalDazeDefaults.idlePetIconSideMax, step: 4) {
+                    Text("桌宠图标边长：\(idlePetIconSideStored) pt")
+                }
+                .help("调大后桌宠更清晰，透明窗口与可点击区域会一起变大。")
+                .onChange(of: idlePetIconSideStored) { _ in
+                    NotificationCenter.default.post(
+                        name: MalDazeBroadcastNotifications.idlePetIconSidePointsChanged,
+                        object: nil
+                    )
+                }
+
                 HStack(alignment: .firstTextBaseline, spacing: 12) {
                     Text(resetPetShortcutModel.displayString)
                         .font(.system(.body, design: .monospaced))

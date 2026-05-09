@@ -85,6 +85,7 @@ final class AppViewModel: ObservableObject {
     private var deskPetMenuShortcutObserver: NSObjectProtocol?
     private var sevenMinuteShortcutObserver: NSObjectProtocol?
     private var resetIdlePetShortcutObserver: NSObjectProtocol?
+    private var idlePetIconSidePointsObserver: NSObjectProtocol?
     /// 智能提醒写入的 `EKAlarm` 到点后弹出与 7 分钟倒计时相同的中央铃铛。
     private var smartReminderBellTasks: [String: Task<Void, Never>] = [:]
 
@@ -215,6 +216,14 @@ final class AppViewModel: ObservableObject {
         ) { [weak self] _ in
             self?.resetIdlePetPositionFromUserAction()
         }
+
+        idlePetIconSidePointsObserver = NotificationCenter.default.addObserver(
+            forName: MalDazeBroadcastNotifications.idlePetIconSidePointsChanged,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.applyIdlePetIconSideFromUserDefaults()
+        }
     }
 
     /// 从 `UserDefaults` 同步番茄工作/休息时长到两个引擎（面板 Stepper 与设置改动后调用）。
@@ -246,6 +255,9 @@ final class AppViewModel: ObservableObject {
         }
         if let resetIdlePetShortcutObserver {
             NotificationCenter.default.removeObserver(resetIdlePetShortcutObserver)
+        }
+        if let idlePetIconSidePointsObserver {
+            NotificationCenter.default.removeObserver(idlePetIconSidePointsObserver)
         }
     }
 

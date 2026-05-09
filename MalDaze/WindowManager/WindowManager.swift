@@ -104,17 +104,13 @@ final class WindowManager: WindowManaging {
     private var window: NSWindow?
     private var stageView: PetStageView?
     private weak var deskMenuViewModel: AppViewModel?
-    /// 桌宠旁浮动控制面板（非 `NSPopover`：可右对齐锚点并在 SwiftUI 内自绘底部小三角）。
-    private var deskMenuPanel: NSPanel?
-    private var deskMenuHosting: NSHostingController<AnyView>?
+    /// 桌宠旁浮动控制面板（NSPopover，与 MenuBarExtra 共享系统外观）。
+    private var deskMenuPopover: NSPopover?
     /// Custom transient-dismiss monitor（原 `.transient` Popover 行为）。
     private var transientMonitor: Any?
     /// 桌宠浮动菜单：Esc 关闭（与 `SmartReminder` 输入框的 Esc 监听同理，用本地监视器吃掉按键避免系统咚声）。
     private var deskMenuEscMonitor: Any?
     private var dismissObservers: [NSObjectProtocol] = []
-    /// 启动后对 `deskMenuPanel` 做一次静默预热（alpha=0），提前触发 SwiftUI 首次 layout。
-    private var isPrewarming = false
-    private var prewarmCloseWorkItem: DispatchWorkItem?
     private var pendingDismiss: (() -> Void)?
     private var screenObserver: NSObjectProtocol?
     private var primaryDisplayObserver: NSObjectProtocol?
@@ -188,7 +184,6 @@ final class WindowManager: WindowManaging {
         idleCursorTrackTimer?.invalidate()
         breakRunCountdownTimer?.invalidate()
         breakRunShieldWorkItem?.cancel()
-        prewarmCloseWorkItem?.cancel()
         breakRunShieldWindow?.orderOut(nil)
         breakRunCountdownPanel?.orderOut(nil)
         if let launchObserver {
@@ -380,21 +375,15 @@ final class WindowManager: WindowManaging {
     func bindDeskPetMenu(viewModel: AppViewModel?) {
         deskMenuViewModel = viewModel
         tearDownPopoverDismissMonitor()
-        deskMenuPanel?.orderOut(nil)
-        deskMenuPanel = nil
-        deskMenuHosting = nil
+        deskMenuPopover?.close()
+        deskMenuPopover = nil
         if let v = stageView {
             wireDeskPetCallbacks(into: v)
         }
         if viewModel != nil {
-            _ = makeDeskMenuPanelIfNeeded()
+            _ = makeDeskMenuPopoverIfNeeded()
         }
         applyMousePolicy()
-        if deskMenuPanel != nil {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
-                self?.prewarmDeskMenuIfNeeded()
-            }
-        }
     }
 
     private func wireDeskPetCallbacks(into v: PetStageView) {
@@ -1039,159 +1028,47 @@ extension WindowManager: PetStageDeskMenuPresenter {
         vm.userRequestedSmartReminderInput(screenAnchor: screenAnchor)
     }
 
-    /// 创建或复用桌宠旁浮动面板（`NSPanel` + `MenuBarContentView`）。
-    private func makeDeskMenuPanelIfNeeded() -> NSPanel? {
+    private func makeDeskPetControlPanelRootView(viewModel vm: AppViewModel) -> AnyView {
+        AnyView(MenuBarContentView(viewModel: vm))
+    }
+
+    /// 创建或复用桌宠旁浮动菜单（`NSPopover` + `MenuBarContentView`）。
+    /// NSPopover 与 MenuBarExtra 共享系统外观，外观（颜色/圆角/阴影）完全一致。
+    private func makeDeskMenuPopoverIfNeeded() -> NSPopover? {
         guard let vm = deskMenuViewModel else { return nil }
-        if let existing = deskMenuPanel { return existing }
+        if let existing = deskMenuPopover { return existing }
 
-        let size = MenuBarContentView.deskPetPanelContentSize
-        let panel = NSPanel(
-            contentRect: NSRect(origin: .zero, size: size),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
+        let popover = NSPopover()
+        popover.contentSize = MenuBarContentView.controlPanelPreferredContentSize
+        popover.behavior = .applicationDefined
+        popover.animates = true
+        popover.contentViewController = NSHostingController(
+            rootView: makeDeskPetControlPanelRootView(viewModel: vm)
         )
-        panel.isFloatingPanel = true
-        panel.level = .floating
-        panel.backgroundColor = .clear
-        panel.isOpaque = false
-        panel.hasShadow = true
-        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        panel.hidesOnDeactivate = false
-        panel.isMovableByWindowBackground = false
 
-        // 与 MenuBarExtra 同款：NSVisualEffectView(.popover) 提供系统级毛玻璃背景与圆角，
-        // 取代原先在 SwiftUI 层手绘的 RoundedRectangle + .regularMaterial。
-        let effectView = NSVisualEffectView(frame: NSRect(origin: .zero, size: size))
-        effectView.material = .popover
-        effectView.blendingMode = .behindWindow
-        effectView.state = .active
-        effectView.wantsLayer = true
-        effectView.layer?.cornerRadius = 12
-        effectView.layer?.masksToBounds = true
-        panel.contentView = effectView
-
-        let host = NSHostingController(
-            rootView: AnyView(
-                MenuBarContentView(viewModel: vm)
-                    .environment(\.maldazeDeskMenuPresentation, .deskPetFloatingPanel)
-            )
-        )
-        host.view.translatesAutoresizingMaskIntoConstraints = true
-        host.view.frame = effectView.bounds
-        host.view.autoresizingMask = [.width, .height]
-        effectView.addSubview(host.view)
-        panel.setContentSize(size)
-
-        deskMenuPanel = panel
-        deskMenuHosting = host
-        return panel
+        deskMenuPopover = popover
+        return popover
     }
 
-    /// 右对齐桌宠锚点：面板右缘贴近锚区右缘，避免系统 Popover 箭头落在第 2、3 栏之间。
-    private func deskMenuPanelFrame(anchorScreen: NSRect) -> NSRect {
-        let size = MenuBarContentView.deskPetPanelContentSize
-        let screen = NSScreen.screens.first(where: { NSIntersectsRect($0.frame, anchorScreen) }) ?? NSScreen.main!
-        let vf = screen.visibleFrame
-        let gap: CGFloat = 6
-        var originX = anchorScreen.maxX - size.width
-        originX = min(originX, vf.maxX - size.width - 4)
-        originX = max(originX, vf.minX + 4)
-        let originY = anchorScreen.maxY + gap
-        return NSRect(x: originX, y: originY, width: size.width, height: size.height)
-    }
-
-    /// 立即收起桌宠菜单（无动画）；保留 `deskMenuPanel` 实例供复用。
+    /// 立即收起桌宠菜单（无动画）；保留 `deskMenuPopover` 实例供复用。
     private func closeDeskMenuImmediate() {
         tearDownPopoverDismissMonitor()
-        deskMenuPanel?.orderOut(nil)
-        deskMenuPanel?.alphaValue = 1
-        deskMenuPanel?.ignoresMouseEvents = false
-    }
-
-    /// 启动后悄悄 `orderFront` 一次浮动面板（alpha=0，ignoresMouseEvents=true），
-    /// 触发 SwiftUI 首次 layout，使用户第一次点击桌宠时面板能瞬间出现。
-    ///
-    /// - 预热窗口完全透明且不拦截鼠标，用户不会察觉。
-    /// - 0.4s 后自动关闭；用户若在预热期间点击，由 `presentDeskMenu` 中止预热并立即展示面板。
-    private func prewarmDeskMenuIfNeeded() {
-        guard !isPrewarming,
-              let panel = makeDeskMenuPanelIfNeeded(),
-              let stage = stageView,
-              !panel.isVisible else { return }
-
-        isPrewarming = true
-        guard let petWin = stage.window else {
-            isPrewarming = false
-            return
-        }
-        let anchor = petWin.convertToScreen(stage.deskMenuShortcutAnchorRect)
-        let frame = deskMenuPanelFrame(anchorScreen: anchor)
-        panel.alphaValue = 0
-        panel.ignoresMouseEvents = true
-        panel.setFrame(frame, display: false)
-        panel.orderFrontRegardless()
-
-        let item = DispatchWorkItem { [weak self] in
-            guard let self, self.isPrewarming else { return }
-            self.isPrewarming = false
-            self.prewarmCloseWorkItem = nil
-            if let panel = self.deskMenuPanel {
-                panel.ignoresMouseEvents = false
-                panel.orderOut(nil)
-                panel.alphaValue = 1
-            }
-        }
-        prewarmCloseWorkItem = item
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: item)
+        deskMenuPopover?.close()
     }
 
     func presentDeskMenu(from stage: PetStageView, anchorRect: NSRect) {
-        guard let vm = deskMenuViewModel else { return }
-        guard let panel = makeDeskMenuPanelIfNeeded() else { return }
+        guard deskMenuViewModel != nil else { return }
+        guard let popover = makeDeskMenuPopoverIfNeeded() else { return }
 
-        if let host = deskMenuHosting {
-            host.rootView = AnyView(
-                MenuBarContentView(viewModel: vm)
-                    .environment(\.maldazeDeskMenuPresentation, .deskPetFloatingPanel)
-            )
+        if popover.isShown {
+            closeDeskMenuPopover()
+            return
         }
 
-        if panel.isVisible {
-            if isPrewarming {
-                prewarmCloseWorkItem?.cancel()
-                prewarmCloseWorkItem = nil
-                isPrewarming = false
-                panel.ignoresMouseEvents = false
-                panel.orderOut(nil)
-                panel.alphaValue = 1
-            } else {
-                closeDeskMenuPanelWithFade()
-                return
-            }
-        }
-
-        let capturedAnchor = anchorRect
-        DispatchQueue.main.async { [weak self, weak panel, weak stage] in
-            guard let self, let panel, !panel.isVisible, let stage, let petWin = stage.window else { return }
+        DispatchQueue.main.async { [weak self, weak stage, weak popover] in
+            guard let self, let stage, let popover, !popover.isShown else { return }
             NSApp.activate(ignoringOtherApps: true)
-            let screenAnchor = petWin.convertToScreen(capturedAnchor)
-            let frame = self.deskMenuPanelFrame(anchorScreen: screenAnchor)
-            panel.setFrame(frame, display: true)
-            panel.ignoresMouseEvents = false
-            panel.alphaValue = 0
-            panel.orderFrontRegardless()
-            NSAnimationContext.runAnimationGroup { ctx in
-                ctx.duration = 0.14
-                ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
-                panel.animator().alphaValue = 1
-            }
-            if let host = self.deskMenuHosting, let vm = self.deskMenuViewModel {
-                host.rootView = AnyView(
-                    MenuBarContentView(viewModel: vm)
-                        .environment(\.maldazeDeskMenuPresentation, .deskPetFloatingPanel)
-                )
-            }
+            popover.show(relativeTo: anchorRect, of: stage, preferredEdge: .maxY)
             self.installPopoverDismissMonitor()
         }
     }
@@ -1202,8 +1079,8 @@ extension WindowManager: PetStageDeskMenuPresenter {
     ///
     /// 使用自定义监视器的原因：
     /// 1. acceptsFirstMouse + App 非 frontmost 时的首次点击会产生系统级 App Activation Event，
-    ///    内置 transient 监视器会把该事件误判为「外部点击」而立即关闭面板。
-    /// 2. petHitRect 在几何上位于面板窗口之外，会把每次点击宠物都判定为「外部点击」，
+    ///    内置 transient 监视器会把该事件误判为「外部点击」而立即关闭 popover。
+    /// 2. petHitRect 在几何上位于 popover 窗口之外，会把每次点击宠物都判定为「外部点击」，
     ///    导致 toggle 逻辑失效。
     private func installPopoverDismissMonitor() {
         tearDownPopoverDismissMonitor()
@@ -1211,23 +1088,24 @@ extension WindowManager: PetStageDeskMenuPresenter {
         transientMonitor = NSEvent.addGlobalMonitorForEvents(
             matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]
         ) { [weak self] _ in
-            guard let self, let panel = self.deskMenuPanel, panel.isVisible else {
+            guard let self, let popover = self.deskMenuPopover, popover.isShown else {
                 self?.tearDownPopoverDismissMonitor()
                 return
             }
-            if panel.frame.contains(NSEvent.mouseLocation) {
+            if let popoverWindow = popover.contentViewController?.view.window,
+               popoverWindow.frame.contains(NSEvent.mouseLocation) {
                 return
             }
-            self.closeDeskMenuPanelWithFade()
+            self.closeDeskMenuPopover()
         }
 
         deskMenuEscMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self else { return event }
             guard event.keyCode == 53 else { return event }
-            guard let panel = self.deskMenuPanel, panel.isVisible else { return event }
+            guard let popover = self.deskMenuPopover, popover.isShown else { return event }
             // 智能输入面板自己处理 Esc；避免抢它的取消语义。
             guard self.smartInputPanel == nil else { return event }
-            self.closeDeskMenuPanelWithFade()
+            self.closeDeskMenuPopover()
             return nil
         }
 
@@ -1236,7 +1114,7 @@ extension WindowManager: PetStageDeskMenuPresenter {
             forName: NSApplication.didResignActiveNotification,
             object: nil, queue: .main
         ) { [weak self] _ in
-            self?.closeDeskMenuPanelWithFade()
+            self?.closeDeskMenuPopover()
         })
     }
 
@@ -1253,17 +1131,9 @@ extension WindowManager: PetStageDeskMenuPresenter {
         dismissObservers = []
     }
 
-    /// 淡出后收起面板。
-    private func closeDeskMenuPanelWithFade() {
+    /// 收起 popover（NSPopover 自带淡出动画）。
+    private func closeDeskMenuPopover() {
         tearDownPopoverDismissMonitor()
-        guard let panel = deskMenuPanel, panel.isVisible else { return }
-        NSAnimationContext.runAnimationGroup({ ctx in
-            ctx.duration = 0.10
-            ctx.timingFunction = CAMediaTimingFunction(name: .easeIn)
-            panel.animator().alphaValue = 0
-        }, completionHandler: {
-            panel.orderOut(nil)
-            panel.alphaValue = 1
-        })
+        deskMenuPopover?.close()
     }
 }

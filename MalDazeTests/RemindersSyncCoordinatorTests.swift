@@ -49,13 +49,40 @@ final class RemindersSyncCoordinatorTests: XCTestCase {
         await c.reloadFromEventKit()
         XCTAssertEqual(mock.fetchCallCount, 1)
 
+        let debouncedReload = expectation(description: "Debounced external changes should trigger exactly one reload")
+        debouncedReload.expectedFulfillmentCount = 1
+        debouncedReload.assertForOverFulfill = true
+        let extraReload = expectation(description: "Rapid external changes should not trigger extra reloads")
+        extraReload.isInverted = true
+        var observedDebouncedReloads = 0
+        c.onItemsChanged = { _ in
+            observedDebouncedReloads += 1
+            debouncedReload.fulfill()
+            if observedDebouncedReloads > 1 {
+                extraReload.fulfill()
+            }
+        }
+
         c.scheduleReloadFromExternalChange()
         c.scheduleReloadFromExternalChange()
         c.scheduleReloadFromExternalChange()
         XCTAssertEqual(mock.fetchCallCount, 1)
 
-        try? await Task.sleep(nanoseconds: 90_000_000)
-        XCTAssertEqual(mock.fetchCallCount, 2)
+        await fulfillment(
+            of: [debouncedReload],
+            timeout: 1,
+            enforceOrder: true
+        )
+        await fulfillment(
+            of: [extraReload],
+            timeout: 0.15,
+            enforceOrder: true
+        )
+        XCTAssertEqual(
+            mock.fetchCallCount,
+            2,
+            "Expected initial fetch plus one debounced reload after rapid external change signals."
+        )
     }
 
     func testOptimisticComplete_removesItemBeforeAsyncSaveFinishes() async {

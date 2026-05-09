@@ -67,6 +67,7 @@
 		A306 /* SmartReminderNotesComposerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B306 /* SmartReminderNotesComposerTests.swift */; };
 		A307 /* DeskReminderTimeFormatterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B307 /* DeskReminderTimeFormatterTests.swift */; };
 		A308 /* DeskReminderSidebarMergerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B308 /* DeskReminderSidebarMergerTests.swift */; };
+		A309 /* ControlPanelPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B309 /* ControlPanelPresentationTests.swift */; };
 		A401 /* AssistantAPIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B401 /* AssistantAPIClient.swift */; };
 		A402 /* LearningAssistantViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B402 /* LearningAssistantViewModel.swift */; };
 		A403 /* AssistantPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B403 /* AssistantPanelView.swift */; };
@@ -146,6 +147,7 @@
 		B306 /* SmartReminderNotesComposerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartReminderNotesComposerTests.swift; sourceTree = "<group>"; };
 		B307 /* DeskReminderTimeFormatterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeskReminderTimeFormatterTests.swift; sourceTree = "<group>"; };
 		B308 /* DeskReminderSidebarMergerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeskReminderSidebarMergerTests.swift; sourceTree = "<group>"; };
+		B309 /* ControlPanelPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlPanelPresentationTests.swift; sourceTree = "<group>"; };
 		C200 /* MalDaze.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MalDaze.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C301 /* MalDazeTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MalDazeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B235 /* Carbon.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Carbon.framework; path = System/Library/Frameworks/Carbon.framework; sourceTree = SDKROOT; };
@@ -272,6 +274,7 @@
 				B306 /* SmartReminderNotesComposerTests.swift */,
 				B307 /* DeskReminderTimeFormatterTests.swift */,
 				B308 /* DeskReminderSidebarMergerTests.swift */,
+				B309 /* ControlPanelPresentationTests.swift */,
 			);
 			path = MalDazeTests;
 			sourceTree = "<group>";
@@ -522,6 +525,7 @@
 				A306 /* SmartReminderNotesComposerTests.swift in Sources */,
 				A307 /* DeskReminderTimeFormatterTests.swift in Sources */,
 				A308 /* DeskReminderSidebarMergerTests.swift in Sources */,
+				A309 /* ControlPanelPresentationTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

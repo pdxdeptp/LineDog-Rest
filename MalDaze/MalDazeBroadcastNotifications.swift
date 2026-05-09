@@ -11,6 +11,8 @@ enum MalDazeBroadcastNotifications {
     static let toggleSevenMinuteReminder = Notification.Name("com.maldaze.toggleSevenMinuteReminder")
     /// 全局快捷键：常态桌宠窗回到菜单栏屏可见区右下角并持久化（休息霸屏中忽略）。
     static let resetIdlePetPositionToDefault = Notification.Name("com.maldaze.resetIdlePetPositionToDefault")
+    /// 设置页调整常态桌宠图标边长后投递；运行中的 `AppViewModel` 负责同步到窗口。
+    static let idlePetIconSidePointsChanged = Notification.Name("com.maldaze.idlePetIconSidePointsChanged")
     /// `userInfo` 中为 `NSValue` 包 `NSRect`（屏幕坐标）。
     static let idlePetScreenFrameUserInfoKey = "screenFrame"
 }
