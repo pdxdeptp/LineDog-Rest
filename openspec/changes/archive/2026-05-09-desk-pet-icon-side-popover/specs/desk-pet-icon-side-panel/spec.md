@@ -2,7 +2,11 @@
 
 ### Requirement: Shared popover exposes desk pet icon side length above animation intensity
 
-The system SHALL provide a **single control** for idle desk pet **icon side length** (in points) inside `MenuBarContentView`, using a **slider-style** control (continuous drag with **step 4** between stored values), bound to `MalDazeDefaults.idlePetIconSidePoints` within `MalDazeDefaults.idlePetIconSideMin` and `MalDazeDefaults.idlePetIconSideMax`.
+The system SHALL provide a **single control** for idle desk pet **icon side length** (in points) inside `MenuBarContentView`, bound to `MalDazeDefaults.idlePetIconSidePoints` within `MalDazeDefaults.idlePetIconSideMin` and `MalDazeDefaults.idlePetIconSideMax`.
+
+The icon side length control SHALL use a **slider presentation that matches the desk pet animation intensity slider**: a **continuous track** suitable for smooth dragging, **without** stepped tick marks introduced solely to reflect stored quantization.
+
+Stored values SHALL remain **quantized to 4 pt steps** (same semantics as the legacy Settings stepper): quantization SHALL occur when the user **commits** the adjustment (e.g., drag end), not by rendering a visibly stepped slider.
 
 The icon side length control SHALL appear **visually above** the existing **desk pet animation intensity** slider in the same panel layout, preserving the same relative order in both the menu bar popover and the desk pet popover presentations.
 
@@ -10,6 +14,11 @@ The icon side length control SHALL appear **visually above** the existing **desk
 
 - **WHEN** the user opens the control panel from the **menu bar** or from the **desk pet** entry point
 - **THEN** the icon side length control SHALL appear **above** the animation intensity slider (not below it)
+
+#### Scenario: Slider chrome matches animation intensity (no stepped ticks)
+
+- **WHEN** the user views the icon side length slider beside the animation intensity slider in `MenuBarContentView`
+- **THEN** the icon side length slider SHALL present the **same continuous slider chrome class** as the animation intensity slider (no tick marks attributable only to 4 pt quantization)
 
 #### Scenario: Drag does not spam persistence or sync
 

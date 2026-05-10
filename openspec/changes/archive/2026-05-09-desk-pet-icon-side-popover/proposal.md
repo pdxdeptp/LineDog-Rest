@@ -13,7 +13,7 @@
 
 ### New Capabilities
 
-- `desk-pet-icon-side-panel`: 定义常态桌宠图标边长在共用控制面板中的展示位置、与菜单栏/桌宠入口的一致性，以及从设置页移除重复入口后的可发现性约束（帮助文案或等价提示）。
+- `desk-pet-icon-side-panel`: 定义常态桌宠图标边长在共用控制面板中的展示位置、与菜单栏/桌宠入口的一致性、与「桌宠动态强度」滑杆在 **连续轨道 / 无刻度** 体验上的一致性，以及从设置页移除重复入口后的可发现性约束（帮助文案或等价提示）。
 
 ### Modified Capabilities
 
@@ -21,7 +21,7 @@
 
 ## Impact
 
-- **SwiftUI**：`MenuBarContentView.swift`（新增 `@AppStorage`、Slider、`onEditingChanged` 与通知）；`MalDazeSettingsView.swift`（删除 Stepper 块）。
+- **SwiftUI**：`MenuBarContentView.swift`（新增 `@AppStorage`、与强度滑杆一致的连续 Slider 外观、`onEditingChanged` 与通知）；`MalDazeSettingsView.swift`（删除 Stepper 块）。
 - **测试**：`ControlPanelPresentationTests` / 其它扫描设置源码断言通知投递的测试需改为指向 **`MenuBarContentView`**（或同时覆盖两处若仍保留间接路径）。
 - **布局**：`controlPanelPreferredContentSize` 可能需增加高度以容纳新的一行控件。
 - **运行时**：沿用 `MalDazeBroadcastNotifications.idlePetIconSidePointsChanged` 与 `applyIdlePetIconSideFromUserDefaults()`，无新偏好键。

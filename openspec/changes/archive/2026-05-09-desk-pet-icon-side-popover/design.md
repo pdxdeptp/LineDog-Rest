@@ -20,10 +20,10 @@
 
 ## Decisions
 
-1. **Slider 与整型步进 4**  
-   - **做法**：UI 层使用 `Slider` + `step: 4`，绑定到与存储一致的整型闭区间（或通过 `Binding` 将 `Double` 与按步取整的 `Int` 桥接），保证落库值仍为步进 4 的整数。  
-   - **理由**：与现有 `Stepper(step: 4)` 行为一致，避免存储中出现非法值。  
-   - **备选**：连续滑杆仅在 `onEditingChanged(false)` 时四舍五入到最近 4 的倍数——略难预测，故优先离散步进。
+1. **连续轨道 + 落库步进 4（与强度滑杆统一体验）**  
+   - **做法**：图标边长使用与 **`idlePetAnimationIntensity`** 相同的 **无极 `Slider` 形态**（不在 SwiftUI `Slider` 上使用会产生刻度 UI 的离散步进参数）；拖动中用连续 `Double`（或等效）表示 72…180 区间内的位置；在 **`onEditingChanged(false)`**（或等价「提交」时机）将值 **舍入到最近的 4 pt 倍数**，再经 `clampedIdlePetIconSidePoints` 写入 `@AppStorage`。  
+   - **理由**：离散步进的 `Slider` 在 AppKit/SwiftUI 上常表现为 **轨道刻度点**，与强度滑杆的连续外观不一致；统一观感优先于「拖动过程中拇指始终落在 4 的倍数上」。  
+   - **旧决策废止**：~~优先使用 `Slider(..., step: 4)`~~（已实现过则视为待修正的实现细节）。
 
 2. **拖动中不写死 UserDefaults**  
    - **做法**：采用与 `idlePetAnimationIntensity` 相同的模式——可选用 `@State` 缓存拖动中的显示值，仅在 `onEditingChanged` 为 `false` 时写回 `@AppStorage` 并 `post` `idlePetIconSidePointsChanged`；若 SwiftUI 绑定在拖动结束才提交，则仅需在结束时分发通知。  

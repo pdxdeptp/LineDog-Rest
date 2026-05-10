@@ -52,11 +52,11 @@ File: `MalDaze/MenuBarDogLabel.swift`
 
 - [x] 6.1 Create a new 1024×1024 px paw print PNG following PawPal's `trayIcon.ts` geometry: one large circle (radius ≈ 32% of canvas) centered at (50%, 68%), three smaller toe circles (radius ≈ 11%) at approximately (23%, 18%), (50%, 11%), (77%, 18%), and one more toe at (12%, 41%) — or use any paw print that reads clearly as a paw
 - [x] 6.2 Export the PNG at all required iOS/macOS icon sizes and replace `MalDaze/Assets.xcassets/AppIcon.appiconset/MalDazeMark.png` with the new 1024×1024 image (update `Contents.json` if the filename changes)
-- [ ] 6.3 Build and confirm the app icon in the macOS Dock shows a paw print
+- [x] 6.3 Build and confirm the app icon in the macOS Dock shows a paw print
 
 ## 7. Verification
 
-- [ ] 7.1 Run the app and trigger each `PetDisplayMode` state; verify: (a) `.runningBlack` shows a looping idle GIF, (b) `.restingRed` shows a break-prompt/running GIF, (c) `.pausedWhiteOutline` shows the sleeping GIF, (d) `.thinking` shows a focus GIF
+- [x] 7.1 Run the app and trigger each `PetDisplayMode` state; verify: (a) `.runningBlack` shows a looping idle GIF, (b) `.restingRed` shows a break-prompt/running GIF, (c) `.pausedWhiteOutline` shows the sleeping GIF, (d) `.thinking` shows a focus GIF
 - [x] 7.2 Confirm no `dog.fill` references remain in `MenuBarDogLabel.swift` or `PetRenderer.swift` by running: `grep -n "dog.fill" MalDaze/MenuBarDogLabel.swift MalDaze/PetRenderer/PetRenderer.swift`
 - [x] 7.3 Confirm `MalDazePet.imageset` no longer exists: `ls MalDaze/Assets.xcassets/ | grep MalDazePet` should return nothing
 - [x] 7.4 Confirm all 12 GIF files are in the built `.app` bundle: `find MalDaze.app -name "*.gif" | wc -l` should return 12 (we have 13 including bonus focusGuard variant)

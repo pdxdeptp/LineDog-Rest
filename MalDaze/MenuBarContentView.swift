@@ -138,6 +138,15 @@ struct MenuBarContentView: View {
         static let paleBlue = Color(red: 0.45, green: 0.72, blue: 0.98)
     }
 
+    /// 无极拖动得到的 pt → 最近 **4 pt** 刻度，再走 `clampedIdlePetIconSidePoints`（与旧 Stepper 存储语义一致）。
+    private static func quantizedIdlePetIconSidePoints(fromContinuousPt continuous: Double) -> Int {
+        let lo = Double(MalDazeDefaults.idlePetIconSideMin)
+        let hi = Double(MalDazeDefaults.idlePetIconSideMax)
+        let bounded = min(max(continuous, lo), hi)
+        let snapped = (bounded / 4.0).rounded() * 4.0
+        return MalDazeDefaults.clampedIdlePetIconSidePoints(stored: Int(snapped.rounded()))
+    }
+
     var body: some View {
         let chrome = VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top, spacing: 0) {
@@ -537,13 +546,12 @@ struct MenuBarContentView: View {
                                 .frame(width: 14, alignment: .leading)
                             Slider(
                                 value: $idlePetIconSideSliderLive,
-                                in: Double(MalDazeDefaults.idlePetIconSideMin)...Double(MalDazeDefaults.idlePetIconSideMax),
-                                step: 4
+                                in: Double(MalDazeDefaults.idlePetIconSideMin)...Double(MalDazeDefaults.idlePetIconSideMax)
                             ) { editing in
                                 guard !editing else { return }
-                                let clamped = MalDazeDefaults.clampedIdlePetIconSidePoints(stored: Int(idlePetIconSideSliderLive.rounded()))
-                                idlePetIconSideStored = clamped
-                                idlePetIconSideSliderLive = Double(clamped)
+                                let quantized = Self.quantizedIdlePetIconSidePoints(fromContinuousPt: idlePetIconSideSliderLive)
+                                idlePetIconSideStored = quantized
+                                idlePetIconSideSliderLive = Double(quantized)
                                 NotificationCenter.default.post(
                                     name: MalDazeBroadcastNotifications.idlePetIconSidePointsChanged,
                                     object: nil
