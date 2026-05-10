@@ -59,6 +59,7 @@ opsx:apply
 
 必须包含：
 
+- Affected Specs：先运行 `openspec list --specs`，列出本 change 修改的主 spec id。
 - 用户旅程：这个闭环从哪里开始，到哪里算完成。
 - 状态矩阵：空状态、加载中、成功、失败、部分失败、离线、超时。
 - 前端验收标准：布局、信息层级、按钮状态、错误提示、文案、截图场景。
@@ -67,10 +68,35 @@ opsx:apply
 - Subagent handoff：前端、后端、测试、验收的分工和文件边界。
 - 验收命令：`pytest`、`xcodebuild test`、curl 场景、必要时截图或 UI 状态检查。
 
+### 0.3.1 Spec Targeting Gate
+
+每个 change 在创建 `proposal.md`、`design.md`、`specs/`、`tasks.md` 之前，必须先确定目标主 spec。
+
+固定步骤：
+
+```text
+1. 运行 openspec list --specs
+2. 选择本 change 修改的已有 spec-id
+3. 在 proposal.md 写 Affected Specs
+4. 在 changes/<name>/specs/<spec-id>/spec.md 写 delta spec
+5. 只有现有主 specs 没有对应能力时，才创建新的 spec-id
+```
+
+Archive 同步是路径驱动的：
+
+```text
+openspec/changes/<change-name>/specs/<spec-id>/spec.md
+  ↓ archive
+openspec/specs/<spec-id>/spec.md
+```
+
+因此不要依赖 change 名称的语义来决定归档目标。比如学习助手首页重设计应修改 `specs/assistant-panel-ui/spec.md`，而不是随手新建 `specs/learning-assistant-home/spec.md`，除非已经明确决定“首页”是一项新的长期 capability。
+
 ### 0.4 实施硬门槛
 
 - 前半段必须先完成 OpenSpec proposal/spec/tasks。
 - 文档没过，不进入实现。
+- 创建 proposal 前必须通过 Spec Targeting Gate，明确 affected spec ids。
 - 实现阶段不由主 agent 直接写主要业务代码，主 agent 负责调度、审查和集成。
 - 每个实现任务遵守 TDD：失败测试先于实现代码。
 - 前后端契约变化必须同步更新 spec。
@@ -581,6 +607,7 @@ automate-learning-assistant-acceptance
 必须说明：
 
 - Why：这个闭环为什么现在要做。
+- Affected Specs：本 change 修改哪些主 spec id；若新增 spec，需要解释为什么现有 spec 不适用。
 - What Changes：前端、后端、数据、测试分别改什么。
 - User Journey：用户从哪里进入，怎么完成。
 - Non-Goals：明确不做哪些诱人的扩展。
@@ -603,6 +630,9 @@ automate-learning-assistant-acceptance
 
 必须使用可验收的 requirement + scenario：
 
+- `specs/<spec-id>/spec.md` 的 `<spec-id>` 必须与目标主 spec folder 完全一致。
+- 修改已有能力时使用已有 spec-id，写 `MODIFIED Requirements`。
+- 新增能力时才创建新 spec-id，写 `ADDED Requirements`。
 - WHEN 用户处于某个状态或执行某个动作。
 - THEN 系统展示什么、请求什么、写入什么、禁止什么。
 - 每个 scenario 应能被测试、截图、curl 或人工产品判断验证。

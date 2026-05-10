@@ -12,6 +12,18 @@ When a new feature is proposed or you're asked to explore an idea:
 1. **`opsx:explore`** — OpenSpec-aware design discussion. Reads existing artifacts, explores the problem space, identifies edge cases. Do NOT skip to code.
 2. **`opsx:propose`** — Once direction is clear, generate all OpenSpec artifacts in one step: `proposal.md`, `design.md`, `specs/`, and `tasks.md`.
 
+### Spec Targeting Gate (before `opsx:propose`)
+
+Before creating any OpenSpec change artifacts, the agent MUST resolve which main specs the change modifies.
+
+1. Run `openspec list --specs`.
+2. Identify existing spec ids affected by the change.
+3. Record them in `proposal.md` under an `Affected Specs` section.
+4. Put delta specs under `openspec/changes/<change-name>/specs/<spec-id>/spec.md`, where `<spec-id>` exactly matches the target main spec folder.
+5. Only create a new `<spec-id>` when no existing main spec describes the capability.
+
+Archive sync is path-driven: `changes/<change>/specs/<spec-id>/spec.md` merges back to `openspec/specs/<spec-id>/spec.md`. Do not rely on change-name semantics or natural-language guessing for archive targets.
+
 **Gate:** `openspec/changes/<name>/tasks.md` exists before Phase 1 begins.
 
 ---
@@ -97,6 +109,7 @@ When all tasks are complete:
 - **Failing test BEFORE implementation.** The TDD Iron Law is enforced — code without a preceding failing test is deleted.
 - **Spec compliance review AFTER each task.** Critical issues block the next task.
 - **Spec Sync:** If implementation reveals a design flaw, update the OpenSpec `spec.md` before continuing — don't drift from the spec silently.
+- **Spec Targeting BEFORE proposal.** Every change must declare affected main spec ids and place delta specs in matching `specs/<spec-id>/` folders before implementation.
 - **Parallelism Safety:** Do not dispatch parallel subagents for tasks that touch overlapping files or have strict sequential dependencies.
 
 ### Hotfix Exception Channel
