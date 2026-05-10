@@ -43,6 +43,11 @@ final class PetStageView: NSView {
         didSet { needsLayout = true }
     }
 
+    /// 与 `MalDazeDefaults.idlePetIconAnimationEnabled` 同步到 `PetRenderer`（休息 / 跑屏中也可调用以立即定格或恢复）。
+    func applyIdlePetGIFAnimationFromDefaults() {
+        pet.setGIFAnimationEnabled(MalDazeDefaults.resolvedIdlePetIconAnimationEnabled())
+    }
+
     private static let edgeMargin: CGFloat = 16
     /// 常态命中区相对 `PetRenderer` 图像框边长的比例。GIF 在框内按比例缩放，四周透明仍占满框，全框可点会感觉比「看见的狗」大一圈。
     private static let idlePetHitRectSideFactor: CGFloat = 0.6

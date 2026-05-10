@@ -3,7 +3,8 @@ import SwiftUI
 
 extension MenuBarContentView {
     static var controlPanelPreferredContentSize: NSSize {
-        NSSize(width: 300 + 280 + 300 + 3 * 24, height: 556)
+        /// 较原 556 增加一行桌宠动画 Toggle（与菜单栏 / 桌宠 Popover 共用）。
+        NSSize(width: 300 + 280 + 300 + 3 * 24, height: 592)
     }
 }
 
@@ -42,6 +43,8 @@ struct MenuBarContentView: View {
 
     @AppStorage(MalDazeDefaults.pomodoroWorkDurationMinutes) private var pomodoroWorkMinutesStored = 25
     @AppStorage(MalDazeDefaults.pomodoroRestDurationMinutes) private var pomodoroRestMinutesStored = 5
+
+    @AppStorage(MalDazeDefaults.idlePetIconAnimationEnabled) private var idlePetIconAnimationStored = true
 
     private var deskReminders: DeskRemindersModel { viewModel.deskReminders }
 
@@ -161,7 +164,7 @@ struct MenuBarContentView: View {
         }
         .frame(
             minWidth: remindersColumnWidth + assistantColumnWidth + 300 + 3 * 24,
-            minHeight: 556
+            minHeight: 592
         )
 
         chrome
@@ -519,6 +522,17 @@ struct MenuBarContentView: View {
                 .toggleStyle(.switch)
                 .tint(SwitchOnTrackTint.paleBlue)
                 .help("开启时休息霸屏期间连续单击屏幕中央小狗 20 下（每次间隔 ≤ 3 秒）即可提前结束休息（默认）；关闭后点击无效，只能等计时自然结束。")
+
+                Toggle(isOn: $idlePetIconAnimationStored) {
+                    Text("桌宠图标动态效果")
+                        .font(.subheadline)
+                }
+                .toggleStyle(.switch)
+                .tint(SwitchOnTrackTint.paleBlue)
+                .help("关闭后右下角桌宠 GIF 定格且不再自动轮换素材；不影响菜单栏图标。")
+                .onChange(of: idlePetIconAnimationStored) { _ in
+                    NotificationCenter.default.post(name: MalDazeBroadcastNotifications.idlePetIconAnimationChanged, object: nil)
+                }
 
                 Divider()
 

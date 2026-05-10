@@ -78,6 +78,7 @@
 		A409 /* BackendProcessManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B409 /* BackendProcessManager.swift */; };
 		A40A /* AssistantAPIClientProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = B40A /* AssistantAPIClientProtocol.swift */; };
 		A310 /* LearningAssistantTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B310 /* LearningAssistantTests.swift */; };
+		A311 /* PetRendererTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B311 /* PetRendererTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -164,6 +165,7 @@
 		B409 /* BackendProcessManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendProcessManager.swift; sourceTree = "<group>"; };
 		B40A /* AssistantAPIClientProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssistantAPIClientProtocol.swift; sourceTree = "<group>"; };
 		B310 /* LearningAssistantTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningAssistantTests.swift; sourceTree = "<group>"; };
+		B311 /* PetRendererTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetRendererTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -280,6 +282,7 @@
 				B308 /* DeskReminderSidebarMergerTests.swift */,
 				B309 /* ControlPanelPresentationTests.swift */,
 				B310 /* LearningAssistantTests.swift */,
+				B311 /* PetRendererTests.swift */,
 			);
 			path = MalDazeTests;
 			sourceTree = "<group>";
@@ -534,6 +537,7 @@
 				A308 /* DeskReminderSidebarMergerTests.swift in Sources */,
 				A309 /* ControlPanelPresentationTests.swift in Sources */,
 				A310 /* LearningAssistantTests.swift in Sources */,
+				A311 /* PetRendererTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -66,6 +66,8 @@ final class MockWindowManager: WindowManaging {
 
     func applyIdlePetIconSideFromUserDefaults() {}
 
+    func applyIdlePetAnimationFromUserDefaults() {}
+
     /// 对应真实流程里休息动画结束、`finishRestCycle` 调用用户传入的 `onDismissed`。
     func testing_simulateRestPresentationFinished() {
         let cb = pendingUserDismiss

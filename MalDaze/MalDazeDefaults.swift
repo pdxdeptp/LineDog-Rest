@@ -57,6 +57,9 @@ enum MalDazeDefaults {
     /// 休息打断风格："fullscreen"（默认霸屏）或 "breakRun"（跑屏漫游）。
     static let breakInterruptStyle = "MalDaze.breakInterruptStyle"
 
+    /// 常态桌宠 GIF 是否播放帧动画并允许多素材轮换（默认开）；键缺失时视为 `true`。
+    static let idlePetIconAnimationEnabled = "MalDaze.idlePetIconAnimationEnabled"
+
     /// 常态桌宠图标绘制边长（点），与桌宠透明小窗边长联动；未写入时按默认 120。
     static let idlePetIconSidePoints = "MalDaze.idlePetIconSidePoints"
     static let idlePetIconSideMin = 72
@@ -66,5 +69,13 @@ enum MalDazeDefaults {
     static func clampedIdlePetIconSidePoints(stored: Int) -> Int {
         let base = stored == 0 ? idlePetIconSideDefault : stored
         return min(max(base, idlePetIconSideMin), idlePetIconSideMax)
+    }
+
+    /// 与 `@AppStorage(..., true)` 对齐：未写入 UserDefaults 时默认允许动画。
+    static func resolvedIdlePetIconAnimationEnabled() -> Bool {
+        if UserDefaults.standard.object(forKey: idlePetIconAnimationEnabled) == nil {
+            return true
+        }
+        return UserDefaults.standard.bool(forKey: idlePetIconAnimationEnabled)
     }
 }

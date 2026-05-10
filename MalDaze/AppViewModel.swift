@@ -86,6 +86,7 @@ final class AppViewModel: ObservableObject {
     private var sevenMinuteShortcutObserver: NSObjectProtocol?
     private var resetIdlePetShortcutObserver: NSObjectProtocol?
     private var idlePetIconSidePointsObserver: NSObjectProtocol?
+    private var idlePetIconAnimationObserver: NSObjectProtocol?
     /// 智能提醒写入的 `EKAlarm` 到点后弹出与 7 分钟倒计时相同的中央铃铛。
     private var smartReminderBellTasks: [String: Task<Void, Never>] = [:]
 
@@ -224,6 +225,14 @@ final class AppViewModel: ObservableObject {
         ) { [weak self] _ in
             self?.applyIdlePetIconSideFromUserDefaults()
         }
+
+        idlePetIconAnimationObserver = NotificationCenter.default.addObserver(
+            forName: MalDazeBroadcastNotifications.idlePetIconAnimationChanged,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.applyIdlePetAnimationFromUserDefaults()
+        }
     }
 
     /// 从 `UserDefaults` 同步番茄工作/休息时长到两个引擎（面板 Stepper 与设置改动后调用）。
@@ -258,6 +267,9 @@ final class AppViewModel: ObservableObject {
         }
         if let idlePetIconSidePointsObserver {
             NotificationCenter.default.removeObserver(idlePetIconSidePointsObserver)
+        }
+        if let idlePetIconAnimationObserver {
+            NotificationCenter.default.removeObserver(idlePetIconAnimationObserver)
         }
     }
 
@@ -408,6 +420,11 @@ final class AppViewModel: ObservableObject {
     /// 桌宠图标边长（UserDefaults）变更后刷新小窗与命中区。
     func applyIdlePetIconSideFromUserDefaults() {
         windowManager.applyIdlePetIconSideFromUserDefaults()
+    }
+
+    /// 桌宠 GIF 动态偏好变更后刷新 `PetRenderer`。
+    func applyIdlePetAnimationFromUserDefaults() {
+        windowManager.applyIdlePetAnimationFromUserDefaults()
     }
 
     func setRestBlocksClicksDuringRest(_ enabled: Bool) {

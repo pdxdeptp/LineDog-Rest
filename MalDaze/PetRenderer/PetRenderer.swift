@@ -5,6 +5,7 @@ protocol PetRendering: AnyObject {
     func install(in parent: NSView)
     func layoutPet(in bounds: CGRect, visualCenter: CGPoint, scale: CGFloat)
     func setDisplayMode(_ mode: PetDisplayMode)
+    func setGIFAnimationEnabled(_ enabled: Bool)
 }
 
 @MainActor
@@ -20,9 +21,13 @@ final class PetRenderer: PetRendering {
     private var activeIndex: Int = 0
     private static let variantRotationInterval: TimeInterval = 5 * 60
 
+    private var currentMode: PetDisplayMode = .runningBlack
+    private var gifAnimationEnabled: Bool
+
     init() {
+        gifAnimationEnabled = MalDazeDefaults.resolvedIdlePetIconAnimationEnabled()
         imageView.imageScaling = .scaleProportionallyUpOrDown
-        imageView.animates = true
+        imageView.animates = gifAnimationEnabled
         imageView.wantsLayer = true
         gifURLsByMode = Self.resolveGIFURLs()
     }
@@ -62,12 +67,19 @@ final class PetRenderer: PetRendering {
         setDisplayMode(.runningBlack)
     }
 
-    func setDisplayMode(_ mode: PetDisplayMode) {
-        let urls = gifURLsByMode[mode] ?? []
-        startGIFCycle(urls: urls, continuous: mode == .runningBlack || mode == .thinking)
+    func setGIFAnimationEnabled(_ enabled: Bool) {
+        gifAnimationEnabled = enabled
+        setDisplayMode(currentMode)
     }
 
-    private func startGIFCycle(urls: [URL], continuous: Bool) {
+    func setDisplayMode(_ mode: PetDisplayMode) {
+        currentMode = mode
+        let urls = gifURLsByMode[mode] ?? []
+        let allowsVariantRotation = mode == .runningBlack || mode == .thinking
+        startGIFCycle(urls: urls, allowsVariantRotationWhenAnimated: allowsVariantRotation)
+    }
+
+    private func startGIFCycle(urls: [URL], allowsVariantRotationWhenAnimated: Bool) {
         cycleTimer?.invalidate()
         cycleTimer = nil
         activeURLs = urls
@@ -77,7 +89,8 @@ final class PetRenderer: PetRendering {
         }
         activeIndex = Int.random(in: 0..<urls.count)
         loadGIF(url: urls[activeIndex])
-        guard continuous, urls.count > 1 else { return }
+        let shouldRotate = gifAnimationEnabled && allowsVariantRotationWhenAnimated && urls.count > 1
+        guard shouldRotate else { return }
         let t = Timer.scheduledTimer(withTimeInterval: Self.variantRotationInterval, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in self?.rotateVariant() }
         }
@@ -86,6 +99,7 @@ final class PetRenderer: PetRendering {
     }
 
     private func rotateVariant() {
+        guard gifAnimationEnabled else { return }
         guard activeURLs.count > 1 else { return }
         let prev = activeIndex
         var next = Int.random(in: 0..<activeURLs.count)
@@ -101,7 +115,7 @@ final class PetRenderer: PetRendering {
             return
         }
         imageView.image = image
-        imageView.animates = true
+        imageView.animates = gifAnimationEnabled
     }
 
     private func applyFallbackSymbol() {
@@ -109,6 +123,7 @@ final class PetRenderer: PetRendering {
         let sym = NSImage(systemSymbolName: "pawprint.fill", accessibilityDescription: "pet")?
             .withSymbolConfiguration(cfg)
         imageView.image = sym
+        imageView.animates = false
     }
 
     func layoutPet(in bounds: CGRect, visualCenter: CGPoint, scale: CGFloat) {
@@ -131,4 +146,9 @@ final class PetRenderer: PetRendering {
         let t = cycleTimer
         DispatchQueue.main.async { t?.invalidate() }
     }
+
+    // MARK: - Tests (@testable)
+
+    internal var testing_imageViewAnimates: Bool { imageView.animates }
+    internal var testing_variantCycleTimerExists: Bool { cycleTimer != nil }
 }

@@ -86,6 +86,8 @@ protocol WindowManaging: AnyObject {
     func resetIdlePetPositionToDefaultCorner()
     /// `MalDazeDefaults.idlePetIconSidePoints` 变更后：按新边长调整桌宠小窗与命中区。
     func applyIdlePetIconSideFromUserDefaults()
+    /// `MalDazeDefaults.idlePetIconAnimationEnabled` 变更后：刷新桌宠 GIF 动画与素材轮换。
+    func applyIdlePetAnimationFromUserDefaults()
 }
 
 extension WindowManaging {
@@ -402,6 +404,7 @@ final class WindowManager: WindowManaging {
             v.onRestPetDoubleClickEndRest = nil
         }
         v.idlePetIconSidePoints = Self.resolvedIdlePetIconSidePoints()
+        v.applyIdlePetGIFAnimationFromDefaults()
     }
 
     func setRestBlocksClicks(_ blocks: Bool) {
@@ -464,6 +467,11 @@ final class WindowManager: WindowManaging {
         stage.layoutSubtreeIfNeeded()
         persistIdlePetFrameIfIdleSized()
         applyMousePolicy()
+    }
+
+    func applyIdlePetAnimationFromUserDefaults() {
+        installPetWindowIfNeeded()
+        stageView?.applyIdlePetGIFAnimationFromDefaults()
     }
 
     func dismissRestImmediately(bringIdlePetWindowToFront: Bool) {
@@ -1036,7 +1044,10 @@ extension WindowManager: PetStageDeskMenuPresenter {
     /// NSPopover 与 MenuBarExtra 共享系统外观，外观（颜色/圆角/阴影）完全一致。
     private func makeDeskMenuPopoverIfNeeded() -> NSPopover? {
         guard let vm = deskMenuViewModel else { return nil }
-        if let existing = deskMenuPopover { return existing }
+        if let existing = deskMenuPopover {
+            existing.contentSize = MenuBarContentView.controlPanelPreferredContentSize
+            return existing
+        }
 
         let popover = NSPopover()
         popover.contentSize = MenuBarContentView.controlPanelPreferredContentSize
@@ -1059,6 +1070,8 @@ extension WindowManager: PetStageDeskMenuPresenter {
     func presentDeskMenu(from stage: PetStageView, anchorRect: NSRect) {
         guard deskMenuViewModel != nil else { return }
         guard let popover = makeDeskMenuPopoverIfNeeded() else { return }
+
+        popover.contentSize = MenuBarContentView.controlPanelPreferredContentSize
 
         if popover.isShown {
             closeDeskMenuPopover()
