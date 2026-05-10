@@ -1,10 +1,37 @@
 import AppKit
 import SwiftUI
 
+private enum ControlPanelLayout {
+    static let remindersColumnWidth: CGFloat = 300
+    static let assistantMinimumColumnWidth: CGFloat = 360
+    static let controlsColumnWidth: CGFloat = 300
+    static let horizontalPadding: CGFloat = 12
+    static let dividerWidth: CGFloat = 1
+    static let safeHorizontalMargin: CGFloat = 48
+    static let contentHeight: CGFloat = 664
+    static let fallbackVisibleFrame = NSRect(x: 0, y: 0, width: 1280, height: 800)
+
+    static var minimumContentWidth: CGFloat {
+        remindersColumnWidth
+        + assistantMinimumColumnWidth
+        + controlsColumnWidth
+        + 2 * horizontalPadding
+        + 2 * horizontalPadding
+        + 2 * dividerWidth
+    }
+
+    static func preferredContentSize(screenVisibleFrame visibleFrame: NSRect?) -> NSSize {
+        let visibleFrame = visibleFrame ?? fallbackVisibleFrame
+        let targetWidth = visibleFrame.width - 2 * safeHorizontalMargin
+        let clampedTargetWidth = min(targetWidth, visibleFrame.width)
+        let width = min(max(minimumContentWidth, clampedTargetWidth), visibleFrame.width)
+        return NSSize(width: width, height: contentHeight)
+    }
+}
+
 extension MenuBarContentView {
     static var controlPanelPreferredContentSize: NSSize {
-        /// 含桌宠图标边长 + 动态强度滑杆（菜单栏 / 桌宠 Popover 共用）。
-        NSSize(width: 300 + 280 + 300 + 3 * 24, height: 664)
+        ControlPanelLayout.preferredContentSize(screenVisibleFrame: NSScreen.main?.visibleFrame)
     }
 }
 
@@ -111,15 +138,9 @@ struct MenuBarContentView: View {
         DispatchQueue.main.async(execute: work)
     }
 
-    /// 左侧提醒栏固定宽度，避免与右侧主菜单抢空间。
-    private let remindersColumnWidth: CGFloat = 300
-
-    /// 中间学习助手栏固定宽度。
-    private let assistantColumnWidth: CGFloat = 280
-
     /// 三栏外圈与右栏标题行：数值集中，避免「窗体顶边 vs 首行」只靠右栏独自撑开。
     private enum MainPanelChrome {
-        static let horizontalPadding: CGFloat = 12
+        static let horizontalPadding = ControlPanelLayout.horizontalPadding
         /// 整块内容上内边距。顶部留白唯一控制点，改此处即可（不要在 ScrollView 上加 ignoresSafeArea，否则会被抵消）。
         static let topPadding: CGFloat = 16
         static let bottomPadding: CGFloat = 12
@@ -152,7 +173,7 @@ struct MenuBarContentView: View {
             HStack(alignment: .top, spacing: 0) {
                 // 左栏：提醒事项
                 remindersSidebar
-                    .frame(width: remindersColumnWidth, alignment: .topLeading)
+                    .frame(width: ControlPanelLayout.remindersColumnWidth, alignment: .topLeading)
                     .padding(.trailing, MainPanelChrome.horizontalPadding)
 
                 Divider()
@@ -161,13 +182,13 @@ struct MenuBarContentView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     AssistantPanelView()
                 }
-                .frame(width: assistantColumnWidth, alignment: .topLeading)
+                .frame(minWidth: ControlPanelLayout.assistantMinimumColumnWidth, maxWidth: .infinity, alignment: .topLeading)
 
                 Divider()
 
                 // 右栏：番茄钟、小猫等原有控制
                 mainControlsColumn
-                    .frame(minWidth: 300, alignment: .leading)
+                    .frame(width: ControlPanelLayout.controlsColumnWidth, alignment: .leading)
                     .padding(.leading, MainPanelChrome.horizontalPadding)
             }
             .padding(.horizontal, MainPanelChrome.horizontalPadding)
@@ -175,8 +196,9 @@ struct MenuBarContentView: View {
             .padding(.bottom, MainPanelChrome.bottomPadding)
         }
         .frame(
-            minWidth: remindersColumnWidth + assistantColumnWidth + 300 + 3 * 24,
-            minHeight: 664
+            minWidth: ControlPanelLayout.minimumContentWidth,
+            maxWidth: .infinity,
+            minHeight: ControlPanelLayout.contentHeight
         )
 
         chrome

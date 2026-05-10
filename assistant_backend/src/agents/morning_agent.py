@@ -190,6 +190,8 @@ async def _generate_briefing_node(state: MorningState) -> dict:
             "target_minutes": t.get("target_minutes"),
             "completed_at": t.get("completed_at"),
             "resource_title": res["title"] if res else None,
+            "resource_url": res.get("url") if res else None,
+            "unit_url": None,
             "priority": t.get("priority", 0),
         })
 

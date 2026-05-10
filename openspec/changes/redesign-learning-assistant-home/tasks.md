@@ -1,43 +1,43 @@
 ## 1. Baseline And Red Tests
 
 - [ ] 1.1 Run baseline verification before implementation in the selected workspace: `cd assistant_backend && pytest`, then `xcodebuild test -project MalDaze.xcodeproj -scheme MalDaze -destination 'platform=macOS'`
-- [ ] 1.2 Add failing backend tests for `GET /api/today-briefing` task payloads including existing task fields plus `resource_url` and `unit_url`
-- [ ] 1.3 Add failing Swift decoding tests for `AssistantTask.resourceURL` and `AssistantTask.unitURL`, including null fallback cases
-- [ ] 1.4 Add failing ViewModel tests for summary-first dashboard state, whole-column offline, empty database primary action, local task display order, task expansion state, link availability, and bottom navigation selection
-- [ ] 1.5 Add failing layout/fixture tests or preview assertions for wide popover layout: left fixed column, right fixed column, adaptive learning assistant middle column
+- [x] 1.2 Add failing backend tests for `GET /api/today-briefing` task payloads including existing task fields plus `resource_url` and `unit_url`
+- [x] 1.3 Add failing Swift decoding tests for `AssistantTask.resourceURL` and `AssistantTask.unitURL`, including null fallback cases
+- [x] 1.4 Add failing ViewModel tests for summary-first dashboard state, whole-column offline, empty database primary action, local task display order, task expansion state, link availability, and bottom navigation selection
+- [x] 1.5 Add failing layout/fixture tests or preview assertions for wide popover layout: left fixed column, right fixed column, adaptive learning assistant middle column
 
 ## 2. Backend Briefing Link Contract
 
-- [ ] 2.1 Update `assistant_backend/src/agents/morning_agent.py` so each today briefing task includes `resource_url` from the associated resource and `unit_url` when available, preserving existing fields
-- [ ] 2.2 Update or add backend fixtures in `assistant_backend/tests/` to cover task with resource URL, task without resource URL, and task without associated resource
-- [ ] 2.3 Run focused backend tests for today's briefing link payload and confirm they pass
-- [ ] 2.4 Run full backend regression verification: `cd assistant_backend && pytest`
+- [x] 2.1 Update `assistant_backend/src/agents/morning_agent.py` so each today briefing task includes `resource_url` from the associated resource and `unit_url` when available, preserving existing fields
+- [x] 2.2 Update or add backend fixtures in `assistant_backend/tests/` to cover task with resource URL, task without resource URL, and task without associated resource
+- [x] 2.3 Run focused backend tests for today's briefing link payload and confirm they pass
+- [x] 2.4 Run full backend regression verification: `cd assistant_backend && pytest`
 
 ## 3. Swift Models And Dashboard State
 
-- [ ] 3.1 Update `MalDaze/LearningAssistant/AssistantAPIClient.swift` models so `AssistantTask` decodes optional `resource_url` and `unit_url`
-- [ ] 3.2 Update `MalDaze/LearningAssistant/LearningAssistantViewModel.swift` to expose summary-first dashboard state without a system-selected next task
-- [ ] 3.3 Add local presentation ordering for today's visible tasks keyed by date and task ids; do not call backend APIs or mutate task priority/scheduled_date for drag ordering
-- [ ] 3.4 Add task expansion state and link availability helpers that prefer `unit_url`, fall back to `resource_url`, and expose unavailable state when neither exists
-- [ ] 3.5 Update offline handling so any assistant homepage data request failure enters whole-column service-unavailable state rather than cached-content or partial-failure dashboard
-- [ ] 3.6 Run focused Swift tests for model decoding and ViewModel dashboard behavior
+- [x] 3.1 Update `MalDaze/LearningAssistant/AssistantAPIClient.swift` models so `AssistantTask` decodes optional `resource_url` and `unit_url`
+- [x] 3.2 Update `MalDaze/LearningAssistant/LearningAssistantViewModel.swift` to expose summary-first dashboard state without a system-selected next task
+- [x] 3.3 Add local presentation ordering for today's visible tasks keyed by date and task ids; do not call backend APIs or mutate task priority/scheduled_date for drag ordering
+- [x] 3.4 Add task expansion state and link availability helpers that prefer `unit_url`, fall back to `resource_url`, and expose unavailable state when neither exists
+- [x] 3.5 Update offline handling so any assistant homepage data request failure enters whole-column service-unavailable state rather than cached-content or partial-failure dashboard
+- [x] 3.6 Run focused Swift tests for model decoding and ViewModel dashboard behavior
 
 ## 4. Wide Popover Layout
 
-- [ ] 4.1 Update `MalDaze/MenuBarContentView.swift` sizing so the desk-pet popover can use a screen-aware near-full-width content size while keeping a safe margin inside the visible screen
-- [ ] 4.2 Update `MenuBarContentView` three-column layout so reminders and right controls remain fixed width while `AssistantPanelView` receives the remaining adaptive width
-- [ ] 4.3 Preserve existing `NSPopover` presentation and dismiss behavior in `MalDaze/WindowManager/WindowManager.swift`; if `NSPopover` cannot support the required layout, stop and update spec before changing windowing strategy
-- [ ] 4.4 Add or update tests around control panel preferred size / layout constants where feasible
+- [x] 4.1 Update `MalDaze/MenuBarContentView.swift` sizing so the desk-pet popover can use a screen-aware near-full-width content size while keeping a safe margin inside the visible screen
+- [x] 4.2 Update `MenuBarContentView` three-column layout so reminders and right controls remain fixed width while `AssistantPanelView` receives the remaining adaptive width
+- [x] 4.3 Preserve existing `NSPopover` presentation and dismiss behavior in `MalDaze/WindowManager/WindowManager.swift`; if `NSPopover` cannot support the required layout, stop and update spec before changing windowing strategy
+- [x] 4.4 Add or update tests around control panel preferred size / layout constants where feasible
 
 ## 5. Dashboard UI And Interactions
 
-- [ ] 5.1 Replace the ready-state four-tab first screen in `MalDaze/LearningAssistant/AssistantPanelView.swift` with a summary-first dashboard
-- [ ] 5.2 Add bottom fixed navigation for 首页, 添加资料, 资料进度, 调整计划; keep it outside the scrollable dashboard content and hide it in whole-column offline state
-- [ ] 5.3 Implement homepage states for empty database, tasks today, all tasks completed, resources without today tasks, and deadline risk
-- [ ] 5.4 Implement reorderable today task rows with a clear drag handle and local presentation ordering only
-- [ ] 5.5 Implement clickable task row body expansion for light details, keeping completion and drag targets distinct
-- [ ] 5.6 Implement explicit “打开链接” action in expanded task details, opening `unit_url` first and `resource_url` second; show unavailable state when no link exists
-- [ ] 5.7 Keep existing Add Material, Resource Progress, and Chat/Planner surfaces reachable from bottom navigation without productizing those surfaces in this loop
+- [x] 5.1 Replace the ready-state four-tab first screen in `MalDaze/LearningAssistant/AssistantPanelView.swift` with a summary-first dashboard
+- [x] 5.2 Add bottom fixed navigation for 首页, 添加资料, 资料进度, 调整计划; keep it outside the scrollable dashboard content and hide it in whole-column offline state
+- [x] 5.3 Implement homepage states for empty database, tasks today, all tasks completed, resources without today tasks, and deadline risk
+- [x] 5.4 Implement reorderable today task rows with a clear drag handle and local presentation ordering only
+- [x] 5.5 Implement clickable task row body expansion for light details, keeping completion and drag targets distinct
+- [x] 5.6 Implement explicit “打开链接” action in expanded task details, opening `unit_url` first and `resource_url` second; show unavailable state when no link exists
+- [x] 5.7 Keep existing Add Material, Resource Progress, and Chat/Planner surfaces reachable from bottom navigation without productizing those surfaces in this loop
 - [ ] 5.8 Verify text fits within the adaptive middle column and bottom navigation labels do not overlap across expected desktop widths
 
 ## 6. Fixtures And Acceptance Evidence

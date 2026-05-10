@@ -10,6 +10,45 @@ struct ChatMessage: Identifiable {
     let text: String
 }
 
+// MARK: - Dashboard State
+
+enum AssistantPanelTab: Equatable {
+    case home
+    case addResource
+    case resourceProgress
+    case adjustPlan
+}
+
+enum AssistantDashboardKind: Equatable {
+    case connecting
+    case offline
+    case emptyDatabase
+    case noTasksWithResources
+    case tasksToday
+    case allTasksCompleted
+}
+
+enum AssistantDashboardPrimaryAction: Equatable {
+    case addResource
+}
+
+struct AssistantDashboardState: Equatable {
+    let kind: AssistantDashboardKind
+    let totalMinutes: Int
+    let taskCount: Int
+    let completedTaskCount: Int
+    let highlights: String
+    let resourceCount: Int
+    let hasDeadlineRisk: Bool
+    let primaryAction: AssistantDashboardPrimaryAction?
+    let primaryTaskID: Int?
+}
+
+enum TaskLearningLink: Equatable {
+    case available(URL)
+    case unavailable
+}
+
 // MARK: - ViewModel
 
 /// 学习助手中栏数据层；ObservableObject 供 SwiftUI 视图订阅，兼容 macOS 13+。
@@ -18,11 +57,14 @@ final class LearningAssistantViewModel: ObservableObject {
     // MARK: State
 
     @Published var tasks: [AssistantTask]         = []
+    @Published var visibleTodayTasks: [AssistantTask] = []
     @Published var resources: [AssistantResource] = []
     @Published var chatMessages: [ChatMessage]    = []
     @Published var currentProposal: String?       = nil
     @Published var isOffline: Bool                = false
     @Published var threadId: String?              = nil
+    @Published var selectedPanelTab: AssistantPanelTab = .home
+    @Published private var expandedTaskIDs: Set<Int> = []
 
     @Published var ingestionDraft: IngestionDraftDetail? = nil
     @Published var ingestionThreadId: String?            = nil
@@ -38,12 +80,21 @@ final class LearningAssistantViewModel: ObservableObject {
     @Published var isConnecting: Bool = true
 
     private let api: any AssistantAPIClientProtocol
+    private let orderStore: UserDefaults
+    private let todayProvider: () -> Date
     private var readyObserver: Any?
 
     // MARK: - Init
 
-    init(api: any AssistantAPIClientProtocol = AssistantAPIClient.shared) {
+    init(
+        api: any AssistantAPIClientProtocol = AssistantAPIClient.shared,
+        orderStore: UserDefaults = .standard,
+        todayProvider: @escaping () -> Date = Date.init,
+        autoLoadWhenReady: Bool = true
+    ) {
         self.api = api
+        self.orderStore = orderStore
+        self.todayProvider = todayProvider
         readyObserver = NotificationCenter.default.addObserver(
             forName: .backendDidBecomeReady,
             object: nil,
@@ -53,14 +104,14 @@ final class LearningAssistantViewModel: ObservableObject {
             Task { @MainActor [weak self] in
                 guard let self, self.isConnecting else { return }
                 self.isConnecting = false
-                await self.fetchTodayBriefing()
+                await self.fetchDashboard()
             }
         }
 
         // 若通知在订阅前已发出（后端早于视图初始化就绪），直接开始 fetch。
-        if BackendProcessManager.shared.isReady {
+        if autoLoadWhenReady, BackendProcessManager.shared.isReady {
             isConnecting = false
-            Task { await fetchTodayBriefing() }
+            Task { await fetchDashboard() }
         }
     }
 
@@ -70,12 +121,68 @@ final class LearningAssistantViewModel: ObservableObject {
 
     // MARK: - Briefing
 
+    var dashboardState: AssistantDashboardState {
+        let kind: AssistantDashboardKind
+        let primaryAction: AssistantDashboardPrimaryAction?
+
+        if isConnecting {
+            kind = .connecting
+            primaryAction = nil
+        } else if isOffline {
+            kind = .offline
+            primaryAction = nil
+        } else if tasks.isEmpty, resources.isEmpty {
+            kind = .emptyDatabase
+            primaryAction = .addResource
+        } else if tasks.isEmpty {
+            kind = .noTasksWithResources
+            primaryAction = nil
+        } else if tasks.allSatisfy(\.isCompleted) {
+            kind = .allTasksCompleted
+            primaryAction = nil
+        } else {
+            kind = .tasksToday
+            primaryAction = nil
+        }
+
+        return AssistantDashboardState(
+            kind: kind,
+            totalMinutes: todayTotalMinutes,
+            taskCount: tasks.count,
+            completedTaskCount: tasks.filter(\.isCompleted).count,
+            highlights: todayHighlights,
+            resourceCount: resources.count,
+            hasDeadlineRisk: hasDeadlineRisk,
+            primaryAction: primaryAction,
+            primaryTaskID: nil
+        )
+    }
+
+    func fetchDashboard() async {
+        isFetchingBriefing = true
+        defer { isFetchingBriefing = false }
+        do {
+            async let briefingRequest = api.fetchTodayBriefing()
+            async let resourcesRequest = api.fetchResources()
+            let (briefing, fetchedResources) = try await (briefingRequest, resourcesRequest)
+            apply(briefing: briefing, resources: fetchedResources)
+            isOffline = false
+            isConnecting = false
+        } catch {
+            clearDashboardContent()
+            isOffline = true
+            isConnecting = false
+        }
+    }
+
     func fetchTodayBriefing() async {
         isFetchingBriefing = true
         defer { isFetchingBriefing = false }
         do {
             let briefing      = try await api.fetchTodayBriefing()
-            tasks             = briefing.tasks
+            let orderedTasks   = applyLocalDisplayOrder(to: briefing.tasks)
+            tasks             = orderedTasks
+            visibleTodayTasks = orderedTasks
             todayTotalMinutes = briefing.totalMinutes
             todayHighlights   = briefing.highlights
             isOffline         = false
@@ -100,10 +207,47 @@ final class LearningAssistantViewModel: ObservableObject {
         do {
             try await api.completeTask(id: task.id, actualMinutes: nil)
             // Optimistic update: mark locally while re-fetching
-            await fetchTodayBriefing()
+            await fetchDashboard()
         } catch {
             isOffline = true
         }
+    }
+
+    // MARK: - Dashboard interactions
+
+    func moveVisibleTasks(fromOffsets source: IndexSet, toOffset destination: Int) {
+        guard !source.isEmpty else { return }
+        var reordered = visibleTodayTasks
+        let moving = source.sorted().compactMap { index in
+            reordered.indices.contains(index) ? reordered[index] : nil
+        }
+        for index in source.sorted(by: >) where reordered.indices.contains(index) {
+            reordered.remove(at: index)
+        }
+        let removedBeforeDestination = source.filter { $0 < destination }.count
+        let insertionIndex = min(max(destination - removedBeforeDestination, 0), reordered.count)
+        reordered.insert(contentsOf: moving, at: insertionIndex)
+        tasks = reordered
+        visibleTodayTasks = reordered
+        saveDisplayOrder(reordered.map(\.id))
+    }
+
+    func toggleTaskExpansion(_ task: AssistantTask) {
+        if expandedTaskIDs.contains(task.id) {
+            expandedTaskIDs.remove(task.id)
+        } else {
+            expandedTaskIDs.insert(task.id)
+        }
+    }
+
+    func isTaskExpanded(_ task: AssistantTask) -> Bool {
+        expandedTaskIDs.contains(task.id)
+    }
+
+    func learningLink(for task: AssistantTask) -> TaskLearningLink {
+        if let unitURL = task.unitURL { return .available(unitURL) }
+        if let resourceURL = task.resourceURL { return .available(resourceURL) }
+        return .unavailable
     }
 
     // MARK: - Chat
@@ -166,9 +310,99 @@ final class LearningAssistantViewModel: ObservableObject {
                                            selectedOption: confirmed ? (option ?? selectedOption) : nil)
             ingestionDraft    = nil
             ingestionThreadId = nil
-            if confirmed { await fetchTodayBriefing() }
+            if confirmed { await fetchDashboard() }
         } catch {
             isOffline = true
         }
+    }
+
+    // MARK: - Private dashboard helpers
+
+    private var hasDeadlineRisk: Bool {
+        resources.contains { resourceHasDeadlineRisk($0) }
+    }
+
+    private func apply(briefing: TodayBriefing, resources fetchedResources: [AssistantResource]) {
+        let orderedTasks = applyLocalDisplayOrder(to: briefing.tasks)
+        tasks = orderedTasks
+        visibleTodayTasks = orderedTasks
+        todayTotalMinutes = briefing.totalMinutes
+        todayHighlights = briefing.highlights
+        resources = fetchedResources
+    }
+
+    private func clearDashboardContent() {
+        tasks = []
+        visibleTodayTasks = []
+        resources = []
+        todayTotalMinutes = 0
+        todayHighlights = ""
+        expandedTaskIDs = []
+    }
+
+    private func applyLocalDisplayOrder(to incomingTasks: [AssistantTask]) -> [AssistantTask] {
+        let storedIDs = savedDisplayOrder()
+        guard !storedIDs.isEmpty else {
+            saveDisplayOrder(incomingTasks.map(\.id))
+            return incomingTasks
+        }
+
+        let tasksByID = Dictionary(uniqueKeysWithValues: incomingTasks.map { ($0.id, $0) })
+        var seen = Set<Int>()
+        var ordered = storedIDs.compactMap { id -> AssistantTask? in
+            guard let task = tasksByID[id] else { return nil }
+            seen.insert(id)
+            return task
+        }
+        ordered.append(contentsOf: incomingTasks.filter { !seen.contains($0.id) })
+        saveDisplayOrder(ordered.map(\.id))
+        return ordered
+    }
+
+    private func savedDisplayOrder() -> [Int] {
+        orderStore.array(forKey: displayOrderKey) as? [Int] ?? []
+    }
+
+    private func saveDisplayOrder(_ ids: [Int]) {
+        orderStore.set(ids, forKey: displayOrderKey)
+    }
+
+    private var displayOrderKey: String {
+        "LearningAssistant.todayTaskOrder.\(todayKey)"
+    }
+
+    private var todayKey: String {
+        let calendar = Calendar.current
+        let formatter = DateFormatter()
+        formatter.calendar = calendar
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = calendar.timeZone
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: todayProvider())
+    }
+
+    private func resourceHasDeadlineRisk(_ resource: AssistantResource) -> Bool {
+        let status = resource.status.lowercased()
+        if status.contains("overdue") || status.contains("risk") || status.contains("due") {
+            return true
+        }
+        guard let deadline = parseDeadline(resource.deadline) else { return false }
+        let today = Calendar.current.startOfDay(for: todayProvider())
+        let warningWindow = Calendar.current.date(byAdding: .day, value: 3, to: today) ?? today
+        return deadline <= warningWindow
+    }
+
+    private func parseDeadline(_ rawValue: String?) -> Date? {
+        guard let rawValue, !rawValue.isEmpty else { return nil }
+        let isoFormatter = ISO8601DateFormatter()
+        isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = isoFormatter.date(from: rawValue) { return Calendar.current.startOfDay(for: date) }
+
+        let dateOnlyFormatter = DateFormatter()
+        dateOnlyFormatter.calendar = Calendar(identifier: .gregorian)
+        dateOnlyFormatter.locale = Locale(identifier: "en_US_POSIX")
+        dateOnlyFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+        dateOnlyFormatter.dateFormat = "yyyy-MM-dd"
+        return dateOnlyFormatter.date(from: rawValue)
     }
 }
