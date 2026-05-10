@@ -187,6 +187,25 @@ async def test_9_5_offline_compensation_detection(db):
     assert result_after is True, "After inserting event, review should be detected as done"
 
 
+@pytest.mark.asyncio
+async def test_9_5_weekly_review_legacy_event_detects_sqlite_timestamp(db):
+    """
+    legacy/scheduled weekly_review_done event may have no payload and SQLite timestamp format.
+    """
+    from src.db.queries import has_weekly_review_done
+
+    target_sunday = date(2026, 5, 3)
+    await db.execute(
+        "INSERT INTO events (event_type, payload, created_at) VALUES (?, ?, ?)",
+        ("weekly_review_done", None, "2026-05-03 20:00:00"),
+    )
+    await db.commit()
+
+    result = await has_weekly_review_done(db, target_sunday)
+
+    assert result is True, "Legacy event on target Sunday should count as completed"
+
+
 # ---------------------------------------------------------------------------
 # 9.6 — Idempotency: repeated /api/morning-briefing calls same day
 # ---------------------------------------------------------------------------

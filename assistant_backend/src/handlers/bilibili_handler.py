@@ -36,10 +36,10 @@ async def _fetch_pagelist(client: httpx.AsyncClient, bvid: str) -> list[dict]:
             headers=_HEADERS,
             timeout=15,
         )
-        if resp.status_code == 200:
-            data = resp.json()
-            if data.get("code") == 0:
-                return data.get("data", [])
+        resp.raise_for_status()
+        data = resp.json()
+        if data.get("code") == 0:
+            return data.get("data", [])
     except Exception:
         pass
     return []
@@ -53,10 +53,10 @@ async def _fetch_view(client: httpx.AsyncClient, bvid: str) -> dict:
             headers=_HEADERS,
             timeout=15,
         )
-        if resp.status_code == 200:
-            data = resp.json()
-            if data.get("code") == 0:
-                return data.get("data", {})
+        resp.raise_for_status()
+        data = resp.json()
+        if data.get("code") == 0:
+            return data.get("data", {})
     except Exception:
         pass
     return {}

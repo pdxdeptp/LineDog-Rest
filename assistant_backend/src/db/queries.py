@@ -86,13 +86,25 @@ async def insert_event(db: aiosqlite.Connection, event_type: str, payload: dict 
 
 
 async def has_weekly_review_done(db: aiosqlite.Connection, target_sunday: date) -> bool:
-    day_start = datetime.combine(target_sunday, datetime.min.time()).isoformat()
-    day_end = datetime.combine(target_sunday, datetime.max.time()).isoformat()
+    target_iso = target_sunday.isoformat()
     async with db.execute(
-        "SELECT 1 FROM events WHERE event_type = 'weekly_review_done' AND created_at BETWEEN ? AND ? LIMIT 1",
-        (day_start, day_end),
+        "SELECT payload, created_at FROM events WHERE event_type = 'weekly_review_done'",
     ) as cursor:
-        return await cursor.fetchone() is not None
+        rows = await cursor.fetchall()
+
+    for payload_raw, created_at in rows:
+        if isinstance(created_at, str) and created_at[:10] == target_iso:
+            return True
+        if not payload_raw:
+            continue
+        try:
+            payload = json.loads(payload_raw)
+        except json.JSONDecodeError:
+            continue
+        week = payload.get("week")
+        if week == target_iso or (isinstance(week, str) and target_iso in week.split("/")):
+            return True
+    return False
 
 
 async def get_task_stats(db: aiosqlite.Connection, period: str) -> dict:

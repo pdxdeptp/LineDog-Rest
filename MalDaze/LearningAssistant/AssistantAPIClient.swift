@@ -28,6 +28,28 @@ struct AssistantTask: Codable, Identifiable {
     let completedAt: String?
     let resourceTitle: String?
     let priority: Int
+    let resourceURL: URL?
+    let unitURL: URL?
+
+    init(
+        id: Int,
+        title: String,
+        targetMinutes: Int,
+        completedAt: String?,
+        resourceTitle: String?,
+        priority: Int,
+        resourceURL: URL? = nil,
+        unitURL: URL? = nil
+    ) {
+        self.id = id
+        self.title = title
+        self.targetMinutes = targetMinutes
+        self.completedAt = completedAt
+        self.resourceTitle = resourceTitle
+        self.priority = priority
+        self.resourceURL = resourceURL
+        self.unitURL = unitURL
+    }
 
     var isCompleted: Bool { completedAt != nil }
 
@@ -37,6 +59,8 @@ struct AssistantTask: Codable, Identifiable {
         case completedAt   = "completed_at"
         case resourceTitle = "resource_title"
         case priority
+        case resourceURL   = "resource_url"
+        case unitURL       = "unit_url"
     }
 }
 

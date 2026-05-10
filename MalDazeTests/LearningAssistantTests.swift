@@ -139,6 +139,76 @@ final class AssistantModelDecodingTests: XCTestCase {
         XCTAssertEqual(briefing.totalMinutes, 13)
     }
 
+    func testAssistantTaskDecodesOptionalLearningLinks() throws {
+        let json = """
+        {
+            "tasks": [
+                {
+                    "id": 1,
+                    "title": "01 相向双指针",
+                    "target_minutes": 13,
+                    "completed_at": null,
+                    "resource_title": "基础算法精讲",
+                    "priority": 1,
+                    "resource_url": "https://example.com/resource",
+                    "unit_url": "https://example.com/unit"
+                }
+            ],
+            "total_minutes": 13,
+            "highlights": "今日负荷正常"
+        }
+        """
+        let briefing = try decode(TodayBriefing.self, from: json)
+        XCTAssertEqual(briefing.tasks[0].resourceURL, URL(string: "https://example.com/resource"))
+        XCTAssertEqual(briefing.tasks[0].unitURL, URL(string: "https://example.com/unit"))
+    }
+
+    func testAssistantTaskDecodesMissingLearningLinksAsNil() throws {
+        let json = """
+        {
+            "tasks": [
+                {
+                    "id": 1,
+                    "title": "T",
+                    "target_minutes": 10,
+                    "completed_at": null,
+                    "resource_title": null,
+                    "priority": 0
+                }
+            ],
+            "total_minutes": 10,
+            "highlights": ""
+        }
+        """
+        let briefing = try decode(TodayBriefing.self, from: json)
+        XCTAssertNil(briefing.tasks[0].resourceURL)
+        XCTAssertNil(briefing.tasks[0].unitURL)
+    }
+
+    func testAssistantTaskDecodesNullLearningLinksAsNil() throws {
+        let json = """
+        {
+            "tasks": [
+                {
+                    "id": 1,
+                    "title": "T",
+                    "target_minutes": 10,
+                    "completed_at": null,
+                    "resource_title": null,
+                    "priority": 0,
+                    "resource_url": null,
+                    "unit_url": null
+                }
+            ],
+            "total_minutes": 10,
+            "highlights": ""
+        }
+        """
+        let briefing = try decode(TodayBriefing.self, from: json)
+        XCTAssertNil(briefing.tasks[0].resourceURL)
+        XCTAssertNil(briefing.tasks[0].unitURL)
+    }
+
     func testBriefingTaskIsCompletedWhenCompletedAtPresent() throws {
         let json = """
         {"tasks":[{"id":1,"title":"T","target_minutes":10,"completed_at":"2026-05-09T17:46:14","resource_title":null,"priority":0}],"total_minutes":10,"highlights":""}
@@ -161,6 +231,74 @@ final class AssistantModelDecodingTests: XCTestCase {
     }
 }
 
+// MARK: - UI Source Tests
+// UI 层目前没有稳定的 SwiftUI inspection 依赖；这些测试锁定 OpenSpec 要求的结构和关键文案。
+
+final class LearningAssistantUISourceTests: XCTestCase {
+
+    func testAssistantPanelUsesDashboardHomeAndBottomNavigationInsteadOfSegmentedTabs() throws {
+        let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
+
+        XCTAssertTrue(source.contains("selectedPanelTab"))
+        XCTAssertTrue(source.contains("bottomNavigationBar"))
+        XCTAssertTrue(source.contains("首页"))
+        XCTAssertTrue(source.contains("添加资料"))
+        XCTAssertTrue(source.contains("资料进度"))
+        XCTAssertTrue(source.contains("调整计划"))
+        XCTAssertTrue(source.contains("fetchDashboard()"))
+        XCTAssertFalse(source.contains(".pickerStyle(.segmented)"))
+    }
+
+    func testAssistantPanelCoversDashboardStatesAndReorderableTodayTasks() throws {
+        let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
+
+        XCTAssertTrue(source.contains("emptyDatabase"))
+        XCTAssertTrue(source.contains("尚未添加学习资料"))
+        XCTAssertTrue(source.contains("添加第一份资料"))
+        XCTAssertTrue(source.contains("noTasksWithResources"))
+        XCTAssertTrue(source.contains("今天没有安排学习任务"))
+        XCTAssertTrue(source.contains("allTasksCompleted"))
+        XCTAssertTrue(source.contains("今日已完成"))
+        XCTAssertTrue(source.contains("hasDeadlineRisk"))
+        XCTAssertTrue(source.contains("moveVisibleTasks"))
+    }
+
+    func testAssistantPanelProvidesFixtureInjectionAndPreviewStateMatrix() throws {
+        let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
+
+        XCTAssertTrue(source.contains("init(viewModel: LearningAssistantViewModel = LearningAssistantViewModel())"))
+        XCTAssertTrue(source.contains("_vm = StateObject(wrappedValue: viewModel)"))
+        XCTAssertTrue(source.contains("AssistantPanelPreviewFixtures"))
+        XCTAssertTrue(source.contains("emptyDatabaseViewModel"))
+        XCTAssertTrue(source.contains("backendStartingViewModel"))
+        XCTAssertTrue(source.contains("wholeColumnOfflineViewModel"))
+        XCTAssertTrue(source.contains("tasksTodayViewModel"))
+        XCTAssertTrue(source.contains("taskExpandedWithLinkViewModel"))
+        XCTAssertTrue(source.contains("taskExpandedWithoutLinkViewModel"))
+        XCTAssertTrue(source.contains("resourcesWithoutTodayTasksViewModel"))
+        XCTAssertTrue(source.contains("deadlineRiskViewModel"))
+    }
+
+    func testTaskRowProvidesIndependentHandleExpansionCompletionAndLearningLinkAction() throws {
+        let source = try sourceFile("MalDaze/LearningAssistant/TaskRowView.swift")
+
+        XCTAssertTrue(source.contains("dragHandle"))
+        XCTAssertTrue(source.contains("line.3.horizontal"))
+        XCTAssertTrue(source.contains("onToggleExpansion"))
+        XCTAssertTrue(source.contains("onComplete"))
+        XCTAssertTrue(source.contains("打开链接"))
+        XCTAssertTrue(source.contains("链接不可用"))
+        XCTAssertTrue(source.contains("NSWorkspace.shared.open"))
+    }
+
+    private func sourceFile(_ relativePath: String) throws -> String {
+        let testFile = URL(fileURLWithPath: #filePath)
+        let projectRoot = testFile.deletingLastPathComponent().deletingLastPathComponent()
+        let url = projectRoot.appendingPathComponent(relativePath)
+        return try String(contentsOf: url, encoding: .utf8)
+    }
+}
+
 // MARK: - ViewModel Tests
 // 验证验收场景中涉及前端的各流程；使用 MockAssistantAPIClient 隔离网络
 
@@ -170,13 +308,222 @@ final class LearningAssistantViewModelTests: XCTestCase {
     // MARK: 0-3 空状态初始值
 
     func testInitialStateIsEmpty() {
-        let vm = LearningAssistantViewModel(api: MockAssistantAPIClient())
+        let vm = LearningAssistantViewModel(api: MockAssistantAPIClient(), autoLoadWhenReady: false)
         XCTAssertTrue(vm.tasks.isEmpty)
         XCTAssertTrue(vm.chatMessages.isEmpty)
         XCTAssertNil(vm.ingestionDraft)
         XCTAssertNil(vm.ingestionThreadId)
         XCTAssertFalse(vm.isOffline)
         XCTAssertEqual(vm.selectedOption, "A")
+    }
+
+    // MARK: 1.4 / 3.2-3.6 首页 dashboard 状态层
+
+    func testFetchDashboardAggregatesBriefingAndResourcesIntoSummaryState() async {
+        let mock = MockAssistantAPIClient()
+        mock.briefingResult = TodayBriefing(
+            tasks: [
+                AssistantTask(id: 1, title: "A", targetMinutes: 15,
+                              completedAt: nil, resourceTitle: "R", priority: 1),
+                AssistantTask(id: 2, title: "B", targetMinutes: 20,
+                              completedAt: nil, resourceTitle: "R", priority: 2)
+            ],
+            totalMinutes: 35,
+            highlights: "今日负荷正常"
+        )
+        mock.resourcesResult = [
+            AssistantResource(id: 10, title: "R", trackingMode: "video",
+                              completedUnits: 1, totalUnits: 5, actualMinutesTotal: 20,
+                              deadline: nil, status: "active")
+        ]
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+
+        await vm.fetchDashboard()
+
+        XCTAssertEqual(mock.fetchBriefingCallCount, 1)
+        XCTAssertEqual(mock.fetchResourcesCallCount, 1)
+        XCTAssertFalse(vm.isOffline)
+        XCTAssertEqual(vm.dashboardState.kind, .tasksToday)
+        XCTAssertEqual(vm.dashboardState.taskCount, 2)
+        XCTAssertEqual(vm.dashboardState.totalMinutes, 35)
+        XCTAssertEqual(vm.dashboardState.highlights, "今日负荷正常")
+        XCTAssertEqual(vm.visibleTodayTasks.map(\.id), [1, 2])
+    }
+
+    func testDashboardEmptyDatabaseMarksAddResourceAsPrimaryAction() async {
+        let mock = MockAssistantAPIClient()
+        mock.briefingResult = TodayBriefing(tasks: [], totalMinutes: 0, highlights: "")
+        mock.resourcesResult = []
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+
+        await vm.fetchDashboard()
+
+        XCTAssertEqual(vm.dashboardState.kind, .emptyDatabase)
+        XCTAssertEqual(vm.dashboardState.primaryAction, .addResource)
+        XCTAssertTrue(vm.visibleTodayTasks.isEmpty)
+    }
+
+    func testDashboardNoTasksWithResourcesDoesNotSelectNextTask() async {
+        let mock = MockAssistantAPIClient()
+        mock.briefingResult = TodayBriefing(tasks: [], totalMinutes: 0, highlights: "")
+        mock.resourcesResult = [
+            AssistantResource(id: 10, title: "R", trackingMode: "video",
+                              completedUnits: 1, totalUnits: 5, actualMinutesTotal: 20,
+                              deadline: nil, status: "active")
+        ]
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+
+        await vm.fetchDashboard()
+
+        XCTAssertEqual(vm.dashboardState.kind, .noTasksWithResources)
+        XCTAssertNil(vm.dashboardState.primaryTaskID)
+        XCTAssertEqual(vm.selectedPanelTab, .home)
+    }
+
+    func testFetchDashboardFailureDoesNotKeepPartialSuccessState() async {
+        let mock = MockAssistantAPIClient()
+        mock.briefingResult = TodayBriefing(
+            tasks: [AssistantTask(id: 1, title: "A", targetMinutes: 15,
+                                  completedAt: nil, resourceTitle: "R", priority: 1)],
+            totalMinutes: 15,
+            highlights: "ok"
+        )
+        mock.resourcesResult = [
+            AssistantResource(id: 10, title: "R", trackingMode: "video",
+                              completedUnits: 1, totalUnits: 5, actualMinutesTotal: 20,
+                              deadline: nil, status: "active")
+        ]
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        await vm.fetchDashboard()
+
+        mock.shouldThrowResources = true
+        mock.briefingResult = TodayBriefing(
+            tasks: [AssistantTask(id: 2, title: "B", targetMinutes: 20,
+                                  completedAt: nil, resourceTitle: "R2", priority: 1)],
+            totalMinutes: 20,
+            highlights: "new"
+        )
+        await vm.fetchDashboard()
+
+        XCTAssertTrue(vm.isOffline)
+        XCTAssertEqual(vm.dashboardState.kind, .offline)
+        XCTAssertTrue(vm.tasks.isEmpty)
+        XCTAssertTrue(vm.resources.isEmpty)
+        XCTAssertTrue(vm.visibleTodayTasks.isEmpty)
+    }
+
+    func testLocalTaskDisplayOrderPersistsAndMergesChangedTaskSet() async {
+        let mock = MockAssistantAPIClient()
+        let defaults = UserDefaults(suiteName: "LearningAssistantTests.order.\(UUID().uuidString)")!
+        mock.briefingResult = TodayBriefing(
+            tasks: [
+                AssistantTask(id: 1, title: "A", targetMinutes: 10,
+                              completedAt: nil, resourceTitle: nil, priority: 1),
+                AssistantTask(id: 2, title: "B", targetMinutes: 10,
+                              completedAt: nil, resourceTitle: nil, priority: 2),
+                AssistantTask(id: 3, title: "C", targetMinutes: 10,
+                              completedAt: nil, resourceTitle: nil, priority: 3)
+            ],
+            totalMinutes: 30,
+            highlights: ""
+        )
+        let vm = LearningAssistantViewModel(
+            api: mock,
+            orderStore: defaults,
+            todayProvider: { Date(timeIntervalSince1970: 1_778_630_400) },
+            autoLoadWhenReady: false
+        )
+        await vm.fetchDashboard()
+
+        vm.moveVisibleTasks(fromOffsets: IndexSet(integer: 2), toOffset: 0)
+        XCTAssertEqual(vm.visibleTodayTasks.map(\.id), [3, 1, 2])
+
+        mock.briefingResult = TodayBriefing(
+            tasks: [
+                AssistantTask(id: 2, title: "B", targetMinutes: 10,
+                              completedAt: nil, resourceTitle: nil, priority: 2),
+                AssistantTask(id: 3, title: "C", targetMinutes: 10,
+                              completedAt: nil, resourceTitle: nil, priority: 3),
+                AssistantTask(id: 4, title: "D", targetMinutes: 10,
+                              completedAt: nil, resourceTitle: nil, priority: 4)
+            ],
+            totalMinutes: 30,
+            highlights: ""
+        )
+        await vm.fetchDashboard()
+
+        XCTAssertEqual(vm.visibleTodayTasks.map(\.id), [3, 2, 4])
+        XCTAssertNil(mock.lastCompleteTaskId)
+    }
+
+    func testLocalTaskDisplayOrderUsesUserLocalTodayKey() async throws {
+        let previousTimeZone = NSTimeZone.default
+        NSTimeZone.default = TimeZone(identifier: "America/New_York")!
+        defer { NSTimeZone.default = previousTimeZone }
+
+        let mock = MockAssistantAPIClient()
+        let defaults = UserDefaults(suiteName: "LearningAssistantTests.order.\(UUID().uuidString)")!
+        defaults.set([2, 1], forKey: "LearningAssistant.todayTaskOrder.2026-01-31")
+        mock.briefingResult = TodayBriefing(
+            tasks: [
+                AssistantTask(id: 1, title: "A", targetMinutes: 10,
+                              completedAt: nil, resourceTitle: nil, priority: 1),
+                AssistantTask(id: 2, title: "B", targetMinutes: 10,
+                              completedAt: nil, resourceTitle: nil, priority: 2)
+            ],
+            totalMinutes: 20,
+            highlights: ""
+        )
+        let date = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-02-01T02:00:00Z"))
+        let vm = LearningAssistantViewModel(
+            api: mock,
+            orderStore: defaults,
+            todayProvider: { date },
+            autoLoadWhenReady: false
+        )
+
+        await vm.fetchDashboard()
+
+        XCTAssertEqual(vm.visibleTodayTasks.map(\.id), [2, 1])
+    }
+
+    func testTaskExpansionTogglesAndLearningLinkPrefersUnitURL() {
+        let vm = LearningAssistantViewModel(api: MockAssistantAPIClient(), autoLoadWhenReady: false)
+        let task = AssistantTask(
+            id: 1,
+            title: "T",
+            targetMinutes: 10,
+            completedAt: nil,
+            resourceTitle: "R",
+            priority: 0,
+            resourceURL: URL(string: "https://example.com/resource"),
+            unitURL: URL(string: "https://example.com/unit")
+        )
+
+        XCTAssertFalse(vm.isTaskExpanded(task))
+        vm.toggleTaskExpansion(task)
+        XCTAssertTrue(vm.isTaskExpanded(task))
+        XCTAssertEqual(vm.learningLink(for: task), .available(URL(string: "https://example.com/unit")!))
+        vm.toggleTaskExpansion(task)
+        XCTAssertFalse(vm.isTaskExpanded(task))
+    }
+
+    func testLearningLinkFallsBackToResourceURLAndCanBeUnavailable() {
+        let vm = LearningAssistantViewModel(api: MockAssistantAPIClient(), autoLoadWhenReady: false)
+        let resourceOnly = AssistantTask(
+            id: 1,
+            title: "T",
+            targetMinutes: 10,
+            completedAt: nil,
+            resourceTitle: "R",
+            priority: 0,
+            resourceURL: URL(string: "https://example.com/resource")
+        )
+        let noLink = AssistantTask(id: 2, title: "N", targetMinutes: 10,
+                                   completedAt: nil, resourceTitle: nil, priority: 0)
+
+        XCTAssertEqual(vm.learningLink(for: resourceOnly), .available(URL(string: "https://example.com/resource")!))
+        XCTAssertEqual(vm.learningLink(for: noLink), .unavailable)
     }
 
     // MARK: 2-3 面板任务列表 — fetchTodayBriefing
@@ -394,12 +741,15 @@ private final class MockAssistantAPIClient: AssistantAPIClientProtocol, @uncheck
 
     // Configurable results
     var briefingResult = TodayBriefing(tasks: [], totalMinutes: 0, highlights: "")
+    var resourcesResult: [AssistantResource] = []
     var ingestionResult: IngestionDraft?
     var chatResult: ChatResponse?
     var shouldThrowOffline = false
+    var shouldThrowResources = false
 
     // Captured call arguments for assertions
     private(set) var fetchBriefingCallCount = 0
+    private(set) var fetchResourcesCallCount = 0
     private(set) var lastCompleteTaskId: Int?
     private(set) var lastConfirmChatConfirmed: Bool?
     private(set) var lastConfirmIngestionConfirmed: Bool?
@@ -444,7 +794,8 @@ private final class MockAssistantAPIClient: AssistantAPIClientProtocol, @uncheck
     }
 
     func fetchResources() async throws -> [AssistantResource] {
-        if shouldThrowOffline { throw AssistantOfflineError() }
-        return []
+        fetchResourcesCallCount += 1
+        if shouldThrowOffline || shouldThrowResources { throw AssistantOfflineError() }
+        return resourcesResult
     }
 }

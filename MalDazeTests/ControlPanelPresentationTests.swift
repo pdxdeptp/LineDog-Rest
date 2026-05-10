@@ -85,6 +85,70 @@ final class ControlPanelPresentationTests: XCTestCase {
         )
     }
 
+    func testControlPanelPreferredContentSizeUsesVisibleScreenWidthWithSafetyMargin() throws {
+        let source = try readProjectSource("MalDaze/MenuBarContentView.swift")
+        let preferredSizeRange = try XCTUnwrap(
+            rangeOfMember(named: "controlPanelPreferredContentSize", in: source),
+            "MenuBarContentView should expose a single shared preferred content size for menu bar and desk pet popovers."
+        )
+        let preferredSizeSource = String(source[preferredSizeRange])
+
+        XCTAssertTrue(
+            preferredSizeSource.contains("NSScreen.main?.visibleFrame"),
+            "controlPanelPreferredContentSize should derive the wide popover width from the current screen visibleFrame."
+        )
+        XCTAssertTrue(
+            source.contains("static let safeHorizontalMargin"),
+            "controlPanelPreferredContentSize should reserve a named horizontal safety margin."
+        )
+        XCTAssertTrue(
+            preferredSizeSource.contains("ControlPanelLayout.preferredContentSize(screenVisibleFrame:"),
+            "controlPanelPreferredContentSize should delegate screen-aware sizing to a testable layout helper."
+        )
+    }
+
+    func testControlPanelLayoutHelperClampsWidthAndProvidesFallback() throws {
+        let source = try readProjectSource("MalDaze/MenuBarContentView.swift")
+
+        XCTAssertTrue(
+            source.contains("static func preferredContentSize(screenVisibleFrame visibleFrame: NSRect?) -> NSSize"),
+            "MenuBarContentView should keep popover sizing in a deterministic helper that accepts an optional visibleFrame."
+        )
+        XCTAssertTrue(
+            source.contains("fallbackVisibleFrame"),
+            "The sizing helper should provide a reasonable fallback when no screen is available."
+        )
+        XCTAssertTrue(
+            source.contains("min(targetWidth, visibleFrame.width)"),
+            "The sizing helper should clamp the preferred width so it never exceeds the visible screen width."
+        )
+        XCTAssertTrue(
+            source.contains("min(max(minimumContentWidth, clampedTargetWidth), visibleFrame.width)"),
+            "The sizing helper should keep the shell near full width while clamping it to the visible screen width."
+        )
+    }
+
+    func testWideControlPanelShellKeepsOuterColumnsFixedAndAssistantAdaptive() throws {
+        let source = try readProjectSource("MalDaze/MenuBarContentView.swift")
+
+        XCTAssertTrue(
+            source.contains(".frame(width: ControlPanelLayout.remindersColumnWidth"),
+            "The reminders sidebar should keep a fixed width in the wide popover shell."
+        )
+        XCTAssertTrue(
+            source.contains(".frame(width: ControlPanelLayout.controlsColumnWidth"),
+            "The right controls column should keep a fixed width in the wide popover shell."
+        )
+        XCTAssertTrue(
+            source.contains(".frame(minWidth: ControlPanelLayout.assistantMinimumColumnWidth, maxWidth: .infinity"),
+            "AssistantPanelView should receive the remaining adaptive width between the fixed outer columns."
+        )
+        XCTAssertFalse(
+            source.contains(".frame(width: assistantColumnWidth"),
+            "AssistantPanelView should no longer be pinned to the old narrow fixed width."
+        )
+    }
+
     func testIdlePetIconSideSettingsChangesBroadcastToRunningAppViewModel() throws {
         let notificationSource = try readProjectSource("MalDaze/MalDazeBroadcastNotifications.swift")
         let panelSource = try readProjectSource("MalDaze/MenuBarContentView.swift")
@@ -132,6 +196,31 @@ final class ControlPanelPresentationTests: XCTestCase {
 
     private func rangeOfFunction(named functionName: String, in source: String) -> Range<String.Index>? {
         guard let declarationRange = source.range(of: "func \(functionName)("),
+              let openingBrace = source[declarationRange.upperBound...].firstIndex(of: "{")
+        else { return nil }
+
+        var depth = 0
+        var cursor = openingBrace
+        while cursor < source.endIndex {
+            switch source[cursor] {
+            case "{":
+                depth += 1
+            case "}":
+                depth -= 1
+                if depth == 0 {
+                    return declarationRange.lowerBound..<source.index(after: cursor)
+                }
+            default:
+                break
+            }
+            cursor = source.index(after: cursor)
+        }
+
+        return nil
+    }
+
+    private func rangeOfMember(named memberName: String, in source: String) -> Range<String.Index>? {
+        guard let declarationRange = source.range(of: "static var \(memberName):"),
               let openingBrace = source[declarationRange.upperBound...].firstIndex(of: "{")
         else { return nil }
 
