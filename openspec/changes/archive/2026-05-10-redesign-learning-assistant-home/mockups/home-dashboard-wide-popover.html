@@ -1,0 +1,923 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MalDaze Learning Assistant Home Mockup</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #ece9e3;
+      --panel: #f9f8f5;
+      --section: #ffffff;
+      --line: #d8d3cb;
+      --line-soft: #e8e3da;
+      --text: #23211e;
+      --muted: #68625b;
+      --faint: #8a847d;
+      --accent: #2f7d76;
+      --accent-soft: #e5f1ee;
+      --warn: #b75d3b;
+      --warn-soft: #f7ebe5;
+      --focus: #596f9f;
+      --shadow: 0 22px 72px rgba(47, 42, 35, 0.18), 0 6px 18px rgba(47, 42, 35, 0.10);
+      --radius: 8px;
+      --left: 300px;
+      --right: 300px;
+      --chrome-pad: 14px;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.4), rgba(255,255,255,0) 34%),
+        var(--bg);
+      color: var(--text);
+      display: grid;
+      place-items: center;
+      padding: 26px;
+    }
+
+    .screen {
+      width: min(1560px, 96vw);
+      min-width: 1040px;
+    }
+
+    .popover {
+      width: 100%;
+      height: min(780px, calc(100vh - 52px));
+      min-height: 640px;
+      display: grid;
+      grid-template-columns: var(--left) 1px minmax(420px, 1fr) 1px var(--right);
+      overflow: hidden;
+      background: rgba(249, 248, 245, 0.96);
+      border: 1px solid rgba(154, 144, 132, 0.45);
+      border-radius: 14px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px);
+    }
+
+    .divider {
+      background: var(--line);
+    }
+
+    .rail,
+    .rightbar,
+    .assistant {
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .rail,
+    .rightbar {
+      padding: 18px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .assistant {
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      background: linear-gradient(180deg, rgba(255,255,255,0.55), rgba(255,255,255,0.1));
+    }
+
+    .column-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      min-height: 34px;
+    }
+
+    h1,
+    h2,
+    h3,
+    p {
+      margin: 0;
+    }
+
+    h1 {
+      font-size: 19px;
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+
+    h2 {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+
+    h3 {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .faint {
+      color: var(--faint);
+    }
+
+    .small {
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    .tiny {
+      font-size: 11px;
+      line-height: 1.35;
+    }
+
+    .section {
+      background: var(--section);
+      border: 1px solid var(--line-soft);
+      border-radius: var(--radius);
+      padding: 12px;
+    }
+
+    .flat-section {
+      padding: 12px 0;
+      border-top: 1px solid var(--line-soft);
+    }
+
+    .assistant-header {
+      grid-row: 1;
+      padding: 16px 18px 12px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .header-copy {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 0;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 0 0 auto;
+    }
+
+    .icon-button,
+    .tool,
+    .plain-button,
+    .primary-button {
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--text);
+      border-radius: 7px;
+      min-height: 30px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      padding: 0 10px;
+      font: inherit;
+      font-size: 12px;
+      white-space: nowrap;
+      cursor: default;
+    }
+
+    .icon-button {
+      width: 30px;
+      padding: 0;
+    }
+
+    .primary-button {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+      font-weight: 650;
+    }
+
+    .tool {
+      min-height: 48px;
+      flex-direction: column;
+      justify-content: center;
+      gap: 4px;
+      padding: 6px 8px;
+      background: #fff;
+      border-color: var(--line-soft);
+      font-size: 11px;
+    }
+
+    .tool[aria-current="true"] {
+      background: var(--accent-soft);
+      border-color: rgba(47, 125, 118, 0.35);
+      color: #154f49;
+      font-weight: 650;
+    }
+
+    .icon {
+      width: 16px;
+      height: 16px;
+      display: inline-block;
+      flex: 0 0 auto;
+      color: currentColor;
+    }
+
+    .toolstrip {
+      grid-row: 3;
+      padding: 8px 18px 10px;
+      border-top: 1px solid var(--line);
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      background: rgba(249, 248, 245, 0.92);
+      box-shadow: 0 -10px 24px rgba(64, 55, 45, 0.05);
+    }
+
+    .assistant-scroll {
+      grid-row: 2;
+      min-height: 0;
+      overflow: auto;
+      padding: 16px 18px 18px;
+    }
+
+    .dashboard {
+      max-width: 920px;
+      margin: 0 auto;
+      display: grid;
+      gap: 14px;
+    }
+
+    .summary-band {
+      background: var(--section);
+      border: 1px solid var(--line-soft);
+      border-radius: var(--radius);
+      padding: 16px;
+      display: grid;
+      grid-template-columns: minmax(0, 1.3fr) 240px;
+      gap: 14px;
+    }
+
+    .summary-main {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .summary-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    .summary-title {
+      font-size: 24px;
+      line-height: 1.2;
+      font-weight: 760;
+      letter-spacing: 0;
+    }
+
+    .summary-text {
+      font-size: 13px;
+      line-height: 1.55;
+      color: var(--muted);
+      max-width: 68ch;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .metric {
+      background: #f7f5f0;
+      border: 1px solid var(--line-soft);
+      border-radius: 7px;
+      padding: 10px;
+      min-width: 0;
+    }
+
+    .metric strong {
+      display: block;
+      font-size: 19px;
+      line-height: 1.15;
+      letter-spacing: 0;
+    }
+
+    .metric span {
+      display: block;
+      margin-top: 4px;
+      font-size: 11px;
+      color: var(--muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .risk-panel {
+      border-radius: 7px;
+      background: var(--warn-soft);
+      border: 1px solid rgba(183, 93, 59, 0.24);
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      align-self: stretch;
+    }
+
+    .risk-panel strong {
+      color: #7a321f;
+      font-size: 13px;
+    }
+
+    .progress-line {
+      height: 7px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: #eee9df;
+    }
+
+    .progress-fill {
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--accent), #78a883);
+    }
+
+    .tasks-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .task-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .task {
+      display: grid;
+      grid-template-columns: 28px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 10px;
+      min-height: 58px;
+      padding: 10px 11px;
+      border: 1px solid var(--line-soft);
+      border-radius: var(--radius);
+      background: #fff;
+      cursor: default;
+    }
+
+    .task.dragging {
+      opacity: 0.58;
+      border-color: rgba(89, 111, 159, 0.35);
+      background: #f3f5fb;
+    }
+
+    .task.expanded {
+      align-items: start;
+      border-color: rgba(47, 125, 118, 0.26);
+      box-shadow: inset 3px 0 0 var(--accent);
+    }
+
+    .drag-handle {
+      width: 24px;
+      height: 32px;
+      border: 0;
+      background: transparent;
+      color: #958f86;
+      display: grid;
+      place-items: center;
+      padding: 0;
+    }
+
+    .task-copy {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 0;
+    }
+
+    .task-title {
+      font-size: 13px;
+      font-weight: 650;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .task-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 20px;
+      padding: 0 7px;
+      border-radius: 999px;
+      border: 1px solid var(--line-soft);
+      background: #f7f5f0;
+      color: var(--muted);
+      font-size: 11px;
+      white-space: nowrap;
+    }
+
+    .pill.priority {
+      background: #eef3f8;
+      border-color: #d8e1ea;
+      color: #37516f;
+      font-weight: 650;
+    }
+
+    .done-box {
+      width: 26px;
+      height: 26px;
+      border-radius: 7px;
+      border: 1px solid var(--line);
+      background: #faf9f6;
+      display: grid;
+      place-items: center;
+      color: var(--accent);
+    }
+
+    .task-detail {
+      grid-column: 2 / 4;
+      display: none;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: center;
+      margin-top: 1px;
+      padding-top: 10px;
+      border-top: 1px solid var(--line-soft);
+    }
+
+    .task.expanded .task-detail {
+      display: grid;
+    }
+
+    .task-note {
+      display: grid;
+      gap: 4px;
+      min-width: 0;
+    }
+
+    .link-button {
+      border: 1px solid rgba(47, 125, 118, 0.32);
+      background: var(--accent-soft);
+      color: #154f49;
+      border-radius: 7px;
+      min-height: 30px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 0 10px;
+      font-size: 12px;
+      font-weight: 650;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .empty-state {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 14px;
+      padding: 14px;
+      background: var(--accent-soft);
+      border: 1px solid rgba(47, 125, 118, 0.22);
+      border-radius: var(--radius);
+    }
+
+    .offline-state {
+      display: none;
+      margin: auto;
+      width: min(520px, 92%);
+      text-align: center;
+      background: #fff;
+      border: 1px solid var(--line-soft);
+      border-radius: var(--radius);
+      padding: 28px;
+    }
+
+    .offline-state h2 {
+      font-size: 20px;
+      margin: 10px 0 7px;
+    }
+
+    .offline .assistant-header,
+    .offline .toolstrip,
+    .offline .assistant-scroll {
+      display: none;
+    }
+
+    .offline .assistant {
+      display: grid;
+      place-items: center;
+    }
+
+    .offline .offline-state {
+      display: block;
+    }
+
+    .reminder-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .reminder-item {
+      padding: 10px;
+      border: 1px solid var(--line-soft);
+      border-radius: 7px;
+      background: #fff;
+      display: grid;
+      gap: 4px;
+    }
+
+    .timer-block {
+      display: grid;
+      gap: 9px;
+    }
+
+    .timer-display {
+      font-size: 28px;
+      font-weight: 760;
+      line-height: 1;
+      letter-spacing: 0;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .control-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      min-height: 32px;
+    }
+
+    .switch {
+      width: 34px;
+      height: 20px;
+      border-radius: 999px;
+      background: #d7d0c7;
+      position: relative;
+      flex: 0 0 auto;
+    }
+
+    .switch::after {
+      content: "";
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      top: 2px;
+      left: 16px;
+      background: #fff;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+
+    .switch.on {
+      background: #72a7a0;
+    }
+
+    @media (max-width: 1180px) {
+      .screen {
+        min-width: 960px;
+      }
+
+      .popover {
+        grid-template-columns: 260px 1px minmax(380px, 1fr) 1px 260px;
+      }
+
+      .summary-band {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="screen" aria-label="宽屏桌宠菜单原型">
+    <section class="popover" id="popover">
+      <aside class="rail" aria-label="左侧提醒栏">
+        <div class="column-title">
+          <h2>提醒</h2>
+          <button class="icon-button" aria-label="新增提醒" title="新增提醒">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+        </div>
+        <div class="reminder-list">
+          <div class="reminder-item">
+            <strong class="small">整理 Obsidian 收件箱</strong>
+            <span class="tiny faint">今天 16:00</span>
+          </div>
+          <div class="reminder-item">
+            <strong class="small">发周报草稿</strong>
+            <span class="tiny faint">今天 18:30</span>
+          </div>
+          <div class="reminder-item">
+            <strong class="small">复查 LeetCode 错题</strong>
+            <span class="tiny faint">明天 09:00</span>
+          </div>
+        </div>
+        <div class="flat-section">
+          <p class="tiny muted">左栏保持固定宽度，只承载提醒和轻量入口，不再挤压学习助手。</p>
+        </div>
+      </aside>
+
+      <div class="divider" aria-hidden="true"></div>
+
+      <section class="assistant" aria-label="学习助手中栏">
+        <div class="offline-state">
+          <svg class="icon" style="width:36px;height:36px;color:#8b837b" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M2 8.8A15 15 0 0 1 12 5c3.8 0 7.3 1.4 10 3.8"/><path d="M5 12.4A10.5 10.5 0 0 1 12 10c2.7 0 5.1.9 7 2.4"/><path d="M8.6 16A5.7 5.7 0 0 1 12 15c1.3 0 2.5.4 3.4 1"/><path d="M3 3l18 18"/></svg>
+          <h2>学习助手服务不可用</h2>
+          <p class="small muted">前后端应同时在线；出现此状态时，中栏只表达服务不可用并提供重试。</p>
+          <button class="primary-button" style="margin-top:16px">重试连接</button>
+        </div>
+
+        <header class="assistant-header">
+          <div class="header-copy">
+            <h1>学习助手</h1>
+            <p class="small muted">今天先看整体状态，再自己决定任务顺序。</p>
+          </div>
+          <div class="header-actions">
+            <button class="icon-button" id="toggleOffline" aria-label="切换离线预览" title="切换离线预览">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4.9 19.1A10 10 0 1 1 19.1 4.9"/><path d="M20 20v-6h-6"/></svg>
+            </button>
+            <button class="icon-button" aria-label="刷新" title="刷新">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 0 1-15.1 6.6"/><path d="M3 12A9 9 0 0 1 18.1 5.4"/><path d="M18 2v4h-4M6 22v-4h4"/></svg>
+            </button>
+          </div>
+        </header>
+
+        <div class="assistant-scroll">
+          <div class="dashboard">
+            <section class="summary-band" aria-label="今日摘要">
+              <div class="summary-main">
+                <div class="summary-label">
+                  <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 2v4M16 2v4M3 10h18"/><rect x="3" y="4" width="18" height="18" rx="2"/></svg>
+                  今日摘要
+                </div>
+                <h2 class="summary-title">今天安排了 3 项学习，共 85 分钟。</h2>
+                <p class="summary-text">负荷正常。建议先看完算法章节，再处理 SwiftUI 状态重构；如果今天时间不够，可以在“调整计划”里让助手重新排。</p>
+                <div class="metrics" aria-label="今日指标">
+                  <div class="metric">
+                    <strong>85</strong>
+                    <span>计划分钟</span>
+                  </div>
+                  <div class="metric">
+                    <strong>3</strong>
+                    <span>待处理任务</span>
+                  </div>
+                  <div class="metric">
+                    <strong>1</strong>
+                    <span>资料有风险</span>
+                  </div>
+                </div>
+              </div>
+              <aside class="risk-panel" aria-label="资料风险">
+                <strong>一个资料接近截止</strong>
+                <p class="tiny muted">“SwiftUI 数据流”还剩 6 个单元，按当前速度可能晚 1 天完成。</p>
+                <div class="progress-line" aria-hidden="true">
+                  <div class="progress-fill" style="width:58%"></div>
+                </div>
+                <button class="plain-button">查看资料进度</button>
+              </aside>
+            </section>
+
+            <section class="section" aria-label="任务顺序">
+              <div class="tasks-header">
+                <div>
+                  <h2>今日任务</h2>
+                  <p class="tiny muted">拖动左侧把手调整展示顺序；不强推“下一项任务”。</p>
+                </div>
+                <button class="plain-button">
+                  <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3v18M18 3v18M6 7h12M6 12h12M6 17h12"/></svg>
+                  保存顺序
+                </button>
+              </div>
+              <div class="task-list" id="taskList">
+                <article class="task expanded" draggable="true" aria-expanded="true">
+                  <button class="drag-handle" aria-label="拖动任务">
+                    <svg class="icon" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>
+                  </button>
+                  <div class="task-copy">
+                    <div class="task-title">双指针：相向扫描复习</div>
+                    <div class="task-meta">
+                      <span>基础算法精讲</span>
+                      <span>25 分钟</span>
+                      <span class="pill priority">P1</span>
+                    </div>
+                  </div>
+                  <button class="done-box" aria-label="标记完成">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg>
+                  </button>
+                  <div class="task-detail">
+                    <div class="task-note">
+                      <strong class="tiny">详情</strong>
+                      <p class="tiny muted">安排原因：这项是 P1，且属于今天 85 分钟计划里的核心章节。详情区保持轻量，主要服务于快速打开学习入口。</p>
+                    </div>
+                    <a class="link-button" href="https://example.com/learning/algorithm-two-pointers" target="_blank" rel="noreferrer">
+                      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg>
+                      打开链接
+                    </a>
+                  </div>
+                </article>
+
+                <article class="task" draggable="true" aria-expanded="false">
+                  <button class="drag-handle" aria-label="拖动任务">
+                    <svg class="icon" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>
+                  </button>
+                  <div class="task-copy">
+                    <div class="task-title">SwiftUI ObservableObject 状态边界</div>
+                    <div class="task-meta">
+                      <span>SwiftUI 数据流</span>
+                      <span>35 分钟</span>
+                      <span class="pill">普通</span>
+                    </div>
+                  </div>
+                  <button class="done-box" aria-label="标记完成">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg>
+                  </button>
+                  <div class="task-detail">
+                    <div class="task-note">
+                      <strong class="tiny">详情</strong>
+                      <p class="tiny muted">目标：理解 ObservableObject 的边界，补齐后面学习助手 ViewModel 重构需要的上下文。</p>
+                    </div>
+                    <a class="link-button" href="https://example.com/learning/swiftui-data-flow" target="_blank" rel="noreferrer">
+                      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg>
+                      打开链接
+                    </a>
+                  </div>
+                </article>
+
+                <article class="task" draggable="true" aria-expanded="false">
+                  <button class="drag-handle" aria-label="拖动任务">
+                    <svg class="icon" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>
+                  </button>
+                  <div class="task-copy">
+                    <div class="task-title">整理 LangGraph ingestion notes</div>
+                    <div class="task-meta">
+                      <span>学习助手后端</span>
+                      <span>25 分钟</span>
+                      <span class="pill">普通</span>
+                    </div>
+                  </div>
+                  <button class="done-box" aria-label="标记完成">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg>
+                  </button>
+                  <div class="task-detail">
+                    <div class="task-note">
+                      <strong class="tiny">详情</strong>
+                      <p class="tiny muted">目标：整理 ingestion agent 的笔记，后续添加资料体验重修时会用到。</p>
+                    </div>
+                    <a class="link-button" href="https://example.com/learning/langgraph-ingestion" target="_blank" rel="noreferrer">
+                      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg>
+                      打开链接
+                    </a>
+                  </div>
+                </article>
+              </div>
+            </section>
+
+            <section class="empty-state" aria-label="空数据库状态示例">
+              <div>
+                <h2>第一次使用时：从添加第一份资料开始</h2>
+                <p class="small muted">如果没有任何资料，首页不解释“为什么空”，而是直接把添加资料作为主路径。</p>
+              </div>
+              <button class="primary-button">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+                添加资料
+              </button>
+            </section>
+          </div>
+        </div>
+
+        <nav class="toolstrip" aria-label="学习助手底部导航">
+          <button class="tool" aria-current="true">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5V5a2 2 0 0 1 2-2h9l5 5v11.5a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 19.5Z"/><path d="M14 3v6h6"/></svg>
+            首页
+          </button>
+          <button class="tool">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+            添加资料
+          </button>
+          <button class="tool">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5"/><path d="M8 19V9"/><path d="M12 19V7"/><path d="M16 19v-4"/><path d="M20 19V11"/></svg>
+            资料进度
+          </button>
+          <button class="tool">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4Z"/></svg>
+            调整计划
+          </button>
+        </nav>
+      </section>
+
+      <div class="divider" aria-hidden="true"></div>
+
+      <aside class="rightbar" aria-label="右侧控制栏">
+        <div class="column-title">
+          <h2>MalDaze Rest</h2>
+          <button class="icon-button" aria-label="设置" title="设置">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 0 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V21a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1A2 2 0 0 1 4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H3a2 2 0 0 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1A2 2 0 1 1 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3h.1A1.7 1.7 0 0 0 10 3.1V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 1 1.6h.1a1.7 1.7 0 0 0 1.9-.3l.1-.1A2 2 0 1 1 19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9v.1A1.7 1.7 0 0 0 20.9 10H21a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>
+          </button>
+        </div>
+
+        <section class="section timer-block">
+          <p class="tiny muted">下一次休息</p>
+          <div class="timer-display">24:18</div>
+          <div class="control-row">
+            <button class="primary-button">开始专注</button>
+            <button class="plain-button">停止</button>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="control-row">
+            <div>
+              <h3>喝水提醒</h3>
+              <p class="tiny muted">90 分钟</p>
+            </div>
+            <span class="switch on" aria-hidden="true"></span>
+          </div>
+          <div class="control-row">
+            <div>
+              <h3>整点休息</h3>
+              <p class="tiny muted">工作日启用</p>
+            </div>
+            <span class="switch" aria-hidden="true"></span>
+          </div>
+        </section>
+
+        <section class="flat-section">
+          <p class="tiny muted">右栏也固定 300px，主要空间交给中间学习助手。宽屏时中栏自然变宽，窄屏时保持最低可读宽度。</p>
+        </section>
+      </aside>
+    </section>
+  </main>
+
+  <script>
+    const popover = document.getElementById("popover");
+    document.getElementById("toggleOffline").addEventListener("click", () => {
+      popover.classList.toggle("offline");
+    });
+
+    const list = document.getElementById("taskList");
+    let dragged = null;
+
+    list.addEventListener("click", (event) => {
+      if (event.target.closest("button, a, .drag-handle")) return;
+      const task = event.target.closest(".task");
+      if (!task) return;
+      const isExpanded = task.classList.toggle("expanded");
+      task.setAttribute("aria-expanded", String(isExpanded));
+    });
+
+    list.addEventListener("dragstart", (event) => {
+      dragged = event.target.closest(".task");
+      if (!dragged) return;
+      dragged.classList.add("dragging");
+      event.dataTransfer.effectAllowed = "move";
+    });
+
+    list.addEventListener("dragend", () => {
+      if (dragged) dragged.classList.remove("dragging");
+      dragged = null;
+    });
+
+    list.addEventListener("dragover", (event) => {
+      event.preventDefault();
+      const after = [...list.querySelectorAll(".task:not(.dragging)")].find((item) => {
+        const box = item.getBoundingClientRect();
+        return event.clientY < box.top + box.height / 2;
+      });
+      if (!dragged) return;
+      if (after) {
+        list.insertBefore(dragged, after);
+      } else {
+        list.appendChild(dragged);
+      }
+    });
+  </script>
+</body>
+</html>
