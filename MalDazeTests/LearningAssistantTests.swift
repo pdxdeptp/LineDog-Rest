@@ -757,6 +757,7 @@ private final class MockAssistantAPIClient: AssistantAPIClientProtocol, @uncheck
     var progressEvents: [IngestionProgressEvent] = []
     var rescheduleResult: IngestionDraftDetail?
     var rescheduleError: Error?
+    var learningPreferencesResult = LearningPreferences(dailyCapacityMin: 60)
 
     // Captured call arguments for assertions
     private(set) var fetchBriefingCallCount = 0
@@ -831,7 +832,7 @@ private final class MockAssistantAPIClient: AssistantAPIClientProtocol, @uncheck
 
     func getLearningPreferences() async throws -> LearningPreferences {
         if shouldThrowOffline { throw AssistantOfflineError() }
-        return LearningPreferences(dailyCapacityMin: 60)
+        return learningPreferencesResult
     }
 
     func updateLearningPreferences(_ prefs: LearningPreferences) async throws {
@@ -994,7 +995,45 @@ final class IngestionViewModelTests: XCTestCase {
         let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
         await vm.startIngestion(url: "https://bad.example.com", deadline: Date(), speedFactor: 1.0)
         XCTAssertTrue(vm.isOffline)
+        XCTAssertEqual(vm.ingestionError, "无法连接学习助手后端，请确认服务已启动（localhost:8765）")
         XCTAssertNil(vm.ingestionDraft)
+    }
+
+    // MARK: Capacity refresh + reschedule after preferences change
+
+    func testFetchDailyCapacityUsesAPI() async {
+        let mock = MockAssistantAPIClient()
+        mock.learningPreferencesResult = LearningPreferences(dailyCapacityMin: 120)
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        await vm.fetchDailyCapacity()
+        XCTAssertEqual(vm.dailyCapacityMin, 120)
+    }
+
+    func testRefreshDailyCapacityAndRescheduleWhenDraftPresent() async {
+        let mock = MockAssistantAPIClient()
+        mock.learningPreferencesResult = LearningPreferences(dailyCapacityMin: 90)
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        vm.ingestionDraft = sampleDraftDetail()
+        vm.ingestionThreadId = "tid"
+        vm.currentDeadline = "2026-08-01"
+        vm.currentSpeedFactor = 1.2
+        await vm.refreshDailyCapacityAndRescheduleIfDraftActive()
+        XCTAssertEqual(vm.dailyCapacityMin, 90)
+        XCTAssertEqual(mock.lastRescheduleDeadline, "2026-08-01")
+        XCTAssertEqual(mock.lastRescheduleSpeedFactor ?? 0, 1.2, accuracy: 0.001)
+    }
+
+    func testSSEErrorSetsIngestionError() async {
+        let mock = MockAssistantAPIClient()
+        mock.startIngestionThreadId = "err-thread"
+        mock.progressEvents = [
+            IngestionProgressEvent(phase: "error", label: "链接格式无效", done: true, draft: nil, error: "fetch_failed"),
+        ]
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        await vm.startIngestion(url: "http://bad", deadline: Date().addingTimeInterval(86400 * 30), speedFactor: 1.0)
+        try? await Task.sleep(nanoseconds: 100_000_000)
+        XCTAssertEqual(vm.ingestionError, "链接格式无效")
+        XCTAssertFalse(vm.isIngesting)
     }
 }
 

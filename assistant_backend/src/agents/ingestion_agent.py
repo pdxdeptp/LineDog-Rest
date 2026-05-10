@@ -20,6 +20,7 @@ import re
 from dataclasses import dataclass, field as dc_field
 from datetime import date, timedelta
 from typing import Any, Literal
+from urllib.parse import urlparse
 
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.checkpoint.memory import MemorySaver
@@ -45,6 +46,44 @@ class ThreadProgress:
 
 
 progress_store: dict[str, "ThreadProgress"] = {}
+
+
+def validate_learning_material_url(url: str) -> None:
+    """
+    Ensure the URL is a plausible http(s) resource locator before handlers run.
+
+    Raises ValueError with a short Chinese message suitable for UI display.
+    """
+    raw = (url or "").strip()
+    if not raw:
+        raise ValueError("请输入资料链接")
+    parsed = urlparse(raw)
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError("链接必须以 http:// 或 https:// 开头")
+    if not parsed.hostname:
+        raise ValueError("链接格式无效，请检查域名是否正确")
+
+
+def _friendly_ingestion_fetch_error(exc: BaseException) -> str:
+    """Map common httpx/network errors to short Chinese copy for the client."""
+    try:
+        import httpx
+    except ImportError:
+        return str(exc)[:240]
+
+    if isinstance(exc, httpx.InvalidURL):
+        return "链接格式无效，无法访问"
+    if isinstance(exc, httpx.UnsupportedProtocol):
+        return "仅支持 http:// 或 https:// 链接"
+    if isinstance(exc, httpx.ConnectError):
+        return "无法连接到该地址，请检查链接或网络"
+    if isinstance(exc, httpx.TimeoutException):
+        return "读取链接超时，请稍后重试"
+    if isinstance(exc, httpx.HTTPStatusError):
+        return f"链接返回错误（HTTP {exc.response.status_code}），无法作为学习资料读取"
+
+    msg = str(exc).strip()
+    return msg[:240] if msg else "无法读取该链接，请稍后再试"
 
 
 async def _run_ingestion_with_progress(
@@ -105,7 +144,7 @@ async def _run_ingestion_with_progress(
     except Exception as exc:
         err_event = {
             "phase": "error",
-            "label": str(exc),
+            "label": _friendly_ingestion_fetch_error(exc),
             "done": True,
             "error": "unexpected_error",
         }
@@ -258,11 +297,12 @@ def _schedule_option_b(
 async def fetch_structure(state: IngestionState) -> IngestionState:
     url = state["url"]
     try:
+        validate_learning_material_url(url)
         handler_cls = dispatch(url)
         handler = handler_cls(url)
         resource = await handler.fetch()
     except Exception as exc:
-        return {**state, "resource": None, "error": str(exc)}
+        return {**state, "resource": None, "error": _friendly_ingestion_fetch_error(exc)}
     return {**state, "resource": resource, "error": None}
 
 

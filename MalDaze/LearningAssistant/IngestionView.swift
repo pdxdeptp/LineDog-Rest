@@ -7,7 +7,6 @@ struct IngestionView: View {
     @State private var deadline: Date = Calendar.current.date(byAdding: .month, value: 1, to: Date()) ?? Date()
     @State private var speedFactor: Double = 1.0
     @State private var showFullPlan: Bool = false
-    @State private var dailyCapacityMin: Int = 60
 
     private let formatter: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()
@@ -38,6 +37,14 @@ struct IngestionView: View {
                 Spacer(minLength: 0)
             }
             .padding(12)
+        }
+        .onAppear {
+            Task { await vm.refreshDailyCapacityAndRescheduleIfDraftActive() }
+        }
+        .onChange(of: vm.selectedPanelTab) { tab in
+            if tab == .addResource {
+                Task { await vm.refreshDailyCapacityAndRescheduleIfDraftActive() }
+            }
         }
         .onDisappear { vm.cancelAnalysis() }
     }
@@ -169,7 +176,7 @@ struct IngestionView: View {
 
             // Daily capacity row
             HStack {
-                Label("每日容量：\(dailyCapacityMin) 分钟", systemImage: "gauge")
+                Label("每日容量：\(vm.dailyCapacityMin) 分钟", systemImage: "gauge")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()
@@ -207,15 +214,6 @@ struct IngestionView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.blue.opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
         .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.blue.opacity(0.2), lineWidth: 0.5))
-        .onAppear {
-            Task {
-                guard let url = URL(string: "http://localhost:8765/api/settings/learning-preferences"),
-                      let (data, _) = try? await URLSession.shared.data(from: url),
-                      let json = try? JSONDecoder().decode([String: Int].self, from: data),
-                      let cap = json["daily_capacity_min"] else { return }
-                dailyCapacityMin = cap
-            }
-        }
     }
 
     // MARK: - Error states

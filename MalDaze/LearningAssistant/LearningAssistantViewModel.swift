@@ -347,6 +347,7 @@ final class LearningAssistantViewModel: ObservableObject {
                                 if event.phase == "draft_ready", let draft = event.draft {
                                     self.ingestionDraft = draft
                                     self.isIngesting = false
+                                    Task { await self.fetchDailyCapacity() }
                                 } else if event.phase == "error" {
                                     self.ingestionError = event.label
                                     self.isIngesting = false
@@ -373,6 +374,7 @@ final class LearningAssistantViewModel: ObservableObject {
         } catch {
             isIngesting = false
             isOffline = true
+            ingestionError = "无法连接学习助手后端，请确认服务已启动（localhost:8765）"
         }
     }
 
@@ -459,11 +461,20 @@ final class LearningAssistantViewModel: ObservableObject {
     }
 
     func fetchDailyCapacity() async {
-        guard let url = URL(string: "http://localhost:8765/api/settings/learning-preferences"),
-              let (data, _) = try? await URLSession.shared.data(from: url),
-              let json = try? JSONDecoder().decode([String: Int].self, from: data),
-              let cap = json["daily_capacity_min"] else { return }
-        dailyCapacityMin = cap
+        do {
+            let prefs = try await api.getLearningPreferences()
+            dailyCapacityMin = prefs.dailyCapacityMin
+        } catch {
+            // Keep previous dailyCapacityMin on failure
+        }
+    }
+
+    /// 从设置返回采集页或偏好变更后：刷新每日容量并按当前草稿参数重新拉取排期。
+    func refreshDailyCapacityAndRescheduleIfDraftActive() async {
+        await fetchDailyCapacity()
+        guard ingestionDraft != nil,
+              let deadline = currentDeadline else { return }
+        await reschedule(deadline: deadline, speedFactor: currentSpeedFactor)
     }
 
     // MARK: - Private dashboard helpers

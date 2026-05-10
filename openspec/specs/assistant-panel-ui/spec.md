@@ -120,22 +120,21 @@ MalDaze 菜单栏面板包含学习助手中栏。当前前端通过 SwiftUI 展
 
 #### Scenario: 开始分析
 - **WHEN** 用户输入 URL 并点击分析
-- **THEN** 前端调用 `POST /api/ingest`
-- **AND** 分析期间显示 loading 状态
+- **THEN** 前端调用 `POST /api/ingest/start` 获取 `thread_id`
+- **AND** 订阅 `GET /api/ingest/progress/{thread_id}` SSE 展示阶段进度
 
 #### Scenario: 展示草稿
-- **WHEN** 后端返回 ingestion draft
+- **WHEN** SSE 返回 `draft_ready` 且携带 draft
 - **THEN** 前端显示资料标题、unit 数、总估算小时数和方案 A/B 选择器
 
 #### Scenario: 确认草稿
 - **WHEN** 用户点击确认写入
-- **THEN** 前端调用 `POST /api/ingest/confirm`，传入 selected_option
+- **THEN** 前端调用 `POST /api/ingest/confirm`，传入 selected_option 及可选 deadline/speed_factor
 - **AND** 成功后清空草稿并刷新今日简报
 
 #### Scenario: 取消草稿
-- **WHEN** 用户点击取消
-- **THEN** 前端调用 `POST /api/ingest/confirm` 且 confirmed=false
-- **AND** 清空草稿
+- **WHEN** 用户点击取消（本地取消草稿）
+- **THEN** 前端清除草稿 UI 状态且不写入数据库；可选调用 `POST /api/ingest/confirm` 且 `confirmed=false` 以保持契约一致
 
 ### Requirement: HTTP 客户端
 Swift 前端 SHALL 通过 `AssistantAPIClient` 调用本地后端。
@@ -273,3 +272,15 @@ Swift 前端 SHALL 通过 `AssistantAPIClient` 调用本地后端。
 #### Scenario: deadline 风险验收
 - **WHEN** 测试 fixture 提供临近截止或逾期资料
 - **THEN** 首页呈现 deadline 风险提示
+
+### Requirement: 学习偏好入口
+学习助手中栏 SHALL 提供进入学习偏好设置页的入口。
+
+#### Scenario: 从面板进入设置
+- **WHEN** 用户在学习助手面板中点击设置入口（底部导航或设置图标）
+- **THEN** 中栏导航至 `LearningPreferencesView`
+
+#### Scenario: 从草稿卡片跳转
+- **WHEN** 用户在 IngestionView 草稿卡片中点击"去设置 →"
+- **THEN** 中栏导航至 `LearningPreferencesView`
+- **AND** 用户返回后仍停留在添加资料页，草稿状态保留

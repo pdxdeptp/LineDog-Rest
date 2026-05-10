@@ -103,18 +103,9 @@ class WebHandler:
         self.url = url
 
     async def fetch(self) -> ResourceStructure:
-        try:
-            html = await _fetch_html(self.url)
-        except Exception as exc:
-            # Network failure — single-unit fallback
-            return ResourceStructure(
-                title=self.url,
-                type="web_article",
-                tracking_mode="sequential",
-                url=self.url,
-                units=[UnitDraft(title=self.url, order_index=0, estimated_minutes=None)],
-                total_estimated_hours=0.0,
-            )
+        # Let failures propagate so ingestion can surface a friendly error via SSE
+        # instead of silently falling back to a fake single-unit resource.
+        html = await _fetch_html(self.url)
 
         page_title = _extract_title(html)
         headings = _extract_headings(html)
