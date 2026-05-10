@@ -10,4 +10,8 @@ async def init_db(db_path: str) -> None:
                 "INSERT OR IGNORE INTO system_state (key, value) VALUES (?, ?)",
                 (key, value),
             )
+        # One-time migration: if daily_capacity_min is still the old default "300", update to "60"
+        await db.execute(
+            "UPDATE system_state SET value = '60' WHERE key = 'daily_capacity_min' AND value = '300'"
+        )
         await db.commit()

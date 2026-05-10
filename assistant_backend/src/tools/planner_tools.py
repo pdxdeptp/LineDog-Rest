@@ -48,7 +48,7 @@ async def check_capacity(db: aiosqlite.Connection, start: str, end: str) -> dict
     defaults to 120 minutes if the key is absent.
     """
     raw = await queries.get_system_state(db, "daily_capacity_min")
-    daily_capacity_min: int = int(raw) if raw else 120
+    daily_capacity_min: int = int(raw) if raw else 60
 
     start_date = date.fromisoformat(start)
     end_date = date.fromisoformat(end)

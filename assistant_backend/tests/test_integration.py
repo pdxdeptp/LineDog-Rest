@@ -273,3 +273,340 @@ async def test_planner_tool_get_tasks_by_date_returns_ids(db):
     assert tasks[0]["title"] == "二分查找练习"
     assert tasks[0]["scheduled_date"] == tomorrow
     assert tasks[0]["target_minutes"] == 30
+
+
+# ---------------------------------------------------------------------------
+# Task 1.1 — daily_capacity_min default is 60
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_daily_capacity_default_is_60():
+    """
+    新数据库的 daily_capacity_min 默认值应为 "60"；
+    已有 "300" 的数据库经 init_db 迁移后应更新为 "60"。
+    """
+    import aiosqlite
+    import tempfile
+    import os
+    from src.db.schema import SCHEMA_SQL, DEFAULT_SYSTEM_STATE
+    from src.db.init import init_db
+
+    # 1. 新建 DB：确认默认值为 "60"
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
+        new_db_path = f.name
+    try:
+        await init_db(new_db_path)
+        async with aiosqlite.connect(new_db_path) as conn:
+            async with conn.execute(
+                "SELECT value FROM system_state WHERE key = 'daily_capacity_min'"
+            ) as cur:
+                row = await cur.fetchone()
+        assert row is not None, "daily_capacity_min should exist in system_state"
+        assert row[0] == "60", f"Expected '60', got {row[0]!r}"
+    finally:
+        os.unlink(new_db_path)
+
+    # 2. 已有 "300" 的 DB：init_db 应迁移为 "60"
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
+        migrate_db_path = f.name
+    try:
+        # 先建表并插入旧值 "300"
+        async with aiosqlite.connect(migrate_db_path) as conn:
+            await conn.executescript(SCHEMA_SQL)
+            await conn.execute(
+                "INSERT OR REPLACE INTO system_state (key, value) VALUES ('daily_capacity_min', '300')"
+            )
+            await conn.commit()
+
+        # 执行 init_db（应触发迁移逻辑）
+        await init_db(migrate_db_path)
+
+        async with aiosqlite.connect(migrate_db_path) as conn:
+            async with conn.execute(
+                "SELECT value FROM system_state WHERE key = 'daily_capacity_min'"
+            ) as cur:
+                row = await cur.fetchone()
+        assert row is not None
+        assert row[0] == "60", f"Migration failed: expected '60', got {row[0]!r}"
+    finally:
+        os.unlink(migrate_db_path)
+
+
+# ---------------------------------------------------------------------------
+# Tasks 2.1–2.4 — Learning Preferences API (GET/PUT /api/settings/learning-preferences)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_get_learning_preferences_default(client):
+    """
+    GET /api/settings/learning-preferences 在 daily_capacity_min 未写入 DB 时
+    应返回默认值 60。
+    """
+    resp = await client.get("/api/settings/learning-preferences")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data == {"daily_capacity_min": 60}
+
+
+@pytest.mark.asyncio
+async def test_put_learning_preferences_valid(client):
+    """
+    PUT /api/settings/learning-preferences {"daily_capacity_min": 90}
+    应返回 {"daily_capacity_min": 90}，随后 GET 也应返回 90。
+    """
+    put_resp = await client.put(
+        "/api/settings/learning-preferences",
+        json={"daily_capacity_min": 90},
+    )
+    assert put_resp.status_code == 200
+    assert put_resp.json() == {"daily_capacity_min": 90}
+
+    get_resp = await client.get("/api/settings/learning-preferences")
+    assert get_resp.status_code == 200
+    assert get_resp.json() == {"daily_capacity_min": 90}
+
+
+@pytest.mark.asyncio
+async def test_put_learning_preferences_invalid_range(client):
+    """
+    PUT daily_capacity_min=0 → 422；1441 → 422；
+    边界值 1 → 200；1440 → 200。
+    """
+    # 超出下界
+    resp = await client.put(
+        "/api/settings/learning-preferences",
+        json={"daily_capacity_min": 0},
+    )
+    assert resp.status_code == 422, f"expected 422 for 0, got {resp.status_code}"
+
+    # 超出上界
+    resp = await client.put(
+        "/api/settings/learning-preferences",
+        json={"daily_capacity_min": 1441},
+    )
+    assert resp.status_code == 422, f"expected 422 for 1441, got {resp.status_code}"
+
+    # 边界下限合法
+    resp = await client.put(
+        "/api/settings/learning-preferences",
+        json={"daily_capacity_min": 1},
+    )
+    assert resp.status_code == 200, f"expected 200 for 1, got {resp.status_code}"
+
+    # 边界上限合法
+    resp = await client.put(
+        "/api/settings/learning-preferences",
+        json={"daily_capacity_min": 1440},
+    )
+    assert resp.status_code == 200, f"expected 200 for 1440, got {resp.status_code}"
+
+
+# ---------------------------------------------------------------------------
+# Task 1.3 — POST /api/ingest/start returns thread_id
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_ingest_start_returns_thread_id(client):
+    """
+    POST /api/ingest/start 应立即返回 {"thread_id": <uuid>}，不等待图执行完成。
+    """
+    import uuid
+
+    # patch create_task to prevent actual LLM/network calls in background
+    with patch("src.routers.ingest.asyncio.create_task") as mock_create_task:
+        mock_create_task.return_value = MagicMock()
+
+        resp = await client.post(
+            "/api/ingest/start",
+            json={
+                "url": "https://github.com/example/repo",
+                "deadline": "2026-12-31",
+                "speed_factor": 1.0,
+            },
+        )
+
+    assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
+    data = resp.json()
+    assert "thread_id" in data, f"Response missing 'thread_id': {data}"
+    try:
+        uuid.UUID(data["thread_id"])
+    except ValueError:
+        pytest.fail(f"thread_id is not a valid UUID: {data['thread_id']!r}")
+
+
+# ---------------------------------------------------------------------------
+# Task 1.4 — GET /api/ingest/progress/{thread_id} SSE stream
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_sse_phases_sequence(client):
+    """
+    预先在 progress_store 中填充事件，SSE 端点应按顺序流式返回所有事件，
+    最后一个事件的 done=True。
+    """
+    from src.agents.ingestion_agent import progress_store, ThreadProgress
+
+    test_thread_id = "test-sse-thread-001"
+    prog = ThreadProgress()
+    events = [
+        {"phase": "fetch_structure", "label": "正在读取章节结构…", "done": False},
+        {"phase": "estimate_time", "label": "正在估算学习时长…", "done": False},
+        {"phase": "check_capacity", "label": "正在生成排期方案…", "done": False},
+        {"phase": "draft_ready", "label": "草稿已就绪", "done": True, "draft": {}},
+    ]
+    for e in events:
+        prog.events.append(e)
+        await prog._queue.put(e)
+    prog.is_done = True
+    progress_store[test_thread_id] = prog
+
+    received = []
+    try:
+        async with client.stream("GET", f"/api/ingest/progress/{test_thread_id}") as resp:
+            assert resp.status_code == 200
+            assert "text/event-stream" in resp.headers.get("content-type", "")
+            async for line in resp.aiter_lines():
+                if line.startswith("data: "):
+                    received.append(json.loads(line[6:]))
+    finally:
+        progress_store.pop(test_thread_id, None)
+
+    assert len(received) == 4, f"Expected 4 events, got {len(received)}: {received}"
+    phases = [e["phase"] for e in received]
+    assert phases == [
+        "fetch_structure", "estimate_time", "check_capacity", "draft_ready"
+    ], f"Phase sequence mismatch: {phases}"
+    assert received[-1]["done"] is True, "Last event should have done=True"
+
+
+# ---------------------------------------------------------------------------
+# Task 1.5 — POST /api/ingest/reschedule returns new options
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_reschedule_returns_new_options(client):
+    """
+    已有 thread 中存有 resource，调用 /api/ingest/reschedule 并传入新 deadline，
+    应返回包含 option_a 和 option_b 的响应。
+    """
+    from src.handlers.models import ResourceStructure, UnitDraft
+    from src.agents.ingestion_agent import ingestion_graph
+
+    fake_resource = ResourceStructure(
+        title="Test Course",
+        type="github_repo",
+        tracking_mode="sequential",
+        url="https://github.com/example/test",
+        units=[
+            UnitDraft(title="Unit 1", order_index=0, estimated_minutes=30),
+            UnitDraft(title="Unit 2", order_index=1, estimated_minutes=45),
+        ],
+        total_estimated_hours=1.25,
+    )
+
+    mock_snapshot = MagicMock()
+    mock_snapshot.values = {
+        "resource": fake_resource,
+        "deadline": (date.today() + timedelta(days=30)).isoformat(),
+        "speed_factor": 1.0,
+    }
+
+    deadline_str = (date.today() + timedelta(days=14)).isoformat()
+
+    with patch.object(ingestion_graph, "get_state", return_value=mock_snapshot):
+        resp = await client.post(
+            "/api/ingest/reschedule",
+            json={
+                "thread_id": "mock-thread-001",
+                "deadline": deadline_str,
+                "speed_factor": 1.0,
+            },
+        )
+
+    assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
+    data = resp.json()
+    assert "option_a" in data, f"Missing option_a in response: {data}"
+    assert "option_b" in data, f"Missing option_b in response: {data}"
+    assert "resource_title" in data, f"Missing resource_title: {data}"
+    assert data["resource_title"] == "Test Course"
+    assert data["unit_count"] == 2
+
+
+# ---------------------------------------------------------------------------
+# Task 1.6 — POST /api/ingest/confirm with deadline override
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_confirm_with_deadline_override():
+    """
+    write_to_db 使用 state 中的 deadline 排期，传入覆盖后的 deadline 时，
+    验证写入 DB 的任务全部在新 deadline 范围内。
+    """
+    import tempfile, os
+    import aiosqlite
+    from contextlib import asynccontextmanager
+    from datetime import date, timedelta
+
+    from src.handlers.models import ResourceStructure, UnitDraft
+    from src.agents.ingestion_agent import write_to_db, _schedule_option_a, _schedule_option_b
+    from src.db.queries import check_capacity
+    from src.db.init import init_db
+
+    with tempfile.TemporaryDirectory() as tmp:
+        db_path = os.path.join(tmp, "test.db")
+        await init_db(db_path)
+
+        today = date.today()
+        new_deadline = (today + timedelta(days=7)).isoformat()
+        new_deadline_date = date.fromisoformat(new_deadline)
+
+        fake_resource = ResourceStructure(
+            title="Override Test",
+            type="github_repo",
+            tracking_mode="sequential",
+            url="https://github.com/example/override",
+            units=[
+                UnitDraft(title="Chapter 1", order_index=0, estimated_minutes=30),
+            ],
+            total_estimated_hours=0.5,
+        )
+
+        async with aiosqlite.connect(db_path) as db:
+            db.row_factory = aiosqlite.Row
+            free_map = await check_capacity(db, today, new_deadline_date, 60)
+
+        option_b = _schedule_option_b(fake_resource.units, new_deadline_date, today, 1.0, 60)
+
+        state_with_override = {
+            "url": "https://github.com/example/override",
+            "deadline": new_deadline,
+            "speed_factor": 1.0,
+            "resource": fake_resource,
+            "option_a": [],
+            "option_b": option_b,
+            "confirmed": True,
+            "selected_option": "B",
+        }
+
+        @asynccontextmanager
+        async def mock_get_db():
+            async with aiosqlite.connect(db_path) as conn:
+                conn.row_factory = aiosqlite.Row
+                yield conn
+
+        with patch("src.agents.ingestion_agent.get_db", mock_get_db):
+            result_state = await write_to_db(state_with_override)
+
+        assert result_state.get("resource_id") is not None, "resource_id should be set after write_to_db"
+
+        async with aiosqlite.connect(db_path) as db:
+            async with db.execute("SELECT scheduled_date FROM tasks ORDER BY scheduled_date") as cur:
+                rows = await cur.fetchall()
+
+        assert len(rows) > 0, "At least one task should be written"
+        for row in rows:
+            task_date = date.fromisoformat(row[0])
+            assert task_date <= new_deadline_date, (
+                f"Task scheduled on {task_date} exceeds new deadline {new_deadline_date}"
+            )

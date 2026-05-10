@@ -314,7 +314,7 @@ final class LearningAssistantViewModelTests: XCTestCase {
         XCTAssertNil(vm.ingestionDraft)
         XCTAssertNil(vm.ingestionThreadId)
         XCTAssertFalse(vm.isOffline)
-        XCTAssertEqual(vm.selectedOption, "A")
+        XCTAssertEqual(vm.selectedOption, "B")  // default is now "B"
     }
 
     // MARK: 1.4 / 3.2-3.6 首页 dashboard 状态层
@@ -559,39 +559,45 @@ final class LearningAssistantViewModelTests: XCTestCase {
         XCTAssertTrue(vm.tasks.isEmpty)
     }
 
-    // MARK: 1-1a/b 资料分析 → 草稿展示（Bug A 覆盖）
+    // MARK: 1-1a/b 资料分析 → 草稿展示（via SSE）
 
-    func testStartIngestionSetsDraftDetail() async {
+    func testStartIngestionSetsDraftDetailViaSse() async {
         let mock = MockAssistantAPIClient()
-        mock.ingestionResult = IngestionDraft(
-            threadId: "c414b9cb",
-            draft: IngestionDraftDetail(
-                resourceTitle: "基础算法精讲 高频面试题",
-                resourceType: "bilibili_series",
-                totalEstimatedHours: 4.55,
-                unitCount: 27,
-                optionA: [],
-                optionB: []
+        mock.startIngestionThreadId = "c414b9cb"
+        mock.progressEvents = [
+            IngestionProgressEvent(
+                phase: "draft_ready",
+                label: "草稿已就绪",
+                done: true,
+                draft: IngestionDraftDetail(
+                    resourceTitle: "基础算法精讲 高频面试题",
+                    resourceType: "bilibili_series",
+                    totalEstimatedHours: 4.55,
+                    unitCount: 27,
+                    optionA: [],
+                    optionB: []
+                ),
+                error: nil
             )
-        )
-        let vm = LearningAssistantViewModel(api: mock)
+        ]
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
         await vm.startIngestion(url: "https://bilibili.com/BV1bP411c7oJ", deadline: Date(), speedFactor: 1.0)
+        // Allow SSE task to complete
+        try? await Task.sleep(nanoseconds: 100_000_000)
 
-        // Bug A: ingestionDraft 现在是 IngestionDraftDetail?，不再是 String?
         XCTAssertNotNil(vm.ingestionDraft)
         XCTAssertEqual(vm.ingestionDraft?.resourceTitle, "基础算法精讲 高频面试题")
         XCTAssertEqual(vm.ingestionDraft?.resourceType, "bilibili_series")
         XCTAssertEqual(vm.ingestionDraft?.unitCount, 27)
         XCTAssertEqual(vm.ingestionDraft?.totalEstimatedHours ?? 0, 4.55, accuracy: 0.001)
         XCTAssertEqual(vm.ingestionThreadId, "c414b9cb")
-        XCTAssertEqual(vm.selectedOption, "A")   // 每次新 ingestion 重置为 A
         XCTAssertFalse(vm.isOffline)
     }
 
     func testStartIngestionOfflineSetsIsOffline() async {
         let mock = MockAssistantAPIClient()
         mock.shouldThrowOffline = true
-        let vm = LearningAssistantViewModel(api: mock)
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
         await vm.startIngestion(url: "https://bad.example.com", deadline: Date(), speedFactor: 1.0)
         XCTAssertTrue(vm.isOffline)
         XCTAssertNil(vm.ingestionDraft)
@@ -601,7 +607,7 @@ final class LearningAssistantViewModelTests: XCTestCase {
 
     func testConfirmIngestionPassesSelectedOptionToAPI() async {
         let mock = MockAssistantAPIClient()
-        let vm = LearningAssistantViewModel(api: mock)
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
         vm.ingestionThreadId = "t1"
         vm.selectedOption = "B"
         await vm.confirmIngestion(confirmed: true)
@@ -612,18 +618,18 @@ final class LearningAssistantViewModelTests: XCTestCase {
         XCTAssertEqual(mock.lastConfirmIngestionOption, "B")
     }
 
-    // MARK: 1-3 取消草稿 — draft 被清除，API 收到 confirmed:false 且 option 为 nil
+    // MARK: 1-3 取消草稿 — cancelDraft 清除 draft（纯本地操作）
 
-    func testCancelIngestionClearsDraft() async {
+    func testCancelIngestionClearsDraft() {
         let mock = MockAssistantAPIClient()
-        let vm = LearningAssistantViewModel(api: mock)
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
         vm.ingestionThreadId = "t1"
-        await vm.confirmIngestion(confirmed: false)
+        vm.ingestionDraft = sampleDraftDetail()
+        vm.confirmIngestion(cancelDraft: true)
 
         XCTAssertNil(vm.ingestionDraft)
         XCTAssertNil(vm.ingestionThreadId)
-        XCTAssertEqual(mock.lastConfirmIngestionConfirmed, false)
-        XCTAssertNil(mock.lastConfirmIngestionOption)   // 取消时不传 selectedOption
+        XCTAssertEqual(vm.selectedOption, "B")
     }
 
     // MARK: 4-1 对话查询 — 有文字回复
@@ -746,6 +752,11 @@ private final class MockAssistantAPIClient: AssistantAPIClientProtocol, @uncheck
     var chatResult: ChatResponse?
     var shouldThrowOffline = false
     var shouldThrowResources = false
+    // New: for updated protocol methods
+    var startIngestionThreadId: String = "mock-thread"
+    var progressEvents: [IngestionProgressEvent] = []
+    var rescheduleResult: IngestionDraftDetail?
+    var rescheduleError: Error?
 
     // Captured call arguments for assertions
     private(set) var fetchBriefingCallCount = 0
@@ -754,6 +765,10 @@ private final class MockAssistantAPIClient: AssistantAPIClientProtocol, @uncheck
     private(set) var lastConfirmChatConfirmed: Bool?
     private(set) var lastConfirmIngestionConfirmed: Bool?
     private(set) var lastConfirmIngestionOption: String?
+    private(set) var lastConfirmIngestionDeadline: String?
+    private(set) var lastConfirmIngestionSpeedFactor: Double?
+    private(set) var lastRescheduleDeadline: String?
+    private(set) var lastRescheduleSpeedFactor: Double?
 
     func fetchTodayBriefing() async throws -> TodayBriefing {
         fetchBriefingCallCount += 1
@@ -776,26 +791,294 @@ private final class MockAssistantAPIClient: AssistantAPIClientProtocol, @uncheck
         lastConfirmChatConfirmed = confirmed
     }
 
-    func startIngestion(url: String, deadline: String, speedFactor: Double?) async throws -> IngestionDraft {
+    // Updated: now returns String (thread_id)
+    func startIngestion(url: String, deadline: String, speedFactor: Double?) async throws -> String {
         if shouldThrowOffline { throw AssistantOfflineError() }
-        return ingestionResult ?? IngestionDraft(
-            threadId: "mock-thread",
-            draft: IngestionDraftDetail(
-                resourceTitle: "mock", resourceType: "web_article",
-                totalEstimatedHours: 0.1, unitCount: 1, optionA: [], optionB: []
-            )
-        )
+        return startIngestionThreadId
     }
 
-    func confirmIngestion(threadId: String, confirmed: Bool, selectedOption: String?) async throws {
+    func subscribeIngestionProgress(threadId: String) -> AsyncThrowingStream<IngestionProgressEvent, Error> {
+        let events = progressEvents
+        return AsyncThrowingStream { continuation in
+            for event in events {
+                continuation.yield(event)
+            }
+            continuation.finish()
+        }
+    }
+
+    func rescheduleIngestion(threadId: String, deadline: String, speedFactor: Double) async throws -> IngestionDraftDetail {
+        lastRescheduleDeadline = deadline
+        lastRescheduleSpeedFactor = speedFactor
+        if let err = rescheduleError { throw err }
+        if shouldThrowOffline { throw AssistantOfflineError() }
+        return rescheduleResult ?? sampleDraftDetail()
+    }
+
+    func confirmIngestion(threadId: String, confirmed: Bool, selectedOption: String?, deadline: String?, speedFactor: Double?) async throws {
         if shouldThrowOffline { throw AssistantOfflineError() }
         lastConfirmIngestionConfirmed = confirmed
         lastConfirmIngestionOption = selectedOption
+        lastConfirmIngestionDeadline = deadline
+        lastConfirmIngestionSpeedFactor = speedFactor
     }
 
     func fetchResources() async throws -> [AssistantResource] {
         fetchResourcesCallCount += 1
         if shouldThrowOffline || shouldThrowResources { throw AssistantOfflineError() }
         return resourcesResult
+    }
+
+    func getLearningPreferences() async throws -> LearningPreferences {
+        if shouldThrowOffline { throw AssistantOfflineError() }
+        return LearningPreferences(dailyCapacityMin: 60)
+    }
+
+    func updateLearningPreferences(_ prefs: LearningPreferences) async throws {
+        if shouldThrowOffline { throw AssistantOfflineError() }
+    }
+}
+
+// MARK: - Shared test fixtures
+
+private func sampleDraftDetail() -> IngestionDraftDetail {
+    IngestionDraftDetail(
+        resourceTitle: "测试资料",
+        resourceType: "bilibili_series",
+        totalEstimatedHours: 4.0,
+        unitCount: 10,
+        optionA: [],
+        optionB: []
+    )
+}
+
+// MARK: - New ViewModel Ingestion Tests (Tasks 3.1–3.6)
+
+@MainActor
+final class IngestionViewModelTests: XCTestCase {
+
+    // MARK: 3.1 selectedOption defaults to "B"
+
+    func testSelectedOptionDefaultsToB() {
+        let vm = LearningAssistantViewModel(api: MockAssistantAPIClient(), autoLoadWhenReady: false)
+        XCTAssertEqual(vm.selectedOption, "B")
+    }
+
+    // MARK: 3.5 cancel preserves VM state
+
+    func testCancelPreservesURL() {
+        let vm = LearningAssistantViewModel(api: MockAssistantAPIClient(), autoLoadWhenReady: false)
+        vm.ingestionDraft = sampleDraftDetail()
+        vm.ingestionThreadId = "test-thread"
+        vm.confirmIngestion(cancelDraft: true)
+        XCTAssertNil(vm.ingestionDraft)
+        XCTAssertNil(vm.ingestionThreadId)
+        XCTAssertEqual(vm.selectedOption, "B")
+    }
+
+    // MARK: 3.6 canConfirm logic — unsynced params
+
+    func testCanConfirmFalseWhenParamsUnsynced() {
+        let vm = LearningAssistantViewModel(api: MockAssistantAPIClient(), autoLoadWhenReady: false)
+        vm.ingestionDraft = sampleDraftDetail()
+        vm.isRescheduling = false
+        // After user changes deadline but hasn't synced yet
+        vm.currentDeadline = "2026-07-01"
+        vm.lastSyncedDeadline = "2026-06-01"
+        vm.lastSyncedSpeedFactor = 1.0
+        vm.currentSpeedFactor = 1.0
+        XCTAssertFalse(vm.canConfirm)
+    }
+
+    // MARK: 3.6 canConfirm logic — synced params
+
+    func testCanConfirmTrueAfterSuccessfulReschedule() {
+        let vm = LearningAssistantViewModel(api: MockAssistantAPIClient(), autoLoadWhenReady: false)
+        vm.ingestionDraft = sampleDraftDetail()
+        vm.currentDeadline = "2026-07-01"
+        vm.currentSpeedFactor = 1.0
+        vm.lastSyncedDeadline = "2026-07-01"
+        vm.lastSyncedSpeedFactor = 1.0
+        vm.isRescheduling = false
+        XCTAssertTrue(vm.canConfirm)
+    }
+
+    // MARK: 3.6 canConfirm — initial state (never rescheduled) allows confirm
+
+    func testCanConfirmTrueInInitialStateNeverRescheduled() {
+        let vm = LearningAssistantViewModel(api: MockAssistantAPIClient(), autoLoadWhenReady: false)
+        vm.ingestionDraft = sampleDraftDetail()
+        vm.isRescheduling = false
+        // lastSyncedDeadline is nil → canConfirm should be true
+        XCTAssertTrue(vm.canConfirm)
+    }
+
+    // MARK: 3.5 session expired clears draft
+
+    func testSessionExpiredClearsDraft() async {
+        let mock = MockAssistantAPIClient()
+        mock.rescheduleError = ThreadNotFoundError()
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        vm.ingestionDraft = sampleDraftDetail()
+        vm.ingestionThreadId = "test-thread"
+        await vm.reschedule(deadline: "2026-07-01", speedFactor: 1.0)
+        XCTAssertNil(vm.ingestionDraft)
+        XCTAssertNil(vm.ingestionThreadId)
+        XCTAssertEqual(vm.ingestionError, "session_expired")
+    }
+
+    // MARK: 3.2 SSE phases update ingestionPhase
+
+    func testSSEPhasesUpdateIngestionPhase() async {
+        let mock = MockAssistantAPIClient()
+        mock.startIngestionThreadId = "sse-thread"
+        mock.progressEvents = [
+            IngestionProgressEvent(phase: "fetch_structure", label: "正在读取章节结构…", done: false, draft: nil, error: nil),
+            IngestionProgressEvent(phase: "draft_ready", label: "草稿已就绪", done: true, draft: sampleDraftDetail(), error: nil),
+        ]
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        await vm.startIngestion(url: "https://example.com", deadline: Date().addingTimeInterval(86400 * 30), speedFactor: 1.0)
+        // Give the async analysisTask time to process
+        try? await Task.sleep(nanoseconds: 100_000_000)
+        XCTAssertNotNil(vm.ingestionDraft)
+        XCTAssertEqual(vm.ingestionDraft?.resourceTitle, "测试资料")
+        XCTAssertFalse(vm.isIngesting)
+    }
+
+    // MARK: 3.3 reschedule updates ingestionDraft and syncs params
+
+    func testRescheduleUpdatesIngestionDraft() async {
+        let mock = MockAssistantAPIClient()
+        mock.rescheduleResult = IngestionDraftDetail(
+            resourceTitle: "重排后资料",
+            resourceType: "github_repo",
+            totalEstimatedHours: 6.0,
+            unitCount: 12,
+            optionA: [],
+            optionB: []
+        )
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        vm.ingestionThreadId = "test-thread"
+
+        await vm.reschedule(deadline: "2026-08-01", speedFactor: 1.5)
+
+        XCTAssertEqual(vm.ingestionDraft?.resourceTitle, "重排后资料")
+        XCTAssertEqual(vm.lastSyncedDeadline, "2026-08-01")
+        XCTAssertEqual(vm.lastSyncedSpeedFactor ?? 0, 1.5, accuracy: 0.001)
+        XCTAssertFalse(vm.isRescheduling)
+        XCTAssertFalse(vm.rescheduleError)
+    }
+
+    // MARK: 3.4 confirmIngestion passes deadline and speedFactor
+
+    func testConfirmIngestionPassesDeadlineAndSpeedFactor() async {
+        let mock = MockAssistantAPIClient()
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        vm.ingestionThreadId = "t-confirm"
+        vm.selectedOption = "A"
+        vm.currentDeadline = "2026-09-01"
+        vm.currentSpeedFactor = 1.2
+        await vm.confirmIngestion(confirmed: true)
+        XCTAssertEqual(mock.lastConfirmIngestionDeadline, "2026-09-01")
+        XCTAssertEqual(mock.lastConfirmIngestionSpeedFactor ?? 0, 1.2, accuracy: 0.001)
+        XCTAssertEqual(mock.lastConfirmIngestionOption, "A")
+        XCTAssertNil(vm.ingestionDraft)
+        XCTAssertNil(vm.ingestionThreadId)
+    }
+
+    // MARK: 3.1 startIngestion offline sets isOffline
+
+    func testStartIngestionOfflineSetsIsOffline() async {
+        let mock = MockAssistantAPIClient()
+        mock.shouldThrowOffline = true
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        await vm.startIngestion(url: "https://bad.example.com", deadline: Date(), speedFactor: 1.0)
+        XCTAssertTrue(vm.isOffline)
+        XCTAssertNil(vm.ingestionDraft)
+    }
+}
+
+// MARK: - Learning Preferences Tests (Task 4.1 / 4.2)
+
+final class LearningPreferencesDecodingTests: XCTestCase {
+
+    // RED: LearningPreferences model decodes daily_capacity_min from JSON
+    func testLearningPreferencesDecodesFromJSON() throws {
+        let json = "{\"daily_capacity_min\": 90}"
+        let prefs = try JSONDecoder().decode(LearningPreferences.self, from: Data(json.utf8))
+        XCTAssertEqual(prefs.dailyCapacityMin, 90)
+    }
+
+    // RED: LearningPreferences encodes back to snake_case JSON
+    func testLearningPreferencesEncodesToSnakeCaseJSON() throws {
+        let prefs = LearningPreferences(dailyCapacityMin: 45)
+        let data = try JSONEncoder().encode(prefs)
+        let dict = try JSONSerialization.jsonObject(with: data) as? [String: Int]
+        XCTAssertEqual(dict?["daily_capacity_min"], 45)
+        XCTAssertNil(dict?["dailyCapacityMin"])
+    }
+}
+
+@MainActor
+final class LearningPreferencesAPITests: XCTestCase {
+
+    // RED: MockAssistantAPIClient.getLearningPreferences returns stub value
+    func testMockGetLearningPreferencesReturnsStubbedCapacity() async throws {
+        let mock = MockAssistantAPIClient()
+        let prefs = try await mock.getLearningPreferences()
+        XCTAssertEqual(prefs.dailyCapacityMin, 60)
+    }
+
+    // RED: MockAssistantAPIClient.updateLearningPreferences does not throw
+    func testMockUpdateLearningPreferencesDoesNotThrow() async {
+        let mock = MockAssistantAPIClient()
+        let prefs = LearningPreferences(dailyCapacityMin: 30)
+        await XCTAssertNoThrowAsync { try await mock.updateLearningPreferences(prefs) }
+    }
+}
+
+// MARK: - LearningPreferencesView Source Tests (Task 4.2)
+
+final class LearningPreferencesViewSourceTests: XCTestCase {
+
+    // RED: LearningPreferencesView.swift exists and contains expected UI elements
+    func testLearningPreferencesViewFileExists() throws {
+        let source = try sourceFile("MalDaze/LearningAssistant/LearningPreferencesView.swift")
+        XCTAssertTrue(source.contains("LearningPreferencesView"))
+        XCTAssertTrue(source.contains("dailyCapacityMin"))
+        XCTAssertTrue(source.contains("每日学习容量"))
+        XCTAssertTrue(source.contains("Stepper"))
+        XCTAssertTrue(source.contains("getLearningPreferences"))
+        XCTAssertTrue(source.contains("updateLearningPreferences"))
+    }
+
+    // RED: AssistantPanelView wires LearningPreferencesView for .settings tab
+    func testAssistantPanelViewWiresLearningPreferencesViewForSettingsTab() throws {
+        let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
+        XCTAssertTrue(source.contains("LearningPreferencesView"))
+        XCTAssertFalse(source.contains("Text(\"学习偏好\")"))
+    }
+
+    // RED: AssistantPanelView bottom nav includes settings tab
+    func testAssistantPanelViewBottomNavIncludesSettingsTab() throws {
+        let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
+        XCTAssertTrue(source.contains("bottomNavigationButton(.settings)"))
+    }
+
+    private func sourceFile(_ relativePath: String) throws -> String {
+        let testFile = URL(fileURLWithPath: #filePath)
+        let projectRoot = testFile.deletingLastPathComponent().deletingLastPathComponent()
+        let url = projectRoot.appendingPathComponent(relativePath)
+        return try String(contentsOf: url, encoding: .utf8)
+    }
+}
+
+// MARK: - XCTest async helper
+
+func XCTAssertNoThrowAsync(_ expression: () async throws -> Void, file: StaticString = #file, line: UInt = #line) async {
+    do {
+        try await expression()
+    } catch {
+        XCTFail("Unexpected error thrown: \(error)", file: file, line: line)
     }
 }

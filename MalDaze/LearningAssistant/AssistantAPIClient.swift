@@ -7,6 +7,9 @@ struct AssistantOfflineError: Error, LocalizedError {
     var errorDescription: String? { "学习助手后端离线或无法连接（localhost:8765）" }
 }
 
+/// 404 + {"error":"thread_not_found"} 时抛出此错误。
+struct ThreadNotFoundError: Error {}
+
 // MARK: - Response Models
 
 struct TodayBriefing: Codable {
@@ -107,14 +110,19 @@ struct ChatProposal: Codable {
     }
 }
 
-struct IngestionDraft: Codable {
-    let threadId: String
-    let draft: IngestionDraftDetail
+// MARK: - Ingestion Models (new flow)
 
-    enum CodingKeys: String, CodingKey {
-        case threadId = "thread_id"
-        case draft
-    }
+struct StartIngestionResponse: Codable {
+    let threadId: String
+    enum CodingKeys: String, CodingKey { case threadId = "thread_id" }
+}
+
+struct IngestionProgressEvent: Decodable {
+    let phase: String
+    let label: String
+    let done: Bool
+    let draft: IngestionDraftDetail?
+    let error: String?
 }
 
 struct IngestionDraftDetail: Codable {
@@ -132,6 +140,24 @@ struct IngestionDraftDetail: Codable {
         case unitCount           = "unit_count"
         case optionA             = "option_a"
         case optionB             = "option_b"
+    }
+}
+
+// MARK: - Learning Preferences Model
+
+struct LearningPreferences: Codable {
+    let dailyCapacityMin: Int
+    enum CodingKeys: String, CodingKey { case dailyCapacityMin = "daily_capacity_min" }
+}
+
+// Keep IngestionDraft for backward-compatible test decoding tests only
+struct IngestionDraft: Codable {
+    let threadId: String
+    let draft: IngestionDraftDetail
+
+    enum CodingKeys: String, CodingKey {
+        case threadId = "thread_id"
+        case draft
     }
 }
 
@@ -169,7 +195,7 @@ final class AssistantAPIClient {
     static let shared = AssistantAPIClient()
 
     private let baseURL = URL(string: "http://localhost:8765")!
-    private let session: URLSession
+    let session: URLSession
 
     private init() {
         let config = URLSessionConfiguration.default
@@ -199,6 +225,12 @@ final class AssistantAPIClient {
         _ = try await fetch(url: url, method: "POST", body: bodyData)
     }
 
+    private func putVoid<B: Encodable>(_ path: String, body: B) async throws {
+        let url  = baseURL.appendingPathComponent(path)
+        let bodyData = try JSONEncoder().encode(body)
+        _ = try await fetch(url: url, method: "PUT", body: bodyData)
+    }
+
     private func fetch(url: URL, method: String, body: Data?) async throws -> Data {
         var request        = URLRequest(url: url)
         request.httpMethod = method
@@ -208,10 +240,17 @@ final class AssistantAPIClient {
         }
         do {
             let (data, response) = try await session.data(for: request)
-            guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
-                throw AssistantOfflineError()
+            guard let http = response as? HTTPURLResponse else { throw AssistantOfflineError() }
+            // Detect thread_not_found 404
+            if http.statusCode == 404,
+               let json = try? JSONDecoder().decode([String: String].self, from: data),
+               json["error"] == "thread_not_found" {
+                throw ThreadNotFoundError()
             }
+            guard (200..<300).contains(http.statusCode) else { throw AssistantOfflineError() }
             return data
+        } catch is ThreadNotFoundError {
+            throw ThreadNotFoundError()
         } catch is AssistantOfflineError {
             throw AssistantOfflineError()
         } catch {
@@ -266,7 +305,9 @@ final class AssistantAPIClient {
         try await postVoid("/api/chat/confirm", body: Body(threadId: threadId, confirmed: confirmed))
     }
 
-    func startIngestion(url: String, deadline: String, speedFactor: Double?) async throws -> IngestionDraft {
+    // MARK: - Ingestion (new flow)
+
+    func startIngestion(url: String, deadline: String, speedFactor: Double?) async throws -> String {
         struct Body: Encodable {
             let url: String
             let deadline: String
@@ -276,25 +317,92 @@ final class AssistantAPIClient {
                 case speedFactor = "speed_factor"
             }
         }
-        return try await post("/api/ingest", body: Body(url: url, deadline: deadline, speedFactor: speedFactor))
+        let resp: StartIngestionResponse = try await post("/api/ingest/start",
+                                                          body: Body(url: url, deadline: deadline, speedFactor: speedFactor))
+        return resp.threadId
     }
 
-    func confirmIngestion(threadId: String, confirmed: Bool, selectedOption: String?) async throws {
+    func subscribeIngestionProgress(threadId: String) -> AsyncThrowingStream<IngestionProgressEvent, Error> {
+        AsyncThrowingStream { continuation in
+            Task {
+                let url = self.baseURL.appendingPathComponent("/api/ingest/progress/\(threadId)")
+                var request = URLRequest(url: url)
+                request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+                do {
+                    let (bytes, response) = try await self.session.bytes(for: request)
+                    guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+                        continuation.finish(throwing: AssistantOfflineError())
+                        return
+                    }
+                    for try await line in bytes.lines {
+                        if line.hasPrefix("data:") {
+                            let jsonStr = String(line.dropFirst(5)).trimmingCharacters(in: .whitespaces)
+                            if let data = jsonStr.data(using: .utf8),
+                               let event = try? JSONDecoder().decode(IngestionProgressEvent.self, from: data) {
+                                continuation.yield(event)
+                                if event.done {
+                                    continuation.finish()
+                                    return
+                                }
+                            }
+                        }
+                    }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+        }
+    }
+
+    func rescheduleIngestion(threadId: String, deadline: String, speedFactor: Double) async throws -> IngestionDraftDetail {
+        struct Body: Encodable {
+            let threadId: String
+            let deadline: String
+            let speedFactor: Double
+            enum CodingKeys: String, CodingKey {
+                case threadId = "thread_id"
+                case deadline
+                case speedFactor = "speed_factor"
+            }
+        }
+        return try await post("/api/ingest/reschedule",
+                              body: Body(threadId: threadId, deadline: deadline, speedFactor: speedFactor))
+    }
+
+    func confirmIngestion(threadId: String, confirmed: Bool, selectedOption: String?, deadline: String? = nil, speedFactor: Double? = nil) async throws {
         struct Body: Encodable {
             let threadId: String
             let confirmed: Bool
             let selectedOption: String?
+            let deadline: String?
+            let speedFactor: Double?
             enum CodingKeys: String, CodingKey {
-                case threadId      = "thread_id"
+                case threadId = "thread_id"
                 case confirmed
                 case selectedOption = "selected_option"
+                case deadline
+                case speedFactor = "speed_factor"
             }
         }
         try await postVoid("/api/ingest/confirm",
-                           body: Body(threadId: threadId, confirmed: confirmed, selectedOption: selectedOption))
+                           body: Body(threadId: threadId, confirmed: confirmed, selectedOption: selectedOption,
+                                     deadline: deadline, speedFactor: speedFactor))
     }
 
     func fetchResources() async throws -> [AssistantResource] {
         try await get("/api/resources")
+    }
+
+    func getLearningPreferences() async throws -> LearningPreferences {
+        try await get("/api/settings/learning-preferences")
+    }
+
+    func updateLearningPreferences(_ prefs: LearningPreferences) async throws {
+        struct Body: Encodable {
+            let dailyCapacityMin: Int
+            enum CodingKeys: String, CodingKey { case dailyCapacityMin = "daily_capacity_min" }
+        }
+        try await putVoid("/api/settings/learning-preferences", body: Body(dailyCapacityMin: prefs.dailyCapacityMin))
     }
 }

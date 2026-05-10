@@ -73,7 +73,7 @@ async def aggregate_data(state: WeeklyReviewState) -> dict:
 
         # 3. Daily capacity from system_state
         raw_cap = await get_system_state(db, "daily_capacity_min")
-        daily_capacity_min = int(raw_cap) if raw_cap else 300
+        daily_capacity_min = int(raw_cap) if raw_cap else 60
 
         total_reschedule = 0
         resource_risks: list[dict] = []

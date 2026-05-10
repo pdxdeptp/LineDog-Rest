@@ -75,6 +75,8 @@
 		A405 /* ResourceProgressView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B405 /* ResourceProgressView.swift */; };
 		A406 /* ChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B406 /* ChatView.swift */; };
 		A407 /* IngestionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B407 /* IngestionView.swift */; };
+		A408 /* FullPlanSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B408 /* FullPlanSheetView.swift */; };
+		A40B /* LearningPreferencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B40B /* LearningPreferencesView.swift */; };
 		A409 /* BackendProcessManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B409 /* BackendProcessManager.swift */; };
 		A40A /* AssistantAPIClientProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = B40A /* AssistantAPIClientProtocol.swift */; };
 		A310 /* LearningAssistantTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B310 /* LearningAssistantTests.swift */; };
@@ -162,8 +164,10 @@
 		B405 /* ResourceProgressView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResourceProgressView.swift; sourceTree = "<group>"; };
 		B406 /* ChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatView.swift; sourceTree = "<group>"; };
 		B407 /* IngestionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IngestionView.swift; sourceTree = "<group>"; };
+		B408 /* FullPlanSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FullPlanSheetView.swift; sourceTree = "<group>"; };
 		B409 /* BackendProcessManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendProcessManager.swift; sourceTree = "<group>"; };
 		B40A /* AssistantAPIClientProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssistantAPIClientProtocol.swift; sourceTree = "<group>"; };
+		B40B /* LearningPreferencesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningPreferencesView.swift; sourceTree = "<group>"; };
 		B310 /* LearningAssistantTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningAssistantTests.swift; sourceTree = "<group>"; };
 		B311 /* PetRendererTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetRendererTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -364,8 +368,10 @@
 				B405 /* ResourceProgressView.swift */,
 				B406 /* ChatView.swift */,
 				B407 /* IngestionView.swift */,
+				B408 /* FullPlanSheetView.swift */,
 				B409 /* BackendProcessManager.swift */,
 				B40A /* AssistantAPIClientProtocol.swift */,
+				B40B /* LearningPreferencesView.swift */,
 			);
 			path = LearningAssistant;
 			sourceTree = "<group>";
@@ -518,8 +524,10 @@
 				A405 /* ResourceProgressView.swift in Sources */,
 				A406 /* ChatView.swift in Sources */,
 				A407 /* IngestionView.swift in Sources */,
+				A408 /* FullPlanSheetView.swift in Sources */,
 				A409 /* BackendProcessManager.swift in Sources */,
 				A40A /* AssistantAPIClientProtocol.swift in Sources */,
+				A40B /* LearningPreferencesView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -17,6 +17,7 @@ enum AssistantPanelTab: Equatable {
     case addResource
     case resourceProgress
     case adjustPlan
+    case settings
 }
 
 enum AssistantDashboardKind: Equatable {
@@ -68,7 +69,7 @@ final class LearningAssistantViewModel: ObservableObject {
 
     @Published var ingestionDraft: IngestionDraftDetail? = nil
     @Published var ingestionThreadId: String?            = nil
-    @Published var selectedOption: String                = "A"
+    @Published var selectedOption: String                = "B"
 
     @Published var todayTotalMinutes: Int  = 0
     @Published var todayHighlights: String = ""
@@ -79,10 +80,39 @@ final class LearningAssistantViewModel: ObservableObject {
     /// 后端进程启动中（还未收到就绪通知）；区别于运行期离线。
     @Published var isConnecting: Bool = true
 
-    private let api: any AssistantAPIClientProtocol
+    // Ingestion phase tracking (SSE)
+    @Published var ingestionPhase: String? = nil
+    @Published var ingestionError: String? = nil
+
+    // Reschedule tracking
+    @Published var currentDeadline: String? = nil
+    @Published var currentSpeedFactor: Double = 1.0
+    @Published var isRescheduling: Bool = false
+    @Published var rescheduleError: Bool = false
+    @Published var dailyCapacityMin: Int = 60
+
+    // Internal sync state (not private so tests can verify/set)
+    var lastSyncedDeadline: String? = nil
+    var lastSyncedSpeedFactor: Double? = nil
+
+    // MARK: - Computed
+
+    var canConfirm: Bool {
+        guard let last = lastSyncedDeadline, let lastSpeed = lastSyncedSpeedFactor else {
+            // Never rescheduled — use initial draft, always allow confirm
+            return ingestionDraft != nil && !isRescheduling
+        }
+        return last == currentDeadline && lastSpeed == currentSpeedFactor && !isRescheduling
+    }
+
+    // MARK: - Private
+
+    let api: any AssistantAPIClientProtocol
     private let orderStore: UserDefaults
     private let todayProvider: () -> Date
     private var readyObserver: Any?
+    private var analysisTask: Task<Void, Never>?
+    private var rescheduleDebounceTask: Task<Void, Never>?
 
     // MARK: - Init
 
@@ -287,33 +317,153 @@ final class LearningAssistantViewModel: ObservableObject {
 
     func startIngestion(url: String, deadline: Date, speedFactor: Double) async {
         isIngesting = true
-        defer { isIngesting = false }
+        ingestionPhase = nil
+        ingestionError = nil
+        ingestionDraft = nil
+        ingestionThreadId = nil
+        rescheduleError = false
+
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withFullDate]
         let deadlineStr = formatter.string(from: deadline)
+        currentDeadline = deadlineStr
+        currentSpeedFactor = speedFactor
+        lastSyncedDeadline = nil
+        lastSyncedSpeedFactor = nil
+
         do {
-            let draft           = try await api.startIngestion(url: url, deadline: deadlineStr,
-                                                               speedFactor: speedFactor)
-            ingestionDraft    = draft.draft
-            ingestionThreadId = draft.threadId
-            selectedOption    = "A"
-            isOffline         = false
+            let threadId = try await api.startIngestion(url: url, deadline: deadlineStr, speedFactor: speedFactor)
+            ingestionThreadId = threadId
+            isOffline = false
+
+            analysisTask = Task {
+                do {
+                    for try await event in api.subscribeIngestionProgress(threadId: threadId) {
+                        await MainActor.run {
+                            self.ingestionPhase = event.label
+                        }
+                        if event.done {
+                            await MainActor.run {
+                                if event.phase == "draft_ready", let draft = event.draft {
+                                    self.ingestionDraft = draft
+                                    self.isIngesting = false
+                                } else if event.phase == "error" {
+                                    self.ingestionError = event.label
+                                    self.isIngesting = false
+                                    self.ingestionPhase = nil
+                                }
+                            }
+                            return
+                        }
+                    }
+                    // Stream ended without done event
+                    await MainActor.run {
+                        self.ingestionError = "连接中断，请重新提交链接分析"
+                        self.isIngesting = false
+                        self.ingestionPhase = nil
+                    }
+                } catch {
+                    await MainActor.run {
+                        self.ingestionError = "连接中断，请重新提交链接分析"
+                        self.isIngesting = false
+                        self.ingestionPhase = nil
+                    }
+                }
+            }
         } catch {
+            isIngesting = false
             isOffline = true
         }
     }
 
+    func reschedule(deadline: String, speedFactor: Double) async {
+        guard let threadId = ingestionThreadId else { return }
+        isRescheduling = true
+        rescheduleError = false
+        defer { isRescheduling = false }
+        do {
+            let newDraft = try await api.rescheduleIngestion(threadId: threadId, deadline: deadline, speedFactor: speedFactor)
+            ingestionDraft = newDraft
+            lastSyncedDeadline = deadline
+            lastSyncedSpeedFactor = speedFactor
+            rescheduleError = false
+            isOffline = false
+        } catch is ThreadNotFoundError {
+            ingestionDraft = nil
+            ingestionThreadId = nil
+            ingestionError = "session_expired"
+        } catch {
+            rescheduleError = true
+        }
+    }
+
+    func debounceReschedule(deadline: String, speedFactor: Double) {
+        rescheduleDebounceTask?.cancel()
+        rescheduleDebounceTask = Task {
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            guard !Task.isCancelled else { return }
+            await reschedule(deadline: deadline, speedFactor: speedFactor)
+        }
+    }
+
+    /// HTTP confirm path (confirmed = true)
     func confirmIngestion(confirmed: Bool, option: String? = nil) async {
         guard let tid = ingestionThreadId else { return }
         do {
-            try await api.confirmIngestion(threadId: tid, confirmed: confirmed,
-                                           selectedOption: confirmed ? (option ?? selectedOption) : nil)
-            ingestionDraft    = nil
-            ingestionThreadId = nil
-            if confirmed { await fetchDashboard() }
+            if confirmed {
+                try await api.confirmIngestion(
+                    threadId: tid,
+                    confirmed: true,
+                    selectedOption: option ?? selectedOption,
+                    deadline: currentDeadline,
+                    speedFactor: currentSpeedFactor
+                )
+                ingestionDraft = nil
+                ingestionThreadId = nil
+                selectedOption = "B"
+                await fetchDashboard()
+            } else {
+                // Cancel: pass to server for cleanliness (not currently needed but keep contract)
+                try await api.confirmIngestion(
+                    threadId: tid,
+                    confirmed: false,
+                    selectedOption: nil,
+                    deadline: nil,
+                    speedFactor: nil
+                )
+                ingestionDraft = nil
+                ingestionThreadId = nil
+                selectedOption = "B"
+            }
         } catch {
-            isOffline = true
+            ingestionError = "写入失败，请重试"
         }
+    }
+
+    /// Pure local cancel — no HTTP call
+    func confirmIngestion(cancelDraft: Bool) {
+        guard cancelDraft else { return }
+        analysisTask?.cancel()
+        analysisTask = nil
+        ingestionDraft = nil
+        ingestionThreadId = nil
+        ingestionPhase = nil
+        ingestionError = nil
+        rescheduleError = false
+        selectedOption = "B"
+    }
+
+    func cancelAnalysis() {
+        analysisTask?.cancel()
+        analysisTask = nil
+    }
+
+    func fetchDailyCapacity() async {
+        guard let url = URL(string: "http://localhost:8765/api/settings/learning-preferences"),
+              let (data, _) = try? await URLSession.shared.data(from: url),
+              let json = try? JSONDecoder().decode([String: Int].self, from: data),
+              let cap = json["daily_capacity_min"] else { return }
+        dailyCapacityMin = cap
     }
 
     // MARK: - Private dashboard helpers

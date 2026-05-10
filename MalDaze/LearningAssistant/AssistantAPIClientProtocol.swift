@@ -6,9 +6,13 @@ protocol AssistantAPIClientProtocol {
     func completeTask(id: Int, actualMinutes: Int?) async throws
     func sendMessage(message: String, threadId: String?) async throws -> ChatResponse
     func confirmChat(threadId: String, confirmed: Bool) async throws
-    func startIngestion(url: String, deadline: String, speedFactor: Double?) async throws -> IngestionDraft
-    func confirmIngestion(threadId: String, confirmed: Bool, selectedOption: String?) async throws
+    func startIngestion(url: String, deadline: String, speedFactor: Double?) async throws -> String
+    func subscribeIngestionProgress(threadId: String) -> AsyncThrowingStream<IngestionProgressEvent, Error>
+    func rescheduleIngestion(threadId: String, deadline: String, speedFactor: Double) async throws -> IngestionDraftDetail
+    func confirmIngestion(threadId: String, confirmed: Bool, selectedOption: String?, deadline: String?, speedFactor: Double?) async throws
     func fetchResources() async throws -> [AssistantResource]
+    func getLearningPreferences() async throws -> LearningPreferences
+    func updateLearningPreferences(_ prefs: LearningPreferences) async throws
 }
 
 extension AssistantAPIClient: AssistantAPIClientProtocol {}

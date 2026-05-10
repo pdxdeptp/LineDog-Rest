@@ -14,8 +14,10 @@ END
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import re
+from dataclasses import dataclass, field as dc_field
 from datetime import date, timedelta
 from typing import Any, Literal
 
@@ -29,6 +31,88 @@ from ..db.connection import get_db
 from ..db.queries import check_capacity, insert_event
 from ..handlers.dispatcher import dispatch
 from ..handlers.models import ResourceStructure, UnitDraft
+
+
+# ---------------------------------------------------------------------------
+# SSE progress tracking
+# ---------------------------------------------------------------------------
+
+@dataclass
+class ThreadProgress:
+    events: list[dict] = dc_field(default_factory=list)
+    is_done: bool = False
+    _queue: asyncio.Queue = dc_field(default_factory=asyncio.Queue)
+
+
+progress_store: dict[str, "ThreadProgress"] = {}
+
+
+async def _run_ingestion_with_progress(
+    thread_id: str,
+    initial_state: dict,
+    config: dict,
+) -> None:
+    """Run the ingestion graph, pushing SSE events into progress_store[thread_id]."""
+    prog = progress_store[thread_id]
+
+    # Node name → phase event mapping
+    _phase_map = {
+        "fetch_structure": {"phase": "fetch_structure", "label": "正在读取章节结构…", "done": False},
+        "estimate_time": {"phase": "estimate_time", "label": "正在估算学习时长…", "done": False},
+        "check_capacity": {"phase": "check_capacity", "label": "正在生成排期方案…", "done": False},
+    }
+
+    try:
+        async for chunk in ingestion_graph.astream(initial_state, config, stream_mode="updates"):
+            # chunk is {node_name: node_output}
+            for node_name, node_output in chunk.items():
+                if node_name == "fetch_structure":
+                    if isinstance(node_output, dict) and node_output.get("error"):
+                        err_event = {
+                            "phase": "error",
+                            "label": node_output["error"],
+                            "done": True,
+                            "error": "fetch_failed",
+                        }
+                        prog.events.append(err_event)
+                        await prog._queue.put(err_event)
+                        return
+
+                if node_name in _phase_map:
+                    event = dict(_phase_map[node_name])
+                    prog.events.append(event)
+                    await prog._queue.put(event)
+
+        # After stream ends (graph hit interrupt at present_draft), read the interrupt value
+        state_snapshot = ingestion_graph.get_state(config)
+        draft_value = None
+        if state_snapshot:
+            for task in (state_snapshot.tasks or []):
+                interrupts = getattr(task, "interrupts", None) or []
+                if interrupts:
+                    draft_value = interrupts[0].value if hasattr(interrupts[0], "value") else interrupts[0]
+                    break
+
+        done_event = {
+            "phase": "draft_ready",
+            "label": "草稿已就绪",
+            "done": True,
+            "draft": draft_value,
+        }
+        prog.events.append(done_event)
+        await prog._queue.put(done_event)
+
+    except Exception as exc:
+        err_event = {
+            "phase": "error",
+            "label": str(exc),
+            "done": True,
+            "error": "unexpected_error",
+        }
+        prog.events.append(err_event)
+        await prog._queue.put(err_event)
+    finally:
+        prog.is_done = True
 
 # ---------------------------------------------------------------------------
 # State schema
@@ -239,14 +323,20 @@ async def present_draft(state: IngestionState) -> IngestionState:
     # On resume, returns the value provided via Command(resume=...).
     user_response = interrupt(draft_summary)
 
-    # When resumed, user_response contains {"confirmed": bool, "selected_option": "A"|"B"}
+    # When resumed, user_response contains {"confirmed": bool, "selected_option": "A"|"B",
+    #   optionally "deadline" and "speed_factor"}
     if isinstance(user_response, dict):
         confirmed = bool(user_response.get("confirmed", False))
-        selected = str(user_response.get("selected_option", "A"))
+        selected = str(user_response.get("selected_option", "B"))
     else:
         confirmed = False
-        selected = "A"
-    return {**state, "confirmed": confirmed, "selected_option": selected}
+        selected = "B"
+    result = {**state, "confirmed": confirmed, "selected_option": selected}
+    if isinstance(user_response, dict) and user_response.get("deadline"):
+        result["deadline"] = user_response["deadline"]
+    if isinstance(user_response, dict) and user_response.get("speed_factor") is not None:
+        result["speed_factor"] = float(user_response["speed_factor"])
+    return result
 
 
 async def write_to_db(state: IngestionState) -> IngestionState:

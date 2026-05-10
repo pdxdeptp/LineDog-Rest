@@ -71,7 +71,7 @@ CREATE TABLE IF NOT EXISTS system_state (
 
 DEFAULT_SYSTEM_STATE = {
     "load_mode": "normal",
-    "daily_capacity_min": "300",
+    "daily_capacity_min": "60",
     "reduced_capacity_min": "60",
     "user_speed_factor": "1.0",
 }

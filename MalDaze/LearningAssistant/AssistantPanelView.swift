@@ -117,6 +117,8 @@ struct AssistantPanelView: View {
             resourcesPanel
         case .adjustPlan:
             ChatView(vm: vm)
+        case .settings:
+            LearningPreferencesView(api: vm.api)
         }
     }
 
@@ -286,6 +288,7 @@ struct AssistantPanelView: View {
             bottomNavigationButton(.addResource)
             bottomNavigationButton(.resourceProgress)
             bottomNavigationButton(.adjustPlan)
+            bottomNavigationButton(.settings)
         }
         .frame(height: 56)
         .frame(maxWidth: .infinity)
@@ -438,21 +441,39 @@ private struct AssistantPanelFixtureAPIClient: AssistantAPIClientProtocol {
         ChatResponse(threadId: threadId ?? "preview-thread", response: "预览回复", proposal: nil)
     }
     func confirmChat(threadId: String, confirmed: Bool) async throws {}
-    func startIngestion(url: String, deadline: String, speedFactor: Double?) async throws -> IngestionDraft {
-        IngestionDraft(
-            threadId: "preview-ingestion",
-            draft: IngestionDraftDetail(
-                resourceTitle: "预览资料",
-                resourceType: "web_article",
-                totalEstimatedHours: 1,
-                unitCount: 1,
-                optionA: [],
-                optionB: []
-            )
-        )
+
+    func startIngestion(url: String, deadline: String, speedFactor: Double?) async throws -> String {
+        "preview-ingestion"
     }
-    func confirmIngestion(threadId: String, confirmed: Bool, selectedOption: String?) async throws {}
+    func subscribeIngestionProgress(threadId: String) -> AsyncThrowingStream<IngestionProgressEvent, Error> {
+        AsyncThrowingStream { continuation in
+            continuation.yield(IngestionProgressEvent(
+                phase: "draft_ready",
+                label: "草稿已就绪",
+                done: true,
+                draft: IngestionDraftDetail(
+                    resourceTitle: "预览资料",
+                    resourceType: "web_article",
+                    totalEstimatedHours: 1,
+                    unitCount: 1,
+                    optionA: [],
+                    optionB: []
+                ),
+                error: nil
+            ))
+            continuation.finish()
+        }
+    }
+    func rescheduleIngestion(threadId: String, deadline: String, speedFactor: Double) async throws -> IngestionDraftDetail {
+        IngestionDraftDetail(resourceTitle: "预览资料", resourceType: "web_article",
+                             totalEstimatedHours: 1, unitCount: 1, optionA: [], optionB: [])
+    }
+    func confirmIngestion(threadId: String, confirmed: Bool, selectedOption: String?, deadline: String?, speedFactor: Double?) async throws {}
     func fetchResources() async throws -> [AssistantResource] { resources }
+    func getLearningPreferences() async throws -> LearningPreferences {
+        LearningPreferences(dailyCapacityMin: 60)
+    }
+    func updateLearningPreferences(_ prefs: LearningPreferences) async throws {}
 }
 
 private struct AssistantPanelView_Previews: PreviewProvider {
@@ -488,6 +509,7 @@ private extension AssistantPanelTab {
         case .addResource: return "添加资料"
         case .resourceProgress: return "资料进度"
         case .adjustPlan: return "调整计划"
+        case .settings: return "设置"
         }
     }
 
@@ -497,6 +519,7 @@ private extension AssistantPanelTab {
         case .addResource: return "plus.circle"
         case .resourceProgress: return "chart.bar"
         case .adjustPlan: return "slider.horizontal.3"
+        case .settings: return "gearshape"
         }
     }
 }

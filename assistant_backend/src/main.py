@@ -20,12 +20,13 @@ scheduler = AsyncIOScheduler()
 async def lifespan(app: FastAPI):
     await init_db(DB_PATH)
 
-    from .routers import ingest, morning, chat, review, tasks as tasks_router
+    from .routers import ingest, morning, chat, review, tasks as tasks_router, settings as settings_router
     app.include_router(ingest.router, prefix="/api")
     app.include_router(morning.router, prefix="/api")
     app.include_router(chat.router, prefix="/api")
     app.include_router(review.router, prefix="/api")
     app.include_router(tasks_router.router, prefix="/api")
+    app.include_router(settings_router.router, prefix="/api")
 
     _register_scheduler_jobs()
     scheduler.start()
