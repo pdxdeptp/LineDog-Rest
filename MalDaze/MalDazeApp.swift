@@ -5,6 +5,10 @@ struct MalDazeApp: App {
     @NSApplicationDelegateAdaptor(MalDazeAppDelegate.self) private var appDelegate
     @StateObject private var viewModel = AppViewModel()
 
+    init() {
+        MalDazeDefaults.migrateIdlePetAnimationIntensityFromLegacyIfNeeded()
+    }
+
     var body: some Scene {
         MenuBarExtra {
             MenuBarContentView(viewModel: viewModel)

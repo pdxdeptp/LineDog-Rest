@@ -13,8 +13,8 @@ enum MalDazeBroadcastNotifications {
     static let resetIdlePetPositionToDefault = Notification.Name("com.maldaze.resetIdlePetPositionToDefault")
     /// 设置页调整常态桌宠图标边长后投递；运行中的 `AppViewModel` 负责同步到窗口。
     static let idlePetIconSidePointsChanged = Notification.Name("com.maldaze.idlePetIconSidePointsChanged")
-    /// 桌宠浮窗等处切换「图标动态效果」后投递；运行中的 `AppViewModel` 同步到 `PetRenderer`。
-    static let idlePetIconAnimationChanged = Notification.Name("com.maldaze.idlePetIconAnimationChanged")
+    /// 桌宠动画强度（滑杆）提交后投递；运行中的 `AppViewModel` 同步到 `PetRenderer`。
+    static let idlePetAnimationIntensityChanged = Notification.Name("com.maldaze.idlePetAnimationIntensityChanged")
     /// `userInfo` 中为 `NSValue` 包 `NSRect`（屏幕坐标）。
     static let idlePetScreenFrameUserInfoKey = "screenFrame"
 }

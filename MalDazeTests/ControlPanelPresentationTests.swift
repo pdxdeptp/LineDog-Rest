@@ -87,6 +87,7 @@ final class ControlPanelPresentationTests: XCTestCase {
 
     func testIdlePetIconSideSettingsChangesBroadcastToRunningAppViewModel() throws {
         let notificationSource = try readProjectSource("MalDaze/MalDazeBroadcastNotifications.swift")
+        let panelSource = try readProjectSource("MalDaze/MenuBarContentView.swift")
         let settingsSource = try readProjectSource("MalDaze/Settings/MalDazeSettingsView.swift")
         let appViewModelSource = try readProjectSource("MalDaze/AppViewModel.swift")
         let notificationName = "idlePetIconSidePointsChanged"
@@ -98,10 +99,15 @@ final class ControlPanelPresentationTests: XCTestCase {
         )
 
         XCTAssertTrue(
-            settingsSource.contains(".onChange(of: idlePetIconSideStored)")
-                && settingsSource.contains("NotificationCenter.default.post")
-                && settingsSource.contains("MalDazeBroadcastNotifications.\(notificationName)"),
-            "MalDazeSettingsView.swift should post \(notificationName) when idlePetIconSideStored changes."
+            panelSource.contains("MalDazeBroadcastNotifications.\(notificationName)")
+                && panelSource.contains("idlePetIconSideSliderLive")
+                && panelSource.contains("Slider("),
+            "MenuBarContentView.swift should post \(notificationName) when icon side slider editing completes."
+        )
+
+        XCTAssertFalse(
+            settingsSource.contains("idlePetIconSideStored"),
+            "MalDazeSettingsView.swift should no longer duplicate idle pet icon side storage in Settings."
         )
 
         guard let observerRange = appViewModelSource.range(of: "forName: MalDazeBroadcastNotifications.\(notificationName)") else {

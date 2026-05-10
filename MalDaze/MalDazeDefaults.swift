@@ -57,8 +57,11 @@ enum MalDazeDefaults {
     /// 休息打断风格："fullscreen"（默认霸屏）或 "breakRun"（跑屏漫游）。
     static let breakInterruptStyle = "MalDaze.breakInterruptStyle"
 
-    /// 常态桌宠 GIF 是否播放帧动画并允许多素材轮换（默认开）；键缺失时视为 `true`。
+    /// **已迁移**：常态桌宠 GIF 是否播放（由 `idlePetAnimationIntensity` 替代）；勿在新代码写入。
     static let idlePetIconAnimationEnabled = "MalDaze.idlePetIconAnimationEnabled"
+
+    /// 常态桌宠 GIF 动态强度 **0…1**（0 静止，1 满速原生动画与轮换）。首次读取时从旧布尔键迁移。
+    static let idlePetAnimationIntensity = "MalDaze.idlePetAnimationIntensity"
 
     /// 常态桌宠图标绘制边长（点），与桌宠透明小窗边长联动；未写入时按默认 120。
     static let idlePetIconSidePoints = "MalDaze.idlePetIconSidePoints"
@@ -71,11 +74,23 @@ enum MalDazeDefaults {
         return min(max(base, idlePetIconSideMin), idlePetIconSideMax)
     }
 
-    /// 与 `@AppStorage(..., true)` 对齐：未写入 UserDefaults 时默认允许动画。
-    static func resolvedIdlePetIconAnimationEnabled() -> Bool {
-        if UserDefaults.standard.object(forKey: idlePetIconAnimationEnabled) == nil {
-            return true
+    /// 首次启动或升级后调用：若无强度键则从旧布尔键迁移（关→0、开→1；皆缺失→1）。
+    static func migrateIdlePetAnimationIntensityFromLegacyIfNeeded() {
+        let ud = UserDefaults.standard
+        guard ud.object(forKey: idlePetAnimationIntensity) == nil else { return }
+        let value: Double
+        if ud.object(forKey: idlePetIconAnimationEnabled) != nil {
+            value = ud.bool(forKey: idlePetIconAnimationEnabled) ? 1.0 : 0.0
+        } else {
+            value = 1.0
         }
-        return UserDefaults.standard.bool(forKey: idlePetIconAnimationEnabled)
+        ud.set(value, forKey: idlePetAnimationIntensity)
+    }
+
+    /// 返回 **0…1** 常态桌宠动画强度（读取前确保已执行迁移）。
+    static func resolvedIdlePetAnimationIntensity() -> Double {
+        migrateIdlePetAnimationIntensityFromLegacyIfNeeded()
+        let raw = UserDefaults.standard.double(forKey: idlePetAnimationIntensity)
+        return min(max(raw, 0), 1)
     }
 }

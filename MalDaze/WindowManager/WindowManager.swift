@@ -86,7 +86,7 @@ protocol WindowManaging: AnyObject {
     func resetIdlePetPositionToDefaultCorner()
     /// `MalDazeDefaults.idlePetIconSidePoints` 变更后：按新边长调整桌宠小窗与命中区。
     func applyIdlePetIconSideFromUserDefaults()
-    /// `MalDazeDefaults.idlePetIconAnimationEnabled` 变更后：刷新桌宠 GIF 动画与素材轮换。
+    /// `MalDazeDefaults.idlePetAnimationIntensity` 变更后：刷新桌宠 GIF 动画强度。
     func applyIdlePetAnimationFromUserDefaults()
 }
 

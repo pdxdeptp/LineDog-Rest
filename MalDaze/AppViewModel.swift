@@ -86,7 +86,7 @@ final class AppViewModel: ObservableObject {
     private var sevenMinuteShortcutObserver: NSObjectProtocol?
     private var resetIdlePetShortcutObserver: NSObjectProtocol?
     private var idlePetIconSidePointsObserver: NSObjectProtocol?
-    private var idlePetIconAnimationObserver: NSObjectProtocol?
+    private var idlePetAnimationIntensityObserver: NSObjectProtocol?
     /// 智能提醒写入的 `EKAlarm` 到点后弹出与 7 分钟倒计时相同的中央铃铛。
     private var smartReminderBellTasks: [String: Task<Void, Never>] = [:]
 
@@ -226,8 +226,8 @@ final class AppViewModel: ObservableObject {
             self?.applyIdlePetIconSideFromUserDefaults()
         }
 
-        idlePetIconAnimationObserver = NotificationCenter.default.addObserver(
-            forName: MalDazeBroadcastNotifications.idlePetIconAnimationChanged,
+        idlePetAnimationIntensityObserver = NotificationCenter.default.addObserver(
+            forName: MalDazeBroadcastNotifications.idlePetAnimationIntensityChanged,
             object: nil,
             queue: .main
         ) { [weak self] _ in
@@ -268,8 +268,8 @@ final class AppViewModel: ObservableObject {
         if let idlePetIconSidePointsObserver {
             NotificationCenter.default.removeObserver(idlePetIconSidePointsObserver)
         }
-        if let idlePetIconAnimationObserver {
-            NotificationCenter.default.removeObserver(idlePetIconAnimationObserver)
+        if let idlePetAnimationIntensityObserver {
+            NotificationCenter.default.removeObserver(idlePetAnimationIntensityObserver)
         }
     }
 

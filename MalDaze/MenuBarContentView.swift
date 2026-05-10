@@ -3,8 +3,8 @@ import SwiftUI
 
 extension MenuBarContentView {
     static var controlPanelPreferredContentSize: NSSize {
-        /// 较原 556 增加一行桌宠动画 Toggle（与菜单栏 / 桌宠 Popover 共用）。
-        NSSize(width: 300 + 280 + 300 + 3 * 24, height: 592)
+        /// 含桌宠图标边长 + 动态强度滑杆（菜单栏 / 桌宠 Popover 共用）。
+        NSSize(width: 300 + 280 + 300 + 3 * 24, height: 664)
     }
 }
 
@@ -44,12 +44,15 @@ struct MenuBarContentView: View {
     @AppStorage(MalDazeDefaults.pomodoroWorkDurationMinutes) private var pomodoroWorkMinutesStored = 25
     @AppStorage(MalDazeDefaults.pomodoroRestDurationMinutes) private var pomodoroRestMinutesStored = 5
 
-    @AppStorage(MalDazeDefaults.idlePetIconAnimationEnabled) private var idlePetIconAnimationStored = true
+    @AppStorage(MalDazeDefaults.idlePetAnimationIntensity) private var idlePetAnimationIntensityStored = 1.0
+    @AppStorage(MalDazeDefaults.idlePetIconSidePoints) private var idlePetIconSideStored = MalDazeDefaults.idlePetIconSideDefault
 
     private var deskReminders: DeskRemindersModel { viewModel.deskReminders }
 
     @State private var reminderUnderEdit: ReminderDisplayItem?
     @State private var deleteConfirmationId: String?
+    /// 拖动中预览；松手后写入 `@AppStorage` 并发帖，避免拖动每一帧写偏好。
+    @State private var idlePetIconSideSliderLive = Double(MalDazeDefaults.idlePetIconSideDefault)
 
     private var sevenMinuteMinutesResolved: Int {
         let v = sevenMinuteMinutesStored
@@ -164,7 +167,7 @@ struct MenuBarContentView: View {
         }
         .frame(
             minWidth: remindersColumnWidth + assistantColumnWidth + 300 + 3 * 24,
-            minHeight: 592
+            minHeight: 664
         )
 
         chrome
@@ -523,15 +526,68 @@ struct MenuBarContentView: View {
                 .tint(SwitchOnTrackTint.paleBlue)
                 .help("开启时休息霸屏期间连续单击屏幕中央小狗 20 下（每次间隔 ≤ 3 秒）即可提前结束休息（默认）；关闭后点击无效，只能等计时自然结束。")
 
-                Toggle(isOn: $idlePetIconAnimationStored) {
-                    Text("桌宠图标动态效果")
-                        .font(.subheadline)
+                VStack(alignment: .leading, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("桌宠图标边长")
+                            .font(.subheadline)
+                        HStack(spacing: 10) {
+                            Text("小")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .frame(width: 14, alignment: .leading)
+                            Slider(
+                                value: $idlePetIconSideSliderLive,
+                                in: Double(MalDazeDefaults.idlePetIconSideMin)...Double(MalDazeDefaults.idlePetIconSideMax),
+                                step: 4
+                            ) { editing in
+                                guard !editing else { return }
+                                let clamped = MalDazeDefaults.clampedIdlePetIconSidePoints(stored: Int(idlePetIconSideSliderLive.rounded()))
+                                idlePetIconSideStored = clamped
+                                idlePetIconSideSliderLive = Double(clamped)
+                                NotificationCenter.default.post(
+                                    name: MalDazeBroadcastNotifications.idlePetIconSidePointsChanged,
+                                    object: nil
+                                )
+                            }
+                            Text("大")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .frame(width: 14, alignment: .trailing)
+                        }
+                    }
+                    .help("调大后更清晰，透明窗口与可点击区域会一起变大。")
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("桌宠动态强度")
+                            .font(.subheadline)
+                        HStack(spacing: 10) {
+                            Text("静")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .frame(width: 14, alignment: .leading)
+                            Slider(value: $idlePetAnimationIntensityStored, in: 0...1) { editing in
+                                if !editing {
+                                    NotificationCenter.default.post(
+                                        name: MalDazeBroadcastNotifications.idlePetAnimationIntensityChanged,
+                                        object: nil
+                                    )
+                                }
+                            }
+                            Text("满")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .frame(width: 14, alignment: .trailing)
+                        }
+                    }
+                    .help("左端完全静止；右端与原先「开启动画」一致；中间为较慢的逐帧播放。")
                 }
-                .toggleStyle(.switch)
-                .tint(SwitchOnTrackTint.paleBlue)
-                .help("关闭后右下角桌宠 GIF 定格且不再自动轮换素材；不影响菜单栏图标。")
-                .onChange(of: idlePetIconAnimationStored) { _ in
-                    NotificationCenter.default.post(name: MalDazeBroadcastNotifications.idlePetIconAnimationChanged, object: nil)
+                .onAppear {
+                    let clamped = MalDazeDefaults.clampedIdlePetIconSidePoints(stored: idlePetIconSideStored)
+                    idlePetIconSideSliderLive = Double(clamped)
+                }
+                .onChange(of: idlePetIconSideStored) { _ in
+                    let clamped = MalDazeDefaults.clampedIdlePetIconSidePoints(stored: idlePetIconSideStored)
+                    idlePetIconSideSliderLive = Double(clamped)
                 }
 
                 Divider()

@@ -43,9 +43,9 @@ final class PetStageView: NSView {
         didSet { needsLayout = true }
     }
 
-    /// 与 `MalDazeDefaults.idlePetIconAnimationEnabled` 同步到 `PetRenderer`（休息 / 跑屏中也可调用以立即定格或恢复）。
+    /// 与 `MalDazeDefaults.idlePetAnimationIntensity` 同步到 `PetRenderer`（休息 / 跑屏中也可调用）。
     func applyIdlePetGIFAnimationFromDefaults() {
-        pet.setGIFAnimationEnabled(MalDazeDefaults.resolvedIdlePetIconAnimationEnabled())
+        pet.setAnimationIntensity(MalDazeDefaults.resolvedIdlePetAnimationIntensity())
     }
 
     private static let edgeMargin: CGFloat = 16
