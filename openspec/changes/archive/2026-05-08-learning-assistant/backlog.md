@@ -5,6 +5,8 @@
 ## 基础设施
 
 - **Python 后端生产打包**：当前路径发现（`findBackendDir()` 层 2）依赖 DerivedData `info.plist`，仅开发期有效。生产 .app 需要层 1 生效：将 `assistant_backend/` 打进 `.app/Contents/Resources/`。难点：`.venv/` 含平台相关 native binary，整体约 100–500 MB；Python 解释器需一并处理（bundle `Python.framework` 或用 PyInstaller 编译成单一 binary）。PyInstaller 方案最省事，届时 `spawnBackend()` 改为寻找编译后的 binary 而非 `.venv/bin/uvicorn`。
+- **XPC Service 后端 helper 评估**：若后续需要更符合 Mac App Store / sandbox 语境的原生 helper 边界，评估将当前 localhost FastAPI helper 迁移或包裹为 XPC Service。该方向更适合 Swift/ObjC 原生服务边界；由于当前后端是 Python/FastAPI/LangGraph，属于较大架构迁移，不阻塞当前 app-owned child process 方案。
+- **SMAppService LoginItem / LaunchAgent 评估**：仅当产品语义改为“主 App 退出后学习助手仍需后台运行”时再评估 bundled LoginItem 或 LaunchAgent。该方向会把生命周期从“Cmd+Q 停后端”改成“后台 helper 可继续运行，用户通过设置/开关管理”，不适合当前退出即收束的需求。
 
 ## 正向反馈 / 激励
 

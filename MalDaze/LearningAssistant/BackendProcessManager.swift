@@ -6,19 +6,61 @@ extension Notification.Name {
     static let backendDidBecomeReady = Notification.Name("BackendProcessManagerDidBecomeReady")
 }
 
+@MainActor
+protocol BackendProcessControlling: AnyObject {
+    var executableURL: URL? { get set }
+    var arguments: [String]? { get set }
+    var currentDirectoryURL: URL? { get set }
+    var environment: [String: String]? { get set }
+    var isRunning: Bool { get }
+
+    func run() throws
+    func terminate()
+    func setTerminationHandler(_ handler: @escaping @MainActor @Sendable (BackendProcessControlling) -> Void)
+}
+
+extension Process: BackendProcessControlling {
+    func setTerminationHandler(_ handler: @escaping @MainActor @Sendable (BackendProcessControlling) -> Void) {
+        terminationHandler = { process in
+            Task { @MainActor in
+                handler(process)
+            }
+        }
+    }
+}
+
+@MainActor
+protocol AppBackendLifecycleManaging: AnyObject {
+    func start()
+    func stop()
+}
+
 /// Option B 后端进程管理：桌宠启动时探测 8765 端口。
 /// - 端口已占用（手动 uvicorn）→ 不接管，退出时也不 kill。
 /// - 端口空闲 → spawn .venv/bin/uvicorn，退出时 kill。
 @MainActor
-final class BackendProcessManager {
+final class BackendProcessManager: AppBackendLifecycleManaging {
     static let shared = BackendProcessManager()
 
-    private var process: Process?
+    private var process: BackendProcessControlling?
     private var ownsProcess = false
     /// ViewModel 可在订阅通知前检查此标志，避免错过通知。
     private(set) var isReady = false
 
     private let port: UInt16 = 8765
+    private let backendDirectoryProvider: () -> URL?
+    private let processFactory: () -> BackendProcessControlling
+    private let parentProcessIdentifierProvider: () -> Int32
+
+    init(
+        backendDirectoryProvider: (() -> URL?)? = nil,
+        processFactory: @escaping () -> BackendProcessControlling = { Process() },
+        parentProcessIdentifierProvider: @escaping () -> Int32 = { getpid() }
+    ) {
+        self.backendDirectoryProvider = backendDirectoryProvider ?? { nil }
+        self.processFactory = processFactory
+        self.parentProcessIdentifierProvider = parentProcessIdentifierProvider
+    }
 
     func start() {
         Task {
@@ -95,17 +137,24 @@ final class BackendProcessManager {
 
     // MARK: - Spawn
 
+    func spawnBackendForTesting() {
+        spawnBackend()
+    }
+
     private func spawnBackend() {
-        guard let backendDir = findBackendDir() else { return }
+        guard let backendDir = backendDirectoryProvider() ?? findBackendDir() else { return }
         let uvicorn = backendDir.appendingPathComponent(".venv/bin/uvicorn")
         guard FileManager.default.fileExists(atPath: uvicorn.path) else { return }
 
-        let p = Process()
+        let p = processFactory()
         p.executableURL      = uvicorn
         p.arguments          = ["src.main:app", "--host", "127.0.0.1", "--port", "\(port)"]
         p.currentDirectoryURL = backendDir
+        var environment = ProcessInfo.processInfo.environment
+        environment["MALDAZE_PARENT_PID"] = "\(parentProcessIdentifierProvider())"
+        p.environment = environment
 
-        p.terminationHandler = { [weak self] _ in
+        p.setTerminationHandler { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.process     = nil
                 self?.ownsProcess = false

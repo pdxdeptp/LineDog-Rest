@@ -2,12 +2,37 @@ import AppKit
 
 /// 在启动完成后再设置激活策略；避免在 `App.init` 里调 `setActivationPolicy`（会导致 XCTest 宿主早期崩溃）。
 /// `.regular` + 非 `LSUIElement`：Dock 图标、Cmd+Tab、Mission Control 中可见桌宠等 `NSWindow`。
+@MainActor
 final class MalDazeAppDelegate: NSObject, NSApplicationDelegate {
     /// 全局快捷键监听（需「辅助功能」授权才能在其他 App 前台时生效）。
     private var globalMalDazeKeyMonitor: Any?
+    private let backendLifecycle: AppBackendLifecycleManaging
+    /// 在停止后端之后执行的其余退出清理（便于测试断言顺序；生产环境在 `override init()` 里绑定默认实现）。
+    private var terminationCleanupAfterBackendStop: () -> Void = {}
+
+    override init() {
+        self.backendLifecycle = BackendProcessManager.shared
+        super.init()
+        self.terminationCleanupAfterBackendStop = { [weak self] in
+            MalDazeCarbonGlobalHotKeys.stop()
+            guard let self else { return }
+            if let globalMalDazeKeyMonitor = self.globalMalDazeKeyMonitor {
+                NSEvent.removeMonitor(globalMalDazeKeyMonitor)
+            }
+        }
+    }
+
+    init(
+        backendLifecycle: AppBackendLifecycleManaging,
+        terminationCleanupAfterBackendStop: @escaping () -> Void = {}
+    ) {
+        self.backendLifecycle = backendLifecycle
+        super.init()
+        self.terminationCleanupAfterBackendStop = terminationCleanupAfterBackendStop
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        BackendProcessManager.shared.start()
+        backendLifecycle.start()
         UserDefaults.standard.register(defaults: [
             MalDazeDefaults.geminiModelId: MalDazeDefaults.defaultGeminiModelId,
             MalDazeDefaults.sevenMinuteReminderDurationMinutes: 7,
@@ -37,11 +62,8 @@ final class MalDazeAppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        BackendProcessManager.shared.stop()
-        MalDazeCarbonGlobalHotKeys.stop()
-        if let globalMalDazeKeyMonitor {
-            NSEvent.removeMonitor(globalMalDazeKeyMonitor)
-        }
+        backendLifecycle.stop()
+        terminationCleanupAfterBackendStop()
     }
 
     /// Dock 图标被再次点按时，激活应用并把桌宠窗提到前层（休息霸屏时仍为 `screenSaver` 层级，由 `WindowManager` 管理）。

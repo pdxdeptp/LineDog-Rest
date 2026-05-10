@@ -26,6 +26,17 @@ Archive sync is path-driven: `changes/<change>/specs/<spec-id>/spec.md` merges b
 
 **Gate:** `openspec/changes/<name>/tasks.md` exists before Phase 1 begins.
 
+### Soft Pre-Apply Guidance (after `opsx:propose`)
+
+After `opsx:propose` creates or updates a change, do not immediately push the user into `opsx:apply` as the only next step. Instead, summarize that the proposal/design/specs/tasks are ready and offer a short choice:
+
+- **Lightweight path:** run `opsx:apply-readiness <change>` before implementation.
+- **Full pre-apply path:** run `opsx:product-deepen <change>` → `opsx:scope-decision <change>` → `opsx:apply-readiness <change>`.
+- **Pause:** leave the change ready for later review or manual edits.
+- **Direct apply:** proceed only if the user explicitly wants to skip pre-apply review.
+
+Do not automatically run the full three-skill sequence by default. Recommend the full path for medium/large, user-visible, async, multi-agent, data-writing, or cross-module changes; keep the lightweight path acceptable for small, well-bounded changes.
+
 ---
 
 ## Phase 1: Git Safety Check and Desktop-App Manual QA Workflow
@@ -38,7 +49,8 @@ This desktop-pet project requires frequent manual verification in the running lo
 2. Identify whether there are existing user changes.
 3. If there are existing user changes, avoid touching overlapping files unless the user explicitly approves.
 4. For large, risky, or multi-step changes, recommend or create a checkpoint commit before editing when appropriate.
-5. Work directly in the current project directory by default so the user can restart the desktop app and manually verify the actual modified code.
+5. If `opsx:apply` will run without a git worktree, create a checkpoint commit of the current code state before starting implementation.
+6. Work directly in the current project directory by default so the user can restart the desktop app and manually verify the actual modified code.
 
 ### Default Workflow for This Project
 
@@ -46,10 +58,11 @@ Use the current project directory by default:
 
 1. Check `git status`.
 2. Keep changes scoped to the requested feature, fix, or OpenSpec task.
-3. Implement using the Phase 2 TDD + subagent workflow.
-4. Run relevant automated checks where available.
-5. Ask the user to manually verify UI/UX behavior in the running desktop app when visual or interaction behavior is affected.
-6. Commit or prepare changes only after implementation and verification are complete, unless the user requests a checkpoint earlier.
+3. Before `opsx:apply`, if no git worktree is being used, create a checkpoint commit for the current code state.
+4. Implement using the Phase 2 TDD + subagent workflow.
+5. Run relevant automated checks where available.
+6. Ask the user to manually verify UI/UX behavior in the running desktop app when visual or interaction behavior is affected.
+7. Commit or prepare changes only after implementation and verification are complete, unless the user requests a checkpoint earlier.
 
 ### When to Use a Git Worktree
 
@@ -138,6 +151,7 @@ When all tasks are complete:
 
 - **Skill declaration BEFORE action.** Before invoking any Superpowers skill, announce: 「触发 skill: <skill-name>」. If code is being written without this declaration appearing first, stop and confirm whether the appropriate skill should be invoked.
 - **Git safety check BEFORE code.** Run `git status` before implementation. Work directly in the current project directory by default for this desktop-pet project; use a git worktree only under the conditions listed in Phase 1.
+- **Checkpoint BEFORE non-worktree apply.** Before `opsx:apply`, if no git worktree is being used, create a checkpoint commit for the current code state.
 - **Failing test BEFORE implementation.** The TDD Iron Law is enforced — code without a preceding failing test is deleted.
 - **Spec compliance review AFTER each task.** Critical issues block the next task.
 - **Spec Sync:** If implementation reveals a design flaw, update the OpenSpec `spec.md` before continuing — don't drift from the spec silently.

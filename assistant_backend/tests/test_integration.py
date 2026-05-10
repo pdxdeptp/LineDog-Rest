@@ -414,8 +414,12 @@ async def test_ingest_start_returns_thread_id(client):
     import uuid
 
     # patch create_task to prevent actual LLM/network calls in background
+    def close_background_coro(coro):
+        coro.close()
+        return MagicMock()
+
     with patch("src.routers.ingest.asyncio.create_task") as mock_create_task:
-        mock_create_task.return_value = MagicMock()
+        mock_create_task.side_effect = close_background_coro
 
         resp = await client.post(
             "/api/ingest/start",

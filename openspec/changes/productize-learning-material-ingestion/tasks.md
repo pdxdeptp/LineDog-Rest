@@ -37,8 +37,8 @@
 
 ## 5. 集成验收
 
-- [ ] 5.1 运行 `pytest assistant_backend/tests/`，确认全部通过（包含 1.7、2.4 新增用例）
-- [ ] 5.2 运行 `xcodebuild test`，确认 Swift 测试全部通过（包含 3.9 新增用例）
+- [x] 5.1 运行 `pytest assistant_backend/tests/`，确认全部通过（包含 1.7、2.4 新增用例）
+- [x] 5.2 运行 `xcodebuild test`，确认 Swift 测试全部通过（包含 3.9 新增用例）
 - [ ] 5.3 手动验收：B站合集 27 视频 → SSE 四阶段正常 → 草稿显示"均匀铺开"为默认 → 弹窗展示 27 天排期 → 修改 deadline → 重新排期 → 确认写入 → 首页刷新
 - [ ] 5.4 手动验收：无效 URL → error 事件 → 友好错误提示，URL 文本保留
 - [ ] 5.5 手动验收：学习偏好设置页读取/修改 `daily_capacity_min`，Ingestion 草稿卡片显示正确值
