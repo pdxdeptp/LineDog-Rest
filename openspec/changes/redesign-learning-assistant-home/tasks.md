@@ -1,6 +1,6 @@
 ## 1. Baseline And Red Tests
 
-- [ ] 1.1 Run baseline verification before implementation in the selected workspace: `cd assistant_backend && pytest`, then `xcodebuild test -project MalDaze.xcodeproj -scheme MalDaze -destination 'platform=macOS'`
+- [x] 1.1 Run baseline verification before implementation in the selected workspace: `cd assistant_backend && pytest`, then `xcodebuild test -project MalDaze.xcodeproj -scheme MalDaze -destination 'platform=macOS'`
 - [x] 1.2 Add failing backend tests for `GET /api/today-briefing` task payloads including existing task fields plus `resource_url` and `unit_url`
 - [x] 1.3 Add failing Swift decoding tests for `AssistantTask.resourceURL` and `AssistantTask.unitURL`, including null fallback cases
 - [x] 1.4 Add failing ViewModel tests for summary-first dashboard state, whole-column offline, empty database primary action, local task display order, task expansion state, link availability, and bottom navigation selection
@@ -36,29 +36,29 @@
 - [x] 5.3 Implement homepage states for empty database, tasks today, all tasks completed, resources without today tasks, and deadline risk
 - [x] 5.4 Implement reorderable today task rows with a clear drag handle and local presentation ordering only
 - [x] 5.5 Implement clickable task row body expansion for light details, keeping completion and drag targets distinct
-- [x] 5.6 Implement explicit “打开链接” action in expanded task details, opening `unit_url` first and `resource_url` second; show unavailable state when no link exists
+- [x] 5.6 Implement explicit "打开链接" action in expanded task details, opening `unit_url` first and `resource_url` second; show unavailable state when no link exists
 - [x] 5.7 Keep existing Add Material, Resource Progress, and Chat/Planner surfaces reachable from bottom navigation without productizing those surfaces in this loop
 - [ ] 5.8 Verify text fits within the adaptive middle column and bottom navigation labels do not overlap across expected desktop widths
 
 ## 6. Fixtures And Acceptance Evidence
 
-- [ ] 6.1 Add SwiftUI preview fixtures or equivalent constructors for empty database, backend starting, whole-column offline, tasks today, task expanded with link, task without link, resources without today tasks, deadline risk, and wide popover layout
-- [ ] 6.2 Update `docs/acceptance-checklist.md` or a focused acceptance note with homepage journey scenarios and required evidence
+- [x] 6.1 Add SwiftUI preview fixtures or equivalent constructors for empty database, backend starting, whole-column offline, tasks today, task expanded with link, task without link, resources without today tasks, deadline risk, and wide popover layout
+- [x] 6.2 Update `docs/acceptance-checklist.md` or a focused acceptance note with homepage journey scenarios and required evidence
 - [ ] 6.3 Capture or record visual evidence for wide popover layout, bottom fixed navigation, scrollable dashboard with fixed nav, task detail expansion, learning link action, drag reorder, empty database, and whole-column offline
-- [ ] 6.4 Compare SwiftUI result against `openspec/changes/redesign-learning-assistant-home/mockups/home-dashboard-wide-popover.html` and document intentional differences
+- [x] 6.4 Compare SwiftUI result against `openspec/changes/redesign-learning-assistant-home/mockups/home-dashboard-wide-popover.html` and document intentional differences
 
 ## 7. Reviews And Final Verification
 
-- [ ] 7.1 Run full Swift verification: `xcodebuild test -project MalDaze.xcodeproj -scheme MalDaze -destination 'platform=macOS'`
-- [ ] 7.2 Run backend regression verification: `cd assistant_backend && pytest`
-- [ ] 7.3 Perform spec compliance review against all delta specs in `openspec/changes/redesign-learning-assistant-home/specs/`
-- [ ] 7.4 Perform code quality review for state duplication, accidental backend mutation during drag ordering, hidden navigation, overbroad error handling, popover sizing regressions, and layout overlap
-- [ ] 7.5 Update this task list only after each task has passed its verification evidence
+- [x] 7.1 Run full Swift verification: `xcodebuild test -project MalDaze.xcodeproj -scheme MalDaze -destination 'platform=macOS'`
+- [x] 7.2 Run backend regression verification: `cd assistant_backend && pytest`
+- [x] 7.3 Perform spec compliance review against all delta specs in `openspec/changes/redesign-learning-assistant-home/specs/`
+- [x] 7.4 Perform code quality review for state duplication, accidental backend mutation during drag ordering, hidden navigation, overbroad error handling, popover sizing regressions, and layout overlap
+- [x] 7.5 Update this task list only after each task has passed its verification evidence
 
 ## 8. Subagent Handoff Boundaries
 
-- [ ] 8.1 Backend contract subagent owns `assistant_backend/src/agents/morning_agent.py`, backend tests, and the `daily-morning-agent` spec compliance for link fields
-- [ ] 8.2 Frontend state subagent owns `AssistantAPIClient.swift`, `AssistantAPIClientProtocol.swift`, `LearningAssistantViewModel.swift`, and model/ViewModel tests; it must not edit popover shell layout
-- [ ] 8.3 Popover layout subagent owns `MenuBarContentView.swift` and any sizing tests; it must preserve `WindowManager` popover behavior unless spec is updated
-- [ ] 8.4 Frontend UI subagent owns `AssistantPanelView.swift` and visual fixtures; it coordinates with ViewModel state names and does not modify backend code
-- [ ] 8.5 Acceptance subagent owns acceptance documentation and visual evidence; it must not change production Swift or Python code except fixture-only support agreed with the owning subagent
+- [x] 8.1 Backend contract subagent owns `assistant_backend/src/agents/morning_agent.py`, backend tests, and the `daily-morning-agent` spec compliance for link fields
+- [x] 8.2 Frontend state subagent owns `AssistantAPIClient.swift`, `AssistantAPIClientProtocol.swift`, `LearningAssistantViewModel.swift`, and model/ViewModel tests; it must not edit popover shell layout
+- [x] 8.3 Popover layout subagent owns `MenuBarContentView.swift` and any sizing tests; it must preserve `WindowManager` popover behavior unless spec is updated
+- [x] 8.4 Frontend UI subagent owns `AssistantPanelView.swift` and visual fixtures; it coordinates with ViewModel state names and does not modify backend code
+- [x] 8.5 Acceptance subagent owns acceptance documentation and visual evidence; it must not change production Swift or Python code except fixture-only support agreed with the owning subagent
