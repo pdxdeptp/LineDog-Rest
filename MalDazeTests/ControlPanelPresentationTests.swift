@@ -3,6 +3,56 @@ import XCTest
 final class ControlPanelPresentationTests: XCTestCase {
     private let expectedDeskPetRootHelperName = "makeDeskPetControlPanelRootView"
 
+    func testMenuBarExtraUsesCompactSettingsMenuInsteadOfWideControlPanel() throws {
+        let source = try readProjectSource("MalDaze/MalDazeApp.swift")
+        let menuBarContentRange = try XCTUnwrap(
+            rangeOfMenuBarExtraContent(in: source),
+            "MalDazeApp should define MenuBarExtra content."
+        )
+        let menuBarContentSource = String(source[menuBarContentRange])
+
+        XCTAssertFalse(
+            menuBarContentSource.contains("MenuBarContentView(viewModel:"),
+            "MenuBarExtra content should not construct the wide desk pet control panel."
+        )
+        XCTAssertTrue(
+            menuBarContentSource.contains("MenuBarSettingsMenuView()"),
+            "MenuBarExtra content should use the compact settings-only menu view."
+        )
+        XCTAssertTrue(
+            source.contains(".menuBarExtraStyle(.window)"),
+            "The menu bar extra should keep its existing window menu style."
+        )
+    }
+
+    func testCompactMenuBarSettingsMenuHasOneSettingsActionPresentingSettingsWindow() throws {
+        let appSource = try readProjectSource("MalDaze/MalDazeApp.swift")
+        let settingsSource = try readProjectSource("MalDaze/Settings/MalDazeSettingsView.swift")
+        let settingsMenuRange = try XCTUnwrap(
+            rangeOfType(named: "MenuBarSettingsMenuView", in: appSource),
+            "MalDazeApp should declare a compact MenuBarSettingsMenuView."
+        )
+        let settingsMenuSource = String(appSource[settingsMenuRange])
+
+        XCTAssertEqual(
+            settingsMenuSource.ranges(of: "Button(").count,
+            1,
+            "The compact menu bar settings menu should expose exactly one settings action."
+        )
+        XCTAssertTrue(
+            settingsMenuSource.contains("MalDazeSettingsWindowPresenter.present()"),
+            "The compact menu bar settings action should present the existing settings window presenter."
+        )
+        XCTAssertFalse(
+            settingsMenuSource.contains("MenuBarContentView(viewModel:"),
+            "The compact menu bar settings menu should not embed the wide desk pet control panel."
+        )
+        XCTAssertTrue(
+            settingsSource.contains("NSHostingController(rootView: MalDazeSettingsView())"),
+            "MalDazeSettingsWindowPresenter should continue reusing MalDazeSettingsView."
+        )
+    }
+
     func testSharedPopupContentDoesNotInjectDeskPetOnlyPresentationState() throws {
         let source = try readProjectSource("MalDaze/MenuBarContentView.swift")
         let forbiddenTokens = [
@@ -48,6 +98,20 @@ final class ControlPanelPresentationTests: XCTestCase {
         XCTAssertTrue(
             inlineCreationsOutsideHelper.isEmpty,
             "MenuBarContentView(viewModel:) should only be constructed inside \(expectedDeskPetRootHelperName); found \(inlineCreationsOutsideHelper.count) inline construction(s) outside that helper."
+        )
+    }
+
+    func testDeskPetControlPanelRootHelperStillBuildsWideMenuBarContentView() throws {
+        let source = try readProjectSource("MalDaze/WindowManager/WindowManager.swift")
+        let helperRange = try XCTUnwrap(
+            rangeOfFunction(named: expectedDeskPetRootHelperName, in: source),
+            "WindowManager should keep \(expectedDeskPetRootHelperName) as the desk pet popover construction point."
+        )
+        let helperSource = String(source[helperRange])
+
+        XCTAssertTrue(
+            helperSource.contains("AnyView(MenuBarContentView(viewModel: vm))"),
+            "Desk pet left-click and shortcut popovers should continue using the wide MenuBarContentView(viewModel:) root."
         )
     }
 
@@ -249,8 +313,41 @@ final class ControlPanelPresentationTests: XCTestCase {
         return nil
     }
 
+    private func rangeOfMenuBarExtraContent(in source: String) -> Range<String.Index>? {
+        guard let menuBarRange = source.range(of: "MenuBarExtra {"),
+              let labelRange = source[menuBarRange.upperBound...].range(of: "} label:")
+        else { return nil }
+
+        return menuBarRange.upperBound..<labelRange.lowerBound
+    }
+
     private func rangeOfMember(named memberName: String, in source: String) -> Range<String.Index>? {
         guard let declarationRange = source.range(of: "static var \(memberName):"),
+              let openingBrace = source[declarationRange.upperBound...].firstIndex(of: "{")
+        else { return nil }
+
+        var depth = 0
+        var cursor = openingBrace
+        while cursor < source.endIndex {
+            switch source[cursor] {
+            case "{":
+                depth += 1
+            case "}":
+                depth -= 1
+                if depth == 0 {
+                    return declarationRange.lowerBound..<source.index(after: cursor)
+                }
+            default:
+                break
+            }
+            cursor = source.index(after: cursor)
+        }
+
+        return nil
+    }
+
+    private func rangeOfType(named typeName: String, in source: String) -> Range<String.Index>? {
+        guard let declarationRange = source.range(of: "struct \(typeName):"),
               let openingBrace = source[declarationRange.upperBound...].firstIndex(of: "{")
         else { return nil }
 

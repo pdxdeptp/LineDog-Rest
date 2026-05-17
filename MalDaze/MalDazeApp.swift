@@ -11,8 +11,7 @@ struct MalDazeApp: App {
 
     var body: some Scene {
         MenuBarExtra {
-            MenuBarContentView(viewModel: viewModel)
-                .interactiveDismissDisabled(true)
+            MenuBarSettingsMenuView()
         } label: {
             MenuBarDogLabel(mode: viewModel.petDisplayMode)
         }
@@ -20,6 +19,16 @@ struct MalDazeApp: App {
 
         Settings {
             MalDazeSettingsView()
+        }
+    }
+}
+
+private struct MenuBarSettingsMenuView: View {
+    var body: some View {
+        Button(action: {
+            MalDazeSettingsWindowPresenter.present()
+        }) {
+            Label("设置…", systemImage: "gearshape")
         }
     }
 }
