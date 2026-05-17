@@ -61,6 +61,50 @@ final class PetRendererTests: XCTestCase {
         XCTAssertFalse(pet.testing_variantCycleTimerExists)
     }
 
+    func testBreakRunningDisplayModeUsesDedicatedBreakRunningAssetsWithoutVariantRotation() throws {
+        let pet = PetRenderer()
+        let container = NSView(frame: NSRect(x: 0, y: 0, width: 400, height: 400))
+        pet.install(in: container)
+        pet.setAnimationIntensity(1)
+
+        pet.setDisplayMode(.breakRunning)
+
+        XCTAssertEqual(pet.testing_currentMode, .breakRunning)
+        XCTAssertFalse(pet.testing_variantCycleTimerExists)
+        let activeURLs = pet.testing_activeURLs
+        XCTAssertEqual(
+            activeURLs.map(\.lastPathComponent).sorted(),
+            [
+                "线条小狗第1弹_啦啦啦.gif",
+                "线条小狗第1弹_来了.gif",
+            ].sorted()
+        )
+        XCTAssertTrue(activeURLs.allSatisfy { $0.path.contains("/LineDog/breakRunning/") })
+    }
+
+    func testBreakRunDisplayRestoresPreviousNonRestModeWhenCancelled() throws {
+        let stage = PetStageView(frame: NSRect(x: 0, y: 0, width: 240, height: 240))
+        stage.applyNonRestPetDisplayMode(.pausedWhiteOutline)
+
+        stage.beginBreakRunDisplay(total: 60)
+
+        XCTAssertEqual(stage.testing_petDisplayMode, .breakRunning)
+
+        stage.cancelBreakRunToIdle()
+
+        XCTAssertEqual(stage.testing_petDisplayMode, .pausedWhiteOutline)
+    }
+
+    func testBreakRunDisplayKeepsBreakRunningModeAfterLayout() throws {
+        let stage = PetStageView(frame: NSRect(x: 0, y: 0, width: 240, height: 240))
+        stage.applyNonRestPetDisplayMode(.pausedWhiteOutline)
+        stage.beginBreakRunDisplay(total: 60)
+
+        stage.layout()
+
+        XCTAssertEqual(stage.testing_petDisplayMode, .breakRunning)
+    }
+
     func testIntermediateIntensity_startsManualPlaybackWhenGifPresent() {
         let gifSample = Bundle.main.url(
             forResource: "线条小狗第12弹_无聊",

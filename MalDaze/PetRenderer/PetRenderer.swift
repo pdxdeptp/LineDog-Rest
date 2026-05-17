@@ -59,6 +59,8 @@ final class PetRenderer: PetRendering {
                 gif("breakPrompt", "线条小狗第2弹_激动"),
                 gif("breakPrompt", "线条小狗第5弹_偷看"),
                 gif("breakPrompt", "线条小狗第5弹_出去玩"),
+            ].compactMap { $0 },
+            .breakRunning: [
                 gif("breakRunning", "线条小狗第1弹_啦啦啦"),
                 gif("breakRunning", "线条小狗第1弹_来了"),
             ].compactMap { $0 },
@@ -268,6 +270,8 @@ final class PetRenderer: PetRendering {
 
     // MARK: - Tests (@testable)
 
+    internal var testing_currentMode: PetDisplayMode { currentMode }
+    internal var testing_activeURLs: [URL] { activeURLs }
     internal var testing_imageViewAnimates: Bool { imageView.animates }
     internal var testing_variantCycleTimerExists: Bool { cycleTimer != nil }
     internal var testing_manualPlaybackTimerExists: Bool { manualPlaybackTimer != nil }

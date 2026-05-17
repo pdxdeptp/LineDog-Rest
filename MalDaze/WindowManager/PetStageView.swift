@@ -364,7 +364,7 @@ final class PetStageView: NSView {
 
     func applyNonRestPetDisplayMode(_ mode: PetDisplayMode) {
         nonRestDisplayMode = mode
-        if restBeganAt == nil {
+        if restBeganAt == nil, breakRunBeganAt == nil {
             pet.setDisplayMode(mode)
         }
     }
@@ -402,7 +402,7 @@ final class PetStageView: NSView {
 
     // MARK: - 跑屏模式（breakRun）
 
-    /// 进入跑屏显示状态：显示迷你倒计时，切换为跑步配色。不驱动窗口位置（由 `BreakRunController` 负责）。
+    /// 进入跑屏显示状态：显示跑屏小狗。不驱动窗口位置（由 `BreakRunController` 负责）。
     func beginBreakRunDisplay(total: TimeInterval) {
         breakRunBeganAt = Date()
         breakRunTotal = total
@@ -414,7 +414,7 @@ final class PetStageView: NSView {
         // 倒计时已移至 WindowManager 的独立屏幕左下角面板，此处不再显示随桌宠移动的小标签
         breakRunCountdownLabel.isHidden = true
         updateBreakRunCountdown(remaining: total)
-        pet.setDisplayMode(.runningBlack)
+        pet.setDisplayMode(.breakRunning)
     }
 
     /// 更新跑屏倒计时标签（由 `BreakRunController` 的 1s 定时器调用）。
@@ -555,7 +555,7 @@ final class PetStageView: NSView {
         pet.layoutPet(in: b, visualCenter: center, scale: scale)
         idlePetVisualCenter = center
         idlePetVisualSide = base * scale
-        if restBeganAt == nil {
+        if restBeganAt == nil, breakRunBeganAt == nil {
             pet.setDisplayMode(nonRestDisplayMode)
         }
     }
@@ -660,4 +660,8 @@ final class PetStageView: NSView {
     deinit {
         stopTickTimer()
     }
+
+    // MARK: - Tests (@testable)
+
+    internal var testing_petDisplayMode: PetDisplayMode { pet.testing_currentMode }
 }
