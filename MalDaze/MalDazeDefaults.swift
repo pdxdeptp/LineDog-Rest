@@ -7,8 +7,17 @@ enum MalDazeDefaults {
     static let backendGeminiAPIKey   = "MalDaze.backend.geminiAPIKey"
     static let backendOpenAIAPIKey   = "MalDaze.backend.openAIAPIKey"
     static let backendDeepSeekAPIKey = "MalDaze.backend.deepSeekAPIKey"
+    static let assistantBackendLazyStartupEnabled = "MalDaze.assistantBackend.lazyStartupEnabled"
     static let defaultBackendLLMProvider = "gemini"
     static let defaultBackendLLMModel    = "gemini-2.5-flash"
+    static let defaultAssistantBackendLazyStartupEnabled = true
+
+    static func resolvedAssistantBackendLazyStartupEnabled(defaults: UserDefaults = .standard) -> Bool {
+        guard defaults.object(forKey: assistantBackendLazyStartupEnabled) != nil else {
+            return defaultAssistantBackendLazyStartupEnabled
+        }
+        return defaults.bool(forKey: assistantBackendLazyStartupEnabled)
+    }
 
     // 桌宠智能输入（Smart Reminder）— 勿改
     static let geminiAPIKey = "MalDaze.geminiAPIKey"

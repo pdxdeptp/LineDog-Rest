@@ -12,6 +12,22 @@ final class MalDazeInteractionTests: XCTestCase {
         wait(for: [e], timeout: 2.0)
     }
 
+    private func backingTimer(from engine: AutoTimerEngine) throws -> Timer {
+        let child = try XCTUnwrap(
+            Mirror(reflecting: engine).children.first { $0.label == "tickTimer" },
+            "AutoTimerEngine should keep its scheduled Timer in tickTimer"
+        )
+        return try XCTUnwrap(Self.optionalTimer(from: child.value))
+    }
+
+    private static func optionalTimer(from value: Any) -> Timer? {
+        let mirror = Mirror(reflecting: value)
+        if mirror.displayStyle == .optional {
+            return mirror.children.first?.value as? Timer
+        }
+        return value as? Timer
+    }
+
     // MARK: - 模式与计时开关
 
     func testDefaultBootstrapAuto_isChronoActive_blackPet() {
@@ -245,6 +261,74 @@ final class MalDazeInteractionTests: XCTestCase {
     }
 
     // MARK: - AutoTimerEngine.nextHalfHourAnchor
+
+    func testAutoStartSchedulesAnchorTimerInsteadOfQuarterSecondPolling() throws {
+        let engine = AutoTimerEngine(restDuration: 1)
+        var states: [TimeState] = []
+        engine.onStateChange = { states.append($0) }
+
+        engine.start()
+        defer { engine.stop() }
+
+        let state = try XCTUnwrap(states.first)
+        guard case .autoWatching(let anchor) = state else {
+            return XCTFail("Expected AutoTimerEngine to enter autoWatching first")
+        }
+        let delay = anchor.timeIntervalSinceNow
+        if delay < 2 {
+            throw XCTSkip("Current wall clock is too close to the half-hour anchor for a stable timer fireDate assertion")
+        }
+
+        let timer = try backingTimer(from: engine)
+        XCTAssertGreaterThan(timer.fireDate.timeIntervalSinceNow, 1, "Waiting for a future anchor should not use the old 0.25s polling interval")
+        XCTAssertEqual(timer.fireDate.timeIntervalSince(anchor), 0, accuracy: 0.5)
+    }
+
+    func testAutoScheduledRestUsesOneSecondTimerAndSuppressesSameSecondCountdownDuplicates() throws {
+        let engine = AutoTimerEngine(restDuration: 2.4)
+        var states: [TimeState] = []
+        engine.onStateChange = { states.append($0) }
+
+        engine.start()
+        defer { engine.stop() }
+        try backingTimer(from: engine).fire()
+
+        XCTAssertTrue(engine.isInScheduledRest)
+        guard case .resting(let initialRemaining) = try XCTUnwrap(states.last) else {
+            return XCTFail("Expected firing the anchor timer to enter scheduled rest")
+        }
+        XCTAssertEqual(initialRemaining, 2.4, accuracy: 0.1)
+
+        let restTimer = try backingTimer(from: engine)
+        XCTAssertGreaterThan(restTimer.fireDate.timeIntervalSinceNow, 0.75, "Scheduled rest countdown should not keep using the old 0.25s timer cadence")
+        XCTAssertLessThanOrEqual(restTimer.fireDate.timeIntervalSinceNow, 1.1)
+
+        let stateCountAfterBeginningRest = states.count
+        restTimer.fire()
+        restTimer.fire()
+        XCTAssertEqual(states.count, stateCountAfterBeginningRest, "Countdown should not emit duplicate .resting states while the displayed whole second is unchanged")
+    }
+
+    func testAutoScheduledRestDoesNotSkipNextDisplayedSecondWhenOneSecondTickIsLate() throws {
+        let engine = AutoTimerEngine(restDuration: 3)
+        var displayedSeconds: [Int] = []
+        engine.onStateChange = { state in
+            if case .resting(let remaining) = state {
+                displayedSeconds.append(max(0, Int(floor(remaining))))
+            }
+        }
+
+        engine.start()
+        defer { engine.stop() }
+        try backingTimer(from: engine).fire()
+
+        XCTAssertEqual(displayedSeconds, [3])
+        let firstRestTick = try backingTimer(from: engine)
+        Thread.sleep(forTimeInterval: 1.02)
+        firstRestTick.fire()
+
+        XCTAssertEqual(displayedSeconds, [3, 2], "A slightly late one-second rest tick should still emit the next displayed second instead of skipping it")
+    }
 
     func testNextHalfHourAnchor_after1025_is1030() {
         var cal = Calendar(identifier: .gregorian)

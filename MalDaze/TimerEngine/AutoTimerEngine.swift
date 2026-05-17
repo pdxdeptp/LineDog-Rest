@@ -2,6 +2,8 @@ import Foundation
 
 /// 模式 B：每逢时钟 `:00` 与 `:30` 触发休息；其余时间处于等待下一锚点状态。
 final class AutoTimerEngine: TimerEngine {
+    private static let restCountdownSlopTolerance: TimeInterval = 0.15
+
     var onStateChange: ((TimeState) -> Void)?
 
     private var restDuration: TimeInterval
@@ -17,7 +19,7 @@ final class AutoTimerEngine: TimerEngine {
     private var tickTimer: Timer?
     private var phaseEnd: Date?
     private var isResting = false
-    /// 仅当剩余整秒变化时派发 `.resting`，避免每 0.25s 刷屏触发 SwiftUI / WindowServer。
+    /// 仅当剩余整秒变化时派发 `.resting`，避免重复 tick 触发 SwiftUI / WindowServer。
     private var lastRestingEmitWholeSeconds: Int?
 
     var isTimerRunning: Bool { tickTimer != nil }
@@ -59,24 +61,12 @@ final class AutoTimerEngine: TimerEngine {
         phaseEnd = anchor
         onStateChange?(.autoWatching(nextAnchor: anchor))
 
-        let t = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
-            self?.tickWatching()
+        let delay = max(0, anchor.timeIntervalSinceNow)
+        let t = Timer(timeInterval: delay, repeats: false) { [weak self] _ in
+            self?.beginRest()
         }
         RunLoop.main.add(t, forMode: .common)
         tickTimer = t
-    }
-
-    private func tickWatching() {
-        if isResting {
-            tickResting()
-            return
-        }
-        guard let anchor = phaseEnd else { return }
-        if Date() >= anchor {
-            beginRest()
-            return
-        }
-        // 锚点未变；`scheduleWatching` 已派发过一次 `.autoWatching`，此处勿重复（否则约 4Hz 打满主线程与菜单栏刷新）。
     }
 
     private func beginRest() {
@@ -84,9 +74,20 @@ final class AutoTimerEngine: TimerEngine {
         phaseEnd = Date().addingTimeInterval(restDuration)
         lastRestingEmitWholeSeconds = max(0, Int(restDuration.rounded(.down)))
         onStateChange?(.resting(remaining: restDuration))
+        scheduleRestTick()
+    }
 
+    private func scheduleRestTick() {
         tickTimer?.invalidate()
-        let t = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
+        guard let end = phaseEnd, isResting else { return }
+        let remaining = end.timeIntervalSinceNow
+        guard remaining > 0 else {
+            tickResting()
+            return
+        }
+
+        let delay = min(1, remaining)
+        let t = Timer(timeInterval: delay, repeats: false) { [weak self] _ in
             self?.tickResting()
         }
         RunLoop.main.add(t, forMode: .common)
@@ -97,16 +98,27 @@ final class AutoTimerEngine: TimerEngine {
         guard let end = phaseEnd, isResting else { return }
         let remaining = end.timeIntervalSinceNow
         if remaining > 0 {
-            let whole = max(0, Int(remaining.rounded(.down)))
+            let whole = displayedRestWholeSeconds(for: remaining)
             if whole != lastRestingEmitWholeSeconds {
                 lastRestingEmitWholeSeconds = whole
-                onStateChange?(.resting(remaining: remaining))
+                onStateChange?(.resting(remaining: TimeInterval(whole)))
             }
+            scheduleRestTick()
             return
         }
         lastRestingEmitWholeSeconds = nil
         isResting = false
         scheduleWatching()
+    }
+
+    private func displayedRestWholeSeconds(for remaining: TimeInterval) -> Int {
+        let whole = max(0, Int(remaining.rounded(.down)))
+        guard let last = lastRestingEmitWholeSeconds else { return whole }
+        let expectedNext = max(0, last - 1)
+        guard whole < expectedNext else { return whole }
+
+        let slopAdjusted = max(0, Int((remaining + Self.restCountdownSlopTolerance).rounded(.down)))
+        return slopAdjusted >= expectedNext ? expectedNext : whole
     }
 
     /// 严格晚于 `date` 的下一个 `:00` 或 `:30`（秒与纳秒为 0）。

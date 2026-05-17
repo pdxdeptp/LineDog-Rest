@@ -9,6 +9,7 @@ struct MalDazeSettingsView: View {
     @AppStorage(MalDazeDefaults.backendGeminiAPIKey)   private var backendGeminiKey   = ""
     @AppStorage(MalDazeDefaults.backendOpenAIAPIKey)   private var backendOpenAIKey   = ""
     @AppStorage(MalDazeDefaults.backendDeepSeekAPIKey) private var backendDeepSeekKey = ""
+    @AppStorage(MalDazeDefaults.assistantBackendLazyStartupEnabled) private var assistantBackendLazyStartupEnabled = MalDazeDefaults.defaultAssistantBackendLazyStartupEnabled
 
     // 桌宠智能输入（勿改）
     @AppStorage(MalDazeDefaults.geminiAPIKey) private var geminiAPIKey = ""
@@ -104,7 +105,10 @@ struct MalDazeSettingsView: View {
                     SecureField("Gemini API Key", text: $backendGeminiKey)
                         .textFieldStyle(.roundedBorder)
                 }
-                Text("重启桌宠后生效。API Key 仅保存在本机 UserDefaults。")
+                Text("LLM 服务商、模型和 API Key 会在下次学习助手后端启动时生效。API Key 仅保存在本机 UserDefaults。")
+                    .font(.caption).foregroundStyle(.secondary)
+                Toggle("懒启动学习助手后端", isOn: $assistantBackendLazyStartupEnabled)
+                Text("影响下次 App 启动策略：开启时更省电，启动不会拉起后端，首次打开学习助手可能需要等待；关闭后会在 App 启动完成后预先启动后端。切换此项不会立即启动或停止当前后端。")
                     .font(.caption).foregroundStyle(.secondary)
             } header: {
                 Text("学习助手 LLM")

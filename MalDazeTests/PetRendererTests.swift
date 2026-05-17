@@ -1,4 +1,5 @@
 import AppKit
+import ImageIO
 import XCTest
 @testable import MalDaze
 
@@ -75,5 +76,90 @@ final class PetRendererTests: XCTestCase {
         pet.setAnimationIntensity(0.5)
         XCTAssertTrue(pet.testing_manualPlaybackTimerExists)
         XCTAssertFalse(pet.testing_imageViewAnimates)
+    }
+
+    func testStaticFirstFrame_reusesDecodedFrameForSameGIFURL() throws {
+        try Self.requirePausedWhiteOutlineGIF()
+        let pet = PetRenderer()
+        let container = NSView(frame: NSRect(x: 0, y: 0, width: 400, height: 400))
+        pet.install(in: container)
+        pet.setAnimationIntensity(0)
+
+        pet.setDisplayMode(.pausedWhiteOutline)
+        let firstImage = try Self.currentImage(from: pet)
+        pet.setDisplayMode(.pausedWhiteOutline)
+        let secondImage = try Self.currentImage(from: pet)
+
+        XCTAssertTrue(firstImage === secondImage)
+        XCTAssertFalse(pet.testing_imageViewAnimates)
+    }
+
+    func testIntermediatePlayback_reusesDecodedFramesAndReschedulesWithCurrentIntensityForSameGIFURL() throws {
+        try Self.requirePausedWhiteOutlineGIF()
+        let pet = PetRenderer()
+        let container = NSView(frame: NSRect(x: 0, y: 0, width: 400, height: 400))
+        pet.install(in: container)
+
+        pet.setAnimationIntensity(0.25)
+        pet.setDisplayMode(.pausedWhiteOutline)
+        let firstImage = try Self.currentImage(from: pet)
+        let firstDelay = try Self.manualPlaybackTimer(from: pet).fireDate.timeIntervalSinceNow
+
+        pet.setAnimationIntensity(0.5)
+        let secondImage = try Self.currentImage(from: pet)
+        let secondDelay = try Self.manualPlaybackTimer(from: pet).fireDate.timeIntervalSinceNow
+
+        XCTAssertTrue(firstImage === secondImage)
+        XCTAssertLessThan(secondDelay, firstDelay * 0.75)
+        XCTAssertFalse(pet.testing_imageViewAnimates)
+    }
+
+    private static func requirePausedWhiteOutlineGIF() throws {
+        guard let url = Bundle.main.url(
+            forResource: "线条小狗第12弹_困",
+            withExtension: "gif",
+            subdirectory: "LineDog/sleeping"
+        ) else {
+            throw XCTSkip("Paused white outline GIF fixture is not bundled in this test run.")
+        }
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+              CGImageSourceGetCount(source) > 1 else {
+            throw XCTSkip("Paused white outline GIF fixture is not decodable as a multi-frame GIF.")
+        }
+    }
+
+    private static func currentImage(from pet: PetRenderer, file: StaticString = #filePath, line: UInt = #line) throws -> NSImage {
+        guard let imageView = mirroredValue(named: "imageView", from: pet) as? NSImageView else {
+            XCTFail("Could not inspect PetRenderer imageView.", file: file, line: line)
+            throw TestAccessError.missingMirrorValue("imageView")
+        }
+        guard let image = imageView.image else {
+            XCTFail("Expected PetRenderer to display an image.", file: file, line: line)
+            throw TestAccessError.missingMirrorValue("image")
+        }
+        return image
+    }
+
+    private static func manualPlaybackTimer(from pet: PetRenderer, file: StaticString = #filePath, line: UInt = #line) throws -> Timer {
+        if let timer = mirroredValue(named: "manualPlaybackTimer", from: pet) as? Timer {
+            return timer
+        }
+        XCTFail("Expected intermediate GIF playback to schedule a timer.", file: file, line: line)
+        throw TestAccessError.missingMirrorValue("manualPlaybackTimer")
+    }
+
+    private static func mirroredValue(named name: String, from pet: PetRenderer) -> Any? {
+        var mirror: Mirror? = Mirror(reflecting: pet)
+        while let current = mirror {
+            if let value = current.children.first(where: { $0.label == name })?.value {
+                return value
+            }
+            mirror = current.superclassMirror
+        }
+        return nil
+    }
+
+    private enum TestAccessError: Error {
+        case missingMirrorValue(String)
     }
 }

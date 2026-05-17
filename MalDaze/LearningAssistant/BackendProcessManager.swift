@@ -1,9 +1,11 @@
 import Foundation
-import Network
+import Darwin
 
 extension Notification.Name {
     /// 后端进程已就绪（端口可接受连接）时发送；ViewModel 监听后再首次 fetch。
     static let backendDidBecomeReady = Notification.Name("BackendProcessManagerDidBecomeReady")
+    /// 后端启动失败、超时或已退出；ViewModel 可提示离线并允许用户重试。
+    static let backendDidBecomeUnavailable = Notification.Name("BackendProcessManagerDidBecomeUnavailable")
 }
 
 @MainActor
@@ -31,7 +33,10 @@ extension Process: BackendProcessControlling {
 
 @MainActor
 protocol AppBackendLifecycleManaging: AnyObject {
-    func start()
+    var isReady: Bool { get }
+    var isStarting: Bool { get }
+
+    func startIfNeeded()
     func stop()
 }
 
@@ -44,107 +49,198 @@ final class BackendProcessManager: AppBackendLifecycleManaging {
 
     private var process: BackendProcessControlling?
     private var ownsProcess = false
+    private var terminatingOwnedProcess: BackendProcessControlling?
     /// ViewModel 可在订阅通知前检查此标志，避免错过通知。
     private(set) var isReady = false
+    private(set) var isStarting = false
+    private var startupTask: Task<Void, Never>?
+    private var startupGeneration = 0
 
     private let port: UInt16 = 8765
     private let backendDirectoryProvider: () -> URL?
     private let processFactory: () -> BackendProcessControlling
     private let parentProcessIdentifierProvider: () -> Int32
+    private let portBoundProbe: (() async -> Bool)?
+    private let readinessTimeout: TimeInterval
+    private let readinessPollNanoseconds: UInt64
 
     init(
         backendDirectoryProvider: (() -> URL?)? = nil,
         processFactory: @escaping () -> BackendProcessControlling = { Process() },
-        parentProcessIdentifierProvider: @escaping () -> Int32 = { getpid() }
+        parentProcessIdentifierProvider: @escaping () -> Int32 = { getpid() },
+        portBoundProbe: (() async -> Bool)? = nil,
+        readinessTimeout: TimeInterval = 30,
+        readinessPollNanoseconds: UInt64 = 1_000_000_000
     ) {
         self.backendDirectoryProvider = backendDirectoryProvider ?? { nil }
         self.processFactory = processFactory
         self.parentProcessIdentifierProvider = parentProcessIdentifierProvider
+        self.portBoundProbe = portBoundProbe
+        self.readinessTimeout = readinessTimeout
+        self.readinessPollNanoseconds = readinessPollNanoseconds
     }
 
-    func start() {
-        Task {
+    func startIfNeeded() {
+        guard !isReady, !isStarting else { return }
+        isStarting = true
+        startupGeneration += 1
+        let generation = startupGeneration
+        startupTask?.cancel()
+        startupTask = Task {
             if await isPortBound() {
+                guard isCurrentStartupRequest(generation) else { return }
+                if terminatingOwnedProcess != nil {
+                    await waitForTerminatingOwnedProcessThenContinueStartup(generation: generation)
+                    return
+                }
                 ownsProcess = false
                 markReady()
             } else {
-                spawnBackend()
-                await waitUntilReady()
+                guard isCurrentStartupRequest(generation) else { return }
+                await spawnBackendAndWaitUntilReady(generation: generation)
             }
         }
     }
 
+    private func isCurrentStartupRequest(_ generation: Int) -> Bool {
+        !Task.isCancelled && startupGeneration == generation && isStarting
+    }
+
     private func markReady() {
+        startupTask = nil
         isReady = true
+        isStarting = false
         NotificationCenter.default.post(name: .backendDidBecomeReady, object: nil)
     }
 
-    /// 轮询端口，最多等 30 秒；无论成败都发通知，失败时 ViewModel 会显示离线。
-    private func waitUntilReady() async {
-        let deadline = Date().addingTimeInterval(30)
+    private func markUnavailable() {
+        startupTask = nil
+        isReady = false
+        isStarting = false
+        NotificationCenter.default.post(name: .backendDidBecomeUnavailable, object: nil)
+    }
+
+    private func spawnBackendAndWaitUntilReady(generation: Int) async {
+        guard spawnBackend() else {
+            guard isCurrentStartupRequest(generation) else { return }
+            markUnavailable()
+            return
+        }
+        guard isCurrentStartupRequest(generation) else { return }
+        await waitUntilReady(generation: generation)
+    }
+
+    private func waitForTerminatingOwnedProcessThenContinueStartup(generation: Int) async {
+        let deadline = Date().addingTimeInterval(readinessTimeout)
+        while terminatingOwnedProcess != nil && Date() < deadline {
+            try? await Task.sleep(nanoseconds: readinessPollNanoseconds)
+            guard isCurrentStartupRequest(generation) else { return }
+        }
+        guard isCurrentStartupRequest(generation) else { return }
+        guard terminatingOwnedProcess == nil else {
+            markUnavailable()
+            return
+        }
+
+        if await isPortBound() {
+            guard isCurrentStartupRequest(generation) else { return }
+            ownsProcess = false
+            markReady()
+        } else {
+            guard isCurrentStartupRequest(generation) else { return }
+            await spawnBackendAndWaitUntilReady(generation: generation)
+        }
+    }
+
+    /// 轮询端口，最多等 30 秒；超时不伪装为 ready，交给 ViewModel 显示离线。
+    private func waitUntilReady(generation: Int) async {
+        let deadline = Date().addingTimeInterval(readinessTimeout)
         while Date() < deadline {
-            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            try? await Task.sleep(nanoseconds: readinessPollNanoseconds)
+            guard isCurrentStartupRequest(generation) else { return }
             if await isPortBound() {
+                guard isCurrentStartupRequest(generation) else { return }
                 markReady()
                 return
             }
         }
-        markReady()
+        guard isCurrentStartupRequest(generation) else { return }
+        markUnavailable()
     }
 
     func stop() {
+        startupGeneration += 1
+        startupTask?.cancel()
+        startupTask = nil
+        isStarting = false
+        isReady = false
         guard ownsProcess, let p = process, p.isRunning else { return }
-        p.terminate()
+        terminatingOwnedProcess = p
         process = nil
         ownsProcess = false
+        p.terminate()
     }
 
     // MARK: - Port Detection
 
     private func isPortBound() async -> Bool {
-        await withCheckedContinuation { continuation in
-            let conn = NWConnection(
-                host: "127.0.0.1",
-                port: NWEndpoint.Port(rawValue: port)!,
-                using: .tcp
-            )
-            var resumed = false
+        if let portBoundProbe {
+            return await portBoundProbe()
+        }
 
-            conn.stateUpdateHandler = { state in
-                guard !resumed else { return }
-                switch state {
-                case .ready:
-                    resumed = true
-                    conn.cancel()
-                    continuation.resume(returning: true)
-                case .failed, .cancelled:
-                    resumed = true
-                    continuation.resume(returning: false)
-                default:
-                    break
-                }
-            }
-            conn.start(queue: .global())
+        let port = port
+        return await Task.detached(priority: .utility) {
+            Self.isLocalhostPortBound(port: port)
+        }.value
+    }
 
-            DispatchQueue.global().asyncAfter(deadline: .now() + 0.5) {
-                guard !resumed else { return }
-                resumed = true
-                conn.cancel()
-                continuation.resume(returning: false)
+    private nonisolated static func isLocalhostPortBound(port: UInt16) -> Bool {
+        let fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)
+        guard fd >= 0 else { return false }
+        defer { close(fd) }
+
+        let flags = fcntl(fd, F_GETFL, 0)
+        guard flags >= 0, fcntl(fd, F_SETFL, flags | O_NONBLOCK) >= 0 else { return false }
+
+        var address = sockaddr_in()
+        address.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
+        address.sin_family = sa_family_t(AF_INET)
+        address.sin_port = port.bigEndian
+        address.sin_addr = in_addr(s_addr: inet_addr("127.0.0.1"))
+
+        let connectResult = withUnsafePointer(to: &address) { pointer in
+            pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) { sockaddrPointer in
+                connect(fd, sockaddrPointer, socklen_t(MemoryLayout<sockaddr_in>.size))
             }
         }
+        if connectResult == 0 { return true }
+        guard errno == EINPROGRESS else { return false }
+
+        var descriptor = pollfd(fd: fd, events: Int16(POLLOUT), revents: 0)
+        guard poll(&descriptor, 1, 500) > 0 else { return false }
+
+        var socketError: Int32 = 0
+        var socketErrorLength = socklen_t(MemoryLayout<Int32>.size)
+        guard getsockopt(fd, SOL_SOCKET, SO_ERROR, &socketError, &socketErrorLength) == 0 else {
+            return false
+        }
+        return socketError == 0
     }
 
     // MARK: - Spawn
 
     func spawnBackendForTesting() {
-        spawnBackend()
+        _ = spawnBackend()
     }
 
-    private func spawnBackend() {
-        guard let backendDir = backendDirectoryProvider() ?? findBackendDir() else { return }
+    private func spawnBackend() -> Bool {
+        if ownsProcess, let process, process.isRunning {
+            return true
+        }
+
+        guard let backendDir = backendDirectoryProvider() ?? findBackendDir() else { return false }
         let uvicorn = backendDir.appendingPathComponent(".venv/bin/uvicorn")
-        guard FileManager.default.fileExists(atPath: uvicorn.path) else { return }
+        guard FileManager.default.fileExists(atPath: uvicorn.path) else { return false }
 
         let p = processFactory()
         p.executableURL      = uvicorn
@@ -154,10 +250,21 @@ final class BackendProcessManager: AppBackendLifecycleManaging {
         environment["MALDAZE_PARENT_PID"] = "\(parentProcessIdentifierProvider())"
         p.environment = environment
 
-        p.setTerminationHandler { [weak self] _ in
+        p.setTerminationHandler { [weak self] terminatedProcess in
             Task { @MainActor [weak self] in
-                self?.process     = nil
-                self?.ownsProcess = false
+                guard let self else { return }
+                if let terminatingProcess = self.terminatingOwnedProcess,
+                   terminatingProcess === terminatedProcess {
+                    self.terminatingOwnedProcess = nil
+                    return
+                }
+                guard let currentProcess = self.process,
+                      currentProcess === terminatedProcess else {
+                    return
+                }
+                self.process     = nil
+                self.ownsProcess = false
+                self.markUnavailable()
             }
         }
 
@@ -165,8 +272,9 @@ final class BackendProcessManager: AppBackendLifecycleManaging {
             try p.run()
             process     = p
             ownsProcess = true
+            return true
         } catch {
-            // 启动失败时静默：UI 侧会通过 AssistantOfflineError 提示用户
+            return false
         }
     }
 

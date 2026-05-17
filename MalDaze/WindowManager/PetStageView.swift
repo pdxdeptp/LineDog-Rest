@@ -6,6 +6,35 @@ protocol PetStageDeskMenuPresenter: AnyObject {
     func presentSmartReminderInput(from stage: PetStageView, anchorRect: NSRect)
 }
 
+struct RestVisualTickPolicy {
+    static let interactiveTickInterval: TimeInterval = 1.0 / 15.0
+    static let settledTickInterval: TimeInterval = 1.0
+
+    static func interval(
+        forElapsed elapsed: TimeInterval,
+        total: TimeInterval,
+        growDuration: TimeInterval,
+        fadeOutDuration: TimeInterval
+    ) -> TimeInterval {
+        if elapsed < growDuration {
+            return interactiveTickInterval
+        }
+        if elapsed >= total - fadeOutDuration {
+            return interactiveTickInterval
+        }
+        return settledTickInterval
+    }
+}
+
+struct RestCountdownFormatter {
+    static func string(remaining: TimeInterval) -> String {
+        let totalSecs = max(0, Int(floor(remaining)))
+        let m = totalSecs / 60
+        let s = totalSecs % 60
+        return String(format: "%d:%02d", m, s)
+    }
+}
+
 /// 唯一桌宠舞台：非休息时小窗内显示小狗，可拖动窗口；休息时**同一只**变红、移向中央并放大，背景渐暗，左下角倒计时。
 final class PetStageView: NSView {
     private let dimView = NSView()
@@ -390,10 +419,7 @@ final class PetStageView: NSView {
 
     /// 更新跑屏倒计时标签（由 `BreakRunController` 的 1s 定时器调用）。
     func updateBreakRunCountdown(remaining: TimeInterval) {
-        let totalSecs = max(0, Int(floor(remaining)))
-        let m = totalSecs / 60
-        let s = totalSecs % 60
-        breakRunCountdownLabel.stringValue = String(format: "%d:%02d", m, s)
+        breakRunCountdownLabel.stringValue = RestCountdownFormatter.string(remaining: remaining)
     }
 
     /// 跑屏结束/中断，恢复常态显示。
@@ -593,24 +619,37 @@ final class PetStageView: NSView {
     }
 
     private func updateCountdown(remaining: TimeInterval) {
-        let totalSecs = max(0, Int(floor(remaining)))
-        let m = totalSecs / 60
-        let s = totalSecs % 60
-        countdownLabel.stringValue = String(format: "%d:%02d", m, s)
+        countdownLabel.stringValue = RestCountdownFormatter.string(remaining: remaining)
     }
 
     private func startTickTimer() {
         stopTickTimer()
-        // 60Hz 会让主线程与 WindowServer 在整段休息霸屏期间持续重绘；15Hz 对 60s 位移动画仍足够顺滑。
-        let t = Timer.scheduledTimer(withTimeInterval: 1.0 / 15.0, repeats: true) { [weak self] _ in
+        scheduleNextRestTick(after: RestVisualTickPolicy.interactiveTickInterval)
+    }
+
+    private func scheduleNextRestTick(after interval: TimeInterval) {
+        let t = Timer.scheduledTimer(withTimeInterval: interval, repeats: false) { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self, let start = self.restBeganAt else { return }
+                self.tickTimer = nil
                 let elapsed = Date().timeIntervalSince(start)
                 self.applyRestPhase(self.easedProgress(at: elapsed))
+                if self.restBeganAt != nil {
+                    self.scheduleNextRestTick(after: self.restVisualTickInterval(forElapsed: elapsed))
+                }
             }
         }
         RunLoop.main.add(t, forMode: .common)
         tickTimer = t
+    }
+
+    private func restVisualTickInterval(forElapsed elapsed: TimeInterval) -> TimeInterval {
+        RestVisualTickPolicy.interval(
+            forElapsed: elapsed,
+            total: restTotal,
+            growDuration: growDuration,
+            fadeOutDuration: fadeOutDuration
+        )
     }
 
     private func stopTickTimer() {

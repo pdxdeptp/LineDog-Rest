@@ -1,6 +1,30 @@
 import Combine
 import Foundation
 
+private final class NotificationObserverBag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var observers: [NSObjectProtocol] = []
+
+    func add(_ observer: NSObjectProtocol) {
+        lock.lock()
+        observers.append(observer)
+        lock.unlock()
+    }
+
+    func removeAll() {
+        lock.lock()
+        let observers = observers
+        self.observers.removeAll()
+        lock.unlock()
+
+        observers.forEach(NotificationCenter.default.removeObserver)
+    }
+
+    deinit {
+        removeAll()
+    }
+}
+
 // MARK: - Chat Message
 
 struct ChatMessage: Identifiable {
@@ -110,7 +134,9 @@ final class LearningAssistantViewModel: ObservableObject {
     let api: any AssistantAPIClientProtocol
     private let orderStore: UserDefaults
     private let todayProvider: () -> Date
-    private var readyObserver: Any?
+    private let backendLifecycle: AppBackendLifecycleManaging
+    private let shouldRequestBackendStartup: Bool
+    private let notificationObservers = NotificationObserverBag()
     private var analysisTask: Task<Void, Never>?
     private var rescheduleDebounceTask: Task<Void, Never>?
 
@@ -120,33 +146,55 @@ final class LearningAssistantViewModel: ObservableObject {
         api: any AssistantAPIClientProtocol = AssistantAPIClient.shared,
         orderStore: UserDefaults = .standard,
         todayProvider: @escaping () -> Date = Date.init,
-        autoLoadWhenReady: Bool = true
+        autoLoadWhenReady: Bool = true,
+        backendLifecycle: AppBackendLifecycleManaging = BackendProcessManager.shared
     ) {
         self.api = api
         self.orderStore = orderStore
         self.todayProvider = todayProvider
-        readyObserver = NotificationCenter.default.addObserver(
+        self.backendLifecycle = backendLifecycle
+        self.shouldRequestBackendStartup = autoLoadWhenReady
+        let readyObserver = NotificationCenter.default.addObserver(
             forName: .backendDidBecomeReady,
             object: nil,
             queue: .main
         ) { [weak self] _ in
             guard let self else { return }
             Task { @MainActor [weak self] in
-                guard let self, self.isConnecting else { return }
+                guard let self, self.shouldRequestBackendStartup else { return }
                 self.isConnecting = false
                 await self.fetchDashboard()
             }
         }
+        notificationObservers.add(readyObserver)
+
+        let unavailableObserver = NotificationCenter.default.addObserver(
+            forName: .backendDidBecomeUnavailable,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            Task { @MainActor [weak self] in
+                guard let self, self.shouldRequestBackendStartup else { return }
+                self.clearDashboardContent()
+                self.isConnecting = false
+                self.isOffline = true
+            }
+        }
+        notificationObservers.add(unavailableObserver)
 
         // 若通知在订阅前已发出（后端早于视图初始化就绪），直接开始 fetch。
-        if autoLoadWhenReady, BackendProcessManager.shared.isReady {
-            isConnecting = false
-            Task { await fetchDashboard() }
+        if autoLoadWhenReady {
+            requestBackendStartupIfNeeded()
+            if backendLifecycle.isReady {
+                isConnecting = false
+                Task { await fetchDashboard() }
+            }
         }
     }
 
     deinit {
-        if let readyObserver { NotificationCenter.default.removeObserver(readyObserver) }
+        notificationObservers.removeAll()
     }
 
     // MARK: - Briefing
@@ -189,6 +237,13 @@ final class LearningAssistantViewModel: ObservableObject {
     }
 
     func fetchDashboard() async {
+        requestBackendStartupIfNeeded()
+        if shouldRequestBackendStartup, !backendLifecycle.isReady {
+            isConnecting = true
+            isOffline = false
+            return
+        }
+
         isFetchingBriefing = true
         defer { isFetchingBriefing = false }
         do {
@@ -203,6 +258,12 @@ final class LearningAssistantViewModel: ObservableObject {
             isOffline = true
             isConnecting = false
         }
+    }
+
+    private func requestBackendStartupIfNeeded() {
+        guard shouldRequestBackendStartup else { return }
+        guard !backendLifecycle.isReady, !backendLifecycle.isStarting else { return }
+        backendLifecycle.startIfNeeded()
     }
 
     func fetchTodayBriefing() async {

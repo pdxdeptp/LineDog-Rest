@@ -97,6 +97,42 @@ extension WindowManaging {
     }
 }
 
+struct IdleCursorTrackingPolicy {
+    static let nearPollingInterval: TimeInterval = 0.08
+    static let farPollingInterval: TimeInterval = 0.25
+    static let nearDistance: CGFloat = 180
+
+    static func ignoresMouseEvents(pointer: CGPoint, petScreenRect: CGRect) -> Bool {
+        !petScreenRect.contains(pointer)
+    }
+
+    static func pollingInterval(pointer: CGPoint, petScreenRect: CGRect) -> TimeInterval {
+        distance(from: pointer, to: petScreenRect) <= nearDistance ? nearPollingInterval : farPollingInterval
+    }
+
+    private static func distance(from point: CGPoint, to rect: CGRect) -> CGFloat {
+        let dx: CGFloat
+        if point.x < rect.minX {
+            dx = rect.minX - point.x
+        } else if point.x > rect.maxX {
+            dx = point.x - rect.maxX
+        } else {
+            dx = 0
+        }
+
+        let dy: CGFloat
+        if point.y < rect.minY {
+            dy = rect.minY - point.y
+        } else if point.y > rect.maxY {
+            dy = point.y - rect.maxY
+        } else {
+            dy = 0
+        }
+
+        return hypot(dx, dy)
+    }
+}
+
 /// 模块 2：常态为**仅桌宠大小**的透明小窗（可拖动，位置持久化）；休息时扩展为菜单栏屏全屏霸屏。同一只 `PetStageView`。
 @MainActor
 final class WindowManager: WindowManaging {
@@ -119,7 +155,7 @@ final class WindowManager: WindowManaging {
     private var launchObserver: NSObjectProtocol?
     private var terminateObserver: NSObjectProtocol?
     private var screenRepositionWorkItem: DispatchWorkItem?
-    /// 常态下以 10 Hz 轮询光标位置，动态切换 `ignoresMouseEvents`，确保透明区域不吞焦点。
+    /// 常态下自适应轮询光标位置：远离静态桌宠时低频，靠近命中区时短暂高频，确保透明区域不吞焦点。
     private var idleCursorTrackTimer: Timer?
     /// 跑屏模式驱动器（PawPal breakRun 算法移植）。
     private let breakRunController = BreakRunController()
@@ -820,13 +856,21 @@ final class WindowManager: WindowManaging {
         // 跑屏模式：窗口是小窗，复用常态的光标轨迹逻辑（50×50 区域内不穿透）。
         // 常态：根据光标实时位置决定是否透传，防止透明区域抢焦点。
         startIdleCursorTracking()
-        syncIdleWindowMousePolicy()
+        syncIdleWindowMousePolicy(rescheduleIfNeeded: true)
     }
 
     private func startIdleCursorTracking() {
         guard idleCursorTrackTimer == nil else { return }
-        let t = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in self?.syncIdleWindowMousePolicy() }
+        scheduleIdleCursorTracking(after: IdleCursorTrackingPolicy.farPollingInterval)
+    }
+
+    private func scheduleIdleCursorTracking(after interval: TimeInterval) {
+        idleCursorTrackTimer?.invalidate()
+        let t = Timer.scheduledTimer(withTimeInterval: interval, repeats: false) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.idleCursorTrackTimer = nil
+                self?.syncIdleWindowMousePolicy(rescheduleIfNeeded: true)
+            }
         }
         RunLoop.main.add(t, forMode: .common)
         idleCursorTrackTimer = t
@@ -838,11 +882,15 @@ final class WindowManager: WindowManaging {
     }
 
     /// 光标在宠物屏幕命中区内 → 窗口接收鼠标；光标在外 → 完全透传（不抢焦点）。
-    private func syncIdleWindowMousePolicy() {
+    private func syncIdleWindowMousePolicy(rescheduleIfNeeded: Bool = false) {
         guard let win = window, let stage = stageView else { return }
         guard !stage.isInRestPhase, deskMenuViewModel != nil else { return }
         let petScreen = win.convertToScreen(stage.petHitRectInWindowBaseCoordinates)
-        win.ignoresMouseEvents = !petScreen.contains(NSEvent.mouseLocation)
+        let mouse = NSEvent.mouseLocation
+        win.ignoresMouseEvents = IdleCursorTrackingPolicy.ignoresMouseEvents(pointer: mouse, petScreenRect: petScreen)
+        if rescheduleIfNeeded {
+            scheduleIdleCursorTracking(after: IdleCursorTrackingPolicy.pollingInterval(pointer: mouse, petScreenRect: petScreen))
+        }
     }
 
     /// 休息且允许「狗外穿透」时：光标不在狗的屏幕命中区内则整窗 `ignoresMouseEvents = true`（系统级穿透）；在狗上则关闭，以便单击菜单 / 双击结束。

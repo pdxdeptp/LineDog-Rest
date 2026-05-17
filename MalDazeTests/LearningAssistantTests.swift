@@ -317,6 +317,70 @@ final class LearningAssistantViewModelTests: XCTestCase {
         XCTAssertEqual(vm.selectedOption, "B")  // default is now "B"
     }
 
+    func testDefaultViewModelRequestsBackendStartupOnceWhenAssistantUIActivates() async {
+        let mock = MockAssistantAPIClient()
+        let backend = RecordingAssistantBackendLifecycle()
+        let vm = LearningAssistantViewModel(api: mock, backendLifecycle: backend)
+
+        XCTAssertEqual(backend.startIfNeededCallCount, 1)
+
+        await vm.fetchDashboard()
+
+        XCTAssertEqual(backend.startIfNeededCallCount, 1)
+    }
+
+    func testAutoLoadDisabledDoesNotRequestBackendStartupForTestsAndPreviews() {
+        let backend = RecordingAssistantBackendLifecycle()
+        _ = LearningAssistantViewModel(
+            api: MockAssistantAPIClient(),
+            autoLoadWhenReady: false,
+            backendLifecycle: backend
+        )
+
+        XCTAssertEqual(backend.startIfNeededCallCount, 0)
+    }
+
+    func testFetchDashboardWhileBackendIsStartingDefersNetworkAndReadyNotificationLoads() async throws {
+        let mock = MockAssistantAPIClient()
+        mock.shouldThrowOffline = true
+        let backend = RecordingAssistantBackendLifecycle()
+        let vm = LearningAssistantViewModel(api: mock, backendLifecycle: backend)
+
+        await vm.fetchDashboard()
+
+        XCTAssertEqual(mock.fetchBriefingCallCount, 0)
+        XCTAssertEqual(mock.fetchResourcesCallCount, 0)
+        XCTAssertTrue(vm.isConnecting)
+        XCTAssertFalse(vm.isOffline)
+
+        mock.shouldThrowOffline = false
+        backend.markReady()
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        XCTAssertEqual(mock.fetchBriefingCallCount, 1)
+        XCTAssertEqual(mock.fetchResourcesCallCount, 1)
+        XCTAssertFalse(vm.isConnecting)
+        XCTAssertFalse(vm.isOffline)
+        XCTAssertEqual(vm.dashboardState.kind, .emptyDatabase)
+    }
+
+    func testFetchDashboardAfterBackendStartupFailureRequestsStartupAgain() async {
+        let mock = MockAssistantAPIClient()
+        let backend = RecordingAssistantBackendLifecycle()
+        let vm = LearningAssistantViewModel(api: mock, backendLifecycle: backend)
+
+        XCTAssertEqual(backend.startIfNeededCallCount, 1)
+
+        backend.markStartupFailed()
+        await vm.fetchDashboard()
+
+        XCTAssertEqual(backend.startIfNeededCallCount, 2)
+        XCTAssertEqual(mock.fetchBriefingCallCount, 0)
+        XCTAssertEqual(mock.fetchResourcesCallCount, 0)
+        XCTAssertTrue(vm.isConnecting)
+        XCTAssertFalse(vm.isOffline)
+    }
+
     // MARK: 1.4 / 3.2-3.6 首页 dashboard 状态层
 
     func testFetchDashboardAggregatesBriefingAndResourcesIntoSummaryState() async {
@@ -538,7 +602,7 @@ final class LearningAssistantViewModelTests: XCTestCase {
             totalMinutes: 13,
             highlights: "今日负荷正常"
         )
-        let vm = LearningAssistantViewModel(api: mock)
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
         await vm.fetchTodayBriefing()
 
         XCTAssertEqual(vm.tasks.count, 1)
@@ -553,7 +617,7 @@ final class LearningAssistantViewModelTests: XCTestCase {
     func testFetchBriefingOfflineSetsIsOffline() async {
         let mock = MockAssistantAPIClient()
         mock.shouldThrowOffline = true
-        let vm = LearningAssistantViewModel(api: mock)
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
         await vm.fetchTodayBriefing()
         XCTAssertTrue(vm.isOffline)
         XCTAssertTrue(vm.tasks.isEmpty)
@@ -637,7 +701,7 @@ final class LearningAssistantViewModelTests: XCTestCase {
     func testSendMessageWithTextResponseAppendsAssistantMessage() async {
         let mock = MockAssistantAPIClient()
         mock.chatResult = ChatResponse(threadId: "t1", response: "今天有3个任务", proposal: nil)
-        let vm = LearningAssistantViewModel(api: mock)
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
         await vm.sendMessage("今天有什么任务")
 
         XCTAssertEqual(vm.chatMessages.count, 2)
@@ -660,7 +724,7 @@ final class LearningAssistantViewModelTests: XCTestCase {
             summaryForUser: "今天所有任务已完成。"
         )
         mock.chatResult = ChatResponse(threadId: "t2", response: nil, proposal: proposal)
-        let vm = LearningAssistantViewModel(api: mock)
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
         await vm.sendMessage("今天不想学了")
 
         // Bug C: response:null + proposal → 显示 summaryForUser，不崩溃
@@ -678,7 +742,7 @@ final class LearningAssistantViewModelTests: XCTestCase {
             summaryForUser: "已将 2 个任务推迟到明天"
         )
         mock.chatResult = ChatResponse(threadId: "t3", response: nil, proposal: proposal)
-        let vm = LearningAssistantViewModel(api: mock)
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
         await vm.sendMessage("把明天的任务推迟到后天")
 
         XCTAssertEqual(vm.chatMessages[1].text, "已将 2 个任务推迟到明天")
@@ -689,7 +753,7 @@ final class LearningAssistantViewModelTests: XCTestCase {
 
     func testConfirmProposalClearsCurrentProposalAndRefetches() async {
         let mock = MockAssistantAPIClient()
-        let vm = LearningAssistantViewModel(api: mock)
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
         vm.threadId = "t1"
         vm.currentProposal = "等待确认"
         await vm.confirmProposal(confirmed: true)
@@ -703,7 +767,7 @@ final class LearningAssistantViewModelTests: XCTestCase {
 
     func testCancelProposalClearsProposal() async {
         let mock = MockAssistantAPIClient()
-        let vm = LearningAssistantViewModel(api: mock)
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
         vm.threadId = "t1"
         vm.currentProposal = "等待确认"
         await vm.confirmProposal(confirmed: false)
@@ -719,7 +783,7 @@ final class LearningAssistantViewModelTests: XCTestCase {
     func testSendMessageOfflineSetsIsOfflineAndAppendsErrorMessage() async {
         let mock = MockAssistantAPIClient()
         mock.shouldThrowOffline = true
-        let vm = LearningAssistantViewModel(api: mock)
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
         await vm.sendMessage("今天有什么任务")
 
         XCTAssertTrue(vm.isOffline)
@@ -733,7 +797,7 @@ final class LearningAssistantViewModelTests: XCTestCase {
         let mock = MockAssistantAPIClient()
         let task = AssistantTask(id: 5, title: "T", targetMinutes: 10,
                                  completedAt: nil, resourceTitle: nil, priority: 0)
-        let vm = LearningAssistantViewModel(api: mock)
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
         await vm.completeTask(task)
 
         XCTAssertEqual(mock.lastCompleteTaskId, 5)
@@ -837,6 +901,36 @@ private final class MockAssistantAPIClient: AssistantAPIClientProtocol, @uncheck
 
     func updateLearningPreferences(_ prefs: LearningPreferences) async throws {
         if shouldThrowOffline { throw AssistantOfflineError() }
+    }
+}
+
+@MainActor
+private final class RecordingAssistantBackendLifecycle: AppBackendLifecycleManaging {
+    var isReady = false
+    var isStarting = false
+
+    private(set) var startIfNeededCallCount = 0
+    private(set) var didStop = false
+
+    func startIfNeeded() {
+        guard !isReady, !isStarting else { return }
+        isStarting = true
+        startIfNeededCallCount += 1
+    }
+
+    func stop() {
+        didStop = true
+    }
+
+    func markReady() {
+        isReady = true
+        isStarting = false
+        NotificationCenter.default.post(name: .backendDidBecomeReady, object: nil)
+    }
+
+    func markStartupFailed() {
+        isReady = false
+        isStarting = false
     }
 }
 
