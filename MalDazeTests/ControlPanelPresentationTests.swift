@@ -14,8 +14,8 @@ final class ControlPanelPresentationTests: XCTestCase {
         let menuBarContentSource = String(source[menuBarContentRange])
 
         XCTAssertFalse(
-            menuBarContentSource.contains("MenuBarContentView(viewModel:"),
-            "MenuBarExtra content should not construct the wide desk pet control panel."
+            menuBarContentSource.contains("DashboardRootView(viewModel:"),
+            "MenuBarExtra content should not construct the wide desk pet dashboard."
         )
         XCTAssertTrue(
             menuBarContentSource.contains("MenuBarSettingsMenuView()"),
@@ -46,8 +46,8 @@ final class ControlPanelPresentationTests: XCTestCase {
             "The compact menu bar settings action should present the existing settings window presenter."
         )
         XCTAssertFalse(
-            settingsMenuSource.contains("MenuBarContentView(viewModel:"),
-            "The compact menu bar settings menu should not embed the wide desk pet control panel."
+            settingsMenuSource.contains("DashboardRootView(viewModel:"),
+            "The compact menu bar settings menu should not embed the wide desk pet dashboard."
         )
         XCTAssertTrue(
             settingsSource.contains("NSHostingController(rootView: MalDazeSettingsView())"),
@@ -56,7 +56,7 @@ final class ControlPanelPresentationTests: XCTestCase {
     }
 
     func testSharedPopupContentDoesNotInjectDeskPetOnlyPresentationState() throws {
-        let source = try readProjectSource("MalDaze/MenuBarContentView.swift")
+        let source = try readProjectSource("MalDaze/DashboardRootView.swift")
         let forbiddenTokens = [
             "MalDazeDeskMenuPresentation",
             "maldazeDeskMenuPresentation",
@@ -67,7 +67,7 @@ final class ControlPanelPresentationTests: XCTestCase {
         for token in forbiddenTokens {
             XCTAssertFalse(
                 source.contains(token),
-                "MenuBarContentView.swift is the shared popup content source and must not contain desk-pet-only presentation token: \(token)"
+                "DashboardRootView.swift is the dashboard content source and must not contain desk-pet-only presentation token: \(token)"
             )
         }
     }
@@ -108,19 +108,27 @@ final class ControlPanelPresentationTests: XCTestCase {
             "Desk pet left-click and shortcut presentation should use a dashboard-specific root view."
         )
 
-        let contentSource = try readProjectSource("MalDaze/MenuBarContentView.swift")
+        let contentSource = try readProjectSource("MalDaze/DashboardRootView.swift")
         XCTAssertTrue(
             contentSource.contains("struct DeskPetDashboardView: View"),
-            "MenuBarContentView.swift should expose a dashboard semantic root for the desk pet panel."
+            "DashboardRootView.swift should expose a dashboard semantic root for the desk pet panel."
         )
         XCTAssertTrue(
+            contentSource.contains("struct DashboardRootView: View"),
+            "DashboardRootView.swift should expose the dashboard content view."
+        )
+        XCTAssertTrue(
+            contentSource.contains("DashboardRootView(viewModel: viewModel, assistantViewModel: learningAssistantViewModel)"),
+            "DeskPetDashboardView should host the dashboard content directly instead of wrapping MenuBarContentView."
+        )
+        XCTAssertFalse(
             contentSource.contains("MenuBarContentView(viewModel: viewModel, assistantViewModel: learningAssistantViewModel)"),
-            "The dashboard root may temporarily reuse the existing wide three-column content."
+            "DeskPetDashboardView should no longer leave a menu-bar-named shell around the dashboard."
         )
     }
 
     func testDeskPetDashboardRootDrawsVisibleSurfaceInsideTransparentPanel() throws {
-        let source = try readProjectSource("MalDaze/MenuBarContentView.swift")
+        let source = try readProjectSource("MalDaze/DashboardRootView.swift")
         let rootRange = try XCTUnwrap(
             rangeOfType(named: "DeskPetDashboardView", in: source),
             "DeskPetDashboardView should be the desk pet dashboard's semantic root."
@@ -261,34 +269,34 @@ final class ControlPanelPresentationTests: XCTestCase {
         )
     }
 
-    func testControlPanelPreferredContentSizeUsesVisibleScreenWidthWithSafetyMargin() throws {
-        let source = try readProjectSource("MalDaze/MenuBarContentView.swift")
+    func testDashboardPreferredContentSizeUsesVisibleScreenWidthWithSafetyMargin() throws {
+        let source = try readProjectSource("MalDaze/DashboardRootView.swift")
         let preferredSizeRange = try XCTUnwrap(
-            rangeOfMember(named: "controlPanelPreferredContentSize", in: source),
-            "MenuBarContentView should expose a single shared preferred content size for menu bar and desk pet popovers."
+            rangeOfMember(named: "dashboardPreferredContentSize", in: source),
+            "DashboardRootView should expose a screen-aware preferred content size."
         )
         let preferredSizeSource = String(source[preferredSizeRange])
 
         XCTAssertTrue(
             preferredSizeSource.contains("NSScreen.main?.visibleFrame"),
-            "controlPanelPreferredContentSize should derive the wide popover width from the current screen visibleFrame."
+            "dashboardPreferredContentSize should derive the dashboard width from the current screen visibleFrame."
         )
         XCTAssertTrue(
             source.contains("static let safeHorizontalMargin"),
-            "controlPanelPreferredContentSize should reserve a named horizontal safety margin."
+            "dashboardPreferredContentSize should reserve a named horizontal safety margin."
         )
         XCTAssertTrue(
-            preferredSizeSource.contains("ControlPanelLayout.preferredContentSize(screenVisibleFrame:"),
-            "controlPanelPreferredContentSize should delegate screen-aware sizing to a testable layout helper."
+            preferredSizeSource.contains("DashboardLayout.preferredContentSize(screenVisibleFrame:"),
+            "dashboardPreferredContentSize should delegate screen-aware sizing to a testable layout helper."
         )
     }
 
-    func testControlPanelLayoutHelperClampsWidthAndProvidesFallback() throws {
-        let source = try readProjectSource("MalDaze/MenuBarContentView.swift")
+    func testDashboardLayoutHelperClampsWidthAndProvidesFallback() throws {
+        let source = try readProjectSource("MalDaze/DashboardRootView.swift")
 
         XCTAssertTrue(
             source.contains("static func preferredContentSize(screenVisibleFrame visibleFrame: NSRect?) -> NSSize"),
-            "MenuBarContentView should keep popover sizing in a deterministic helper that accepts an optional visibleFrame."
+            "DashboardRootView should keep sizing in a deterministic helper that accepts an optional visibleFrame."
         )
         XCTAssertTrue(
             source.contains("fallbackVisibleFrame"),
@@ -306,7 +314,7 @@ final class ControlPanelPresentationTests: XCTestCase {
 
     func testDeskPetDashboardPreferredSizeUsesAnchorScreenVisibleFrame() throws {
         let windowManagerSource = try readProjectSource("MalDaze/WindowManager/WindowManager.swift")
-        let menuBarContentSource = try readProjectSource("MalDaze/MenuBarContentView.swift")
+        let dashboardSource = try readProjectSource("MalDaze/DashboardRootView.swift")
         let helperRange = try XCTUnwrap(
             rangeOfFunction(named: "makeDeskMenuPanelIfNeeded", in: windowManagerSource),
             "WindowManager should create or reuse the dashboard panel through a single helper."
@@ -320,7 +328,7 @@ final class ControlPanelPresentationTests: XCTestCase {
 
         XCTAssertFalse(
             helperSource.contains("MenuBarContentView.controlPanelPreferredContentSize"),
-            "Desk pet dashboard sizing should not use the NSScreen.main based menu-bar preferred-size shortcut."
+            "Desk pet dashboard sizing should not use the old menu-bar preferred-size shortcut."
         )
         XCTAssertTrue(
             frameSource.contains("DeskPetDashboardPanelLayout.frame(anchorRectInScreen: anchor, visibleFrame: visibleFrame)"),
@@ -331,7 +339,7 @@ final class ControlPanelPresentationTests: XCTestCase {
             "Dashboard panel preferred size should be derived from the visibleFrame of the screen containing the anchor."
         )
         XCTAssertTrue(
-            menuBarContentSource.contains("static func preferredContentSize(screenVisibleFrame visibleFrame: NSRect?) -> NSSize"),
+            dashboardSource.contains("static func preferredContentSize(screenVisibleFrame visibleFrame: NSRect?) -> NSSize"),
             "DeskPetDashboardView should expose a screen-aware preferred size helper for WindowManager."
         )
     }
@@ -376,19 +384,19 @@ final class ControlPanelPresentationTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(frame.minY, insetVisibleFrame.minY)
     }
 
-    func testWideControlPanelShellKeepsOuterColumnsFixedAndAssistantAdaptive() throws {
-        let source = try readProjectSource("MalDaze/MenuBarContentView.swift")
+    func testWideDashboardShellKeepsOuterColumnsFixedAndAssistantAdaptive() throws {
+        let source = try readProjectSource("MalDaze/DashboardRootView.swift")
 
         XCTAssertTrue(
-            source.contains(".frame(width: ControlPanelLayout.remindersColumnWidth"),
-            "The reminders sidebar should keep a fixed width in the wide popover shell."
+            source.contains(".frame(width: DashboardLayout.remindersColumnWidth"),
+            "The reminders sidebar should keep a fixed width in the wide dashboard shell."
         )
         XCTAssertTrue(
-            source.contains(".frame(width: ControlPanelLayout.controlsColumnWidth"),
-            "The right controls column should keep a fixed width in the wide popover shell."
+            source.contains(".frame(width: DashboardLayout.controlsColumnWidth"),
+            "The right controls column should keep a fixed width in the wide dashboard shell."
         )
         XCTAssertTrue(
-            source.contains(".frame(minWidth: ControlPanelLayout.assistantMinimumColumnWidth, maxWidth: .infinity"),
+            source.contains(".frame(minWidth: DashboardLayout.assistantMinimumColumnWidth, maxWidth: .infinity"),
             "AssistantPanelView should receive the remaining adaptive width between the fixed outer columns."
         )
         XCTAssertFalse(
@@ -399,7 +407,7 @@ final class ControlPanelPresentationTests: XCTestCase {
 
     func testIdlePetIconSideSettingsChangesBroadcastToRunningAppViewModel() throws {
         let notificationSource = try readProjectSource("MalDaze/MalDazeBroadcastNotifications.swift")
-        let panelSource = try readProjectSource("MalDaze/MenuBarContentView.swift")
+        let panelSource = try readProjectSource("MalDaze/DashboardRootView.swift")
         let settingsSource = try readProjectSource("MalDaze/Settings/MalDazeSettingsView.swift")
         let appViewModelSource = try readProjectSource("MalDaze/AppViewModel.swift")
         let notificationName = "idlePetIconSidePointsChanged"
@@ -414,7 +422,7 @@ final class ControlPanelPresentationTests: XCTestCase {
             panelSource.contains("MalDazeBroadcastNotifications.\(notificationName)")
                 && panelSource.contains("idlePetIconSideSliderLive")
                 && panelSource.contains("Slider("),
-            "MenuBarContentView.swift should post \(notificationName) when icon side slider editing completes."
+            "DashboardRootView.swift should post \(notificationName) when icon side slider editing completes."
         )
 
         XCTAssertFalse(

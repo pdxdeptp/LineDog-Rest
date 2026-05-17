@@ -9,7 +9,7 @@
 /* Begin PBXBuildFile section */
 		A201 /* MalDazeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B201 /* MalDazeApp.swift */; };
 		A202 /* AppViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B202 /* AppViewModel.swift */; };
-		A203 /* MenuBarContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B203 /* MenuBarContentView.swift */; };
+		A203 /* DashboardRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B203 /* DashboardRootView.swift */; };
 		A204 /* TimeState.swift in Sources */ = {isa = PBXBuildFile; fileRef = B204 /* TimeState.swift */; };
 		A205 /* TimerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B205 /* TimerEngine.swift */; };
 		A206 /* ManualTimerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B206 /* ManualTimerEngine.swift */; };
@@ -97,7 +97,7 @@
 /* Begin PBXFileReference section */
 		B201 /* MalDazeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MalDazeApp.swift; sourceTree = "<group>"; };
 		B202 /* AppViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppViewModel.swift; sourceTree = "<group>"; };
-		B203 /* MenuBarContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarContentView.swift; sourceTree = "<group>"; };
+		B203 /* DashboardRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardRootView.swift; sourceTree = "<group>"; };
 		B204 /* TimeState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeState.swift; sourceTree = "<group>"; };
 		B205 /* TimerEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimerEngine.swift; sourceTree = "<group>"; };
 		B206 /* ManualTimerEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManualTimerEngine.swift; sourceTree = "<group>"; };
@@ -208,7 +208,7 @@
 				B201 /* MalDazeApp.swift */,
 				B210 /* MalDazeAppDelegate.swift */,
 				B202 /* AppViewModel.swift */,
-				B203 /* MenuBarContentView.swift */,
+				B203 /* DashboardRootView.swift */,
 				B20F /* MenuBarDogLabel.swift */,
 				B20E /* PetDisplayMode.swift */,
 				B213 /* MalDazeBroadcastNotifications.swift */,
@@ -474,7 +474,7 @@
 				A201 /* MalDazeApp.swift in Sources */,
 				A210 /* MalDazeAppDelegate.swift in Sources */,
 				A202 /* AppViewModel.swift in Sources */,
-				A203 /* MenuBarContentView.swift in Sources */,
+				A203 /* DashboardRootView.swift in Sources */,
 				A20F /* MenuBarDogLabel.swift in Sources */,
 				A20E /* PetDisplayMode.swift in Sources */,
 				A204 /* TimeState.swift in Sources */,

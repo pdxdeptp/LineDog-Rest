@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-private enum ControlPanelLayout {
+private enum DashboardLayout {
     static let remindersColumnWidth: CGFloat = 300
     static let assistantMinimumColumnWidth: CGFloat = 360
     static let controlsColumnWidth: CGFloat = 300
@@ -29,13 +29,13 @@ private enum ControlPanelLayout {
     }
 }
 
-extension MenuBarContentView {
-    static var controlPanelPreferredContentSize: NSSize {
-        ControlPanelLayout.preferredContentSize(screenVisibleFrame: NSScreen.main?.visibleFrame)
+extension DashboardRootView {
+    static var dashboardPreferredContentSize: NSSize {
+        DashboardLayout.preferredContentSize(screenVisibleFrame: NSScreen.main?.visibleFrame)
     }
 }
 
-/// 桌宠 Dashboard Panel 的语义 root；短期复用现有三栏内容，但与菜单栏入口解耦。
+/// 桌宠 Dashboard Panel 的语义 root；拥有桌宠入口的窗口级外观与长期状态。
 struct DeskPetDashboardView: View {
     private enum DashboardPanelSurface {
         static let cornerRadius: CGFloat = 14
@@ -51,7 +51,7 @@ struct DeskPetDashboardView: View {
     @StateObject private var learningAssistantViewModel: LearningAssistantViewModel
 
     static func preferredContentSize(screenVisibleFrame visibleFrame: NSRect?) -> NSSize {
-        ControlPanelLayout.preferredContentSize(screenVisibleFrame: visibleFrame)
+        DashboardLayout.preferredContentSize(screenVisibleFrame: visibleFrame)
     }
 
     @MainActor
@@ -61,7 +61,7 @@ struct DeskPetDashboardView: View {
     }
 
     var body: some View {
-        MenuBarContentView(viewModel: viewModel, assistantViewModel: learningAssistantViewModel)
+        DashboardRootView(viewModel: viewModel, assistantViewModel: learningAssistantViewModel)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .background {
                 ZStack {
@@ -101,8 +101,8 @@ private struct CardGroupBoxStyle: GroupBoxStyle {
     }
 }
 
-/// 桌宠专属宽控制面板 UI：由右下角桌宠浮动窗（`WindowManager`）展示。
-struct MenuBarContentView: View {
+/// Dashboard 主内容：三栏看板，由桌宠 Dashboard Panel 展示。
+struct DashboardRootView: View {
     @ObservedObject var viewModel: AppViewModel
     private let assistantViewModel: LearningAssistantViewModel?
 
@@ -193,7 +193,7 @@ struct MenuBarContentView: View {
 
     /// 三栏外圈与右栏标题行：数值集中，避免「窗体顶边 vs 首行」只靠右栏独自撑开。
     private enum MainPanelChrome {
-        static let horizontalPadding = ControlPanelLayout.horizontalPadding
+        static let horizontalPadding = DashboardLayout.horizontalPadding
         /// 整块内容上内边距。顶部留白唯一控制点，改此处即可（不要在 ScrollView 上加 ignoresSafeArea，否则会被抵消）。
         static let topPadding: CGFloat = 16
         static let bottomPadding: CGFloat = 12
@@ -226,7 +226,7 @@ struct MenuBarContentView: View {
             HStack(alignment: .top, spacing: 0) {
                 // 左栏：提醒事项
                 remindersSidebar
-                    .frame(width: ControlPanelLayout.remindersColumnWidth, alignment: .topLeading)
+                    .frame(width: DashboardLayout.remindersColumnWidth, alignment: .topLeading)
                     .padding(.trailing, MainPanelChrome.horizontalPadding)
 
                 Divider()
@@ -239,13 +239,13 @@ struct MenuBarContentView: View {
                         AssistantPanelView()
                     }
                 }
-                .frame(minWidth: ControlPanelLayout.assistantMinimumColumnWidth, maxWidth: .infinity, alignment: .topLeading)
+                .frame(minWidth: DashboardLayout.assistantMinimumColumnWidth, maxWidth: .infinity, alignment: .topLeading)
 
                 Divider()
 
                 // 右栏：番茄钟、小猫等原有控制
                 mainControlsColumn
-                    .frame(width: ControlPanelLayout.controlsColumnWidth, alignment: .leading)
+                    .frame(width: DashboardLayout.controlsColumnWidth, alignment: .leading)
                     .padding(.leading, MainPanelChrome.horizontalPadding)
             }
             .padding(.horizontal, MainPanelChrome.horizontalPadding)
@@ -253,9 +253,9 @@ struct MenuBarContentView: View {
             .padding(.bottom, MainPanelChrome.bottomPadding)
         }
         .frame(
-            minWidth: ControlPanelLayout.minimumContentWidth,
+            minWidth: DashboardLayout.minimumContentWidth,
             maxWidth: .infinity,
-            minHeight: ControlPanelLayout.contentHeight
+            minHeight: DashboardLayout.contentHeight
         )
 
         chrome
