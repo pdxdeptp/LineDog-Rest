@@ -76,13 +76,80 @@ struct AssistantResource: Codable, Identifiable {
     let actualMinutesTotal: Int
     let deadline: String?
     let status: String
+    let resourceURL: URL?
+
+    init(
+        id: Int,
+        title: String,
+        trackingMode: String,
+        completedUnits: Int,
+        totalUnits: Int,
+        actualMinutesTotal: Int,
+        deadline: String?,
+        status: String,
+        resourceURL: URL? = nil
+    ) {
+        self.id = id
+        self.title = title
+        self.trackingMode = trackingMode
+        self.completedUnits = completedUnits
+        self.totalUnits = totalUnits
+        self.actualMinutesTotal = actualMinutesTotal
+        self.deadline = deadline
+        self.status = status
+        self.resourceURL = resourceURL
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(Int.self, forKey: .id)
+        title = try container.decode(String.self, forKey: .title)
+        trackingMode = try container.decode(String.self, forKey: .trackingMode)
+        completedUnits = try container.decode(Int.self, forKey: .completedUnits)
+        totalUnits = try container.decode(Int.self, forKey: .totalUnits)
+        actualMinutesTotal = try container.decode(Int.self, forKey: .actualMinutesTotal)
+        deadline = try container.decodeIfPresent(String.self, forKey: .deadline)
+        status = try container.decode(String.self, forKey: .status)
+
+        let rawURL = try container.decodeIfPresent(String.self, forKey: .url)
+        resourceURL = Self.validResourceURL(from: rawURL)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(title, forKey: .title)
+        try container.encode(trackingMode, forKey: .trackingMode)
+        try container.encode(completedUnits, forKey: .completedUnits)
+        try container.encode(totalUnits, forKey: .totalUnits)
+        try container.encode(actualMinutesTotal, forKey: .actualMinutesTotal)
+        try container.encodeIfPresent(deadline, forKey: .deadline)
+        try container.encode(status, forKey: .status)
+        try container.encodeIfPresent(resourceURL?.absoluteString, forKey: .url)
+    }
 
     enum CodingKeys: String, CodingKey {
         case id, title, deadline, status
+        case url
         case trackingMode       = "tracking_mode"
         case completedUnits     = "completed_units"
         case totalUnits         = "total_units"
         case actualMinutesTotal = "actual_minutes_total"
+    }
+
+    private static func validResourceURL(from rawValue: String?) -> URL? {
+        guard let rawValue else { return nil }
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty,
+              let url = URL(string: trimmed),
+              let scheme = url.scheme?.lowercased(),
+              !scheme.isEmpty else { return nil }
+        guard ["http", "https"].contains(scheme),
+              let host = url.host,
+              !host.isEmpty else {
+            return nil
+        }
+        return url
     }
 }
 
@@ -279,6 +346,18 @@ final class AssistantAPIClient {
             enum CodingKeys: String, CodingKey { case actualMinutes = "actual_minutes" }
         }
         try await postVoid("/api/tasks/\(id)/complete", body: Body(actualMinutes: actualMinutes))
+    }
+
+    func completeResource(id: Int) async throws {
+        struct Body: Encodable {
+            let source: String
+        }
+        try await postVoid("/api/resources/\(id)/complete", body: Body(source: "resource_progress"))
+    }
+
+    func archiveResource(id: Int) async throws {
+        struct Body: Encodable {}
+        try await postVoid("/api/resources/\(id)/archive", body: Body())
     }
 
     func sendMessage(message: String, threadId: String?) async throws -> ChatResponse {

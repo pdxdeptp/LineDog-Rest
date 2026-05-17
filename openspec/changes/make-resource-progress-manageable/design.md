@@ -54,6 +54,7 @@ This desktop app favors direct manual QA from the current checkout. The implemen
 - [Risk] Completed resources are not returned by the active resource endpoint. → Mitigation: after completion, refresh resources and dashboard so the disappearance is intentional and immediate.
 - [Risk] Prefilled chat context might become stale if the resource is archived before sending. → Mitigation: the prompt remains user-editable and the backend planner still validates current state before applying changes.
 - [Risk] Existing tests may assume only active resources are returned. → Mitigation: keep `GET /api/resources` active-only and add dedicated tests for status transitions.
+- [Risk] Resource management endpoints are destructive state transitions exposed by the same local backend that currently uses all-open CORS. → Mitigation: keep the route shape compatible with the native desktop app for this change, rely on the existing local-service trust boundary, and defer authentication/CORS tightening to a separate backend security design so this feature does not silently expand scope.
 
 ## Migration Plan
 

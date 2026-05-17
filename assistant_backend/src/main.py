@@ -69,11 +69,20 @@ def _build_parent_monitor_from_env(
 async def lifespan(app: FastAPI):
     await init_db(DB_PATH)
 
-    from .routers import ingest, morning, chat, review, tasks as tasks_router, settings as settings_router
+    from .routers import (
+        ingest,
+        morning,
+        chat,
+        review,
+        resources as resources_router,
+        tasks as tasks_router,
+        settings as settings_router,
+    )
     app.include_router(ingest.router, prefix="/api")
     app.include_router(morning.router, prefix="/api")
     app.include_router(chat.router, prefix="/api")
     app.include_router(review.router, prefix="/api")
+    app.include_router(resources_router.router, prefix="/api")
     app.include_router(tasks_router.router, prefix="/api")
     app.include_router(settings_router.router, prefix="/api")
 
