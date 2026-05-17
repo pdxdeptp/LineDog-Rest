@@ -264,6 +264,10 @@ struct AssistantPanelView: View {
 
     private var resourcesPanel: some View {
         List {
+            if let error = vm.resourceManagementError {
+                resourceManagementErrorBanner(error)
+            }
+
             if vm.resources.isEmpty {
                 Text("暂无资料记录")
                     .font(.subheadline)
@@ -272,12 +276,42 @@ struct AssistantPanelView: View {
                     .padding()
             } else {
                 ForEach(vm.resources) { resource in
-                    ResourceProgressView(resource: resource)
+                    ResourceProgressView(
+                        resource: resource,
+                        isManagementInFlight: vm.isManagingResource(resource),
+                        onAdjustPlan: {
+                            vm.seedAdjustPlan(for: resource)
+                        },
+                        onComplete: {
+                            await vm.completeResource(resource)
+                        },
+                        onArchive: {
+                            await vm.archiveResource(resource)
+                        }
+                    )
                 }
             }
         }
         .listStyle(.plain)
         .task { await vm.fetchResources() }
+    }
+
+    private func resourceManagementErrorBanner(_ error: String) -> some View {
+        HStack(spacing: 8) {
+            Label(error, systemImage: "exclamationmark.triangle")
+                .font(.caption)
+                .foregroundStyle(.orange)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 8)
+            Button {
+                vm.clearResourceManagementError()
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+            }
+            .buttonStyle(.borderless)
+            .help("清除错误")
+        }
+        .padding(.vertical, 6)
     }
 
     // MARK: - Bottom Navigation
@@ -437,6 +471,8 @@ private struct AssistantPanelFixtureAPIClient: AssistantAPIClientProtocol {
 
     func fetchTodayBriefing() async throws -> TodayBriefing { briefing }
     func completeTask(id: Int, actualMinutes: Int?) async throws {}
+    func completeResource(id: Int) async throws {}
+    func archiveResource(id: Int) async throws {}
     func sendMessage(message: String, threadId: String?) async throws -> ChatResponse {
         ChatResponse(threadId: threadId ?? "preview-thread", response: "预览回复", proposal: nil)
     }

@@ -1,8 +1,16 @@
 import json
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 import aiosqlite
+
+
+class ResourceNotFoundError(Exception):
+    pass
+
+
+class ResourceNotActiveError(Exception):
+    pass
 
 
 async def get_tasks_by_date(db: aiosqlite.Connection, target_date: date) -> list[dict]:
@@ -41,11 +49,128 @@ async def get_resource_progress(db: aiosqlite.Connection, resource_id: int) -> d
 
 async def get_all_active_resources(db: aiosqlite.Connection) -> list[dict]:
     async with db.execute(
-        "SELECT * FROM resources WHERE status = 'active'",
+        "SELECT * FROM resources WHERE status = 'active' ORDER BY id ASC",
     ) as cursor:
         rows = await cursor.fetchall()
         cols = [d[0] for d in cursor.description]
         return [dict(zip(cols, r)) for r in rows]
+
+
+async def mark_active_resource_complete(
+    db: aiosqlite.Connection,
+    resource_id: int,
+    source: str = "user_action",
+) -> dict:
+    now = datetime.now(UTC).isoformat()
+    today = date.today().isoformat()
+
+    await db.execute("BEGIN IMMEDIATE")
+    try:
+        cursor = await db.execute(
+            """
+            UPDATE resources
+            SET status = 'completed',
+                completed_units = CASE
+                    WHEN COALESCE(completed_units, 0) > COALESCE(total_units, 0)
+                    THEN completed_units
+                    ELSE COALESCE(total_units, 0)
+                END
+            WHERE id = ? AND status = 'active'
+            """,
+            (resource_id,),
+        )
+        if cursor.rowcount != 1:
+            async with db.execute(
+                "SELECT status FROM resources WHERE id = ?",
+                (resource_id,),
+            ) as status_cursor:
+                row = await status_cursor.fetchone()
+            await db.rollback()
+            if not row:
+                raise ResourceNotFoundError
+            raise ResourceNotActiveError
+
+        await db.execute(
+            """
+            UPDATE units
+            SET status = 'completed', completed_at = COALESCE(completed_at, ?)
+            WHERE resource_id = ? AND status != 'completed'
+            """,
+            (now, resource_id),
+        )
+        await db.execute(
+            """
+            UPDATE tasks
+            SET completed_at = ?
+            WHERE resource_id = ?
+              AND scheduled_date >= ?
+              AND completed_at IS NULL
+            """,
+            (now, resource_id, today),
+        )
+        await db.execute(
+            "INSERT INTO events (event_type, payload) VALUES (?, ?)",
+            (
+                "resource_completed",
+                json.dumps({"resource_id": resource_id, "source": source}),
+            ),
+        )
+        await db.execute("DELETE FROM system_state WHERE key = ?", (f"briefing_{today}",))
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise
+
+    return await get_resource_progress(db, resource_id)
+
+
+async def archive_active_resource(
+    db: aiosqlite.Connection,
+    resource_id: int,
+    source: str = "user_action",
+) -> dict:
+    today = date.today().isoformat()
+
+    await db.execute("BEGIN IMMEDIATE")
+    try:
+        cursor = await db.execute(
+            "UPDATE resources SET status = 'archived' WHERE id = ? AND status = 'active'",
+            (resource_id,),
+        )
+        if cursor.rowcount != 1:
+            async with db.execute(
+                "SELECT status FROM resources WHERE id = ?",
+                (resource_id,),
+            ) as status_cursor:
+                row = await status_cursor.fetchone()
+            await db.rollback()
+            if not row:
+                raise ResourceNotFoundError
+            raise ResourceNotActiveError
+
+        await db.execute(
+            """
+            DELETE FROM tasks
+            WHERE resource_id = ?
+              AND scheduled_date >= ?
+              AND completed_at IS NULL
+            """,
+            (resource_id, today),
+        )
+        await db.execute(
+            "INSERT INTO events (event_type, payload) VALUES (?, ?)",
+            (
+                "resource_archived",
+                json.dumps({"resource_id": resource_id, "source": source}),
+            ),
+        )
+        await db.execute("DELETE FROM system_state WHERE key = ?", (f"briefing_{today}",))
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise
+
+    return await get_resource_progress(db, resource_id)
 
 
 async def check_capacity(db: aiosqlite.Connection, start: date, end: date, daily_capacity_min: int) -> dict[str, int]:

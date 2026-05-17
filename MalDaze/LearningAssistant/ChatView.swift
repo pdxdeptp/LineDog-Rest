@@ -43,6 +43,12 @@ struct ChatView: View {
             // 输入框
             inputBar
         }
+        .onAppear {
+            applyAdjustPlanDraftText()
+        }
+        .onChange(of: vm.adjustPlanDraftText) { _ in
+            applyAdjustPlanDraftText()
+        }
     }
 
     // MARK: - Message Bubble
@@ -151,5 +157,12 @@ struct ChatView: View {
         guard !text.isEmpty, !vm.isSendingMessage else { return }
         inputText = ""
         Task { await vm.sendMessage(text) }
+    }
+
+    private func applyAdjustPlanDraftText() {
+        guard let draft = vm.consumeAdjustPlanDraftText(),
+              !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        inputText = draft
+        inputFocused = true
     }
 }

@@ -1,8 +1,32 @@
+import AppKit
 import SwiftUI
 
 /// 单个资料的进度卡片：进度条 + 完成单元数 / 总数 + 投入小时 + deadline。
 struct ResourceProgressView: View {
     let resource: AssistantResource
+    let isManagementInFlight: Bool
+    let onOpen: (URL) -> Void
+    let onAdjustPlan: () -> Void
+    let onComplete: () async -> Void
+    let onArchive: () async -> Void
+
+    @State private var isLocalManagementInFlight = false
+
+    init(
+        resource: AssistantResource,
+        isManagementInFlight: Bool = false,
+        onOpen: @escaping (URL) -> Void = { NSWorkspace.shared.open($0) },
+        onAdjustPlan: @escaping () -> Void = {},
+        onComplete: @escaping () async -> Void = {},
+        onArchive: @escaping () async -> Void = {}
+    ) {
+        self.resource = resource
+        self.isManagementInFlight = isManagementInFlight
+        self.onOpen = onOpen
+        self.onAdjustPlan = onAdjustPlan
+        self.onComplete = onComplete
+        self.onArchive = onArchive
+    }
 
     private var progress: Double {
         guard resource.totalUnits > 0 else { return 0 }
@@ -20,6 +44,10 @@ struct ResourceProgressView: View {
             return "已投入 \(h) 小时 \(m) 分"
         }
         return "已投入 \(m) 分钟"
+    }
+
+    private var isResourceManagementInFlight: Bool {
+        isManagementInFlight || isLocalManagementInFlight
     }
 
     private var deadlineLabel: String? {
@@ -57,9 +85,63 @@ struct ResourceProgressView: View {
                         .foregroundStyle(.tertiary)
                 }
             }
+
+            resourceActions
         }
         .padding(.vertical, 8)
         .padding(.horizontal, 4)
+    }
+
+    private var resourceActions: some View {
+        HStack(spacing: 8) {
+            Button {
+                if let url = resource.resourceURL {
+                    onOpen(url)
+                }
+            } label: {
+                Image(systemName: "safari")
+            }
+            .disabled(resource.resourceURL == nil)
+            .help(resource.resourceURL == nil ? "资料链接不可用" : "打开资料")
+
+            Button {
+                onAdjustPlan()
+            } label: {
+                Image(systemName: "slider.horizontal.3")
+            }
+            .help("调整计划")
+
+            Spacer(minLength: 8)
+
+            Button {
+                runManagementAction(onComplete)
+            } label: {
+                Image(systemName: "checkmark.circle")
+            }
+            .disabled(isResourceManagementInFlight)
+            .help("标记完成")
+
+            Button {
+                runManagementAction(onArchive)
+            } label: {
+                Image(systemName: "minus.circle")
+            }
+            .disabled(isResourceManagementInFlight)
+            .help("移出当前计划")
+        }
+        .buttonStyle(.borderless)
+        .controlSize(.small)
+        .font(.caption)
+        .foregroundStyle(.secondary)
+    }
+
+    private func runManagementAction(_ action: @escaping () async -> Void) {
+        guard !isResourceManagementInFlight else { return }
+        isLocalManagementInFlight = true
+        Task {
+            await action()
+            isLocalManagementInFlight = false
+        }
     }
 
     private var progressTint: Color {

@@ -1,30 +1,6 @@
 import Combine
 import Foundation
 
-private final class NotificationObserverBag: @unchecked Sendable {
-    private let lock = NSLock()
-    private var observers: [NSObjectProtocol] = []
-
-    func add(_ observer: NSObjectProtocol) {
-        lock.lock()
-        observers.append(observer)
-        lock.unlock()
-    }
-
-    func removeAll() {
-        lock.lock()
-        let observers = observers
-        self.observers.removeAll()
-        lock.unlock()
-
-        observers.forEach(NotificationCenter.default.removeObserver)
-    }
-
-    deinit {
-        removeAll()
-    }
-}
-
 // MARK: - Chat Message
 
 struct ChatMessage: Identifiable {
@@ -90,6 +66,9 @@ final class LearningAssistantViewModel: ObservableObject {
     @Published var threadId: String?              = nil
     @Published var selectedPanelTab: AssistantPanelTab = .home
     @Published private var expandedTaskIDs: Set<Int> = []
+    @Published var resourceManagementError: String? = nil
+    @Published private(set) var managingResourceIDs: Set<Int> = []
+    @Published var adjustPlanDraftText: String? = nil
 
     @Published var ingestionDraft: IngestionDraftDetail? = nil
     @Published var ingestionThreadId: String?            = nil
@@ -134,9 +113,7 @@ final class LearningAssistantViewModel: ObservableObject {
     let api: any AssistantAPIClientProtocol
     private let orderStore: UserDefaults
     private let todayProvider: () -> Date
-    private let backendLifecycle: AppBackendLifecycleManaging
-    private let shouldRequestBackendStartup: Bool
-    private let notificationObservers = NotificationObserverBag()
+    private var readyObserver: Any?
     private var analysisTask: Task<Void, Never>?
     private var rescheduleDebounceTask: Task<Void, Never>?
 
@@ -146,55 +123,33 @@ final class LearningAssistantViewModel: ObservableObject {
         api: any AssistantAPIClientProtocol = AssistantAPIClient.shared,
         orderStore: UserDefaults = .standard,
         todayProvider: @escaping () -> Date = Date.init,
-        autoLoadWhenReady: Bool = true,
-        backendLifecycle: AppBackendLifecycleManaging = BackendProcessManager.shared
+        autoLoadWhenReady: Bool = true
     ) {
         self.api = api
         self.orderStore = orderStore
         self.todayProvider = todayProvider
-        self.backendLifecycle = backendLifecycle
-        self.shouldRequestBackendStartup = autoLoadWhenReady
-        let readyObserver = NotificationCenter.default.addObserver(
+        readyObserver = NotificationCenter.default.addObserver(
             forName: .backendDidBecomeReady,
             object: nil,
             queue: .main
         ) { [weak self] _ in
             guard let self else { return }
             Task { @MainActor [weak self] in
-                guard let self, self.shouldRequestBackendStartup else { return }
+                guard let self, self.isConnecting else { return }
                 self.isConnecting = false
                 await self.fetchDashboard()
             }
         }
-        notificationObservers.add(readyObserver)
-
-        let unavailableObserver = NotificationCenter.default.addObserver(
-            forName: .backendDidBecomeUnavailable,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            guard let self else { return }
-            Task { @MainActor [weak self] in
-                guard let self, self.shouldRequestBackendStartup else { return }
-                self.clearDashboardContent()
-                self.isConnecting = false
-                self.isOffline = true
-            }
-        }
-        notificationObservers.add(unavailableObserver)
 
         // 若通知在订阅前已发出（后端早于视图初始化就绪），直接开始 fetch。
-        if autoLoadWhenReady {
-            requestBackendStartupIfNeeded()
-            if backendLifecycle.isReady {
-                isConnecting = false
-                Task { await fetchDashboard() }
-            }
+        if autoLoadWhenReady, BackendProcessManager.shared.isReady {
+            isConnecting = false
+            Task { await fetchDashboard() }
         }
     }
 
     deinit {
-        notificationObservers.removeAll()
+        if let readyObserver { NotificationCenter.default.removeObserver(readyObserver) }
     }
 
     // MARK: - Briefing
@@ -237,13 +192,6 @@ final class LearningAssistantViewModel: ObservableObject {
     }
 
     func fetchDashboard() async {
-        requestBackendStartupIfNeeded()
-        if shouldRequestBackendStartup, !backendLifecycle.isReady {
-            isConnecting = true
-            isOffline = false
-            return
-        }
-
         isFetchingBriefing = true
         defer { isFetchingBriefing = false }
         do {
@@ -258,12 +206,6 @@ final class LearningAssistantViewModel: ObservableObject {
             isOffline = true
             isConnecting = false
         }
-    }
-
-    private func requestBackendStartupIfNeeded() {
-        guard shouldRequestBackendStartup else { return }
-        guard !backendLifecycle.isReady, !backendLifecycle.isStarting else { return }
-        backendLifecycle.startIfNeeded()
     }
 
     func fetchTodayBriefing() async {
@@ -286,6 +228,7 @@ final class LearningAssistantViewModel: ObservableObject {
     func fetchResources() async {
         do {
             resources = try await api.fetchResources()
+            resourceManagementError = nil
             isOffline = false
         } catch {
             isOffline = true
@@ -302,6 +245,45 @@ final class LearningAssistantViewModel: ObservableObject {
         } catch {
             isOffline = true
         }
+    }
+
+    // MARK: - Resource Management
+
+    func completeResource(_ resource: AssistantResource) async {
+        await manageResource(
+            resource,
+            failureMessage: "标记「\(resource.title)」完成失败，请重试。"
+        ) {
+            try await api.completeResource(id: resource.id)
+        }
+    }
+
+    func archiveResource(_ resource: AssistantResource) async {
+        await manageResource(
+            resource,
+            failureMessage: "移出「\(resource.title)」失败，请重试。"
+        ) {
+            try await api.archiveResource(id: resource.id)
+        }
+    }
+
+    func isManagingResource(_ resource: AssistantResource) -> Bool {
+        !managingResourceIDs.isEmpty
+    }
+
+    func clearResourceManagementError() {
+        resourceManagementError = nil
+    }
+
+    func seedAdjustPlan(for resource: AssistantResource) {
+        adjustPlanDraftText = "请帮我调整「\(resource.title)」（ID: \(resource.id)）的学习计划："
+        selectedPanelTab = .adjustPlan
+    }
+
+    func consumeAdjustPlanDraftText() -> String? {
+        guard let draft = adjustPlanDraftText else { return nil }
+        adjustPlanDraftText = nil
+        return draft
     }
 
     // MARK: - Dashboard interactions
@@ -560,6 +542,43 @@ final class LearningAssistantViewModel: ObservableObject {
         todayTotalMinutes = 0
         todayHighlights = ""
         expandedTaskIDs = []
+    }
+
+    private func manageResource(
+        _ resource: AssistantResource,
+        failureMessage: String,
+        action: () async throws -> Void
+    ) async {
+        guard managingResourceIDs.isEmpty else { return }
+        managingResourceIDs.insert(resource.id)
+        resourceManagementError = nil
+        defer { managingResourceIDs.remove(resource.id) }
+        do {
+            try await action()
+            await refreshDashboardAfterResourceMutation(
+                failureMessage: "已更新「\(resource.title)」，但刷新资料进度失败，请稍后重试。"
+            )
+        } catch {
+            resourceManagementError = failureMessage
+        }
+    }
+
+    private func refreshDashboardAfterResourceMutation(failureMessage: String) async {
+        isFetchingBriefing = true
+        defer { isFetchingBriefing = false }
+        do {
+            async let briefingRequest = api.fetchTodayBriefing()
+            async let resourcesRequest = api.fetchResources()
+            let (briefing, fetchedResources) = try await (briefingRequest, resourcesRequest)
+            apply(briefing: briefing, resources: fetchedResources)
+            resourceManagementError = nil
+            isOffline = false
+            isConnecting = false
+        } catch {
+            resourceManagementError = failureMessage
+            isOffline = true
+            isConnecting = false
+        }
     }
 
     private func applyLocalDisplayOrder(to incomingTasks: [AssistantTask]) -> [AssistantTask] {

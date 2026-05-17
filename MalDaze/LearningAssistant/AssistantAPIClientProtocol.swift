@@ -4,6 +4,8 @@ import Foundation
 protocol AssistantAPIClientProtocol {
     func fetchTodayBriefing() async throws -> TodayBriefing
     func completeTask(id: Int, actualMinutes: Int?) async throws
+    func completeResource(id: Int) async throws
+    func archiveResource(id: Int) async throws
     func sendMessage(message: String, threadId: String?) async throws -> ChatResponse
     func confirmChat(threadId: String, confirmed: Bool) async throws
     func startIngestion(url: String, deadline: String, speedFactor: Double?) async throws -> String

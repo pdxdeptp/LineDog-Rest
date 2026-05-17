@@ -209,6 +209,56 @@ final class AssistantModelDecodingTests: XCTestCase {
         XCTAssertNil(briefing.tasks[0].unitURL)
     }
 
+    func testAssistantResourceDecodesURLIntoResourceURL() throws {
+        let json = """
+        {
+            "id": 42,
+            "title": "Swift Concurrency Guide",
+            "tracking_mode": "article",
+            "completed_units": 2,
+            "total_units": 8,
+            "actual_minutes_total": 75,
+            "deadline": "2026-06-01",
+            "status": "active",
+            "url": "https://example.com/swift-concurrency"
+        }
+        """
+        let resource = try decode(AssistantResource.self, from: json)
+        XCTAssertEqual(resource.resourceURL, URL(string: "https://example.com/swift-concurrency"))
+    }
+
+    func testAssistantResourceTreatsMissingNullOrInvalidURLAsNil() throws {
+        let missingURL = """
+        {"id":1,"title":"A","tracking_mode":"article","completed_units":0,"total_units":1,"actual_minutes_total":0,"deadline":null,"status":"active"}
+        """
+        let nullURL = """
+        {"id":2,"title":"B","tracking_mode":"article","completed_units":0,"total_units":1,"actual_minutes_total":0,"deadline":null,"status":"active","url":null}
+        """
+        let invalidURL = """
+        {"id":3,"title":"C","tracking_mode":"article","completed_units":0,"total_units":1,"actual_minutes_total":0,"deadline":null,"status":"active","url":"not a valid url"}
+        """
+
+        XCTAssertNil(try decode(AssistantResource.self, from: missingURL).resourceURL)
+        XCTAssertNil(try decode(AssistantResource.self, from: nullURL).resourceURL)
+        XCTAssertNil(try decode(AssistantResource.self, from: invalidURL).resourceURL)
+    }
+
+    func testAssistantResourceRejectsUnsafeResourceURLSchemes() throws {
+        let fileURL = """
+        {"id":4,"title":"D","tracking_mode":"article","completed_units":0,"total_units":1,"actual_minutes_total":0,"deadline":null,"status":"active","url":"file:///Users/cpt/.ssh/id_rsa"}
+        """
+        let mailtoURL = """
+        {"id":5,"title":"E","tracking_mode":"article","completed_units":0,"total_units":1,"actual_minutes_total":0,"deadline":null,"status":"active","url":"mailto:test@example.com"}
+        """
+        let customSchemeURL = """
+        {"id":6,"title":"F","tracking_mode":"article","completed_units":0,"total_units":1,"actual_minutes_total":0,"deadline":null,"status":"active","url":"maliciousapp://open"}
+        """
+
+        XCTAssertNil(try decode(AssistantResource.self, from: fileURL).resourceURL)
+        XCTAssertNil(try decode(AssistantResource.self, from: mailtoURL).resourceURL)
+        XCTAssertNil(try decode(AssistantResource.self, from: customSchemeURL).resourceURL)
+    }
+
     func testBriefingTaskIsCompletedWhenCompletedAtPresent() throws {
         let json = """
         {"tasks":[{"id":1,"title":"T","target_minutes":10,"completed_at":"2026-05-09T17:46:14","resource_title":null,"priority":0}],"total_minutes":10,"highlights":""}
@@ -291,6 +341,42 @@ final class LearningAssistantUISourceTests: XCTestCase {
         XCTAssertTrue(source.contains("NSWorkspace.shared.open"))
     }
 
+    func testResourceProgressCardsExposeManagementActions() throws {
+        let source = try sourceFile("MalDaze/LearningAssistant/ResourceProgressView.swift")
+
+        XCTAssertTrue(source.contains("onOpen"))
+        XCTAssertTrue(source.contains("onAdjustPlan"))
+        XCTAssertTrue(source.contains("onComplete"))
+        XCTAssertTrue(source.contains("onArchive"))
+        XCTAssertTrue(source.contains("isManagementInFlight"))
+        XCTAssertTrue(source.contains("isLocalManagementInFlight"))
+        XCTAssertTrue(source.contains(".disabled(isResourceManagementInFlight)"))
+        XCTAssertTrue(source.contains("NSWorkspace.shared.open"))
+        XCTAssertTrue(source.contains("打开资料"))
+        XCTAssertTrue(source.contains("调整计划"))
+        XCTAssertTrue(source.contains("标记完成"))
+        XCTAssertTrue(source.contains("移出当前计划"))
+    }
+
+    func testAssistantPanelWiresResourceProgressManagementActionsAndFeedback() throws {
+        let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
+
+        XCTAssertTrue(source.contains("resourceManagementError"))
+        XCTAssertTrue(source.contains("clearResourceManagementError"))
+        XCTAssertTrue(source.contains("seedAdjustPlan(for: resource)"))
+        XCTAssertTrue(source.contains("completeResource(resource)"))
+        XCTAssertTrue(source.contains("archiveResource(resource)"))
+        XCTAssertTrue(source.contains("isManagingResource(resource)"))
+    }
+
+    func testChatViewConsumesResourceAdjustPlanDraftText() throws {
+        let source = try sourceFile("MalDaze/LearningAssistant/ChatView.swift")
+
+        XCTAssertTrue(source.contains("consumeAdjustPlanDraftText"))
+        XCTAssertTrue(source.contains("inputText = draft"))
+        XCTAssertTrue(source.contains("inputFocused = true"))
+    }
+
     private func sourceFile(_ relativePath: String) throws -> String {
         let testFile = URL(fileURLWithPath: #filePath)
         let projectRoot = testFile.deletingLastPathComponent().deletingLastPathComponent()
@@ -315,70 +401,6 @@ final class LearningAssistantViewModelTests: XCTestCase {
         XCTAssertNil(vm.ingestionThreadId)
         XCTAssertFalse(vm.isOffline)
         XCTAssertEqual(vm.selectedOption, "B")  // default is now "B"
-    }
-
-    func testDefaultViewModelRequestsBackendStartupOnceWhenAssistantUIActivates() async {
-        let mock = MockAssistantAPIClient()
-        let backend = RecordingAssistantBackendLifecycle()
-        let vm = LearningAssistantViewModel(api: mock, backendLifecycle: backend)
-
-        XCTAssertEqual(backend.startIfNeededCallCount, 1)
-
-        await vm.fetchDashboard()
-
-        XCTAssertEqual(backend.startIfNeededCallCount, 1)
-    }
-
-    func testAutoLoadDisabledDoesNotRequestBackendStartupForTestsAndPreviews() {
-        let backend = RecordingAssistantBackendLifecycle()
-        _ = LearningAssistantViewModel(
-            api: MockAssistantAPIClient(),
-            autoLoadWhenReady: false,
-            backendLifecycle: backend
-        )
-
-        XCTAssertEqual(backend.startIfNeededCallCount, 0)
-    }
-
-    func testFetchDashboardWhileBackendIsStartingDefersNetworkAndReadyNotificationLoads() async throws {
-        let mock = MockAssistantAPIClient()
-        mock.shouldThrowOffline = true
-        let backend = RecordingAssistantBackendLifecycle()
-        let vm = LearningAssistantViewModel(api: mock, backendLifecycle: backend)
-
-        await vm.fetchDashboard()
-
-        XCTAssertEqual(mock.fetchBriefingCallCount, 0)
-        XCTAssertEqual(mock.fetchResourcesCallCount, 0)
-        XCTAssertTrue(vm.isConnecting)
-        XCTAssertFalse(vm.isOffline)
-
-        mock.shouldThrowOffline = false
-        backend.markReady()
-        try await Task.sleep(nanoseconds: 100_000_000)
-
-        XCTAssertEqual(mock.fetchBriefingCallCount, 1)
-        XCTAssertEqual(mock.fetchResourcesCallCount, 1)
-        XCTAssertFalse(vm.isConnecting)
-        XCTAssertFalse(vm.isOffline)
-        XCTAssertEqual(vm.dashboardState.kind, .emptyDatabase)
-    }
-
-    func testFetchDashboardAfterBackendStartupFailureRequestsStartupAgain() async {
-        let mock = MockAssistantAPIClient()
-        let backend = RecordingAssistantBackendLifecycle()
-        let vm = LearningAssistantViewModel(api: mock, backendLifecycle: backend)
-
-        XCTAssertEqual(backend.startIfNeededCallCount, 1)
-
-        backend.markStartupFailed()
-        await vm.fetchDashboard()
-
-        XCTAssertEqual(backend.startIfNeededCallCount, 2)
-        XCTAssertEqual(mock.fetchBriefingCallCount, 0)
-        XCTAssertEqual(mock.fetchResourcesCallCount, 0)
-        XCTAssertTrue(vm.isConnecting)
-        XCTAssertFalse(vm.isOffline)
     }
 
     // MARK: 1.4 / 3.2-3.6 首页 dashboard 状态层
@@ -602,7 +624,7 @@ final class LearningAssistantViewModelTests: XCTestCase {
             totalMinutes: 13,
             highlights: "今日负荷正常"
         )
-        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        let vm = LearningAssistantViewModel(api: mock)
         await vm.fetchTodayBriefing()
 
         XCTAssertEqual(vm.tasks.count, 1)
@@ -617,7 +639,7 @@ final class LearningAssistantViewModelTests: XCTestCase {
     func testFetchBriefingOfflineSetsIsOffline() async {
         let mock = MockAssistantAPIClient()
         mock.shouldThrowOffline = true
-        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        let vm = LearningAssistantViewModel(api: mock)
         await vm.fetchTodayBriefing()
         XCTAssertTrue(vm.isOffline)
         XCTAssertTrue(vm.tasks.isEmpty)
@@ -701,7 +723,7 @@ final class LearningAssistantViewModelTests: XCTestCase {
     func testSendMessageWithTextResponseAppendsAssistantMessage() async {
         let mock = MockAssistantAPIClient()
         mock.chatResult = ChatResponse(threadId: "t1", response: "今天有3个任务", proposal: nil)
-        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        let vm = LearningAssistantViewModel(api: mock)
         await vm.sendMessage("今天有什么任务")
 
         XCTAssertEqual(vm.chatMessages.count, 2)
@@ -724,7 +746,7 @@ final class LearningAssistantViewModelTests: XCTestCase {
             summaryForUser: "今天所有任务已完成。"
         )
         mock.chatResult = ChatResponse(threadId: "t2", response: nil, proposal: proposal)
-        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        let vm = LearningAssistantViewModel(api: mock)
         await vm.sendMessage("今天不想学了")
 
         // Bug C: response:null + proposal → 显示 summaryForUser，不崩溃
@@ -742,7 +764,7 @@ final class LearningAssistantViewModelTests: XCTestCase {
             summaryForUser: "已将 2 个任务推迟到明天"
         )
         mock.chatResult = ChatResponse(threadId: "t3", response: nil, proposal: proposal)
-        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        let vm = LearningAssistantViewModel(api: mock)
         await vm.sendMessage("把明天的任务推迟到后天")
 
         XCTAssertEqual(vm.chatMessages[1].text, "已将 2 个任务推迟到明天")
@@ -753,7 +775,7 @@ final class LearningAssistantViewModelTests: XCTestCase {
 
     func testConfirmProposalClearsCurrentProposalAndRefetches() async {
         let mock = MockAssistantAPIClient()
-        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        let vm = LearningAssistantViewModel(api: mock)
         vm.threadId = "t1"
         vm.currentProposal = "等待确认"
         await vm.confirmProposal(confirmed: true)
@@ -767,7 +789,7 @@ final class LearningAssistantViewModelTests: XCTestCase {
 
     func testCancelProposalClearsProposal() async {
         let mock = MockAssistantAPIClient()
-        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        let vm = LearningAssistantViewModel(api: mock)
         vm.threadId = "t1"
         vm.currentProposal = "等待确认"
         await vm.confirmProposal(confirmed: false)
@@ -783,7 +805,7 @@ final class LearningAssistantViewModelTests: XCTestCase {
     func testSendMessageOfflineSetsIsOfflineAndAppendsErrorMessage() async {
         let mock = MockAssistantAPIClient()
         mock.shouldThrowOffline = true
-        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        let vm = LearningAssistantViewModel(api: mock)
         await vm.sendMessage("今天有什么任务")
 
         XCTAssertTrue(vm.isOffline)
@@ -797,11 +819,184 @@ final class LearningAssistantViewModelTests: XCTestCase {
         let mock = MockAssistantAPIClient()
         let task = AssistantTask(id: 5, title: "T", targetMinutes: 10,
                                  completedAt: nil, resourceTitle: nil, priority: 0)
-        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        let vm = LearningAssistantViewModel(api: mock)
         await vm.completeTask(task)
 
         XCTAssertEqual(mock.lastCompleteTaskId, 5)
         XCTAssertGreaterThanOrEqual(mock.fetchBriefingCallCount, 1)
+    }
+
+    func testResourceManagementProtocolCallsCompleteAndArchiveEndpoints() async throws {
+        let mock = MockAssistantAPIClient()
+        let api: any AssistantAPIClientProtocol = mock
+
+        try await api.completeResource(id: 42)
+        try await api.archiveResource(id: 43)
+
+        XCTAssertEqual(mock.lastCompleteResourceId, 42)
+        XCTAssertEqual(mock.lastArchiveResourceId, 43)
+    }
+
+    func testCompleteResourceCallsAPIAndRefreshesDashboard() async {
+        let mock = MockAssistantAPIClient()
+        mock.resourcesResult = [sampleResource(id: 99, title: "Remaining Resource")]
+        mock.briefingResult = TodayBriefing(
+            tasks: [AssistantTask(id: 7, title: "Next", targetMinutes: 20,
+                                  completedAt: nil, resourceTitle: "Remaining Resource", priority: 1)],
+            totalMinutes: 20,
+            highlights: "refreshed"
+        )
+        let resource = sampleResource(id: 42, title: "Swift Concurrency Guide")
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        vm.resources = [resource]
+
+        await vm.completeResource(resource)
+
+        XCTAssertEqual(mock.lastCompleteResourceId, 42)
+        XCTAssertEqual(mock.fetchBriefingCallCount, 1)
+        XCTAssertEqual(mock.fetchResourcesCallCount, 1)
+        XCTAssertNil(vm.resourceManagementError)
+        XCTAssertEqual(vm.resources.map(\.id), [99])
+        XCTAssertEqual(vm.tasks.map(\.id), [7])
+    }
+
+    func testArchiveResourceCallsAPIAndRefreshesDashboard() async {
+        let mock = MockAssistantAPIClient()
+        mock.resourcesResult = []
+        let resource = sampleResource(id: 43, title: "Old Plan")
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        vm.resources = [resource]
+
+        await vm.archiveResource(resource)
+
+        XCTAssertEqual(mock.lastArchiveResourceId, 43)
+        XCTAssertEqual(mock.fetchBriefingCallCount, 1)
+        XCTAssertEqual(mock.fetchResourcesCallCount, 1)
+        XCTAssertNil(vm.resourceManagementError)
+        XCTAssertTrue(vm.resources.isEmpty)
+    }
+
+    func testResourceManagementFailurePreservesResourcesAndShowsClearableError() async {
+        let mock = MockAssistantAPIClient()
+        mock.shouldThrowResourceManagement = true
+        let resource = sampleResource(id: 44, title: "Do Not Remove")
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        vm.resources = [resource]
+
+        await vm.archiveResource(resource)
+
+        XCTAssertEqual(mock.lastArchiveResourceId, 44)
+        XCTAssertEqual(vm.resources.map(\.id), [44])
+        XCTAssertEqual(mock.fetchBriefingCallCount, 0)
+        XCTAssertEqual(mock.fetchResourcesCallCount, 0)
+        XCTAssertNotNil(vm.resourceManagementError)
+
+        vm.clearResourceManagementError()
+        XCTAssertNil(vm.resourceManagementError)
+    }
+
+    func testResourceManagementRefreshFailurePreservesDashboardAndReportsRefreshError() async {
+        let mock = MockAssistantAPIClient()
+        mock.shouldThrowResources = true
+        mock.briefingResult = TodayBriefing(
+            tasks: [AssistantTask(id: 200, title: "Server Update", targetMinutes: 15,
+                                  completedAt: nil, resourceTitle: "Server", priority: 1)],
+            totalMinutes: 15,
+            highlights: "new data that should not partially apply"
+        )
+        let task = AssistantTask(id: 100, title: "Keep Visible", targetMinutes: 25,
+                                 completedAt: nil, resourceTitle: "Local Resource", priority: 2)
+        let resource = sampleResource(id: 45, title: "Local Resource")
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        vm.tasks = [task]
+        vm.visibleTodayTasks = [task]
+        vm.resources = [resource]
+        vm.todayTotalMinutes = 25
+        vm.todayHighlights = "local state"
+
+        await vm.completeResource(resource)
+
+        XCTAssertEqual(mock.lastCompleteResourceId, 45)
+        XCTAssertEqual(mock.fetchBriefingCallCount, 1)
+        XCTAssertEqual(mock.fetchResourcesCallCount, 1)
+        XCTAssertEqual(vm.tasks.map(\.id), [100])
+        XCTAssertEqual(vm.visibleTodayTasks.map(\.id), [100])
+        XCTAssertEqual(vm.resources.map(\.id), [45])
+        XCTAssertEqual(vm.todayTotalMinutes, 25)
+        XCTAssertEqual(vm.todayHighlights, "local state")
+        XCTAssertTrue(vm.resourceManagementError?.contains("刷新") ?? false)
+    }
+
+    func testSuccessfulFetchResourcesClearsStaleResourceManagementError() async {
+        let mock = MockAssistantAPIClient()
+        mock.resourcesResult = [sampleResource(id: 46, title: "Fresh")]
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        vm.resourceManagementError = "之前的资源操作失败"
+
+        await vm.fetchResources()
+
+        XCTAssertNil(vm.resourceManagementError)
+        XCTAssertEqual(vm.resources.map(\.id), [46])
+    }
+
+    func testResourceManagementIgnoresDuplicateArchiveWhileResourceIsInFlight() async {
+        let mock = MockAssistantAPIClient()
+        mock.resourceManagementDelayNanoseconds = 50_000_000
+        let resource = sampleResource(id: 47, title: "Only Archive Once")
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        vm.resources = [resource]
+
+        let firstRequest = Task {
+            await vm.archiveResource(resource)
+        }
+        try? await Task.sleep(nanoseconds: 10_000_000)
+
+        await vm.archiveResource(resource)
+        await firstRequest.value
+
+        XCTAssertEqual(mock.archiveResourceCallCount, 1)
+        XCTAssertEqual(mock.fetchBriefingCallCount, 1)
+        XCTAssertEqual(mock.fetchResourcesCallCount, 1)
+        XCTAssertNil(vm.resourceManagementError)
+    }
+
+    func testResourceManagementIgnoresDifferentResourceWhileAnotherResourceIsInFlight() async {
+        let mock = MockAssistantAPIClient()
+        mock.resourceManagementDelayNanoseconds = 50_000_000
+        let firstResource = sampleResource(id: 48, title: "First Resource")
+        let secondResource = sampleResource(id: 49, title: "Second Resource")
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        vm.resources = [firstResource, secondResource]
+
+        let firstRequest = Task {
+            await vm.archiveResource(firstResource)
+        }
+        try? await Task.sleep(nanoseconds: 10_000_000)
+
+        await vm.completeResource(secondResource)
+        await firstRequest.value
+
+        XCTAssertEqual(mock.archiveResourceCallCount, 1)
+        XCTAssertEqual(mock.completeResourceCallCount, 0)
+        XCTAssertEqual(mock.fetchBriefingCallCount, 1)
+        XCTAssertEqual(mock.fetchResourcesCallCount, 1)
+        XCTAssertNil(vm.resourceManagementError)
+    }
+
+    func testSeedAdjustPlanForResourceSelectsAdjustPlanAndIncludesTitleAndIDInDraft() {
+        let vm = LearningAssistantViewModel(api: MockAssistantAPIClient(), autoLoadWhenReady: false)
+        let resource = sampleResource(id: 45, title: "Distributed Systems Notes")
+
+        vm.seedAdjustPlan(for: resource)
+
+        XCTAssertEqual(vm.selectedPanelTab, .adjustPlan)
+        XCTAssertTrue(vm.adjustPlanDraftText?.contains("Distributed Systems Notes") ?? false)
+        XCTAssertTrue(vm.adjustPlanDraftText?.contains("ID: 45") ?? false)
+
+        let draft = vm.consumeAdjustPlanDraftText()
+        XCTAssertTrue(draft?.contains("Distributed Systems Notes") ?? false)
+        XCTAssertTrue(draft?.contains("ID: 45") ?? false)
+        XCTAssertNil(vm.adjustPlanDraftText)
     }
 }
 
@@ -816,6 +1011,8 @@ private final class MockAssistantAPIClient: AssistantAPIClientProtocol, @uncheck
     var chatResult: ChatResponse?
     var shouldThrowOffline = false
     var shouldThrowResources = false
+    var shouldThrowResourceManagement = false
+    var resourceManagementDelayNanoseconds: UInt64 = 0
     // New: for updated protocol methods
     var startIngestionThreadId: String = "mock-thread"
     var progressEvents: [IngestionProgressEvent] = []
@@ -827,6 +1024,10 @@ private final class MockAssistantAPIClient: AssistantAPIClientProtocol, @uncheck
     private(set) var fetchBriefingCallCount = 0
     private(set) var fetchResourcesCallCount = 0
     private(set) var lastCompleteTaskId: Int?
+    private(set) var lastCompleteResourceId: Int?
+    private(set) var lastArchiveResourceId: Int?
+    private(set) var completeResourceCallCount = 0
+    private(set) var archiveResourceCallCount = 0
     private(set) var lastConfirmChatConfirmed: Bool?
     private(set) var lastConfirmIngestionConfirmed: Bool?
     private(set) var lastConfirmIngestionOption: String?
@@ -844,6 +1045,24 @@ private final class MockAssistantAPIClient: AssistantAPIClientProtocol, @uncheck
     func completeTask(id: Int, actualMinutes: Int?) async throws {
         if shouldThrowOffline { throw AssistantOfflineError() }
         lastCompleteTaskId = id
+    }
+
+    func completeResource(id: Int) async throws {
+        completeResourceCallCount += 1
+        lastCompleteResourceId = id
+        if resourceManagementDelayNanoseconds > 0 {
+            try? await Task.sleep(nanoseconds: resourceManagementDelayNanoseconds)
+        }
+        if shouldThrowOffline || shouldThrowResourceManagement { throw AssistantOfflineError() }
+    }
+
+    func archiveResource(id: Int) async throws {
+        archiveResourceCallCount += 1
+        lastArchiveResourceId = id
+        if resourceManagementDelayNanoseconds > 0 {
+            try? await Task.sleep(nanoseconds: resourceManagementDelayNanoseconds)
+        }
+        if shouldThrowOffline || shouldThrowResourceManagement { throw AssistantOfflineError() }
     }
 
     func sendMessage(message: String, threadId: String?) async throws -> ChatResponse {
@@ -904,36 +1123,6 @@ private final class MockAssistantAPIClient: AssistantAPIClientProtocol, @uncheck
     }
 }
 
-@MainActor
-private final class RecordingAssistantBackendLifecycle: AppBackendLifecycleManaging {
-    var isReady = false
-    var isStarting = false
-
-    private(set) var startIfNeededCallCount = 0
-    private(set) var didStop = false
-
-    func startIfNeeded() {
-        guard !isReady, !isStarting else { return }
-        isStarting = true
-        startIfNeededCallCount += 1
-    }
-
-    func stop() {
-        didStop = true
-    }
-
-    func markReady() {
-        isReady = true
-        isStarting = false
-        NotificationCenter.default.post(name: .backendDidBecomeReady, object: nil)
-    }
-
-    func markStartupFailed() {
-        isReady = false
-        isStarting = false
-    }
-}
-
 // MARK: - Shared test fixtures
 
 private func sampleDraftDetail() -> IngestionDraftDetail {
@@ -944,6 +1133,20 @@ private func sampleDraftDetail() -> IngestionDraftDetail {
         unitCount: 10,
         optionA: [],
         optionB: []
+    )
+}
+
+private func sampleResource(id: Int, title: String) -> AssistantResource {
+    AssistantResource(
+        id: id,
+        title: title,
+        trackingMode: "article",
+        completedUnits: 1,
+        totalUnits: 5,
+        actualMinutesTotal: 45,
+        deadline: nil,
+        status: "active",
+        resourceURL: URL(string: "https://example.com/resources/\(id)")
     )
 }
 
