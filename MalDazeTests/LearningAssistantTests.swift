@@ -493,9 +493,140 @@ final class LearningAssistantViewModelTests: XCTestCase {
 
         XCTAssertTrue(vm.isOffline)
         XCTAssertEqual(vm.dashboardState.kind, .offline)
-        XCTAssertTrue(vm.tasks.isEmpty)
-        XCTAssertTrue(vm.resources.isEmpty)
-        XCTAssertTrue(vm.visibleTodayTasks.isEmpty)
+        XCTAssertEqual(vm.tasks.map(\.id), [1])
+        XCTAssertEqual(vm.resources.map(\.id), [10])
+        XCTAssertEqual(vm.visibleTodayTasks.map(\.id), [1])
+    }
+
+    func testConnectingWithCachedDashboardContentKeepsDashboardVisibleForBackgroundRefresh() async {
+        let mock = MockAssistantAPIClient()
+        mock.briefingResult = TodayBriefing(
+            tasks: [AssistantTask(id: 1, title: "Cached", targetMinutes: 15,
+                                  completedAt: nil, resourceTitle: "R", priority: 1)],
+            totalMinutes: 15,
+            highlights: "缓存可用"
+        )
+        mock.resourcesResult = [
+            AssistantResource(id: 10, title: "R", trackingMode: "video",
+                              completedUnits: 1, totalUnits: 5, actualMinutesTotal: 20,
+                              deadline: nil, status: "active")
+        ]
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        await vm.fetchDashboard()
+
+        vm.isConnecting = true
+
+        XCTAssertEqual(vm.dashboardState.kind, .tasksToday)
+        XCTAssertTrue(vm.isConnecting)
+    }
+
+    func testDashboardOpenStartsLazyBackendWhenNotReadyAndKeepsConnecting() async {
+        let mock = MockAssistantAPIClient()
+        let backend = MockBackendLifecycle()
+        backend.isReady = false
+        backend.isStarting = false
+        let vm = LearningAssistantViewModel(
+            api: mock,
+            backendLifecycle: backend,
+            autoLoadWhenReady: false
+        )
+
+        await vm.refreshForDashboardOpen()
+
+        XCTAssertEqual(backend.startIfNeededCallCount, 1)
+        XCTAssertTrue(vm.isConnecting)
+        XCTAssertEqual(mock.fetchBriefingCallCount, 0)
+        XCTAssertEqual(mock.fetchResourcesCallCount, 0)
+    }
+
+    func testFetchDashboardSerializesConcurrentRefreshesWithoutDroppingLaterRequest() async {
+        let mock = MockAssistantAPIClient()
+        mock.dashboardFetchDelayNanoseconds = 100_000_000
+        mock.briefingResultsQueue = [
+            TodayBriefing(
+                tasks: [AssistantTask(id: 1, title: "Old", targetMinutes: 15,
+                                      completedAt: nil, resourceTitle: "R", priority: 1)],
+                totalMinutes: 15,
+                highlights: "old"
+            ),
+            TodayBriefing(
+                tasks: [AssistantTask(id: 2, title: "New", targetMinutes: 20,
+                                      completedAt: nil, resourceTitle: "R2", priority: 1)],
+                totalMinutes: 20,
+                highlights: "new"
+            )
+        ]
+        mock.resourcesResultsQueue = [
+            [AssistantResource(id: 10, title: "R", trackingMode: "video",
+                               completedUnits: 1, totalUnits: 5, actualMinutesTotal: 20,
+                               deadline: nil, status: "active")],
+            [AssistantResource(id: 20, title: "R2", trackingMode: "article",
+                               completedUnits: 2, totalUnits: 6, actualMinutesTotal: 30,
+                               deadline: nil, status: "active")]
+        ]
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+
+        async let first: Void = vm.fetchDashboard()
+        async let second: Void = vm.fetchDashboard()
+        _ = await (first, second)
+
+        XCTAssertEqual(mock.fetchBriefingCallCount, 2)
+        XCTAssertEqual(mock.fetchResourcesCallCount, 2)
+        XCTAssertEqual(mock.maxConcurrentBriefingFetches, 1)
+        XCTAssertEqual(mock.maxConcurrentResourceFetches, 1)
+        XCTAssertEqual(vm.tasks.map(\.id), [2])
+        XCTAssertEqual(vm.resources.map(\.id), [20])
+        XCTAssertEqual(vm.dashboardState.highlights, "new")
+    }
+
+    func testCompleteTaskQueuesRequiredRefreshWhenDashboardFetchAlreadyInFlight() async {
+        let mock = MockAssistantAPIClient()
+        mock.dashboardFetchDelayNanoseconds = 100_000_000
+        mock.briefingResultsQueue = [
+            TodayBriefing(
+                tasks: [AssistantTask(id: 1, title: "Before completion", targetMinutes: 15,
+                                      completedAt: nil, resourceTitle: "R", priority: 1)],
+                totalMinutes: 15,
+                highlights: "old"
+            ),
+            TodayBriefing(
+                tasks: [AssistantTask(id: 1, title: "After completion", targetMinutes: 15,
+                                      completedAt: "2026-05-17T12:00:00", resourceTitle: "R", priority: 1)],
+                totalMinutes: 15,
+                highlights: "new"
+            )
+        ]
+        mock.resourcesResultsQueue = [
+            [AssistantResource(id: 10, title: "R", trackingMode: "video",
+                               completedUnits: 1, totalUnits: 5, actualMinutesTotal: 20,
+                               deadline: nil, status: "active")],
+            [AssistantResource(id: 10, title: "R", trackingMode: "video",
+                               completedUnits: 2, totalUnits: 5, actualMinutesTotal: 35,
+                               deadline: nil, status: "active")]
+        ]
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        let task = AssistantTask(
+            id: 1,
+            title: "Before completion",
+            targetMinutes: 15,
+            completedAt: nil,
+            resourceTitle: "R",
+            priority: 1
+        )
+
+        async let openingFetch: Void = vm.fetchDashboard()
+        try? await Task.sleep(nanoseconds: 20_000_000)
+        await vm.completeTask(task)
+        await openingFetch
+
+        XCTAssertEqual(mock.lastCompleteTaskId, 1)
+        XCTAssertEqual(mock.fetchBriefingCallCount, 2)
+        XCTAssertEqual(mock.fetchResourcesCallCount, 2)
+        XCTAssertEqual(mock.maxConcurrentBriefingFetches, 1)
+        XCTAssertEqual(mock.maxConcurrentResourceFetches, 1)
+        XCTAssertEqual(vm.tasks.first?.completedAt, "2026-05-17T12:00:00")
+        XCTAssertEqual(vm.resources.first?.actualMinutesTotal, 35)
+        XCTAssertEqual(vm.dashboardState.highlights, "new")
     }
 
     func testLocalTaskDisplayOrderPersistsAndMergesChangedTaskSet() async {
@@ -1012,7 +1143,10 @@ private final class MockAssistantAPIClient: AssistantAPIClientProtocol, @uncheck
     var shouldThrowOffline = false
     var shouldThrowResources = false
     var shouldThrowResourceManagement = false
+    var dashboardFetchDelayNanoseconds: UInt64 = 0
     var resourceManagementDelayNanoseconds: UInt64 = 0
+    var briefingResultsQueue: [TodayBriefing] = []
+    var resourcesResultsQueue: [[AssistantResource]] = []
     // New: for updated protocol methods
     var startIngestionThreadId: String = "mock-thread"
     var progressEvents: [IngestionProgressEvent] = []
@@ -1023,6 +1157,10 @@ private final class MockAssistantAPIClient: AssistantAPIClientProtocol, @uncheck
     // Captured call arguments for assertions
     private(set) var fetchBriefingCallCount = 0
     private(set) var fetchResourcesCallCount = 0
+    private(set) var maxConcurrentBriefingFetches = 0
+    private(set) var maxConcurrentResourceFetches = 0
+    private var activeBriefingFetches = 0
+    private var activeResourceFetches = 0
     private(set) var lastCompleteTaskId: Int?
     private(set) var lastCompleteResourceId: Int?
     private(set) var lastArchiveResourceId: Int?
@@ -1038,7 +1176,16 @@ private final class MockAssistantAPIClient: AssistantAPIClientProtocol, @uncheck
 
     func fetchTodayBriefing() async throws -> TodayBriefing {
         fetchBriefingCallCount += 1
+        activeBriefingFetches += 1
+        maxConcurrentBriefingFetches = max(maxConcurrentBriefingFetches, activeBriefingFetches)
+        defer { activeBriefingFetches -= 1 }
+        if dashboardFetchDelayNanoseconds > 0 {
+            try? await Task.sleep(nanoseconds: dashboardFetchDelayNanoseconds)
+        }
         if shouldThrowOffline { throw AssistantOfflineError() }
+        if !briefingResultsQueue.isEmpty {
+            return briefingResultsQueue.removeFirst()
+        }
         return briefingResult
     }
 
@@ -1109,7 +1256,16 @@ private final class MockAssistantAPIClient: AssistantAPIClientProtocol, @uncheck
 
     func fetchResources() async throws -> [AssistantResource] {
         fetchResourcesCallCount += 1
+        activeResourceFetches += 1
+        maxConcurrentResourceFetches = max(maxConcurrentResourceFetches, activeResourceFetches)
+        defer { activeResourceFetches -= 1 }
+        if dashboardFetchDelayNanoseconds > 0 {
+            try? await Task.sleep(nanoseconds: dashboardFetchDelayNanoseconds)
+        }
         if shouldThrowOffline || shouldThrowResources { throw AssistantOfflineError() }
+        if !resourcesResultsQueue.isEmpty {
+            return resourcesResultsQueue.removeFirst()
+        }
         return resourcesResult
     }
 
@@ -1120,6 +1276,23 @@ private final class MockAssistantAPIClient: AssistantAPIClientProtocol, @uncheck
 
     func updateLearningPreferences(_ prefs: LearningPreferences) async throws {
         if shouldThrowOffline { throw AssistantOfflineError() }
+    }
+}
+
+@MainActor
+private final class MockBackendLifecycle: AppBackendLifecycleManaging {
+    var isReady = false
+    var isStarting = false
+    private(set) var startIfNeededCallCount = 0
+    private(set) var stopCallCount = 0
+
+    func startIfNeeded() {
+        startIfNeededCallCount += 1
+        isStarting = true
+    }
+
+    func stop() {
+        stopCallCount += 1
     }
 }
 

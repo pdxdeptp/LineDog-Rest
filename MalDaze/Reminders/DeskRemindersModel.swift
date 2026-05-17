@@ -18,7 +18,7 @@ final class DeskRemindersModel: ObservableObject {
     /// 编辑 / 删除 / 推迟 等写操作失败时的简短说明（成功后会清空）。
     @Published private(set) var mutationMessage: String?
 
-    /// 合并菜单栏与桌宠 Popover 同时 `.task` 触发的重复 `prepare`。
+    /// 合并菜单栏与桌宠 Dashboard 同时 `.task` 触发的重复 `prepare`。
     private var inflightPrepare: Task<Void, Never>?
 
     private let externalChangeEmitter = RemindersExternalChangeEmitter()

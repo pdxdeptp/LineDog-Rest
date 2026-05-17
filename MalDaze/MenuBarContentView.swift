@@ -35,6 +35,53 @@ extension MenuBarContentView {
     }
 }
 
+/// 桌宠 Dashboard Panel 的语义 root；短期复用现有三栏内容，但与菜单栏入口解耦。
+struct DeskPetDashboardView: View {
+    private enum DashboardPanelSurface {
+        static let cornerRadius: CGFloat = 14
+        static let fillOpacity = 0.94
+        static let borderOpacity = 0.36
+
+        static func shape() -> RoundedRectangle {
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        }
+    }
+
+    @ObservedObject var viewModel: AppViewModel
+    @StateObject private var learningAssistantViewModel: LearningAssistantViewModel
+
+    static func preferredContentSize(screenVisibleFrame visibleFrame: NSRect?) -> NSSize {
+        ControlPanelLayout.preferredContentSize(screenVisibleFrame: visibleFrame)
+    }
+
+    @MainActor
+    init(viewModel: AppViewModel) {
+        self.viewModel = viewModel
+        _learningAssistantViewModel = StateObject(wrappedValue: LearningAssistantViewModel())
+    }
+
+    var body: some View {
+        MenuBarContentView(viewModel: viewModel, assistantViewModel: learningAssistantViewModel)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .background {
+                ZStack {
+                    DashboardPanelSurface.shape()
+                        .fill(.regularMaterial)
+                    DashboardPanelSurface.shape()
+                        .fill(Color(.windowBackgroundColor).opacity(DashboardPanelSurface.fillOpacity))
+                }
+            }
+            .clipShape(DashboardPanelSurface.shape())
+            .overlay(
+                DashboardPanelSurface.shape()
+                    .strokeBorder(Color(.separatorColor).opacity(DashboardPanelSurface.borderOpacity), lineWidth: 0.5)
+            )
+            .onReceive(NotificationCenter.default.publisher(for: MalDazeBroadcastNotifications.deskPetDashboardDidOpen)) { _ in
+                Task { await learningAssistantViewModel.refreshForDashboardOpen() }
+            }
+    }
+}
+
 // MARK: - Card style for section grouping
 
 private struct CardGroupBoxStyle: GroupBoxStyle {
@@ -57,6 +104,7 @@ private struct CardGroupBoxStyle: GroupBoxStyle {
 /// 桌宠专属宽控制面板 UI：由右下角桌宠浮动窗（`WindowManager`）展示。
 struct MenuBarContentView: View {
     @ObservedObject var viewModel: AppViewModel
+    private let assistantViewModel: LearningAssistantViewModel?
 
     @AppStorage(MalDazeDefaults.sevenMinuteReminderDurationMinutes) private var sevenMinuteMinutesStored = 7
     @AppStorage(MalDazeDefaults.hydrationReminderIntervalMinutes) private var hydrationIntervalStored = 90
@@ -80,6 +128,11 @@ struct MenuBarContentView: View {
     @State private var deleteConfirmationId: String?
     /// 拖动中预览；松手后写入 `@AppStorage` 并发帖，避免拖动每一帧写偏好。
     @State private var idlePetIconSideSliderLive = Double(MalDazeDefaults.idlePetIconSideDefault)
+
+    init(viewModel: AppViewModel, assistantViewModel: LearningAssistantViewModel? = nil) {
+        self.viewModel = viewModel
+        self.assistantViewModel = assistantViewModel
+    }
 
     private var sevenMinuteMinutesResolved: Int {
         let v = sevenMinuteMinutesStored
@@ -180,7 +233,11 @@ struct MenuBarContentView: View {
 
                 // 中栏：学习助手
                 VStack(alignment: .leading, spacing: 0) {
-                    AssistantPanelView()
+                    if let assistantViewModel {
+                        AssistantPanelView(viewModel: assistantViewModel)
+                    } else {
+                        AssistantPanelView()
+                    }
                 }
                 .frame(minWidth: ControlPanelLayout.assistantMinimumColumnWidth, maxWidth: .infinity, alignment: .topLeading)
 

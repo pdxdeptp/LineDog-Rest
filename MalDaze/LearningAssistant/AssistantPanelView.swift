@@ -35,7 +35,7 @@ struct AssistantPanelView: View {
                 .font(.headline)
                 .foregroundStyle(.primary)
             Spacer(minLength: 8)
-            if vm.isFetchingBriefing {
+            if vm.isFetchingBriefing || (vm.isConnecting && vm.hasLoadedDashboardContent) {
                 ProgressView()
                     .controlSize(.small)
             }

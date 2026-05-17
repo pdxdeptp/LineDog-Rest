@@ -38,7 +38,7 @@ final class AppViewModel: ObservableObject {
     /// 休息打断风格，持久化到 UserDefaults。
     @Published private(set) var breakInterruptStyle: BreakInterruptStyle
 
-    /// 提醒事项同步（EventKit）；与菜单栏、桌宠 Popover 共用。
+    /// 提醒事项同步（EventKit）；与菜单栏、桌宠 Dashboard 共用。
     let deskReminders: DeskRemindersModel
 
     private static let restBlocksClicksDefaultsKey = "MalDaze.restBlocksClicksDuringRest"

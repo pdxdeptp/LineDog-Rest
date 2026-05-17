@@ -1,7 +1,9 @@
+import AppKit
 import XCTest
+@testable import MalDaze
 
 final class ControlPanelPresentationTests: XCTestCase {
-    private let expectedDeskPetRootHelperName = "makeDeskPetControlPanelRootView"
+    private let expectedDeskPetRootHelperName = "makeDeskPetDashboardRootView"
 
     func testMenuBarExtraUsesCompactSettingsMenuInsteadOfWideControlPanel() throws {
         let source = try readProjectSource("MalDaze/MalDazeApp.swift")
@@ -70,48 +72,76 @@ final class ControlPanelPresentationTests: XCTestCase {
         }
     }
 
-    func testWindowManagerUsesSingleSharedDeskPetControlPanelRootHelper() throws {
+    func testWindowManagerUsesSingleSharedDeskPetDashboardRootHelper() throws {
         let source = try readProjectSource("MalDaze/WindowManager/WindowManager.swift")
 
         XCTAssertTrue(
             source.contains("func \(expectedDeskPetRootHelperName)("),
-            "WindowManager should define a single helper named \(expectedDeskPetRootHelperName) for constructing the desk pet control panel root view."
+            "WindowManager should define a single helper named \(expectedDeskPetRootHelperName) for constructing the desk pet dashboard root view."
         )
         XCTAssertFalse(
             source.contains(".environment(\\.maldazeDeskMenuPresentation, .deskPetFloatingPanel)"),
-            "Desk pet popup root construction should not inject desk-pet-only control-panel presentation environment."
+            "Desk pet dashboard root construction should not inject desk-pet-only control-panel presentation environment."
         )
     }
 
-    func testWindowManagerOnlyCreatesMenuBarContentViewInsideDeskPetRootHelper() throws {
+    func testWindowManagerDoesNotHostMenuBarContentViewDirectlyForDeskPetDashboard() throws {
         let source = try readProjectSource("MalDaze/WindowManager/WindowManager.swift")
-        let helperRange = rangeOfFunction(named: expectedDeskPetRootHelperName, in: source)
-        let sourceOutsideHelper: String
 
-        if let helperRange {
-            sourceOutsideHelper = String(source[..<helperRange.lowerBound] + source[helperRange.upperBound...])
-        } else {
-            sourceOutsideHelper = source
-        }
-
-        let inlineCreationsOutsideHelper = sourceOutsideHelper.ranges(of: "MenuBarContentView(viewModel:")
+        let inlineCreations = source.ranges(of: "MenuBarContentView(viewModel:")
         XCTAssertTrue(
-            inlineCreationsOutsideHelper.isEmpty,
-            "MenuBarContentView(viewModel:) should only be constructed inside \(expectedDeskPetRootHelperName); found \(inlineCreationsOutsideHelper.count) inline construction(s) outside that helper."
+            inlineCreations.isEmpty,
+            "WindowManager should host a dashboard semantic root instead of MenuBarContentView(viewModel:) directly; found \(inlineCreations.count) inline construction(s)."
         )
     }
 
-    func testDeskPetControlPanelRootHelperStillBuildsWideMenuBarContentView() throws {
+    func testDeskPetDashboardRootHelperBuildsDashboardSemanticRoot() throws {
         let source = try readProjectSource("MalDaze/WindowManager/WindowManager.swift")
         let helperRange = try XCTUnwrap(
             rangeOfFunction(named: expectedDeskPetRootHelperName, in: source),
-            "WindowManager should keep \(expectedDeskPetRootHelperName) as the desk pet popover construction point."
+            "WindowManager should keep \(expectedDeskPetRootHelperName) as the desk pet dashboard construction point."
         )
         let helperSource = String(source[helperRange])
 
         XCTAssertTrue(
-            helperSource.contains("AnyView(MenuBarContentView(viewModel: vm))"),
-            "Desk pet left-click and shortcut popovers should continue using the wide MenuBarContentView(viewModel:) root."
+            helperSource.contains("AnyView(DeskPetDashboardView(viewModel: vm))"),
+            "Desk pet left-click and shortcut presentation should use a dashboard-specific root view."
+        )
+
+        let contentSource = try readProjectSource("MalDaze/MenuBarContentView.swift")
+        XCTAssertTrue(
+            contentSource.contains("struct DeskPetDashboardView: View"),
+            "MenuBarContentView.swift should expose a dashboard semantic root for the desk pet panel."
+        )
+        XCTAssertTrue(
+            contentSource.contains("MenuBarContentView(viewModel: viewModel, assistantViewModel: learningAssistantViewModel)"),
+            "The dashboard root may temporarily reuse the existing wide three-column content."
+        )
+    }
+
+    func testDeskPetDashboardRootDrawsVisibleSurfaceInsideTransparentPanel() throws {
+        let source = try readProjectSource("MalDaze/MenuBarContentView.swift")
+        let rootRange = try XCTUnwrap(
+            rangeOfType(named: "DeskPetDashboardView", in: source),
+            "DeskPetDashboardView should be the desk pet dashboard's semantic root."
+        )
+        let rootSource = String(source[rootRange])
+
+        XCTAssertTrue(
+            rootSource.contains("DashboardPanelSurface"),
+            "DeskPetDashboardView should own a visible SwiftUI surface because its NSPanel shell is transparent."
+        )
+        XCTAssertTrue(
+            rootSource.contains(".background {"),
+            "DeskPetDashboardView should draw an actual background instead of relying on transparent NSPanel chrome."
+        )
+        XCTAssertTrue(
+            rootSource.contains(".clipShape("),
+            "DeskPetDashboardView should clip the dashboard surface so the transparent panel does not expose square corners."
+        )
+        XCTAssertTrue(
+            rootSource.contains(".overlay("),
+            "DeskPetDashboardView should draw a boundary that makes the panel edge visible on varied wallpapers."
         )
     }
 
@@ -132,20 +162,102 @@ final class ControlPanelPresentationTests: XCTestCase {
         }
     }
 
-    func testDeskMenuUsesNSPopoverNotNSPanel() throws {
+    func testDeskMenuUsesReusableNSPanelNotNSPopover() throws {
         let source = try readProjectSource("MalDaze/WindowManager/WindowManager.swift")
 
-        XCTAssertTrue(
+        XCTAssertFalse(
             source.contains("NSPopover()"),
-            "WindowManager should use NSPopover for the desk pet menu instead of NSPanel."
+            "WindowManager should not create NSPopover for the desk pet dashboard path."
         )
         XCTAssertFalse(
-            source.contains("makeDeskMenuPanelIfNeeded"),
-            "WindowManager should not use NSPanel-based creation for the desk pet menu."
+            source.contains("popover.show(relativeTo:"),
+            "WindowManager should not show the desk pet dashboard with NSPopover.show(relativeTo:of:preferredEdge:)."
         )
         XCTAssertTrue(
-            source.contains("popover.show(relativeTo:"),
-            "WindowManager should show the desk menu using NSPopover.show(relativeTo:of:preferredEdge:)."
+            source.contains("private final class DeskPetDashboardPanel: NSPanel"),
+            "WindowManager should use an NSPanel subclass for the desk pet dashboard."
+        )
+        XCTAssertTrue(
+            source.contains("private var deskMenuPanel: DeskPetDashboardPanel?"),
+            "WindowManager should retain the dashboard panel for repeat presentation."
+        )
+        XCTAssertTrue(
+            source.contains("private var deskMenuHostingController: NSHostingController<AnyView>?"),
+            "WindowManager should retain the SwiftUI host so local dashboard state survives hide/show."
+        )
+        XCTAssertTrue(
+            source.contains("makeDeskMenuPanelIfNeeded"),
+            "WindowManager should create or reuse the desk pet dashboard through a panel helper."
+        )
+    }
+
+    func testDeskPetDashboardPanelChromeAndLifecycleAreConfigured() throws {
+        let source = try readProjectSource("MalDaze/WindowManager/WindowManager.swift")
+
+        XCTAssertTrue(source.contains("override var canBecomeKey: Bool { true }"))
+        XCTAssertTrue(source.contains("panel.backgroundColor = .clear"))
+        XCTAssertTrue(source.contains("panel.isOpaque = false"))
+        XCTAssertTrue(source.contains("panel.hasShadow = true"))
+        XCTAssertTrue(source.contains("panel.isReleasedWhenClosed = false"))
+        XCTAssertTrue(source.contains("existing.setFrame(Self.dashboardPanelFrame"))
+        XCTAssertTrue(source.contains("panel.orderOut(nil)"))
+    }
+
+    func testDeskPetLeftClickAndShortcutRouteThroughDashboardPanelHelper() throws {
+        let source = try readProjectSource("MalDaze/WindowManager/WindowManager.swift")
+        let presentRange = try XCTUnwrap(
+            rangeOfFunction(named: "presentDeskMenu", in: source),
+            "WindowManager should implement the desk pet presenter entry point."
+        )
+        let presentSource = String(source[presentRange])
+
+        XCTAssertTrue(
+            presentSource.contains("makeDeskMenuPanelIfNeeded(anchorRectInScreen:"),
+            "Desk pet left-click should route through the dashboard panel helper."
+        )
+        XCTAssertTrue(
+            presentSource.contains("panel.isVisible"),
+            "Desk pet left-click should toggle an already-visible dashboard panel closed."
+        )
+        XCTAssertFalse(
+            presentSource.contains("show(relativeTo:"),
+            "Desk pet left-click should not use NSPopover.show."
+        )
+    }
+
+    func testDeskPetDashboardOwnsCustomDismissBehavior() throws {
+        let source = try readProjectSource("MalDaze/WindowManager/WindowManager.swift")
+
+        XCTAssertTrue(source.contains("installDashboardDismissMonitors()"))
+        XCTAssertTrue(source.contains("tearDownDashboardDismissMonitors()"))
+        XCTAssertTrue(source.contains("NSEvent.addGlobalMonitorForEvents"))
+        XCTAssertTrue(
+            source.contains("NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown])"),
+            "Dashboard dismissal should include a local mouse monitor so clicks inside the current app but outside the panel close it."
+        )
+        XCTAssertTrue(source.contains("NSEvent.addLocalMonitorForEvents(matching: .keyDown)"))
+        XCTAssertTrue(source.contains("panel.frame.contains(mouse)"))
+        XCTAssertTrue(source.contains("win.frame.contains(mouse)"))
+        XCTAssertTrue(source.contains("event.keyCode == 53"))
+        XCTAssertTrue(source.contains("smartInputPanel == nil"))
+        XCTAssertTrue(source.contains("NSApplication.didResignActiveNotification"))
+    }
+
+    func testWindowManagingCommentsUseDashboardPanelSemantics() throws {
+        let source = try readProjectSource("MalDaze/WindowManager/WindowManager.swift")
+
+        XCTAssertFalse(
+            source.contains("弹出与菜单栏相同的 `MenuBarContentView`"),
+            "WindowManaging comments should no longer describe the desk pet surface as the same MenuBarContentView used by the menu bar."
+        )
+        XCTAssertFalse(
+            source.contains("弹出 `MenuBarContentView`"),
+            "Global shortcut comments should describe the Dashboard Panel, not MenuBarContentView."
+        )
+        XCTAssertTrue(
+            source.contains("绑定后右下角桌宠可点击打开 Dashboard Panel")
+                && source.contains("全局快捷键：锚在桌宠上与左键相同，打开 Dashboard Panel"),
+            "WindowManaging comments should use Dashboard Panel semantics for the desk pet entry."
         )
     }
 
@@ -190,6 +302,78 @@ final class ControlPanelPresentationTests: XCTestCase {
             source.contains("min(max(minimumContentWidth, clampedTargetWidth), visibleFrame.width)"),
             "The sizing helper should keep the shell near full width while clamping it to the visible screen width."
         )
+    }
+
+    func testDeskPetDashboardPreferredSizeUsesAnchorScreenVisibleFrame() throws {
+        let windowManagerSource = try readProjectSource("MalDaze/WindowManager/WindowManager.swift")
+        let menuBarContentSource = try readProjectSource("MalDaze/MenuBarContentView.swift")
+        let helperRange = try XCTUnwrap(
+            rangeOfFunction(named: "makeDeskMenuPanelIfNeeded", in: windowManagerSource),
+            "WindowManager should create or reuse the dashboard panel through a single helper."
+        )
+        let helperSource = String(windowManagerSource[helperRange])
+        let frameRange = try XCTUnwrap(
+            rangeOfFunction(named: "dashboardPanelFrame", in: windowManagerSource),
+            "WindowManager should calculate dashboard panel frame through a testable helper."
+        )
+        let frameSource = String(windowManagerSource[frameRange])
+
+        XCTAssertFalse(
+            helperSource.contains("MenuBarContentView.controlPanelPreferredContentSize"),
+            "Desk pet dashboard sizing should not use the NSScreen.main based menu-bar preferred-size shortcut."
+        )
+        XCTAssertTrue(
+            frameSource.contains("DeskPetDashboardPanelLayout.frame(anchorRectInScreen: anchor, visibleFrame: visibleFrame)"),
+            "WindowManager should delegate dashboard frame geometry to the testable panel layout helper."
+        )
+        XCTAssertTrue(
+            windowManagerSource.contains("DeskPetDashboardView.preferredContentSize(screenVisibleFrame: visibleFrame)"),
+            "Dashboard panel preferred size should be derived from the visibleFrame of the screen containing the anchor."
+        )
+        XCTAssertTrue(
+            menuBarContentSource.contains("static func preferredContentSize(screenVisibleFrame visibleFrame: NSRect?) -> NSSize"),
+            "DeskPetDashboardView should expose a screen-aware preferred size helper for WindowManager."
+        )
+    }
+
+    func testDeskPetDashboardPanelLayoutClampsToSmallVisibleFrame() {
+        let visibleFrame = NSRect(x: 100, y: 200, width: 760, height: 520)
+        let anchor = NSRect(x: 420, y: 230, width: 80, height: 80)
+
+        let frame = DeskPetDashboardPanelLayout.frame(
+            anchorRectInScreen: anchor,
+            visibleFrame: visibleFrame
+        )
+        let insetVisibleFrame = visibleFrame.insetBy(
+            dx: DeskPetDashboardPanelLayout.margin,
+            dy: DeskPetDashboardPanelLayout.margin
+        )
+
+        XCTAssertLessThanOrEqual(frame.width, insetVisibleFrame.width)
+        XCTAssertLessThanOrEqual(frame.height, insetVisibleFrame.height)
+        XCTAssertGreaterThanOrEqual(frame.minX, insetVisibleFrame.minX)
+        XCTAssertLessThanOrEqual(frame.maxX, insetVisibleFrame.maxX)
+        XCTAssertGreaterThanOrEqual(frame.minY, insetVisibleFrame.minY)
+        XCTAssertLessThanOrEqual(frame.maxY, insetVisibleFrame.maxY)
+    }
+
+    func testDeskPetDashboardPanelLayoutClampsNearRightEdgeAndFallsBelowWhenNoRoomAbove() {
+        let visibleFrame = NSRect(x: 0, y: 0, width: 1440, height: 900)
+        let anchor = NSRect(x: 1370, y: 820, width: 56, height: 56)
+
+        let frame = DeskPetDashboardPanelLayout.frame(
+            anchorRectInScreen: anchor,
+            visibleFrame: visibleFrame
+        )
+        let insetVisibleFrame = visibleFrame.insetBy(
+            dx: DeskPetDashboardPanelLayout.margin,
+            dy: DeskPetDashboardPanelLayout.margin
+        )
+
+        XCTAssertLessThanOrEqual(frame.maxX, insetVisibleFrame.maxX)
+        XCTAssertGreaterThanOrEqual(frame.minX, insetVisibleFrame.minX)
+        XCTAssertLessThan(frame.maxY, anchor.minY)
+        XCTAssertGreaterThanOrEqual(frame.minY, insetVisibleFrame.minY)
     }
 
     func testWideControlPanelShellKeepsOuterColumnsFixedAndAssistantAdaptive() throws {

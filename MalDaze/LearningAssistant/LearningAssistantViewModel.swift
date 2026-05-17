@@ -76,6 +76,7 @@ final class LearningAssistantViewModel: ObservableObject {
 
     @Published var todayTotalMinutes: Int  = 0
     @Published var todayHighlights: String = ""
+    @Published private(set) var hasLoadedDashboardContent = false
 
     @Published var isFetchingBriefing = false
     @Published var isSendingMessage   = false
@@ -113,9 +114,12 @@ final class LearningAssistantViewModel: ObservableObject {
     let api: any AssistantAPIClientProtocol
     private let orderStore: UserDefaults
     private let todayProvider: () -> Date
+    private let backendLifecycle: AppBackendLifecycleManaging
     private var readyObserver: Any?
     private var analysisTask: Task<Void, Never>?
     private var rescheduleDebounceTask: Task<Void, Never>?
+    private var dashboardRefreshTail: Task<Void, Never>?
+    private var dashboardRefreshSequence = 0
 
     // MARK: - Init
 
@@ -123,11 +127,13 @@ final class LearningAssistantViewModel: ObservableObject {
         api: any AssistantAPIClientProtocol = AssistantAPIClient.shared,
         orderStore: UserDefaults = .standard,
         todayProvider: @escaping () -> Date = Date.init,
+        backendLifecycle: AppBackendLifecycleManaging = BackendProcessManager.shared,
         autoLoadWhenReady: Bool = true
     ) {
         self.api = api
         self.orderStore = orderStore
         self.todayProvider = todayProvider
+        self.backendLifecycle = backendLifecycle
         readyObserver = NotificationCenter.default.addObserver(
             forName: .backendDidBecomeReady,
             object: nil,
@@ -142,7 +148,7 @@ final class LearningAssistantViewModel: ObservableObject {
         }
 
         // 若通知在订阅前已发出（后端早于视图初始化就绪），直接开始 fetch。
-        if autoLoadWhenReady, BackendProcessManager.shared.isReady {
+        if autoLoadWhenReady, backendLifecycle.isReady {
             isConnecting = false
             Task { await fetchDashboard() }
         }
@@ -158,11 +164,11 @@ final class LearningAssistantViewModel: ObservableObject {
         let kind: AssistantDashboardKind
         let primaryAction: AssistantDashboardPrimaryAction?
 
-        if isConnecting {
-            kind = .connecting
-            primaryAction = nil
-        } else if isOffline {
+        if isOffline {
             kind = .offline
+            primaryAction = nil
+        } else if isConnecting, !hasLoadedDashboardContent {
+            kind = .connecting
             primaryAction = nil
         } else if tasks.isEmpty, resources.isEmpty {
             kind = .emptyDatabase
@@ -192,6 +198,26 @@ final class LearningAssistantViewModel: ObservableObject {
     }
 
     func fetchDashboard() async {
+        await enqueueDashboardRefresh()
+    }
+
+    private func enqueueDashboardRefresh(resourceRefreshFailureMessage: String? = nil) async {
+        dashboardRefreshSequence += 1
+        let sequence = dashboardRefreshSequence
+        let predecessor = dashboardRefreshTail
+        let task = Task { @MainActor [weak self] in
+            await predecessor?.value
+            guard let self else { return }
+            await self.performDashboardRefresh(resourceRefreshFailureMessage: resourceRefreshFailureMessage)
+            if self.dashboardRefreshSequence == sequence {
+                self.dashboardRefreshTail = nil
+            }
+        }
+        dashboardRefreshTail = task
+        await task.value
+    }
+
+    private func performDashboardRefresh(resourceRefreshFailureMessage: String? = nil) async {
         isFetchingBriefing = true
         defer { isFetchingBriefing = false }
         do {
@@ -199,13 +225,29 @@ final class LearningAssistantViewModel: ObservableObject {
             async let resourcesRequest = api.fetchResources()
             let (briefing, fetchedResources) = try await (briefingRequest, resourcesRequest)
             apply(briefing: briefing, resources: fetchedResources)
+            if resourceRefreshFailureMessage != nil {
+                resourceManagementError = nil
+            }
             isOffline = false
             isConnecting = false
         } catch {
-            clearDashboardContent()
+            if let resourceRefreshFailureMessage {
+                resourceManagementError = resourceRefreshFailureMessage
+            }
             isOffline = true
             isConnecting = false
         }
+    }
+
+    func refreshForDashboardOpen() async {
+        guard backendLifecycle.isReady else {
+            isConnecting = true
+            if !backendLifecycle.isStarting {
+                backendLifecycle.startIfNeeded()
+            }
+            return
+        }
+        await fetchDashboard()
     }
 
     func fetchTodayBriefing() async {
@@ -533,6 +575,7 @@ final class LearningAssistantViewModel: ObservableObject {
         todayTotalMinutes = briefing.totalMinutes
         todayHighlights = briefing.highlights
         resources = fetchedResources
+        hasLoadedDashboardContent = true
     }
 
     private func clearDashboardContent() {
@@ -564,21 +607,7 @@ final class LearningAssistantViewModel: ObservableObject {
     }
 
     private func refreshDashboardAfterResourceMutation(failureMessage: String) async {
-        isFetchingBriefing = true
-        defer { isFetchingBriefing = false }
-        do {
-            async let briefingRequest = api.fetchTodayBriefing()
-            async let resourcesRequest = api.fetchResources()
-            let (briefing, fetchedResources) = try await (briefingRequest, resourcesRequest)
-            apply(briefing: briefing, resources: fetchedResources)
-            resourceManagementError = nil
-            isOffline = false
-            isConnecting = false
-        } catch {
-            resourceManagementError = failureMessage
-            isOffline = true
-            isConnecting = false
-        }
+        await enqueueDashboardRefresh(resourceRefreshFailureMessage: failureMessage)
     }
 
     private func applyLocalDisplayOrder(to incomingTasks: [AssistantTask]) -> [AssistantTask] {
