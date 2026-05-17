@@ -1088,8 +1088,8 @@ extension WindowManager: PetStageDeskMenuPresenter {
         AnyView(MenuBarContentView(viewModel: vm))
     }
 
-    /// 创建或复用桌宠旁浮动菜单（`NSPopover` + `MenuBarContentView`）。
-    /// NSPopover 与 MenuBarExtra 共享系统外观，外观（颜色/圆角/阴影）完全一致。
+    /// 创建或复用桌宠旁浮动控制面板（`NSPopover` + `MenuBarContentView`）。
+    /// 菜单栏入口只保留独立设置菜单；宽控制面板由桌宠入口展示。
     private func makeDeskMenuPopoverIfNeeded() -> NSPopover? {
         guard let vm = deskMenuViewModel else { return nil }
         if let existing = deskMenuPopover {

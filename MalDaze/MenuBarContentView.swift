@@ -54,7 +54,7 @@ private struct CardGroupBoxStyle: GroupBoxStyle {
     }
 }
 
-/// 控制面板 UI：同时用于 `MenuBarExtra` 与右下角桌宠浮动窗（`WindowManager`），改此处即可两边同步。
+/// 桌宠专属宽控制面板 UI：由右下角桌宠浮动窗（`WindowManager`）展示。
 struct MenuBarContentView: View {
     @ObservedObject var viewModel: AppViewModel
 
