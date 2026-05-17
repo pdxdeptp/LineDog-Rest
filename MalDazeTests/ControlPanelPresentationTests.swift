@@ -185,6 +185,36 @@ final class ControlPanelPresentationTests: XCTestCase {
         )
     }
 
+    func testSettingsExposeAssistantBackendLazyStartupTradeoff() throws {
+        let settingsSource = try readProjectSource("MalDaze/Settings/MalDazeSettingsView.swift")
+
+        XCTAssertTrue(
+            settingsSource.contains("@AppStorage(MalDazeDefaults.assistantBackendLazyStartupEnabled)"),
+            "Settings should expose the persistent assistant backend lazy startup key."
+        )
+        XCTAssertTrue(
+            settingsSource.contains("省电") && settingsSource.contains("首次打开"),
+            "Settings should explain that lazy startup saves energy while the first assistant open may wait for backend startup."
+        )
+        XCTAssertTrue(
+            settingsSource.contains("下次 App 启动") && settingsSource.contains("不会立即启动或停止"),
+            "Settings should clarify that the lazy startup switch changes the next app-launch strategy and does not immediately start or stop an existing backend."
+        )
+    }
+
+    func testAppDelegateStartupModeUsesInjectedUserDefaults() throws {
+        let appDelegateSource = try readProjectSource("MalDaze/MalDazeAppDelegate.swift")
+
+        XCTAssertTrue(
+            appDelegateSource.contains("private let userDefaults: UserDefaults"),
+            "MalDazeAppDelegate should keep an injectable UserDefaults store so tests do not mutate UserDefaults.standard."
+        )
+        XCTAssertTrue(
+            appDelegateSource.contains("resolvedAssistantBackendLazyStartupEnabled(defaults: userDefaults)"),
+            "MalDazeAppDelegate should resolve assistant backend startup mode from its injected UserDefaults store."
+        )
+    }
+
     private func readProjectSource(_ relativePath: String) throws -> String {
         let testFile = URL(fileURLWithPath: #filePath)
         let repositoryRoot = testFile

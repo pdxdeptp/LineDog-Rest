@@ -34,6 +34,7 @@ final class PetRenderer: PetRendering {
     private static let intensityFullNativeThreshold = 0.999
     /// 「静止」阈值。
     private static let intensityStaticThreshold = 0.001
+    private static var decodedGIFFrameCache: [URL: [(NSImage, TimeInterval)]] = [:]
 
     init() {
         animationIntensity = MalDazeDefaults.resolvedIdlePetAnimationIntensity()
@@ -145,7 +146,7 @@ final class PetRenderer: PetRendering {
 
     private func showStaticFirstFrame(url: URL) {
         stopManualPlayback()
-        if let frames = Self.decodeGIFFrames(url: url), let first = frames.first?.0 {
+        if let frames = Self.cachedGIFFrames(url: url), let first = frames.first?.0 {
             imageView.image = first
             imageView.animates = false
             return
@@ -155,7 +156,7 @@ final class PetRenderer: PetRendering {
 
     private func beginIntermediateGIFPlayback(url: URL, intensity: Double) {
         stopManualPlayback()
-        guard let frames = Self.decodeGIFFrames(url: url), frames.count >= 1 else {
+        guard let frames = Self.cachedGIFFrames(url: url), frames.count >= 1 else {
             loadGIF(url: url, nativeAnimated: false)
             return
         }
@@ -197,6 +198,13 @@ final class PetRenderer: PetRendering {
     }
 
     /// 解码 GIF 帧及每帧延迟（秒）。
+    private static func cachedGIFFrames(url: URL) -> [(NSImage, TimeInterval)]? {
+        if let frames = decodedGIFFrameCache[url] { return frames }
+        guard let frames = decodeGIFFrames(url: url) else { return nil }
+        decodedGIFFrameCache[url] = frames
+        return frames
+    }
+
     private static func decodeGIFFrames(url: URL) -> [(NSImage, TimeInterval)]? {
         guard let src = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
         let n = CGImageSourceGetCount(src)

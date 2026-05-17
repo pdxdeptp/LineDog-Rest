@@ -70,6 +70,181 @@ final class BackendProcessManagerLifecycleTests: XCTestCase {
         XCTAssertEqual(events, ["backend", "cleanup"])
     }
 
+    func testApplicationDidFinishLaunchingDoesNotStartAssistantBackend() throws {
+        let backend = RecordingAppBackendLifecycle()
+        let (defaults, suiteName) = try makeIsolatedDefaults()
+        let delegate = MalDazeAppDelegate(backendLifecycle: backend, userDefaults: defaults)
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+            delegate.applicationWillTerminate(Notification(name: NSApplication.willTerminateNotification))
+        }
+
+        delegate.applicationDidFinishLaunching(Notification(name: NSApplication.didFinishLaunchingNotification))
+
+        XCTAssertFalse(backend.didStart)
+    }
+
+    func testApplicationDidFinishLaunchingStartsAssistantBackendWhenLazyStartupDisabled() throws {
+        let backend = RecordingAppBackendLifecycle()
+        let (defaults, suiteName) = try makeIsolatedDefaults()
+        let delegate = MalDazeAppDelegate(backendLifecycle: backend, userDefaults: defaults)
+        defaults.set(false, forKey: MalDazeDefaults.assistantBackendLazyStartupEnabled)
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+            delegate.applicationWillTerminate(Notification(name: NSApplication.willTerminateNotification))
+        }
+
+        delegate.applicationDidFinishLaunching(Notification(name: NSApplication.didFinishLaunchingNotification))
+
+        XCTAssertEqual(backend.startIfNeededCallCount, 1)
+    }
+
+    func testStartupTimeoutDoesNotMarkBackendReady() async throws {
+        let backendDir = try makeBackendDir()
+        let process = RecordingBackendProcess()
+        let manager = BackendProcessManager(
+            backendDirectoryProvider: { backendDir },
+            processFactory: { process },
+            parentProcessIdentifierProvider: { 42 },
+            portBoundProbe: { false },
+            readinessTimeout: 0.01,
+            readinessPollNanoseconds: 1_000_000
+        )
+
+        manager.startIfNeeded()
+        try await Task.sleep(nanoseconds: 50_000_000)
+
+        XCTAssertTrue(process.didRun)
+        XCTAssertFalse(manager.isReady)
+        XCTAssertFalse(manager.isStarting)
+    }
+
+    func testStartupFailureClearsStartingStateAndAllowsRetry() async throws {
+        let backendDir = try makeBackendDir()
+        let firstProcess = RecordingBackendProcess(runError: TestBackendRunError())
+        let secondProcess = RecordingBackendProcess(runError: TestBackendRunError())
+        var processes = [firstProcess, secondProcess]
+        let manager = BackendProcessManager(
+            backendDirectoryProvider: { backendDir },
+            processFactory: { processes.removeFirst() },
+            parentProcessIdentifierProvider: { 42 },
+            portBoundProbe: { false },
+            readinessTimeout: 0.01,
+            readinessPollNanoseconds: 1_000_000
+        )
+
+        manager.startIfNeeded()
+        try await Task.sleep(nanoseconds: 50_000_000)
+
+        XCTAssertTrue(firstProcess.didRun)
+        XCTAssertFalse(manager.isReady)
+        XCTAssertFalse(manager.isStarting)
+
+        manager.startIfNeeded()
+        try await Task.sleep(nanoseconds: 50_000_000)
+
+        XCTAssertTrue(secondProcess.didRun)
+        XCTAssertFalse(manager.isReady)
+        XCTAssertFalse(manager.isStarting)
+    }
+
+    func testStopInvalidatesPendingStartupProbeBeforeItCanSpawnBackend() async throws {
+        let backendDir = try makeBackendDir()
+        let process = RecordingBackendProcess()
+        let didBecomeReady = expectation(forNotification: .backendDidBecomeReady, object: nil)
+        didBecomeReady.isInverted = true
+        let manager = BackendProcessManager(
+            backendDirectoryProvider: { backendDir },
+            processFactory: { process },
+            parentProcessIdentifierProvider: { 42 },
+            portBoundProbe: {
+                try? await Task.sleep(nanoseconds: 25_000_000)
+                return false
+            },
+            readinessTimeout: 0.01,
+            readinessPollNanoseconds: 1_000_000
+        )
+
+        manager.startIfNeeded()
+        manager.stop()
+        await fulfillment(of: [didBecomeReady], timeout: 0.1)
+
+        XCTAssertFalse(process.didRun)
+        XCTAssertFalse(manager.isReady)
+        XCTAssertFalse(manager.isStarting)
+    }
+
+    func testOldProcessTerminationCallbackAfterRestartDoesNotClearNewBackendState() async throws {
+        let backendDir = try makeBackendDir()
+        let oldProcess = RecordingBackendProcess(firesTerminationOnTerminate: false)
+        let newProcess = RecordingBackendProcess()
+        var processes = [oldProcess, newProcess]
+        var probeResults = [false, true]
+        let didBecomeUnavailable = expectation(forNotification: .backendDidBecomeUnavailable, object: nil)
+        didBecomeUnavailable.isInverted = true
+        let manager = BackendProcessManager(
+            backendDirectoryProvider: { backendDir },
+            processFactory: { processes.removeFirst() },
+            parentProcessIdentifierProvider: { 42 },
+            portBoundProbe: { probeResults.removeFirst() },
+            readinessTimeout: 0.05,
+            readinessPollNanoseconds: 1_000_000
+        )
+
+        manager.spawnBackendForTesting()
+        manager.stop()
+        manager.startIfNeeded()
+        try await Task.sleep(nanoseconds: 50_000_000)
+        oldProcess.fireTerminationHandler()
+        await fulfillment(of: [didBecomeUnavailable], timeout: 0.1)
+
+        XCTAssertTrue(oldProcess.didTerminate)
+        XCTAssertTrue(newProcess.didRun)
+        XCTAssertTrue(manager.isReady)
+        XCTAssertFalse(manager.isStarting)
+
+        manager.stop()
+
+        XCTAssertTrue(newProcess.didTerminate)
+    }
+
+    func testRestartWhileOwnedProcessStillBoundDoesNotTreatOldPortAsExternalBackend() async throws {
+        let backendDir = try makeBackendDir()
+        let oldProcess = RecordingBackendProcess(firesTerminationOnTerminate: false)
+        let newProcess = RecordingBackendProcess()
+        var processes = [oldProcess, newProcess]
+        var probeResults = [true, false, true]
+        let manager = BackendProcessManager(
+            backendDirectoryProvider: { backendDir },
+            processFactory: { processes.removeFirst() },
+            parentProcessIdentifierProvider: { 42 },
+            portBoundProbe: { probeResults.removeFirst() },
+            readinessTimeout: 0.05,
+            readinessPollNanoseconds: 1_000_000
+        )
+
+        manager.spawnBackendForTesting()
+        manager.stop()
+        manager.startIfNeeded()
+        try await Task.sleep(nanoseconds: 20_000_000)
+
+        XCTAssertTrue(oldProcess.didTerminate)
+        XCTAssertFalse(newProcess.didRun)
+        XCTAssertFalse(manager.isReady)
+        XCTAssertTrue(manager.isStarting)
+
+        oldProcess.fireTerminationHandler()
+        try await Task.sleep(nanoseconds: 50_000_000)
+
+        XCTAssertTrue(newProcess.didRun)
+        XCTAssertTrue(manager.isReady)
+        XCTAssertFalse(manager.isStarting)
+
+        manager.stop()
+
+        XCTAssertTrue(newProcess.didTerminate)
+    }
+
     private func makeBackendDir() throws -> URL {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("BackendProcessManagerLifecycleTests-\(UUID().uuidString)")
@@ -80,6 +255,13 @@ final class BackendProcessManagerLifecycleTests: XCTestCase {
         )
         FileManager.default.createFile(atPath: uvicorn.path, contents: Data())
         return root
+    }
+
+    private func makeIsolatedDefaults() throws -> (UserDefaults, String) {
+        let suiteName = "BackendProcessManagerLifecycleTests-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defaults.removePersistentDomain(forName: suiteName)
+        return (defaults, suiteName)
     }
 }
 
@@ -93,14 +275,28 @@ private final class RecordingBackendProcess: BackendProcessControlling {
     private(set) var didRun = false
     private(set) var didTerminate = false
     private var terminationHandler: (@MainActor @Sendable (BackendProcessControlling) -> Void)?
+    private let runError: Error?
+    private let firesTerminationOnTerminate: Bool
+
+    init(runError: Error? = nil, firesTerminationOnTerminate: Bool = true) {
+        self.runError = runError
+        self.firesTerminationOnTerminate = firesTerminationOnTerminate
+    }
 
     func run() throws {
         didRun = true
+        if let runError { throw runError }
     }
 
     func terminate() {
         didTerminate = true
         isRunning = false
+        if firesTerminationOnTerminate {
+            fireTerminationHandler()
+        }
+    }
+
+    func fireTerminationHandler() {
         terminationHandler?(self)
     }
 
@@ -109,8 +305,14 @@ private final class RecordingBackendProcess: BackendProcessControlling {
     }
 }
 
+private struct TestBackendRunError: Error {}
+
 private final class RecordingAppBackendLifecycle: AppBackendLifecycleManaging {
-    private(set) var didStart = false
+    var isReady = false
+    var isStarting = false
+
+    var didStart: Bool { startIfNeededCallCount > 0 }
+    private(set) var startIfNeededCallCount = 0
     private(set) var didStop = false
     private let onStop: () -> Void
 
@@ -118,8 +320,10 @@ private final class RecordingAppBackendLifecycle: AppBackendLifecycleManaging {
         self.onStop = onStop
     }
 
-    func start() {
-        didStart = true
+    func startIfNeeded() {
+        guard !isReady, !isStarting else { return }
+        isStarting = true
+        startIfNeededCallCount += 1
     }
 
     func stop() {
