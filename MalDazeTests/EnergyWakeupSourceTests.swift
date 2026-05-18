@@ -5,6 +5,7 @@ struct EnergyWakeupSourceTests {
     func run() throws {
         try testIdleCursorTrackingUsesAdaptiveFarAndNearIntervals()
         try testBreakRunTargetsThirtyHertzAndUsesElapsedSecondsForMovement()
+        try testBreakRunShieldResolvesFromPetWindowFrame()
         try testFullscreenRestUsesWholeSecondTicksAfterApproachCompletes()
         try testExtractedEnergyHelpersExercisePassThroughBounceTurnsAndRestCadence()
     }
@@ -77,6 +78,73 @@ struct EnergyWakeupSourceTests {
                 && policy.contains("randomSample < turnProbability"),
             "Break-run random turn probability should remain explicit and testable."
         )
+    }
+
+    private func testBreakRunShieldResolvesFromPetWindowFrame() throws {
+        let source = try readProjectSource("MalDaze/WindowManager/WindowManager.swift")
+        let resolver = try typeBody(named: "BreakRunShieldScreenResolver", in: source)
+        let showShield = try expectFunctionBody(named: "showBreakRunShield", in: source)
+
+        try expect(
+            !showShield.contains("NSScreen.main"),
+            "Delayed break-run shield must not use NSScreen.main because it can follow focus or pointer screen."
+        )
+        try expect(
+            showShield.contains("BreakRunShieldScreenResolver.screenFrame"),
+            "showBreakRunShield should resolve the target display through the pet-window-frame resolver."
+        )
+        try expect(
+            resolver.contains("windowFrame.midX")
+                && resolver.contains("windowFrame.midY")
+                && resolver.contains(".contains(center)"),
+            "Break-run shield screen resolution should use the pet window center as the screen anchor."
+        )
+
+        let fixture = """
+        import Foundation
+        import CoreGraphics
+
+        \(resolver)
+
+        struct FixtureFailure: Error, CustomStringConvertible {
+            let description: String
+        }
+
+        func expect(_ condition: @autoclosure () -> Bool, _ message: String) throws {
+            guard condition() else { throw FixtureFailure(description: message) }
+        }
+
+        let left = CGRect(x: 0, y: 0, width: 500, height: 400)
+        let right = CGRect(x: 500, y: 0, width: 500, height: 400)
+        let menuBar = CGRect(x: 0, y: 400, width: 500, height: 400)
+
+        try expect(
+            BreakRunShieldScreenResolver.screenFrame(
+                forWindowFrame: CGRect(x: 640, y: 80, width: 80, height: 80),
+                screenFrames: [left, right],
+                fallbackFrame: menuBar
+            ) == right,
+            "pet window center on the right display should select the right display"
+        )
+        try expect(
+            BreakRunShieldScreenResolver.screenFrame(
+                forWindowFrame: CGRect(x: 1200, y: 80, width: 80, height: 80),
+                screenFrames: [left, right],
+                fallbackFrame: menuBar
+            ) == menuBar,
+            "off-screen pet frame should fall back to the menu-bar screen when available"
+        )
+        try expect(
+            BreakRunShieldScreenResolver.screenFrame(
+                forWindowFrame: nil,
+                screenFrames: [left, right],
+                fallbackFrame: nil
+            ) == left,
+            "missing pet frame should preserve the first-screen fallback"
+        )
+        """
+
+        try compileAndRunSwiftFixture(fixture)
     }
 
     private func testFullscreenRestUsesWholeSecondTicksAfterApproachCompletes() throws {
@@ -269,6 +337,13 @@ struct EnergyWakeupSourceTests {
             cursor = source.index(after: cursor)
         }
         return nil
+    }
+
+    private func expectFunctionBody(named functionName: String, in source: String) throws -> String {
+        guard let body = functionBody(named: functionName, in: source) else {
+            throw EnergyWakeupSourceTestFailure("Expected production function \(functionName) to exist.")
+        }
+        return body
     }
 
     private func expect(_ condition: @autoclosure () -> Bool, _ message: String) throws {

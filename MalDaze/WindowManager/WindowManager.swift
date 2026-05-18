@@ -43,6 +43,21 @@ enum DeskPetDashboardPanelLayout {
     }
 }
 
+struct BreakRunShieldScreenResolver {
+    static func screenFrame(
+        forWindowFrame windowFrame: CGRect?,
+        screenFrames: [CGRect],
+        fallbackFrame: CGRect?
+    ) -> CGRect? {
+        guard let windowFrame else {
+            return fallbackFrame ?? screenFrames.first
+        }
+
+        let center = CGPoint(x: windowFrame.midX, y: windowFrame.midY)
+        return screenFrames.first { $0.contains(center) } ?? fallbackFrame ?? screenFrames.first
+    }
+}
+
 /// 跑屏模式固定在屏幕左下角的倒计时视图；点击 20 次可提前结束休息。
 private final class BreakRunCountdownView: NSView {
     let label = NSTextField(labelWithString: "5:00")
@@ -714,11 +729,16 @@ final class WindowManager: WindowManaging {
 
     private func showBreakRunShield() {
         guard breakRunShieldWindow == nil else { return }
-        guard let screen = NSScreen.main ?? NSScreen.screens.first else { return }
+        let fallbackScreen = MenuBarNSScreen.screen ?? NSScreen.screens.first
+        guard let screenFrame = BreakRunShieldScreenResolver.screenFrame(
+            forWindowFrame: window?.frame,
+            screenFrames: NSScreen.screens.map(\.frame),
+            fallbackFrame: fallbackScreen?.frame
+        ) else { return }
         // 遮罩层级比 .screenSaver(1000) 低2级；倒计时面板在 screenSaver-1 确保在遮罩之上
         let shieldLevel = NSWindow.Level(rawValue: Int(NSWindow.Level.screenSaver.rawValue) - 2)
         let panel = NSPanel(
-            contentRect: screen.frame,
+            contentRect: screenFrame,
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
