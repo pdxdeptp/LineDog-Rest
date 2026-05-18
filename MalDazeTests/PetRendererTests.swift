@@ -82,6 +82,23 @@ final class PetRendererTests: XCTestCase {
         XCTAssertTrue(activeURLs.allSatisfy { $0.path.contains("/LineDog/breakRunning/") })
     }
 
+    func testBreakRunningDisplayModeUsesFullMotionPlaybackRegardlessOfIdleIntensity() throws {
+        try Self.requireBreakRunningGIF()
+        for intensity in [0.0, 0.5] {
+            let pet = PetRenderer()
+            let container = NSView(frame: NSRect(x: 0, y: 0, width: 400, height: 400))
+            pet.install(in: container)
+            pet.setAnimationIntensity(intensity)
+
+            pet.setDisplayMode(.breakRunning)
+
+            XCTAssertEqual(pet.testing_currentMode, .breakRunning)
+            XCTAssertTrue(pet.testing_imageViewAnimates, "Expected breakRunning to use native full-motion playback at intensity \(intensity).")
+            XCTAssertFalse(pet.testing_manualPlaybackTimerExists, "Expected breakRunning to skip manual slow-frame playback at intensity \(intensity).")
+            XCTAssertFalse(pet.testing_variantCycleTimerExists)
+        }
+    }
+
     func testBreakRunDisplayRestoresPreviousNonRestModeWhenCancelled() throws {
         let stage = PetStageView(frame: NSRect(x: 0, y: 0, width: 240, height: 240))
         stage.applyNonRestPetDisplayMode(.pausedWhiteOutline)
@@ -156,6 +173,20 @@ final class PetRendererTests: XCTestCase {
         XCTAssertTrue(firstImage === secondImage)
         XCTAssertLessThan(secondDelay, firstDelay * 0.75)
         XCTAssertFalse(pet.testing_imageViewAnimates)
+    }
+
+    private static func requireBreakRunningGIF() throws {
+        guard let url = Bundle.main.url(
+            forResource: "线条小狗第1弹_啦啦啦",
+            withExtension: "gif",
+            subdirectory: "LineDog/breakRunning"
+        ) else {
+            throw XCTSkip("Break-running GIF fixture is not bundled in this test run.")
+        }
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+              CGImageSourceGetCount(source) > 1 else {
+            throw XCTSkip("Break-running GIF fixture is not decodable as a multi-frame GIF.")
+        }
     }
 
     private static func requirePausedWhiteOutlineGIF() throws {

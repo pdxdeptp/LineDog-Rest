@@ -90,10 +90,15 @@ final class PetRenderer: PetRendering {
         currentMode = mode
         let urls = gifURLsByMode[mode] ?? []
         let allowsVariantRotation = mode == .runningBlack || mode == .thinking
-        startGIFCycle(urls: urls, allowsVariantRotationWhenAnimated: allowsVariantRotation)
+        let effectiveIntensity = mode == .breakRunning ? 1 : animationIntensity
+        startGIFCycle(
+            urls: urls,
+            effectiveIntensity: effectiveIntensity,
+            allowsVariantRotationWhenAnimated: allowsVariantRotation
+        )
     }
 
-    private func startGIFCycle(urls: [URL], allowsVariantRotationWhenAnimated: Bool) {
+    private func startGIFCycle(urls: [URL], effectiveIntensity: Double, allowsVariantRotationWhenAnimated: Bool) {
         stopManualPlayback()
         cycleTimer?.invalidate()
         cycleTimer = nil
@@ -105,7 +110,7 @@ final class PetRenderer: PetRendering {
         activeIndex = Int.random(in: 0..<urls.count)
         let url = urls[activeIndex]
 
-        let s = animationIntensity
+        let s = Self.clampedIntensity(effectiveIntensity)
         if s <= Self.intensityStaticThreshold {
             showStaticFirstFrame(url: url)
             return
