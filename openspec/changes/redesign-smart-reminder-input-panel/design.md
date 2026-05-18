@@ -43,11 +43,18 @@ The redesigned content should keep cancellation obvious and add an explicit prim
 
 `WindowManager` should continue to create, position, dismiss, and preserve the smart reminder draft. Implementation should avoid moving smart reminder lifecycle state out of `WindowManager` unless the redesigned panel size needs a small positioning clamp or sizing constant update.
 
+### D5: Clamp anchored panels to the anchor screen visible frame
+
+The smart reminder input and result toast are anchored near the desk pet. When the pet is near the right or bottom edge, especially with a vertical Dock on the right, the panel must clamp to the anchor screen's `visibleFrame` rather than raw screen `frame`. This keeps the full panel visible and avoids Dock overlap.
+
+The positioning helper should remain deterministic and testable by accepting an explicit visible frame, with the runtime path resolving the screen whose visible frame intersects the anchor and falling back conservatively when no screen is available.
+
 ## Risks / Trade-offs
 
 - [Risk] A taller panel may overlap the pet or nearby desktop content more often. -> Mitigation: keep dimensions bounded and reuse the current top-center anchor positioning.
 - [Risk] `TextField(axis: .vertical)` behavior can differ across macOS versions. -> Mitigation: add source assertions for the intended SwiftUI API and manually QA long text entry.
 - [Risk] Adding explicit submit UI could make the panel feel heavier. -> Mitigation: keep the action row compact and avoid extra explanatory copy.
+- [Risk] Clamping by raw screen frame would still allow right-side Dock overlap. -> Mitigation: clamp against `NSScreen.visibleFrame`, which excludes Dock and menu bar regions.
 
 ## Migration Plan
 

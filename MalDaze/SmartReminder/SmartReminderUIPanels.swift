@@ -9,35 +9,66 @@ private final class SmartReminderKeyablePanel: NSPanel {
 
 // MARK: - SwiftUI
 
+private enum SmartReminderInputPanelLayout {
+    static let width: CGFloat = 420
+    static let verticalPadding: CGFloat = 14
+    static let contentSpacing: CGFloat = 12
+    static let inputMinHeight: CGFloat = 78
+    static let inputMaxHeight: CGFloat = 112
+    static let actionRowHeight: CGFloat = 32
+
+    static var height: CGFloat {
+        inputMaxHeight + verticalPadding * 2 + contentSpacing + actionRowHeight
+    }
+}
+
 private struct SmartReminderInputPanelContent: View {
     @FocusState private var fieldFocused: Bool
+    @State private var hasSubmitted = false
     /// 由 `WindowManager` 持有，关闭面板后仍保留，下次打开继续编辑。
     @Binding var draft: String
     let onSubmit: (String) -> Void
     let onCancel: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            TextField("用自然语言说出待办，回车添加…", text: $draft)
+        VStack(alignment: .leading, spacing: SmartReminderInputPanelLayout.contentSpacing) {
+            TextField("用自然语言说出待办，回车添加...", text: $draft, axis: .vertical)
                 .textFieldStyle(.roundedBorder)
+                .lineLimit(3...6)
                 .focused($fieldFocused)
-                .frame(width: 400)
-                .onSubmit { onSubmit(draft) }
+                .frame(
+                    minHeight: SmartReminderInputPanelLayout.inputMinHeight,
+                    maxHeight: SmartReminderInputPanelLayout.inputMaxHeight,
+                    alignment: .topLeading
+                )
+                .onSubmit { submitOnce() }
             HStack {
                 Spacer(minLength: 0)
                 Button("取消") {
                     onCancel()
                 }
                 .keyboardShortcut(.cancelAction)
+                Button("添加") {
+                    submitOnce()
+                }
+                .buttonStyle(.borderedProminent)
+                .keyboardShortcut(.defaultAction)
             }
+            .frame(minHeight: SmartReminderInputPanelLayout.actionRowHeight)
         }
-        .padding(14)
+        .padding(SmartReminderInputPanelLayout.verticalPadding)
         .onAppear {
             DispatchQueue.main.async {
                 fieldFocused = true
             }
         }
         .onExitCommand(perform: onCancel)
+    }
+
+    private func submitOnce() {
+        guard !hasSubmitted else { return }
+        hasSubmitted = true
+        onSubmit(draft)
     }
 }
 
@@ -66,8 +97,11 @@ private struct SmartReminderToastContent: View {
 
 // MARK: - NSHosting panels
 
-/// 单行输入与结果气泡（PRD 3）；由 `WindowManager` 在主线程调用。
+/// 智能提醒输入与结果气泡（PRD 3）；由 `WindowManager` 在主线程调用。
 enum SmartReminderUIPanels {
+    private static let positioningGap: CGFloat = 10
+    private static let positioningMargin: CGFloat = 10
+
     static func makeInputPanel(
         draft: Binding<String>,
         onSubmit: @escaping (String) -> Void,
@@ -83,8 +117,8 @@ enum SmartReminderUIPanels {
         let host = NSHostingController(rootView: AnyView(root))
         host.view.translatesAutoresizingMaskIntoConstraints = true
 
-        let w: CGFloat = 428
-        let h: CGFloat = 96
+        let w = SmartReminderInputPanelLayout.width
+        let h = SmartReminderInputPanelLayout.height
         let panel = SmartReminderKeyablePanel(
             contentRect: NSRect(x: 0, y: 0, width: w, height: h),
             styleMask: [.borderless],
@@ -146,9 +180,36 @@ enum SmartReminderUIPanels {
 
     /// 将面板顶边中点置于 `anchor` 上方（屏幕坐标，Y 向上）。
     static func positionPanelTopCenter(_ panel: NSWindow, anchor: NSRect, size: NSSize) {
-        let x = anchor.midX - size.width / 2
-        let gap: CGFloat = 10
-        let y = anchor.maxY + gap
-        panel.setFrame(NSRect(x: x, y: y, width: size.width, height: size.height), display: true)
+        let screen = NSScreen.screens.first { $0.visibleFrame.intersects(anchor) }
+            ?? NSScreen.screens.first { $0.frame.intersects(anchor) }
+            ?? NSScreen.main
+        let visibleFrame = screen?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1280, height: 800)
+        let frame = frameTopCenter(anchor: anchor, size: size, visibleFrame: visibleFrame)
+        panel.setFrame(frame, display: true)
+    }
+
+    static func frameTopCenter(anchor: NSRect, size: NSSize, visibleFrame: NSRect) -> NSRect {
+        let maxWidth = max(visibleFrame.width - 2 * positioningMargin, 1)
+        let maxHeight = max(visibleFrame.height - 2 * positioningMargin, 1)
+        let width = min(size.width, maxWidth)
+        let height = min(size.height, maxHeight)
+
+        let minX = visibleFrame.minX + positioningMargin
+        let maxX = visibleFrame.maxX - positioningMargin - width
+        let unclampedX = anchor.midX - width / 2
+        let x = clamp(unclampedX, lower: minX, upper: maxX)
+
+        let aboveY = anchor.maxY + positioningGap
+        let belowY = anchor.minY - positioningGap - height
+        let preferredY = aboveY + height <= visibleFrame.maxY - positioningMargin ? aboveY : belowY
+        let minY = visibleFrame.minY + positioningMargin
+        let maxY = visibleFrame.maxY - positioningMargin - height
+        let y = clamp(preferredY, lower: minY, upper: maxY)
+
+        return NSRect(x: x, y: y, width: width, height: height)
+    }
+
+    private static func clamp(_ value: CGFloat, lower: CGFloat, upper: CGFloat) -> CGFloat {
+        min(max(value, lower), upper)
     }
 }

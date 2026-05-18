@@ -471,6 +471,329 @@ final class ControlPanelPresentationTests: XCTestCase {
         )
     }
 
+    func testSmartReminderInputPanelUsesVerticalWrappingInput() throws {
+        let source = try readProjectSource("MalDaze/SmartReminder/SmartReminderUIPanels.swift")
+        let inputContentSource = try smartReminderInputPanelContentSource(from: source)
+
+        XCTAssertTrue(
+            inputContentSource.contains("axis: .vertical"),
+            "Smart reminder input should use a vertically wrapping SwiftUI input instead of a fixed single-line strip."
+        )
+        XCTAssertTrue(
+            inputContentSource.contains(".lineLimit(3...6")
+                || inputContentSource.contains(".lineLimit(2...6")
+                || inputContentSource.contains(".lineLimit(3...5"),
+            "Smart reminder input should reserve bounded multiline space for long natural-language drafts."
+        )
+        XCTAssertTrue(
+            inputContentSource.contains("SmartReminderInputPanelLayout.inputMinHeight")
+                && inputContentSource.contains("SmartReminderInputPanelLayout.inputMaxHeight"),
+            "Smart reminder input should bind its multiline field to named bounded height limits."
+        )
+    }
+
+    func testSmartReminderInputPanelUsesBoundedCaptureCardSizing() throws {
+        let source = try readProjectSource("MalDaze/SmartReminder/SmartReminderUIPanels.swift")
+
+        XCTAssertTrue(
+            source.contains("static let width: CGFloat"),
+            "Smart reminder input panel should declare a named capture-card width constant."
+        )
+        XCTAssertTrue(
+            source.contains("static let inputMinHeight: CGFloat"),
+            "Smart reminder input should reserve readable multiline space through a named constant."
+        )
+        XCTAssertTrue(
+            source.contains("static let inputMaxHeight: CGFloat"),
+            "Smart reminder input should cap the growing input area through a named constant."
+        )
+        XCTAssertTrue(
+            source.contains("static let verticalPadding: CGFloat")
+                && source.contains("static let contentSpacing: CGFloat")
+                && source.contains("static let actionRowHeight: CGFloat"),
+            "Smart reminder input panel height should reserve named padding, spacing, and action-row budget."
+        )
+        XCTAssertTrue(
+            source.contains("static var height: CGFloat")
+                && source.contains("inputMaxHeight")
+                && source.contains("verticalPadding * 2")
+                && source.contains("contentSpacing")
+                && source.contains("actionRowHeight"),
+            "Smart reminder input panel height should be derived from input max height plus action-row and spacing budget."
+        )
+        XCTAssertTrue(
+            source.contains("let w = SmartReminderInputPanelLayout.width")
+                && source.contains("let h = SmartReminderInputPanelLayout.height"),
+            "Smart reminder input panel host sizing should use the capture-card layout constants."
+        )
+        XCTAssertFalse(
+            source.contains("static let height: CGFloat = 166"),
+            "Smart reminder input panel height should not remain a fixed visual number disconnected from its content budget."
+        )
+        XCTAssertFalse(
+            source.contains(".frame(width: 400)"),
+            "Smart reminder input should not keep the old fixed 400-point single-line TextField width."
+        )
+        XCTAssertFalse(
+            source.contains("let w: CGFloat = 428") && source.contains("let h: CGFloat = 96"),
+            "Smart reminder input panel should no longer use the old 428x96 strip dimensions."
+        )
+    }
+
+    func testSmartReminderInputPanelKeepsCancelAndAddsExplicitSubmitAction() throws {
+        let source = try readProjectSource("MalDaze/SmartReminder/SmartReminderUIPanels.swift")
+        let inputContentSource = try smartReminderInputPanelContentSource(from: source)
+        let cancelButtonSource = try XCTUnwrap(
+            buttonActionSource(titled: "取消", in: inputContentSource),
+            "Smart reminder input should keep a cancel button."
+        )
+        let addButtonSource = try XCTUnwrap(
+            buttonActionSource(titled: "添加", in: inputContentSource),
+            "Smart reminder input should expose an explicit add button."
+        )
+
+        XCTAssertTrue(
+            cancelButtonSource.contains("onCancel()"),
+            "Smart reminder input should keep an explicit cancel action."
+        )
+        XCTAssertTrue(
+            inputContentSource.contains("func submitOnce()"),
+            "Smart reminder input should centralize submit handling in a single-submit guard."
+        )
+        XCTAssertTrue(
+            inputContentSource.contains("hasSubmitted")
+                && inputContentSource.contains("guard !hasSubmitted else { return }")
+                && inputContentSource.contains("onSubmit(draft)"),
+            "Smart reminder input should call onSubmit(draft) only after a per-panel-lifecycle single-submit guard passes."
+        )
+        XCTAssertTrue(
+            inputContentSource.contains(".onSubmit { submitOnce() }"),
+            "Return submit should route through the same single-submit guard."
+        )
+        XCTAssertTrue(
+            addButtonSource.contains("submitOnce()"),
+            "The explicit add action should route through the same single-submit guard."
+        )
+        XCTAssertFalse(
+            addButtonSource.contains("onSubmit(draft)"),
+            "The explicit add action should not bypass the single-submit guard."
+        )
+    }
+
+    func testSmartReminderEntryPointsAndLifecycleRemainWired() throws {
+        let panelSource = try readProjectSource("MalDaze/SmartReminder/SmartReminderUIPanels.swift")
+        let appSource = try readProjectSource("MalDaze/AppViewModel.swift")
+        let windowManagerSource = try readProjectSource("MalDaze/WindowManager/WindowManager.swift")
+        let inputContentSource = try smartReminderInputPanelContentSource(from: panelSource)
+        let rightClickSource = try functionSource(
+            named: "presentSmartReminderInput",
+            in: windowManagerSource,
+            after: "    func presentSmartReminderInput(\n        anchorRectInScreen"
+        )
+        let globalShortcutSource = try functionSource(
+            named: "presentSmartReminderInputFromGlobalShortcut",
+            in: windowManagerSource,
+            after: "    func presentSmartReminderInputFromGlobalShortcut(\n        onSubmit"
+        )
+        let stagePresenterSource = try functionSource(
+            named: "presentSmartReminderInput",
+            in: windowManagerSource,
+            after: "extension WindowManager: PetStageDeskMenuPresenter"
+        )
+        let appGlobalRange = try XCTUnwrap(
+            rangeOfFunction(named: "presentSmartReminderFromGlobalShortcut", in: appSource),
+            "AppViewModel should keep the smart reminder global shortcut entry point."
+        )
+        let appGlobalSource = String(appSource[appGlobalRange])
+        let appRightClickRange = try XCTUnwrap(
+            rangeOfFunction(named: "userRequestedSmartReminderInput", in: appSource),
+            "AppViewModel should keep the right-click smart reminder entry point."
+        )
+        let appRightClickSource = String(appSource[appRightClickRange])
+        let clearDraftSource = try functionSource(
+            named: "clearSmartReminderInputDraftIfStillMatchesSubmittedText",
+            in: windowManagerSource,
+            after: "    func clearSmartReminderInputDraftIfStillMatchesSubmittedText(_ submitted: String) {"
+        )
+        let dismissMonitorSource = try functionSource(
+            named: "installSmartInputDismissMonitors",
+            in: windowManagerSource,
+            after: "    private func installSmartInputDismissMonitors()"
+        )
+        let localClickAwaySource = try XCTUnwrap(
+            closureSource(
+                assignedTo: "smartInputLocalMouseMonitor",
+                containing: "NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown)",
+                in: dismissMonitorSource
+            ),
+            "Smart input local click-away monitor should still be installed."
+        )
+        let globalClickAwaySource = try XCTUnwrap(
+            closureSource(
+                assignedTo: "smartInputClickAwayMonitor",
+                containing: "NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDown)",
+                in: dismissMonitorSource
+            ),
+            "Smart input global click-away monitor should still be installed."
+        )
+
+        XCTAssertTrue(
+            inputContentSource.contains("fieldFocused = true"),
+            "Smart reminder input should still focus the text field on open."
+        )
+        XCTAssertTrue(
+            appSource.contains("forName: MalDazeBroadcastNotifications.openSmartReminderInput")
+                && appSource.contains("self?.presentSmartReminderFromGlobalShortcut()"),
+            "The openSmartReminderInput notification should still route to the smart reminder global shortcut path."
+        )
+        XCTAssertTrue(
+            stagePresenterSource.contains("vm.userRequestedSmartReminderInput(screenAnchor: screenAnchor)"),
+            "Desk pet right-click should still route through AppViewModel's smart reminder presenter."
+        )
+        XCTAssertTrue(
+            appRightClickSource.contains("windowManager.presentSmartReminderInput(")
+                && appRightClickSource.contains("anchorRectInScreen: screenAnchor"),
+            "AppViewModel right-click entry should still call WindowManager.presentSmartReminderInput with the screen anchor."
+        )
+        XCTAssertTrue(
+            appGlobalSource.contains("windowManager.presentSmartReminderInputFromGlobalShortcut("),
+            "AppViewModel global shortcut entry should still call WindowManager.presentSmartReminderInputFromGlobalShortcut."
+        )
+        XCTAssertTrue(
+            rightClickSource.contains("Binding<String>")
+                && rightClickSource.contains("get: { [weak self] in self?.smartReminderInputDraft ?? \"\" }")
+                && rightClickSource.contains("set: { [weak self] newValue in self?.smartReminderInputDraft = newValue }"),
+            "WindowManager should keep the draft binding that preserves text after dismissal."
+        )
+        XCTAssertTrue(
+            rightClickSource.contains("teardownSmartInputPanel(invokeUserCancel: true)")
+                && inputContentSource.contains(".onExitCommand(perform: onCancel)"),
+            "Cancel, Esc, and dismiss paths should continue invoking the cancel lifecycle."
+        )
+        XCTAssertTrue(
+            dismissMonitorSource.contains("smartInputLocalMouseMonitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown)")
+                && dismissMonitorSource.contains("smartInputClickAwayMonitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDown)"),
+            "WindowManager should keep both local and global click-away monitors for smart reminder input dismissal."
+        )
+        XCTAssertTrue(
+            localClickAwaySource.contains("!panel.frame.contains(NSEvent.mouseLocation)")
+                && localClickAwaySource.contains("teardownSmartInputPanel(invokeUserCancel: true)"),
+            "The local click-away monitor should close through the cancel lifecycle only when the click is outside the panel."
+        )
+        XCTAssertTrue(
+            globalClickAwaySource.contains("!panel.frame.contains(NSEvent.mouseLocation)")
+                && globalClickAwaySource.contains("teardownSmartInputPanel(invokeUserCancel: true)"),
+            "The global click-away monitor should close through the cancel lifecycle only when the click is outside the panel."
+        )
+        XCTAssertFalse(
+            localClickAwaySource.contains("smartReminderInputDraft = \"\""),
+            "Local click-away dismissal should not clear the smart reminder draft directly."
+        )
+        XCTAssertFalse(
+            globalClickAwaySource.contains("smartReminderInputDraft = \"\""),
+            "Global click-away dismissal should not clear the smart reminder draft directly."
+        )
+        XCTAssertTrue(
+            localClickAwaySource.contains("return event"),
+            "The local click-away monitor should continue returning the event after handling outside clicks."
+        )
+        XCTAssertFalse(
+            dismissMonitorSource.contains("smartReminderInputDraft = \"\""),
+            "Click-away dismissal should not clear the smart reminder draft directly."
+        )
+        XCTAssertTrue(
+            globalShortcutSource.contains("presentSmartReminderInput(anchorRectInScreen: anchor, onSubmit: onSubmit, onCancel: onCancel)"),
+            "The global shortcut path should continue reusing the same input presenter."
+        )
+        XCTAssertTrue(
+            clearDraftSource.contains("if smartReminderInputDraft == submitted")
+                && clearDraftSource.contains("smartReminderInputDraft = \"\""),
+            "Successful submit should still clear only the matching draft."
+        )
+    }
+
+    func testSmartReminderPanelTopCenterFrameClampsToVisibleFrame() {
+        let visibleFrame = NSRect(x: 0, y: 0, width: 640, height: 360)
+        let anchorNearTopRight = NSRect(x: 606, y: 326, width: 28, height: 28)
+        let largePanelSize = NSSize(width: 220, height: 96)
+        let margin: CGFloat = 10
+
+        let topRightFrame = SmartReminderUIPanels.frameTopCenter(
+            anchor: anchorNearTopRight,
+            size: largePanelSize,
+            visibleFrame: visibleFrame
+        )
+
+        XCTAssertLessThanOrEqual(
+            topRightFrame.maxX,
+            visibleFrame.maxX - margin,
+            "Smart reminder input/toast panel should clamp to the visibleFrame right edge so a right-side Dock cannot cover it."
+        )
+        XCTAssertGreaterThanOrEqual(
+            topRightFrame.minX,
+            visibleFrame.minX + margin,
+            "Smart reminder input/toast panel should keep its left edge inside the visibleFrame margin."
+        )
+        XCTAssertLessThanOrEqual(
+            topRightFrame.maxY,
+            visibleFrame.maxY - margin,
+            "Smart reminder input/toast panel should clamp vertically when the anchor is near the top of the visibleFrame."
+        )
+        XCTAssertGreaterThanOrEqual(
+            topRightFrame.minY,
+            visibleFrame.minY + margin,
+            "Smart reminder input/toast panel should keep its bottom edge inside the visibleFrame margin."
+        )
+
+        let anchorNearBottom = NSRect(x: 28, y: 2, width: 28, height: 28)
+        let bottomFrame = SmartReminderUIPanels.frameTopCenter(
+            anchor: anchorNearBottom,
+            size: largePanelSize,
+            visibleFrame: visibleFrame
+        )
+
+        XCTAssertGreaterThanOrEqual(
+            bottomFrame.minY,
+            visibleFrame.minY + margin,
+            "Smart reminder input/toast panel should clamp vertically when the anchor is near the bottom of the visibleFrame."
+        )
+        XCTAssertLessThanOrEqual(
+            bottomFrame.maxY,
+            visibleFrame.maxY - margin,
+            "Smart reminder input/toast panel should stay below the visibleFrame top edge after bottom-edge placement."
+        )
+    }
+
+    func testSmartReminderPositioningRuntimeUsesAnchorScreenVisibleFrame() throws {
+        let source = try readProjectSource("MalDaze/SmartReminder/SmartReminderUIPanels.swift")
+        let positioningSource = try functionSource(
+            named: "positionPanelTopCenter",
+            in: source,
+            after: "    static func positionPanelTopCenter"
+        )
+
+        XCTAssertTrue(
+            source.contains("static func frameTopCenter(anchor: NSRect, size: NSSize, visibleFrame: NSRect)"),
+            "Smart reminder positioning should expose a deterministic helper that accepts an explicit visibleFrame."
+        )
+        XCTAssertTrue(
+            positioningSource.contains("NSScreen.screens"),
+            "Runtime smart reminder positioning should resolve the screen containing the anchor."
+        )
+        XCTAssertTrue(
+            positioningSource.contains(".visibleFrame"),
+            "Runtime smart reminder positioning should clamp against NSScreen.visibleFrame rather than the raw screen frame."
+        )
+        XCTAssertTrue(
+            positioningSource.contains("frameTopCenter(anchor: anchor, size: size, visibleFrame:"),
+            "Runtime smart reminder positioning should delegate frame calculation to the deterministic helper."
+        )
+        XCTAssertFalse(
+            positioningSource.contains("let x = anchor.midX - size.width / 2"),
+            "Runtime smart reminder positioning should no longer directly set an unclamped top-center frame."
+        )
+    }
+
     private func readProjectSource(_ relativePath: String) throws -> String {
         let testFile = URL(fileURLWithPath: #filePath)
         let repositoryRoot = testFile
@@ -478,6 +801,77 @@ final class ControlPanelPresentationTests: XCTestCase {
             .deletingLastPathComponent()
         let sourceURL = repositoryRoot.appendingPathComponent(relativePath)
         return try String(contentsOf: sourceURL, encoding: .utf8)
+    }
+
+    private func smartReminderInputPanelContentSource(from source: String) throws -> String {
+        let inputContentRange = try XCTUnwrap(
+            rangeOfType(named: "SmartReminderInputPanelContent", in: source),
+            "SmartReminderUIPanels.swift should define SmartReminderInputPanelContent."
+        )
+        return String(source[inputContentRange])
+    }
+
+    private func buttonActionSource(titled title: String, in source: String) -> String? {
+        guard let declarationRange = source.range(of: "Button(\"\(title)\")"),
+              let openingBrace = source[declarationRange.upperBound...].firstIndex(of: "{")
+        else { return nil }
+
+        var depth = 0
+        var cursor = openingBrace
+        while cursor < source.endIndex {
+            switch source[cursor] {
+            case "{":
+                depth += 1
+            case "}":
+                depth -= 1
+                if depth == 0 {
+                    return String(source[declarationRange.lowerBound..<source.index(after: cursor)])
+                }
+            default:
+                break
+            }
+            cursor = source.index(after: cursor)
+        }
+
+        return nil
+    }
+
+    private func functionSource(named functionName: String, in source: String, after marker: String) throws -> String {
+        let markerRange = try XCTUnwrap(
+            source.range(of: marker),
+            "Expected to find source marker before \(functionName): \(marker)"
+        )
+        let tail = String(source[markerRange.lowerBound...])
+        let functionRange = try XCTUnwrap(
+            rangeOfFunction(named: functionName, in: tail),
+            "Expected to find function \(functionName) after marker: \(marker)"
+        )
+        return String(tail[functionRange])
+    }
+
+    private func closureSource(assignedTo name: String, containing call: String, in source: String) -> String? {
+        guard let assignmentRange = source.range(of: "\(name) = \(call)"),
+              let openingBrace = source[assignmentRange.upperBound...].firstIndex(of: "{")
+        else { return nil }
+
+        var depth = 0
+        var cursor = openingBrace
+        while cursor < source.endIndex {
+            switch source[cursor] {
+            case "{":
+                depth += 1
+            case "}":
+                depth -= 1
+                if depth == 0 {
+                    return String(source[assignmentRange.lowerBound..<source.index(after: cursor)])
+                }
+            default:
+                break
+            }
+            cursor = source.index(after: cursor)
+        }
+
+        return nil
     }
 
     private func rangeOfFunction(named functionName: String, in source: String) -> Range<String.Index>? {
