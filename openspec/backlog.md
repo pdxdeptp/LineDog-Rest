@@ -13,6 +13,7 @@
 | [learning-data-layer](#learning-data-layer-学习数据层) | 2 | 0 | 1 | 1 |
 | [material-ingestion](#material-ingestion-资料摄入) | 2 | 0 | 1 | 1 |
 | [progress-feedback](#progress-feedback-进度反馈) | 1 | 0 | 1 | 0 |
+| [study-smart-mode](#study-smart-mode-智能模式) | 1 | 0 | 0 | 1 |
 | [independent-features](#independent-features-独立功能线) | 3 | 0 | 0 | 3 |
 
 ---
@@ -109,6 +110,18 @@
 
 ---
 
+## study-smart-mode 智能模式
+
+### P3 — 全自动智能模式
+
+- **描述：** 在学习助手 v2「智能模式」之上再加一档:设置里增加「全自动智能模式」开关,开启后助手检测到问题(落后 / 预计超期 / 某天超额)直接应用调整、事后通知,无需用户逐次确认。**前置难题(不解决不做):** 智能模式的提议是多方案并列的(见 `learning-assistant-v2.md` US-19),全自动模式必须先有一套「多方案时默认选哪个」的决策规则——按影响面最小?按「保证不超期」优先?按用户历史选择偏好学出来?这套规则想不清楚,全自动就是给 v1 失控模式留后门。
+- **来源：** learning-assistant-v2 设计探索(2026-05-21,智能模式收尾)
+- **规模：** M
+- **依赖：** v2 智能模式(`study-smart-mode` change)落地;多方案默认决策规则确定
+- **状态：** deferred
+
+---
+
 ## independent-features 独立功能线
 
 以下均属于独立产品线，不在 MalDaze 学习助手主线范围内，单独立项。
@@ -142,4 +155,4 @@
 - **P1 项不进 backlog：** P1 直接进入当前 change 或下一个闭环的 scope
 - **条目提升：** 当某个 deferred 项在 scope-decision 中被认定应该进入当前 change 时，从 backlog 移除并写入对应 change 的 scope
 - **重复检查：** 追加前先在 backlog 中搜索是否已有同模块同主题条目，避免重复
-- **最后更新：** 2026-05-10（初始重构）
+- **最后更新：** 2026-05-21（新增 study-smart-mode 模块 · 全自动智能模式）
