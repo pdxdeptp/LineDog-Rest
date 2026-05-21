@@ -794,6 +794,56 @@ final class ControlPanelPresentationTests: XCTestCase {
         )
     }
 
+    func testDeskReminderSidebarCopyDescribesThreeMonthPlanningWindow() throws {
+        let source = try readProjectSource("MalDaze/DashboardRootView.swift")
+
+        XCTAssertTrue(
+            source.contains("未来三个月"),
+            "The desk reminder sidebar copy should describe the new three-month planning window."
+        )
+        XCTAssertFalse(
+            source.contains("七日内"),
+            "The desk reminder sidebar copy should no longer claim the visible range is seven days."
+        )
+        XCTAssertFalse(
+            source.contains("当前窗口内无待办"),
+            "The empty state should name the three-month reminder window instead of using a generic current-window phrase."
+        )
+        XCTAssertTrue(
+            source.contains("无逾期待办，未来三个月内也无待办"),
+            "The empty state should mention both overdue reminders and the future three-month window."
+        )
+    }
+
+    func testEventKitDeskSidebarFetchUsesExclusiveEndAfterThreeMonthTargetDate() throws {
+        let source = try readProjectSource("MalDaze/Reminders/EventKitRemindersBacking.swift")
+        let fetchSource = try functionSource(named: "fetchDeskSidebarReminders", in: source)
+        let helperSource = try functionSource(named: "upcomingReminderWindowExclusiveEnd", in: source)
+
+        XCTAssertTrue(
+            fetchSource.contains("upcomingReminderWindowExclusiveEnd(startOfToday: startToday, calendar: calWrap)"),
+            "fetchDeskSidebarReminders should use the date-inclusive three-month exclusive end helper for its EventKit predicate."
+        )
+        XCTAssertTrue(
+            helperSource.contains("byAdding: SidebarReminderWindowPolicy.forwardComponent")
+                && helperSource.contains("value: SidebarReminderWindowPolicy.forwardValue"),
+            "The exclusive end helper should first compute the configured three-month target date."
+        )
+        XCTAssertTrue(
+            helperSource.contains("byAdding: .day")
+                && helperSource.contains("value: 1"),
+            "The EventKit predicate end should be the start of the day after the three-month target date."
+        )
+        XCTAssertTrue(
+            source.contains("private static func upcomingReminderWindowExclusiveEnd"),
+            "The fetch window helper should stay private because it exists to support EventKit fetch construction."
+        )
+        XCTAssertFalse(
+            source.contains("static func upcomingReminderWindowEnd"),
+            "The old same-day end helper would exclude reminders later on the three-month target date."
+        )
+    }
+
     private func readProjectSource(_ relativePath: String) throws -> String {
         let testFile = URL(fileURLWithPath: #filePath)
         let repositoryRoot = testFile
@@ -847,6 +897,14 @@ final class ControlPanelPresentationTests: XCTestCase {
             "Expected to find function \(functionName) after marker: \(marker)"
         )
         return String(tail[functionRange])
+    }
+
+    private func functionSource(named functionName: String, in source: String) throws -> String {
+        let functionRange = try XCTUnwrap(
+            rangeOfFunction(named: functionName, in: source),
+            "Expected to find function \(functionName)."
+        )
+        return String(source[functionRange])
     }
 
     private func closureSource(assignedTo name: String, containing call: String, in source: String) -> String? {

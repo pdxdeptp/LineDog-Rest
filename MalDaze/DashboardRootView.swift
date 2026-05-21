@@ -399,7 +399,7 @@ struct DashboardRootView: View {
             Text("计划")
                 .font(.title2.bold())
                 .foregroundStyle(.red)
-            Text("所选列表 · 今日「#日常」· 七日内 · 按日期分组 · 可编辑 / 推迟 / 删除；新建请用智能输入。")
+            Text("所选列表 · 今日「#日常」· 未来三个月 · 按日期分组 · 可编辑 / 推迟 / 删除；新建请用智能输入。")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -441,7 +441,7 @@ struct DashboardRootView: View {
 
             if deskReminders.isAuthorized {
                 if deskReminders.items.isEmpty {
-                    Text("当前窗口内无待办")
+                    Text("无逾期待办，未来三个月内也无待办")
                         .font(.subheadline)
                         .foregroundStyle(.tertiary)
                         .frame(maxWidth: .infinity, alignment: .topLeading)

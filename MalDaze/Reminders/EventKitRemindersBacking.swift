@@ -13,6 +13,11 @@ enum MalDazeReminderEventStore {
 
 /// 生产环境 EventKit 实现：监听 `.EKEventStoreChanged` 仅回调、不隐式写入。
 final class EventKitRemindersBacking: NSObject, RemindersEventStoreBacking {
+    private enum SidebarReminderWindowPolicy {
+        static let forwardComponent = Calendar.Component.month
+        static let forwardValue = 3
+    }
+
     private let store: EKEventStore
     private let onExternalChange: @Sendable () -> Void
 
@@ -74,7 +79,7 @@ final class EventKitRemindersBacking: NSObject, RemindersEventStoreBacking {
         let calWrap = Calendar.current
         let startToday = calWrap.startOfDay(for: Date())
         guard let endToday = calWrap.date(byAdding: .day, value: 1, to: startToday),
-              let endWeek = calWrap.date(byAdding: .day, value: 7, to: startToday)
+              let upcomingWindowEnd = Self.upcomingReminderWindowExclusiveEnd(startOfToday: startToday, calendar: calWrap)
         else { return [] }
 
         // 与系统「提醒事项」一致：仅从今日起算的谓词拿不到「今天之前已到期但仍未完成」的条目，须另抓至 `startToday` 再合并。
@@ -88,18 +93,18 @@ final class EventKitRemindersBacking: NSObject, RemindersEventStoreBacking {
             ending: endToday,
             calendars: [cal]
         )
-        let predWeek = store.predicateForIncompleteReminders(
+        let predUpcomingWindow = store.predicateForIncompleteReminders(
             withDueDateStarting: startToday,
-            ending: endWeek,
+            ending: upcomingWindowEnd,
             calendars: [cal]
         )
 
         let overdueRems = try await fetchReminders(matching: predOverdue)
         let todayRems = try await fetchReminders(matching: predToday)
-        let weekRems = try await fetchReminders(matching: predWeek)
+        let upcomingWindowRems = try await fetchReminders(matching: predUpcomingWindow)
 
         // #region agent log
-        for (label, rems) in [("overdue", overdueRems), ("today", todayRems), ("week", weekRems)] {
+        for (label, rems) in [("overdue", overdueRems), ("today", todayRems), ("upcomingWindow", upcomingWindowRems)] {
             for rem in rems {
                 let dc = rem.dueDateComponents
                 let hasTime = dc?.hour != nil || dc?.minute != nil
@@ -141,14 +146,23 @@ final class EventKitRemindersBacking: NSObject, RemindersEventStoreBacking {
             .filter { MalDazeRoutineTag.notesContainRoutineMarker($0.notes) }
             .map(Self.mapReminder)
 
-        // 不再按 routine 标签过滤 weekRems：被推迟到本周其他日期的 #日常 项应正常展示。
+        // 不再按 routine 标签过滤未来窗口提醒：被推迟到其他日期的 #日常 项应正常展示。
         // mergedDisplayItems 已按 calendarItemIdentifier 去重，今日日常不会重复。
-        let allWeekMapped = weekRems.map(Self.mapReminder)
+        let allUpcomingWindowMapped = upcomingWindowRems.map(Self.mapReminder)
 
         return DeskReminderSidebarMerger.mergedDisplayItems(
             routineToday: routineToday + overdueRoutine,
-            nonRoutineWeek: allWeekMapped + overdueNonRoutine
+            nonRoutineUpcomingWindow: allUpcomingWindowMapped + overdueNonRoutine
         )
+    }
+
+    private static func upcomingReminderWindowExclusiveEnd(startOfToday: Date, calendar: Calendar) -> Date? {
+        guard let targetDate = calendar.date(
+            byAdding: SidebarReminderWindowPolicy.forwardComponent,
+            value: SidebarReminderWindowPolicy.forwardValue,
+            to: startOfToday
+        ) else { return nil }
+        return calendar.date(byAdding: .day, value: 1, to: targetDate)
     }
 
     private func fetchReminders(matching predicate: NSPredicate) async throws -> [EKReminder] {

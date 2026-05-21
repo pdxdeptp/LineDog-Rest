@@ -19,8 +19,8 @@ This change keeps the existing EventKit-backed model and local grouping behavior
 
 ## Decisions
 
-1. Use a fixed three-month horizon in the existing EventKit query.
-   - Rationale: the user asked for "未来三个月" as the new baseline, and a fixed horizon keeps the sidebar behavior simple.
+1. Use a fixed three-month horizon in the existing EventKit query, with an exclusive predicate end at the start of the day after the three-month target date.
+   - Rationale: the user asked for "未来三个月" as the new baseline, and users typically expect a date-level window to include the entire date three months out.
    - Alternative considered: add a setting for seven days / one month / three months. Rejected for this change because it expands UI scope and preference persistence without being requested.
 
 2. Represent the horizon as a named constant near the EventKit fetch code.

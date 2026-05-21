@@ -101,15 +101,15 @@ enum DeskReminderSectionHeaderFormatter {
     }
 }
 
-/// 桌宠列表合并：日常（今日）与非日常（7 日内）去重后按 due 排序。
+/// 桌宠列表合并：日常（今日）与未来窗口内提醒去重后按 due 排序。
 enum DeskReminderSidebarMerger {
     static func mergedDisplayItems(
         routineToday: [ReminderDisplayItem],
-        nonRoutineWeek: [ReminderDisplayItem]
+        nonRoutineUpcomingWindow: [ReminderDisplayItem]
     ) -> [ReminderDisplayItem] {
         var seen = Set<String>()
         var combined: [ReminderDisplayItem] = []
-        for item in routineToday + nonRoutineWeek {
+        for item in routineToday + nonRoutineUpcomingWindow {
             if seen.insert(item.id).inserted {
                 combined.append(item)
             }
