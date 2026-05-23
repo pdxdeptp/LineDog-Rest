@@ -1,0 +1,10 @@
+{
+  "phase": "ready-to-apply",
+  "round": 1,
+  "current_item": "study-plan-foundation",
+  "current_change": "introduce-study-plan-foundation",
+  "current_spec": "study-plan",
+  "items_initialized": true,
+  "last_completed_step": "created-and-validated-introduce-study-plan-foundation",
+  "updated_at": "2026-05-23T14:50:55.420Z"
+}

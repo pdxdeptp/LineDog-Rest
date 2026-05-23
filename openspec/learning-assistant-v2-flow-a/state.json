@@ -1,0 +1,13 @@
+{
+  "phase": "complete",
+  "round": 1,
+  "source_doc": "openspec/learning-assistant-v2.md",
+  "source_doc_hash_before": "e66ed24b352f030df85d8aefd3ef6314fbcafd2e",
+  "source_doc_hash_after": "d83fb77602961d4f3a9c3e17c307c6b499eb987b",
+  "open_questions_before": ["OQ3"],
+  "open_questions_after": [],
+  "decisions_added": ["D30"],
+  "flow_b_readiness": "PASS",
+  "last_completed_step": "round-01",
+  "updated_at": "2026-05-23T14:45:27.779Z"
+}
