@@ -1,0 +1,688 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MalDaze Right Controls Preview</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --window: #f7f6f2;
+      --panel: rgba(255, 255, 255, 0.78);
+      --surface: #ffffff;
+      --surface-soft: #f0eee8;
+      --line: rgba(50, 47, 42, 0.14);
+      --line-strong: rgba(50, 47, 42, 0.22);
+      --text: #25221d;
+      --muted: #706b61;
+      --faint: #9c9588;
+      --accent: #2f7d6d;
+      --accent-ink: #ffffff;
+      --accent-soft: #dceee8;
+      --blue: #2d679f;
+      --blue-soft: #e3edf7;
+      --coral: #b95040;
+      --coral-soft: #f4e2de;
+      --gold: #947331;
+      --gold-soft: #f1ead7;
+      --shadow: 0 18px 46px rgba(43, 38, 30, 0.13);
+      --radius: 8px;
+      --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background:
+        linear-gradient(180deg, #fbfaf6 0%, #ece8de 100%);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 13px;
+      letter-spacing: 0;
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    .frame {
+      width: min(1240px, calc(100vw - 48px));
+      height: min(664px, calc(100vh - 48px));
+      min-height: 620px;
+      display: grid;
+      grid-template-columns: 300px 1fr 300px;
+      overflow: hidden;
+      border: 1px solid rgba(55, 50, 42, 0.20);
+      border-radius: 14px;
+      background: rgba(251, 250, 246, 0.92);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(20px);
+    }
+
+    .ghost-column {
+      min-width: 0;
+      padding: 18px 16px;
+      border-right: 1px solid var(--line);
+      color: var(--muted);
+      background: rgba(255, 255, 255, 0.42);
+    }
+
+    .ghost-column.center {
+      border-right: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.22);
+    }
+
+    .ghost-title {
+      margin: 0 0 12px;
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .ghost-card {
+      height: 76px;
+      margin-bottom: 10px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(255, 255, 255, 0.68);
+    }
+
+    .controls {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      padding: 12px;
+      background: rgba(250, 249, 245, 0.84);
+    }
+
+    .controls-scroll {
+      min-height: 0;
+      overflow: auto;
+      padding-right: 2px;
+    }
+
+    .controls-scroll::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .controls-scroll::-webkit-scrollbar-thumb {
+      border: 2px solid transparent;
+      border-radius: 99px;
+      background: rgba(50, 47, 42, 0.22);
+      background-clip: padding-box;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      min-height: 44px;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    .brand {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .brand strong {
+      display: block;
+      font-size: 15px;
+      line-height: 1.25;
+      font-weight: 700;
+    }
+
+    .brand span {
+      display: block;
+      margin-top: 1px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .icon-button {
+      width: 38px;
+      height: 38px;
+      display: inline-grid;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+      color: var(--muted);
+      cursor: default;
+    }
+
+    .icon {
+      width: 17px;
+      height: 17px;
+      flex: none;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+    }
+
+    .status {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 10px;
+      align-items: start;
+      margin-bottom: 10px;
+      padding: 10px;
+      border: 1px solid rgba(47, 125, 109, 0.18);
+      border-radius: var(--radius);
+      background: var(--accent-soft);
+    }
+
+    .pulse {
+      width: 10px;
+      height: 10px;
+      margin-top: 4px;
+      border-radius: 99px;
+      background: var(--accent);
+      box-shadow: 0 0 0 4px rgba(47, 125, 109, 0.13);
+    }
+
+    .status strong {
+      display: block;
+      line-height: 1.3;
+      color: #1f5f52;
+      font-weight: 700;
+    }
+
+    .status span {
+      display: block;
+      margin-top: 2px;
+      color: #52776e;
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .segment {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 2px;
+      margin-bottom: 10px;
+      padding: 3px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface-soft);
+    }
+
+    .segment button {
+      min-height: 30px;
+      border: 0;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 12px;
+      cursor: default;
+    }
+
+    .segment button.active {
+      background: var(--surface);
+      color: var(--text);
+      font-weight: 650;
+      box-shadow: 0 1px 3px rgba(43, 38, 30, 0.12);
+    }
+
+    .quick-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .action {
+      min-height: 58px;
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 8px;
+      align-items: center;
+      padding: 9px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+      color: var(--text);
+      text-align: left;
+      cursor: default;
+    }
+
+    .action.primary {
+      border-color: rgba(47, 125, 109, 0.34);
+      background: var(--accent);
+      color: var(--accent-ink);
+    }
+
+    .action.blue {
+      background: var(--blue-soft);
+      border-color: rgba(45, 103, 159, 0.22);
+      color: #204f7c;
+    }
+
+    .action.coral {
+      background: var(--coral-soft);
+      border-color: rgba(185, 80, 64, 0.22);
+      color: #80382d;
+    }
+
+    .action.gold {
+      background: var(--gold-soft);
+      border-color: rgba(148, 115, 49, 0.22);
+      color: #74591f;
+    }
+
+    .action strong {
+      display: block;
+      font-size: 12px;
+      line-height: 1.2;
+      font-weight: 700;
+    }
+
+    .action span {
+      display: block;
+      margin-top: 2px;
+      font-size: 11px;
+      line-height: 1.25;
+      opacity: 0.78;
+    }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: 4px 0 7px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .section-title span:last-child {
+      color: var(--faint);
+      font-weight: 500;
+      text-transform: none;
+    }
+
+    details {
+      margin-bottom: 8px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+    }
+
+    details[open] {
+      border-color: var(--line-strong);
+    }
+
+    summary {
+      min-height: 42px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 10px;
+      list-style: none;
+      cursor: default;
+      font-weight: 650;
+    }
+
+    summary::-webkit-details-marker {
+      display: none;
+    }
+
+    summary .chevron {
+      margin-left: auto;
+      color: var(--faint);
+      transition: transform 160ms ease;
+    }
+
+    details[open] summary .chevron {
+      transform: rotate(90deg);
+    }
+
+    .rows {
+      border-top: 1px solid var(--line);
+    }
+
+    .row {
+      min-height: 40px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: center;
+      padding: 8px 10px;
+      border-bottom: 1px solid rgba(50, 47, 42, 0.08);
+    }
+
+    .row:last-child {
+      border-bottom: 0;
+    }
+
+    .row-label strong {
+      display: block;
+      line-height: 1.25;
+      font-weight: 600;
+    }
+
+    .row-label span {
+      display: block;
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.3;
+    }
+
+    .stepper,
+    .time-field {
+      min-width: 68px;
+      min-height: 30px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: var(--surface-soft);
+      color: var(--text);
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+      font-weight: 650;
+    }
+
+    .switch {
+      width: 42px;
+      height: 24px;
+      padding: 3px;
+      border-radius: 99px;
+      background: var(--accent);
+    }
+
+    .switch.off {
+      background: #c7c1b7;
+    }
+
+    .switch::before {
+      content: "";
+      display: block;
+      width: 18px;
+      height: 18px;
+      border-radius: 99px;
+      background: white;
+      box-shadow: 0 1px 3px rgba(43, 38, 30, 0.18);
+      transform: translateX(18px);
+    }
+
+    .switch.off::before {
+      transform: translateX(0);
+    }
+
+    .slider {
+      width: 92px;
+      height: 4px;
+      border-radius: 99px;
+      background: linear-gradient(90deg, var(--accent) 0 64%, #d7d1c8 64% 100%);
+      position: relative;
+    }
+
+    .slider::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 64%;
+      width: 16px;
+      height: 16px;
+      border-radius: 99px;
+      background: white;
+      border: 1px solid var(--line-strong);
+      box-shadow: 0 1px 4px rgba(43, 38, 30, 0.16);
+      transform: translate(-50%, -50%);
+    }
+
+    .footer {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid var(--line);
+    }
+
+    .utility-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .utility {
+      min-height: 36px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: transparent;
+      color: var(--muted);
+      cursor: default;
+    }
+
+    .quit {
+      width: 100%;
+      min-height: 36px;
+      border-color: rgba(185, 80, 64, 0.26);
+      color: var(--coral);
+    }
+
+    .wide-utility {
+      grid-column: 1 / -1;
+    }
+
+    .hint {
+      margin: 8px 0 0;
+      color: var(--faint);
+      font-size: 11px;
+      line-height: 1.35;
+    }
+
+    @media (max-width: 900px) {
+      body {
+        display: block;
+        padding: 18px;
+      }
+
+      .frame {
+        width: 100%;
+        height: auto;
+        min-height: 0;
+        grid-template-columns: 1fr;
+      }
+
+      .ghost-column {
+        display: none;
+      }
+
+      .controls {
+        min-height: 664px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="frame" aria-label="MalDaze Dashboard static preview">
+    <aside class="ghost-column" aria-hidden="true">
+      <h2 class="ghost-title">计划</h2>
+      <div class="ghost-card"></div>
+      <div class="ghost-card"></div>
+      <div class="ghost-card"></div>
+      <div class="ghost-card"></div>
+    </aside>
+
+    <section class="ghost-column center" aria-hidden="true">
+      <h2 class="ghost-title">学习助手</h2>
+      <div class="ghost-card"></div>
+      <div class="ghost-card"></div>
+      <div class="ghost-card"></div>
+      <div class="ghost-card"></div>
+      <div class="ghost-card"></div>
+    </section>
+
+    <aside class="controls" aria-label="重新设计后的右侧控制栏">
+      <div class="controls-scroll">
+        <header class="topbar">
+          <div class="brand">
+            <strong>MalDaze Rest</strong>
+            <span>桌宠节奏控制</span>
+          </div>
+          <button class="icon-button" aria-label="打开设置">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"></path><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.04.04a2 2 0 0 1-2.83 2.83l-.04-.04A1.7 1.7 0 0 0 15 19.37a1.7 1.7 0 0 0-1 .91V20.4a2 2 0 0 1-4 0v-.1A1.7 1.7 0 0 0 9 19.38a1.7 1.7 0 0 0-1.88.34l-.04.04a2 2 0 1 1-2.83-2.83l.04-.04A1.7 1.7 0 0 0 4.63 15a1.7 1.7 0 0 0-.91-1H3.6a2 2 0 0 1 0-4h.1A1.7 1.7 0 0 0 4.62 9a1.7 1.7 0 0 0-.34-1.88l-.04-.04a2 2 0 1 1 2.83-2.83l.04.04A1.7 1.7 0 0 0 9 4.63a1.7 1.7 0 0 0 1-.91V3.6a2 2 0 0 1 4 0v.1A1.7 1.7 0 0 0 15 4.62a1.7 1.7 0 0 0 1.88-.34l.04-.04a2 2 0 1 1 2.83 2.83l-.04.04A1.7 1.7 0 0 0 19.37 9c.11.4.43.73.91 1h.12a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-.9 1Z"></path></svg>
+          </button>
+        </header>
+
+        <div class="status" role="status">
+          <span class="pulse" aria-hidden="true"></span>
+          <div>
+            <strong>专注中，还有 18 分钟</strong>
+            <span>手动番茄，休息 5 分钟，霸屏保护开启</span>
+          </div>
+        </div>
+
+        <nav class="segment" aria-label="计时模式">
+          <button class="active">手动</button>
+          <button>整点</button>
+          <button>半点</button>
+        </nav>
+
+        <div class="quick-actions" aria-label="常用操作">
+          <button class="action primary">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7-11-7Z"></path></svg>
+            <span><strong>开始专注</strong><span>25 分钟</span></span>
+          </button>
+          <button class="action blue">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 2h4"></path><path d="M12 14l3-3"></path><circle cx="12" cy="14" r="8"></circle></svg>
+            <span><strong>倒计时</strong><span>7 分钟</span></span>
+          </button>
+          <button class="action coral">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2v20"></path><path d="M7 7a5 5 0 0 1 10 0c0 6-5 9-5 9s-5-3-5-9Z"></path></svg>
+            <span><strong>喝水提醒</strong><span>90 分钟</span></span>
+          </button>
+          <button class="action gold">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12.5c2-1 2-4 4.5-4 2 0 2.5 2 3 3 1-1 2-2 4-2 2.5 0 3.5 2 3.5 4.5 0 3-2.5 5.5-7.5 5.5-5.5 0-8-2-8-7Z"></path><path d="M8 10l-2-2"></path><path d="M17 11l2-2"></path></svg>
+            <span><strong>召唤小猫</strong><span>5 分钟</span></span>
+          </button>
+        </div>
+
+        <div class="section-title">
+          <span>设置</span>
+          <span>低频项收起</span>
+        </div>
+
+        <details open>
+          <summary>
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v6l4 2"></path><circle cx="12" cy="12" r="9"></circle></svg>
+            专注与休息
+            <svg class="icon chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg>
+          </summary>
+          <div class="rows">
+            <div class="row">
+              <div class="row-label"><strong>专注间隔</strong><span>仅手动模式</span></div>
+              <span class="stepper">25 分</span>
+            </div>
+            <div class="row">
+              <div class="row-label"><strong>休息时长</strong><span>手动和自动共用</span></div>
+              <span class="stepper">5 分</span>
+            </div>
+            <div class="row">
+              <div class="row-label"><strong>休息风格</strong><span>霸屏保护更强</span></div>
+              <span class="stepper">霸屏</span>
+            </div>
+          </div>
+        </details>
+
+        <details>
+          <summary>
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 9h14"></path><path d="M5 15h14"></path><path d="M8 5v14"></path><path d="M16 5v14"></path></svg>
+            行为保护
+            <svg class="icon chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg>
+          </summary>
+          <div class="rows">
+            <div class="row">
+              <div class="row-label"><strong>阻止点击桌面</strong><span>休息时挡住背后窗口</span></div>
+              <span class="switch" aria-hidden="true"></span>
+            </div>
+            <div class="row">
+              <div class="row-label"><strong>20 下结束休息</strong><span>连续点击桌宠提前结束</span></div>
+              <span class="switch" aria-hidden="true"></span>
+            </div>
+          </div>
+        </details>
+
+        <details>
+          <summary>
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6"></path><path d="M10 22h4"></path><path d="M2 8c2.7-4 6-6 10-6s7.3 2 10 6"></path><path d="M6 12c1.7-2 3.7-3 6-3s4.3 1 6 3"></path><path d="M10 16c.6-.7 1.3-1 2-1s1.4.3 2 1"></path></svg>
+            桌宠外观
+            <svg class="icon chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg>
+          </summary>
+          <div class="rows">
+            <div class="row">
+              <div class="row-label"><strong>图标边长</strong><span>窗口和点击区一起调整</span></div>
+              <span class="slider" aria-hidden="true"></span>
+            </div>
+            <div class="row">
+              <div class="row-label"><strong>动态强度</strong><span>从静止到完整动画</span></div>
+              <span class="slider" aria-hidden="true"></span>
+            </div>
+          </div>
+        </details>
+
+        <details>
+          <summary>
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 2h8"></path><path d="M7 7h10"></path><path d="M7 22h10"></path><path d="M12 7v15"></path><path d="M5 22h14"></path></svg>
+            喝水安静时段
+            <svg class="icon chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg>
+          </summary>
+          <div class="rows">
+            <div class="row">
+              <div class="row-label"><strong>开启安静时段</strong><span>夜间静默跳过提醒</span></div>
+              <span class="switch off" aria-hidden="true"></span>
+            </div>
+            <div class="row">
+              <div class="row-label"><strong>停止</strong></div>
+              <span class="time-field">21:00</span>
+            </div>
+            <div class="row">
+              <div class="row-label"><strong>恢复</strong></div>
+              <span class="time-field">08:00</span>
+            </div>
+          </div>
+        </details>
+
+        <footer class="footer">
+          <div class="utility-grid">
+            <button class="utility">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"></path><path d="M3 3v6h6"></path></svg>
+              归位
+            </button>
+            <button class="utility">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2v5"></path><path d="M12 17v5"></path><path d="m4.93 4.93 3.54 3.54"></path><path d="m15.54 15.54 3.53 3.53"></path><path d="M2 12h5"></path><path d="M17 12h5"></path></svg>
+              测试休息
+            </button>
+            <button class="utility wide-utility">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2v20"></path><path d="M7 7a5 5 0 0 1 10 0c0 6-5 9-5 9s-5-3-5-9Z"></path></svg>
+              测试喝水提醒
+            </button>
+          </div>
+          <button class="utility quit">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
+            退出应用
+          </button>
+          <p class="hint">休息霸屏仍保留原有安全逻辑。测试和退出动作下沉，避免和日常控制混在一起。</p>
+        </footer>
+      </div>
+    </aside>
+  </main>
+</body>
+</html>
