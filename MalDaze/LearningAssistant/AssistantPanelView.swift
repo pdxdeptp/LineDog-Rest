@@ -112,7 +112,7 @@ struct AssistantPanelView: View {
         case .home:
             homeDashboard
         case .addResource:
-            IngestionView(vm: vm)
+            StudyPlanIntakeView(vm: vm)
         case .resourceProgress:
             resourcesPanel
         case .adjustPlan:
@@ -349,6 +349,388 @@ struct AssistantPanelView: View {
     }
 }
 
+private struct StudyPlanIntakeView: View {
+    @ObservedObject var vm: LearningAssistantViewModel
+
+    @State private var urlText = ""
+    @State private var deadline = Calendar.current.date(byAdding: .month, value: 1, to: Date()) ?? Date()
+    @State private var capacityMinutes = 60
+    @State private var clarificationAnswers: [String: String] = [:]
+    @State private var clarificationOptionSelections: [String: String] = [:]
+    @State private var durationDrafts: [Int: Int] = [:]
+    @State private var lastClarificationDraftId: Int?
+    @State private var lastDurationDraftId: Int?
+    @State private var lastDurationDraftIdentity: String?
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                intakeControls
+
+                if let error = vm.studyPlanError {
+                    Label(error, systemImage: "exclamationmark.triangle")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+
+                if vm.isStartingStudyPlan {
+                    progressRow("正在预览链接内容")
+                }
+
+                studyPlanClarificationCard
+                studyPlanDraftReview
+
+                Spacer(minLength: 0)
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .task {
+            await vm.fetchDailyCapacity()
+            capacityMinutes = max(vm.dailyCapacityMin, 15)
+        }
+    }
+
+    private var intakeControls: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("学习资料 URL", systemImage: "link")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            TextField("https://example.com/course", text: $urlText)
+                .textFieldStyle(.roundedBorder)
+
+            DatePicker("截止日期（必填）", selection: $deadline, in: Date()..., displayedComponents: .date)
+                .datePickerStyle(.compact)
+
+            Stepper(value: $capacityMinutes, in: 15...480, step: 15) {
+                Text("每日容量：\(capacityMinutes) 分钟")
+                    .font(.callout)
+            }
+
+            Button {
+                startStudyPlan()
+            } label: {
+                Label("生成学习计划", systemImage: "sparkles")
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(urlText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || vm.isStartingStudyPlan)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private var studyPlanClarificationCard: some View {
+        if let clarification = vm.studyPlanClarification, vm.studyPlanDraft == nil {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("生成前确认")
+                    .font(.headline)
+
+                ForEach(Array(clarification.questions.prefix(3)), id: \.id) { question in
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(question.prompt)
+                            .font(.callout.weight(.semibold))
+                            .fixedSize(horizontal: false, vertical: true)
+
+                        if question.options.isEmpty || question.allowsCustomText {
+                            TextField("使用推荐默认，或输入你的补充", text: answerBinding(for: question, defaults: clarification.defaults))
+                                .textFieldStyle(.roundedBorder)
+                        }
+
+                        if !question.options.isEmpty {
+                            Picker("", selection: clarificationOptionSelectionBinding(for: question, defaults: clarification.defaults)) {
+                                ForEach(question.options, id: \.id) { option in
+                                    Text(optionLabel(option))
+                                        .tag(option.id)
+                                }
+                            }
+                            .labelsHidden()
+                            .pickerStyle(.radioGroup)
+                        }
+                    }
+                }
+
+                HStack(spacing: 8) {
+                    Button("生成学习计划") {
+                        clarificationAnswers = mergedClarificationAnswers(for: clarification)
+                        Task { await vm.submitStudyPlanClarification(answers: clarificationAnswers, skip: false) }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(vm.isSubmittingStudyPlanClarification)
+
+                    Button("生成粗略计划") {
+                        Task { await vm.skipStudyPlanClarification() }
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(vm.isSubmittingStudyPlanClarification)
+                }
+            }
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(.controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+            .onAppear {
+                seedClarificationDefaults(from: clarification)
+            }
+            .onChange(of: clarificationDraftId(for: clarification)) { _ in
+                seedClarificationDefaults(from: clarification)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var studyPlanDraftReview: some View {
+        if let draft = vm.studyPlanDraft {
+            VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(draft.title)
+                        .font(.headline)
+                    Text("Review 状态：\(draft.status)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text("截止日期：\(draft.deadline) · 每日容量：\(draft.capacityMinutes) 分钟")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(draft.sourceURL.absoluteString)
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+
+                draftStatusFacts(draft)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("任务列表")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+
+                    ForEach(draft.tasks, id: \.orderIndex) { task in
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("\(task.orderIndex + 1). \(task.title)")
+                                .font(.callout.weight(.semibold))
+                                .fixedSize(horizontal: false, vertical: true)
+                            Text("安排：\(task.scheduledDate) · 目标 \(task.targetMinutes) 分钟")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+
+                            HStack(spacing: 8) {
+                                Stepper(value: durationBinding(for: task), in: 5...600, step: 5) {
+                                    Text("预计 \(durationDrafts[task.orderIndex] ?? task.estimatedMinutes) 分钟")
+                                        .font(.caption)
+                                }
+
+                                Button("更新时长") {
+                                    let minutes = durationDrafts[task.orderIndex] ?? task.estimatedMinutes
+                                    Task { await vm.updateStudyPlanDraftTaskDuration(orderIndex: task.orderIndex, estimatedMinutes: minutes) }
+                                }
+                                .buttonStyle(.bordered)
+                                .disabled(vm.isUpdatingStudyPlanDraft)
+                            }
+                        }
+                        .padding(.vertical, 6)
+                    }
+                }
+
+                HStack(spacing: 8) {
+                    Button("取消") {
+                        Task { await vm.cancelStudyPlanDraft() }
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(vm.isConfirmingStudyPlanDraft)
+
+                    Button("确认创建计划") {
+                        Task { await vm.confirmStudyPlanDraft() }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(vm.isConfirmingStudyPlanDraft)
+                }
+            }
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(.controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+            .onAppear {
+                seedDraftDurations(from: draft)
+            }
+            .onChange(of: durationDraftIdentity(for: draft)) { _ in
+                seedDraftDurations(from: draft)
+            }
+        }
+    }
+
+    private func draftStatusFacts(_ draft: StudyPlanDraft) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if draft.clarificationSkipped || draft.lowCalibration {
+                Label("低校准：已使用推荐默认生成，确认前建议检查任务时长。", systemImage: "exclamationmark.triangle")
+                    .foregroundStyle(.orange)
+            }
+
+            if draft.expectedLate {
+                Label("预计晚于截止日期", systemImage: "calendar")
+                    .foregroundStyle(.red)
+            }
+
+            ForEach(draft.overCapacityDays, id: \.date) { day in
+                Label("超出每日容量：\(day.date) 超出 \(day.overByMinutes) 分钟", systemImage: "gauge")
+                    .foregroundStyle(.orange)
+            }
+        }
+        .font(.caption)
+    }
+
+    private func startStudyPlan() {
+        Task { await vm.startStudyPlan(url: urlText, deadline: deadline, capacityMinutes: capacityMinutes) }
+    }
+
+    private func progressRow(_ label: String) -> some View {
+        HStack(spacing: 8) {
+            ProgressView()
+                .controlSize(.small)
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func seedClarificationDefaults(from clarification: StudyPlanClarification) {
+        let draftId = clarificationDraftId(for: clarification)
+        if lastClarificationDraftId != draftId {
+            clarificationAnswers = [:]
+            clarificationOptionSelections = [:]
+            lastClarificationDraftId = draftId
+        }
+
+        for question in clarification.questions.prefix(3) where clarificationAnswers[question.id] == nil {
+            if let defaultValue = clarification.defaults[question.id] {
+                clarificationAnswers[question.id] = defaultValue
+            } else if let defaultOption = question.options.first(where: { $0.isDefault || $0.usesDefault || $0.recommended }) {
+                clarificationAnswers[question.id] = defaultOption.value
+            } else if let firstOption = question.options.first {
+                clarificationAnswers[question.id] = firstOption.value
+            } else {
+                clarificationAnswers[question.id] = ""
+            }
+        }
+
+        for question in clarification.questions.prefix(3) where !question.options.isEmpty && clarificationOptionSelections[question.id] == nil {
+            clarificationOptionSelections[question.id] = defaultClarificationOption(for: question, defaults: clarification.defaults)?.id
+        }
+    }
+
+    private func mergedClarificationAnswers(for clarification: StudyPlanClarification) -> [String: String] {
+        var answers = clarification.defaults
+        for question in clarification.questions.prefix(3) {
+            answers[question.id] = answerValue(for: question, defaults: clarification.defaults)
+        }
+        return answers
+    }
+
+    private func answerValue(
+        for question: StudyPlanClarificationQuestion,
+        defaults: [String: String]
+    ) -> String {
+        if let selectedOptionId = clarificationOptionSelections[question.id],
+           let selectedOption = question.options.first(where: { $0.id == selectedOptionId }) {
+            let typedAnswer = clarificationAnswers[question.id] ?? selectedOption.value
+            if question.allowsCustomText && typedAnswer != selectedOption.value {
+                return typedAnswer
+            }
+            return selectedOption.value
+        }
+
+        return clarificationAnswers[question.id]
+            ?? defaults[question.id]
+            ?? defaultClarificationOption(for: question, defaults: defaults)?.value
+            ?? ""
+    }
+
+    private func answerBinding(
+        for question: StudyPlanClarificationQuestion,
+        defaults: [String: String]
+    ) -> Binding<String> {
+        Binding(
+            get: {
+                clarificationAnswers[question.id]
+                    ?? defaults[question.id]
+                    ?? question.options.first(where: { $0.isDefault || $0.usesDefault || $0.recommended })?.value
+                    ?? question.options.first?.value
+                    ?? ""
+            },
+            set: { newValue in
+                clarificationAnswers[question.id] = newValue
+                if question.allowsCustomText,
+                   let selectedOptionId = clarificationOptionSelections[question.id],
+                   question.options.first(where: { $0.id == selectedOptionId })?.value != newValue {
+                    clarificationOptionSelections[question.id] = nil
+                }
+            }
+        )
+    }
+
+    private func clarificationOptionSelectionBinding(
+        for question: StudyPlanClarificationQuestion,
+        defaults: [String: String]
+    ) -> Binding<String> {
+        Binding(
+            get: {
+                clarificationOptionSelections[question.id]
+                    ?? defaultClarificationOption(for: question, defaults: defaults)?.id
+                    ?? ""
+            },
+            set: { optionId in
+                clarificationOptionSelections[question.id] = optionId
+                if let option = question.options.first(where: { $0.id == optionId }) {
+                    clarificationAnswers[question.id] = option.value
+                }
+            }
+        )
+    }
+
+    private func defaultClarificationOption(
+        for question: StudyPlanClarificationQuestion,
+        defaults: [String: String]
+    ) -> StudyPlanClarificationOption? {
+        if let defaultValue = defaults[question.id] {
+            return question.options.first { option in
+                option.value == defaultValue && (option.isDefault || option.usesDefault || option.recommended)
+            } ?? question.options.first { $0.value == defaultValue }
+        }
+
+        return question.options.first { $0.isDefault || $0.usesDefault || $0.recommended }
+            ?? question.options.first
+    }
+
+    private func clarificationDraftId(for clarification: StudyPlanClarification) -> Int? {
+        vm.studyPlanDraftId
+    }
+
+    private func optionLabel(_ option: StudyPlanClarificationOption) -> String {
+        var badges: [String] = []
+        if option.recommended { badges.append("推荐") }
+        if option.isDefault || option.usesDefault { badges.append("默认") }
+        return badges.isEmpty ? option.label : "\(option.label)（\(badges.joined(separator: " / "))）"
+    }
+
+    private func seedDraftDurations(from draft: StudyPlanDraft) {
+        let draftIdentity = durationDraftIdentity(for: draft)
+        if lastDurationDraftId != draft.id || lastDurationDraftIdentity != draftIdentity {
+            durationDrafts = Dictionary(uniqueKeysWithValues: draft.tasks.map { ($0.orderIndex, $0.estimatedMinutes) })
+            lastDurationDraftId = draft.id
+            lastDurationDraftIdentity = draftIdentity
+        }
+    }
+
+    private func durationDraftIdentity(for draft: StudyPlanDraft) -> String {
+        ([String(draft.id)] + draft.tasks.map { "\($0.orderIndex):\($0.estimatedMinutes)" }).joined(separator: "|")
+    }
+
+    private func durationBinding(for task: StudyPlanDraftTask) -> Binding<Int> {
+        Binding(
+            get: { durationDrafts[task.orderIndex] ?? task.estimatedMinutes },
+            set: { durationDrafts[task.orderIndex] = $0 }
+        )
+    }
+}
+
 #if DEBUG
 private enum AssistantPanelPreviewFixtures {
     @MainActor
@@ -505,11 +887,76 @@ private struct AssistantPanelFixtureAPIClient: AssistantAPIClientProtocol {
                              totalEstimatedHours: 1, unitCount: 1, optionA: [], optionB: [])
     }
     func confirmIngestion(threadId: String, confirmed: Bool, selectedOption: String?, deadline: String?, speedFactor: Double?) async throws {}
+    func startStudyPlan(url: String, deadline: String, capacityMinutes: Int) async throws -> StudyPlanStartResponse {
+        StudyPlanStartResponse(
+            draftId: 1,
+            clarification: StudyPlanClarification(
+                version: "d30-guided-clarification-v1",
+                materialType: "web_article",
+                questions: [
+                    StudyPlanClarificationQuestion(
+                        id: "goal_depth",
+                        prompt: "预览学习目标？",
+                        options: [
+                            StudyPlanClarificationOption(
+                                id: "recommended",
+                                label: "使用推荐目标",
+                                value: "understand_and_apply",
+                                recommended: true,
+                                isDefault: true
+                            )
+                        ]
+                    )
+                ],
+                defaults: ["goal_depth": "understand_and_apply"],
+                skipAction: StudyPlanSkipAction(id: "generate_rough_draft", label: "生成粗略计划", usesDefaults: true)
+            )
+        )
+    }
+    func submitStudyPlanClarification(draftId: Int, answers: [String: String], skip: Bool) async throws -> StudyPlanDraft {
+        previewStudyPlanDraft(id: draftId)
+    }
+    func updateStudyPlanDraftTaskDuration(draftId: Int, taskOrderIndex: Int, estimatedMinutes: Int) async throws -> StudyPlanDraft {
+        previewStudyPlanDraft(id: draftId, estimatedMinutes: estimatedMinutes)
+    }
+    func cancelStudyPlanDraft(draftId: Int) async throws {}
+    func confirmStudyPlanDraft(draftId: Int) async throws -> StudyPlanActivationResult {
+        StudyPlanActivationResult(
+            id: draftId,
+            resourceId: 1,
+            status: "active",
+            sourceURL: URL(string: "https://example.com/preview")!,
+            deadline: "2026-07-01",
+            capacityMinutes: 60,
+            clarificationSkipped: false
+        )
+    }
     func fetchResources() async throws -> [AssistantResource] { resources }
     func getLearningPreferences() async throws -> LearningPreferences {
         LearningPreferences(dailyCapacityMin: 60)
     }
     func updateLearningPreferences(_ prefs: LearningPreferences) async throws {}
+
+    private func previewStudyPlanDraft(id: Int, estimatedMinutes: Int = 30) -> StudyPlanDraft {
+        StudyPlanDraft(
+            id: id,
+            title: "预览学习计划",
+            sourceURL: URL(string: "https://example.com/preview")!,
+            deadline: "2026-07-01",
+            status: "review",
+            capacityMinutes: 60,
+            clarificationSkipped: false,
+            tasks: [
+                StudyPlanDraftTask(
+                    title: "预览任务",
+                    orderIndex: 0,
+                    estimatedMinutes: estimatedMinutes,
+                    scheduledDate: "2026-06-20",
+                    targetMinutes: estimatedMinutes
+                )
+            ]
+        )
+    }
 }
 
 private struct AssistantPanelView_Previews: PreviewProvider {

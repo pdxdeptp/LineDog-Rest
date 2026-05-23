@@ -74,6 +74,11 @@ final class LearningAssistantViewModel: ObservableObject {
     @Published var ingestionThreadId: String?            = nil
     @Published var selectedOption: String                = "B"
 
+    @Published var studyPlanDraftId: Int? = nil
+    @Published var studyPlanClarification: StudyPlanClarification? = nil
+    @Published var studyPlanDraft: StudyPlanDraft? = nil
+    @Published var studyPlanError: String? = nil
+
     @Published var todayTotalMinutes: Int  = 0
     @Published var todayHighlights: String = ""
     @Published private(set) var hasLoadedDashboardContent = false
@@ -81,6 +86,18 @@ final class LearningAssistantViewModel: ObservableObject {
     @Published var isFetchingBriefing = false
     @Published var isSendingMessage   = false
     @Published var isIngesting        = false
+    @Published var isStartingStudyPlan = false
+    @Published var isSubmittingStudyPlanClarification = false
+    @Published var isUpdatingStudyPlanDraft = false
+    @Published var isConfirmingStudyPlanDraft = false
+    private var isCancellingStudyPlanDraft = false
+    private var isStudyPlanDraftFlowBusy: Bool {
+        isStartingStudyPlan ||
+        isSubmittingStudyPlanClarification ||
+        isUpdatingStudyPlanDraft ||
+        isCancellingStudyPlanDraft ||
+        isConfirmingStudyPlanDraft
+    }
     /// 后端进程启动中（还未收到就绪通知）；区别于运行期离线。
     @Published var isConnecting: Bool = true
 
@@ -540,6 +557,128 @@ final class LearningAssistantViewModel: ObservableObject {
         selectedOption = "B"
     }
 
+    // MARK: - Study Plan Draft Flow
+
+    func startStudyPlan(url: String, deadline: Date, capacityMinutes: Int) async {
+        guard !isStudyPlanDraftFlowBusy else { return }
+        isStartingStudyPlan = true
+        studyPlanError = nil
+        defer { isStartingStudyPlan = false }
+
+        do {
+            let response = try await api.startStudyPlan(
+                url: url,
+                deadline: formatStudyPlanDeadline(deadline),
+                capacityMinutes: capacityMinutes
+            )
+            studyPlanDraftId = response.draftId
+            studyPlanClarification = response.clarification
+            studyPlanDraft = nil
+            isOffline = false
+        } catch {
+            studyPlanError = "无法启动学习计划，请重试。"
+            isOffline = true
+        }
+    }
+
+    func submitStudyPlanClarification(answers: [String: String], skip: Bool) async {
+        guard !isStudyPlanDraftFlowBusy else { return }
+        guard let draftId = studyPlanDraftId else {
+            studyPlanError = "缺少学习计划草稿，请重新提交链接。"
+            return
+        }
+
+        isSubmittingStudyPlanClarification = true
+        studyPlanError = nil
+        defer { isSubmittingStudyPlanClarification = false }
+
+        do {
+            let draft = try await api.submitStudyPlanClarification(
+                draftId: draftId,
+                answers: answers,
+                skip: skip
+            )
+            guard studyPlanDraftId == draftId else { return }
+            studyPlanDraft = draft
+            isOffline = false
+        } catch {
+            studyPlanError = "生成学习计划草稿失败，请重试。"
+            isOffline = true
+        }
+    }
+
+    func skipStudyPlanClarification() async {
+        await submitStudyPlanClarification(
+            answers: studyPlanClarification?.defaults ?? [:],
+            skip: true
+        )
+    }
+
+    func updateStudyPlanDraftTaskDuration(orderIndex: Int, estimatedMinutes: Int) async {
+        guard !isStudyPlanDraftFlowBusy else { return }
+        guard let draftId = reviewReadyStudyPlanDraftId() else { return }
+
+        isUpdatingStudyPlanDraft = true
+        studyPlanError = nil
+        defer { isUpdatingStudyPlanDraft = false }
+
+        do {
+            let draft = try await api.updateStudyPlanDraftTaskDuration(
+                draftId: draftId,
+                taskOrderIndex: orderIndex,
+                estimatedMinutes: estimatedMinutes
+            )
+            guard studyPlanDraftId == draftId else { return }
+            studyPlanDraft = draft
+            isOffline = false
+        } catch {
+            studyPlanError = "更新任务时长失败，请重试。"
+            isOffline = true
+        }
+    }
+
+    func cancelStudyPlanDraft() async {
+        guard !isStudyPlanDraftFlowBusy else { return }
+        guard let draftId = studyPlanDraftId else {
+            clearStudyPlanDraftFlow()
+            return
+        }
+
+        isCancellingStudyPlanDraft = true
+        studyPlanError = nil
+        defer { isCancellingStudyPlanDraft = false }
+
+        do {
+            try await api.cancelStudyPlanDraft(draftId: draftId)
+            guard studyPlanDraftId == draftId else { return }
+            clearStudyPlanDraftFlow()
+            isOffline = false
+        } catch {
+            studyPlanError = "取消学习计划草稿失败，请重试。"
+            isOffline = true
+        }
+    }
+
+    func confirmStudyPlanDraft() async {
+        guard !isStudyPlanDraftFlowBusy else { return }
+        guard let draftId = reviewReadyStudyPlanDraftId() else { return }
+
+        isConfirmingStudyPlanDraft = true
+        studyPlanError = nil
+        defer { isConfirmingStudyPlanDraft = false }
+
+        do {
+            _ = try await api.confirmStudyPlanDraft(draftId: draftId)
+            guard studyPlanDraftId == draftId else { return }
+            clearStudyPlanDraftFlow()
+            isOffline = false
+            await fetchDashboard()
+        } catch {
+            studyPlanError = "确认学习计划失败，请重试。"
+            isOffline = true
+        }
+    }
+
     func cancelAnalysis() {
         analysisTask?.cancel()
         analysisTask = nil
@@ -674,5 +813,32 @@ final class LearningAssistantViewModel: ObservableObject {
         dateOnlyFormatter.timeZone = TimeZone(secondsFromGMT: 0)
         dateOnlyFormatter.dateFormat = "yyyy-MM-dd"
         return dateOnlyFormatter.date(from: rawValue)
+    }
+
+    private func formatStudyPlanDeadline(_ deadline: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: deadline)
+    }
+
+    private func reviewReadyStudyPlanDraftId() -> Int? {
+        guard let draftId = studyPlanDraftId else {
+            studyPlanError = "缺少学习计划草稿，请重新提交链接。"
+            return nil
+        }
+        guard let draft = studyPlanDraft, draft.id == draftId, draft.status == "review" else {
+            studyPlanError = "学习计划草稿尚未准备好，请先完成草稿生成。"
+            return nil
+        }
+        return draftId
+    }
+
+    private func clearStudyPlanDraftFlow() {
+        studyPlanDraftId = nil
+        studyPlanClarification = nil
+        studyPlanDraft = nil
+        studyPlanError = nil
     }
 }

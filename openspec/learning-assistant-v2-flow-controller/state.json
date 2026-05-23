@@ -1,13 +1,14 @@
 {
   "phase": "flow-b",
-  "round": 2,
-  "current_item": "study-plan-foundation",
+  "round": 3,
+  "current_item": "study-views",
   "last_doc_hash": "d83fb77602961d4f3a9c3e17c307c6b499eb987b",
   "flow_a_readiness": "PASS",
   "flow_b_readiness": "PASS",
   "git_strategy": "current-checkout-only",
-  "last_checkpoint_commit": "dd325b4",
+  "last_checkpoint_commit": "efd022d",
   "in_progress_step": null,
-  "last_completed_step": "flow-b-round-01-study-plan-openspec-valid",
-  "updated_at": "2026-05-23T14:50:55.420Z"
+  "last_completed_step": "flow-b-round-10-item-002-openspec-ready",
+  "next_step": "checkpoint-and-opsx-apply-introduce-study-views",
+  "updated_at": "2026-05-23T18:18:56.496Z"
 }

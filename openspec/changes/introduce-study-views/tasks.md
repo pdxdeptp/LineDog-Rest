@@ -1,0 +1,36 @@
+## 1. Proposal Readiness
+
+- [x] 1.1 Confirm the `study-views` proposal, design, spec, and tasks pass `openspec validate introduce-study-views --strict`.
+- [x] 1.2 Record ITEM-002 v1 observation and gap-analysis evidence under Flow B.
+
+## 2. Backend View APIs
+
+- [ ] 2.1 Write failing backend tests for deterministic Today view: active study tasks for the current day, project title, target minutes, learning link, and no morning-agent/LLM invocation.
+- [ ] 2.2 Implement the Today view query and route with persisted task/project facts.
+- [ ] 2.3 Write failing backend tests for task completion idempotency, progress update, unit completion, and view refresh facts.
+- [ ] 2.4 Implement the completion update path needed by v2 views without double-counting duplicate completions.
+- [ ] 2.5 Write failing backend tests for Project Overview active summaries and completed history.
+- [ ] 2.6 Implement project overview queries/routes using current task/unit/resource facts.
+- [ ] 2.7 Write failing backend tests for Calendar load aggregation over a date window and over-capacity marking.
+- [ ] 2.8 Implement read-only calendar load query/route.
+- [ ] 2.9 Write failing backend tests for automatic completed project archive/history when the last unfinished task completes.
+- [ ] 2.10 Implement completed-project transition and event persistence without hard-deleting history.
+
+## 3. Swift API And View Model
+
+- [ ] 3.1 Write failing Swift model/client tests for Today, Project Overview, Calendar Load, and task completion refresh payloads.
+- [ ] 3.2 Implement Swift API models and client methods for study views.
+- [ ] 3.3 Write failing ViewModel tests for default Today view loading, task completion refresh, project overview active/history sections, and read-only calendar load state.
+- [ ] 3.4 Implement ViewModel state transitions for the study views without relying on `TodayBriefing.highlights` as the v2 source of truth.
+
+## 4. Swift UI
+
+- [ ] 4.1 Write failing presentation tests that expose first-class Today, Project Overview, and Calendar views.
+- [ ] 4.2 Implement the minimal v2 UI for Today, Project Overview, completed history, and read-only Calendar load.
+- [ ] 4.3 Verify the Calendar view is inspection-only in this slice and does not expose drag/reschedule/add/delete controls.
+
+## 5. Review And Verification
+
+- [ ] 5.1 Run relevant backend and Swift tests and record RED/GREEN/REFACTOR evidence.
+- [ ] 5.2 Run `openspec validate introduce-study-views --strict`.
+- [ ] 5.3 Use Computer Use/App Use on the current checkout app path to verify Today, completion progress refresh, Project Overview active/history, and Calendar load behavior; save evidence under Flow B.

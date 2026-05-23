@@ -2,7 +2,7 @@
 
 ## Queue
 
-- [ ] ITEM-001 `study-plan-foundation`
+- [x] ITEM-001 `study-plan-foundation`
   - Source: US-1, US-2, US-3, US-4, US-5, D24, D29, D30
   - Change: `introduce-study-plan-foundation`
   - Spec: `study-plan`

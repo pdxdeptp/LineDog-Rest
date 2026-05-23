@@ -110,6 +110,266 @@ final class AssistantModelDecodingTests: XCTestCase {
         XCTAssertEqual(resp.proposal?.summaryForUser, "已将任务推迟到 2026-05-11")
     }
 
+    // MARK: Study Plan v2 Draft Flow
+
+    func testStudyPlanClarificationDecodesBoundedQuestionsDefaultsAndSkipAction() throws {
+        let json = """
+        {
+            "version": "d30-guided-clarification-v1",
+            "material_type": "documentation",
+            "questions": [
+                {
+                    "id": "level_familiarity",
+                    "prompt": "What is your current level?",
+                    "options": [
+                        {
+                            "id": "recommended",
+                            "label": "Use recommended familiarity",
+                            "value": "some_familiarity",
+                            "recommended": true,
+                            "default": true
+                        },
+                        {
+                            "id": "unsure_recommended",
+                            "label": "Not sure / use recommended",
+                            "value": "some_familiarity",
+                            "uses_default": true
+                        }
+                    ]
+                },
+                {
+                    "id": "goal_depth",
+                    "prompt": "What goal should guide the plan?",
+                    "allows_custom_text": false,
+                    "options": []
+                },
+                {
+                    "id": "focus_scope",
+                    "prompt": "What focus or skip scope should guide the draft plan?",
+                    "allows_custom_text": true,
+                    "options": []
+                }
+            ],
+            "defaults": {
+                "level_familiarity": "some_familiarity",
+                "goal_depth": "understand_and_apply",
+                "focus_scope": "Consensus and replication"
+            },
+            "skip_action": {
+                "id": "generate_rough_draft",
+                "label": "Generate rough draft",
+                "uses_defaults": true
+            }
+        }
+        """
+
+        let clarification = try decode(StudyPlanClarification.self, from: json)
+
+        XCTAssertEqual(clarification.version, "d30-guided-clarification-v1")
+        XCTAssertEqual(clarification.materialType, "documentation")
+        XCTAssertLessThanOrEqual(clarification.questions.count, 3)
+        XCTAssertFalse(clarification.questions[0].allowsCustomText)
+        XCTAssertTrue(clarification.questions[2].allowsCustomText)
+        XCTAssertEqual(clarification.defaults["focus_scope"], "Consensus and replication")
+        XCTAssertEqual(clarification.skipAction.id, "generate_rough_draft")
+        XCTAssertTrue(clarification.skipAction.usesDefaults)
+        XCTAssertTrue(clarification.questions[0].options[0].recommended)
+        XCTAssertTrue(clarification.questions[0].options[0].isDefault)
+        XCTAssertTrue(clarification.questions[0].options[1].usesDefault)
+    }
+
+    func testStudyPlanStartResponseDecodesDraftIdAndClarificationWrapper() throws {
+        let json = """
+        {
+            "draft_id": 42,
+            "clarification": {
+                "version": "d30-guided-clarification-v1",
+                "material_type": "documentation",
+                "questions": [
+                    {
+                        "id": "goal_depth",
+                        "prompt": "What learning goal and target depth should the plan aim for?",
+                        "options": [
+                            {
+                                "id": "recommended",
+                                "label": "Use recommended goal",
+                                "value": "understand_and_apply",
+                                "recommended": true,
+                                "default": true
+                            }
+                        ]
+                    }
+                ],
+                "defaults": {
+                    "goal_depth": "understand_and_apply"
+                },
+                "skip_action": {
+                    "id": "generate_rough_draft",
+                    "label": "Generate rough draft",
+                    "uses_defaults": true
+                }
+            }
+        }
+        """
+
+        let response = try decode(StudyPlanStartResponse.self, from: json)
+
+        XCTAssertEqual(response.draftId, 42)
+        XCTAssertEqual(response.clarification.version, "d30-guided-clarification-v1")
+        XCTAssertEqual(response.clarification.materialType, "documentation")
+        XCTAssertEqual(response.clarification.questions.first?.allowsCustomText, false)
+        XCTAssertEqual(response.clarification.defaults["goal_depth"], "understand_and_apply")
+    }
+
+    func testStudyPlanSkipClarificationResponseDecodesDefaultsAndLowCalibrationMarker() throws {
+        let json = """
+        {
+            "answers": {
+                "level_familiarity": "some_familiarity",
+                "goal_depth": "understand_and_apply"
+            },
+            "defaults": {
+                "level_familiarity": "some_familiarity",
+                "goal_depth": "understand_and_apply"
+            },
+            "clarification_skipped": true,
+            "low_calibration": true
+        }
+        """
+
+        let response = try decode(StudyPlanSkipClarificationResponse.self, from: json)
+
+        XCTAssertEqual(response.answers["goal_depth"], "understand_and_apply")
+        XCTAssertEqual(response.defaults["level_familiarity"], "some_familiarity")
+        XCTAssertTrue(response.clarificationSkipped)
+        XCTAssertTrue(response.lowCalibration)
+    }
+
+    func testStudyPlanDraftDecodesReviewStateTasksAndCapacityWarnings() throws {
+        let json = """
+        {
+            "id": 42,
+            "title": "Distributed Systems Primer",
+            "source_url": "https://example.com/distributed-systems",
+            "deadline": "2026-06-30",
+            "status": "review",
+            "capacity_minutes": 75,
+            "clarification_skipped": true,
+            "low_calibration": true,
+            "tasks": [
+                {
+                    "title": "Read clocks chapter",
+                    "order_index": 0,
+                    "estimated_minutes": 45,
+                    "scheduled_date": "2026-06-20",
+                    "target_minutes": 45
+                },
+                {
+                    "title": "Practice consensus exercises",
+                    "order_index": 1,
+                    "estimated_minutes": 90,
+                    "scheduled_date": "2026-06-21",
+                    "target_minutes": 75
+                }
+            ],
+            "expected_late": true,
+            "over_capacity_days": [
+                {
+                    "date": "2026-06-21",
+                    "scheduled_minutes": 90,
+                    "existing_minutes": 20,
+                    "capacity_minutes": 75,
+                    "over_by_minutes": 35
+                }
+            ]
+        }
+        """
+
+        let draft = try decode(StudyPlanDraft.self, from: json)
+
+        XCTAssertEqual(draft.id, 42)
+        XCTAssertEqual(draft.title, "Distributed Systems Primer")
+        XCTAssertEqual(draft.sourceURL, URL(string: "https://example.com/distributed-systems"))
+        XCTAssertEqual(draft.status, "review")
+        XCTAssertEqual(draft.capacityMinutes, 75)
+        XCTAssertTrue(draft.clarificationSkipped)
+        XCTAssertTrue(draft.lowCalibration)
+        XCTAssertTrue(draft.expectedLate)
+        XCTAssertEqual(draft.tasks.map(\.orderIndex), [0, 1])
+        XCTAssertEqual(draft.tasks[1].estimatedMinutes, 90)
+        XCTAssertEqual(draft.tasks[1].targetMinutes, 75)
+        XCTAssertEqual(draft.overCapacityDays.first?.overByMinutes, 35)
+    }
+
+    func testStudyPlanRequestBodiesEncodeSnakeCaseFields() throws {
+        let start = StudyPlanStartRequest(
+            url: "https://example.com/course",
+            deadline: "2026-07-01",
+            capacityMinutes: 60
+        )
+        let clarification = StudyPlanClarificationSubmission(
+            answers: ["goal_depth": "apply"],
+            clarificationSkipped: true
+        )
+        let duration = StudyPlanDraftTaskDurationUpdateRequest(estimatedMinutes: 35)
+
+        let startPayload = try jsonDictionary(from: start)
+        XCTAssertEqual(startPayload["url"] as? String, "https://example.com/course")
+        XCTAssertEqual(startPayload["deadline"] as? String, "2026-07-01")
+        XCTAssertEqual(startPayload["capacity_minutes"] as? Int, 60)
+        XCTAssertNil(startPayload["capacityMinutes"])
+
+        let clarificationPayload = try jsonDictionary(from: clarification)
+        XCTAssertEqual(clarificationPayload["clarification_skipped"] as? Bool, true)
+        XCTAssertNil(clarificationPayload["clarificationSkipped"])
+        let answers = clarificationPayload["answers"] as? [String: String]
+        XCTAssertEqual(answers?["goal_depth"], "apply")
+
+        let durationPayload = try jsonDictionary(from: duration)
+        XCTAssertEqual(durationPayload["estimated_minutes"] as? Int, 35)
+        XCTAssertNil(durationPayload["estimatedMinutes"])
+    }
+
+    func testStudyPlanActivationResultDecodesConfirmPayload() throws {
+        let json = """
+        {
+            "id": 42,
+            "resource_id": 101,
+            "status": "active",
+            "source_url": "https://example.com/distributed-systems",
+            "deadline": "2026-06-30",
+            "capacity_minutes": 75,
+            "clarification_skipped": true
+        }
+        """
+
+        let result = try decode(StudyPlanActivationResult.self, from: json)
+
+        XCTAssertEqual(result.id, 42)
+        XCTAssertEqual(result.resourceId, 101)
+        XCTAssertEqual(result.status, "active")
+        XCTAssertEqual(result.sourceURL, URL(string: "https://example.com/distributed-systems"))
+        XCTAssertEqual(result.deadline, "2026-06-30")
+        XCTAssertEqual(result.capacityMinutes, 75)
+        XCTAssertTrue(result.clarificationSkipped)
+    }
+
+    func testAssistantAPIClientDefinesStudyPlanDraftFlowEndpoints() throws {
+        let source = try sourceFile("MalDaze/LearningAssistant/AssistantAPIClient.swift")
+
+        XCTAssertTrue(source.contains("func startStudyPlan"))
+        XCTAssertTrue(source.contains("-> StudyPlanStartResponse"))
+        XCTAssertTrue(source.contains("func submitStudyPlanClarification"))
+        XCTAssertTrue(source.contains("func updateStudyPlanDraftTaskDuration"))
+        XCTAssertTrue(source.contains("func cancelStudyPlanDraft"))
+        XCTAssertTrue(source.contains("func confirmStudyPlanDraft"))
+        XCTAssertTrue(source.contains("\"/api/study-plan/start\""))
+        XCTAssertTrue(source.contains("\"/api/study-plan/drafts/\\(draftId)/clarification\""))
+        XCTAssertTrue(source.contains("\"/api/study-plan/drafts/\\(draftId)/tasks/\\(taskOrderIndex)/duration\""))
+        XCTAssertTrue(source.contains("\"/api/study-plan/drafts/\\(draftId)/cancel\""))
+        XCTAssertTrue(source.contains("\"/api/study-plan/drafts/\\(draftId)/confirm\""))
+    }
+
     // MARK: TodayBriefing
 
     func testTodayBriefingDecoding() throws {
@@ -279,6 +539,18 @@ final class AssistantModelDecodingTests: XCTestCase {
     private func decode<T: Decodable>(_ type: T.Type, from jsonString: String) throws -> T {
         try JSONDecoder().decode(type, from: Data(jsonString.utf8))
     }
+
+    private func jsonDictionary<T: Encodable>(from value: T) throws -> [String: Any] {
+        let data = try JSONEncoder().encode(value)
+        return try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    }
+
+    private func sourceFile(_ relativePath: String) throws -> String {
+        let testFile = URL(fileURLWithPath: #filePath)
+        let projectRoot = testFile.deletingLastPathComponent().deletingLastPathComponent()
+        let url = projectRoot.appendingPathComponent(relativePath)
+        return try String(contentsOf: url, encoding: .utf8)
+    }
 }
 
 // MARK: - UI Source Tests
@@ -367,6 +639,66 @@ final class LearningAssistantUISourceTests: XCTestCase {
         XCTAssertTrue(source.contains("completeResource(resource)"))
         XCTAssertTrue(source.contains("archiveResource(resource)"))
         XCTAssertTrue(source.contains("isManagingResource(resource)"))
+    }
+
+    func testAssistantPanelAddResourceUsesStudyPlanIntakeView() throws {
+        let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
+
+        XCTAssertTrue(source.contains("case .addResource:"))
+        XCTAssertTrue(source.contains("StudyPlanIntakeView(vm: vm)"))
+        XCTAssertFalse(source.contains("case .addResource:\n            IngestionView(vm: vm)"))
+    }
+
+    func testStudyPlanIntakeReviewUIWiresDraftFlowControls() throws {
+        let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
+
+        XCTAssertTrue(source.contains("private struct StudyPlanIntakeView"))
+        XCTAssertTrue(source.contains("private var studyPlanClarificationCard"))
+        XCTAssertTrue(source.contains("private var studyPlanDraftReview"))
+        XCTAssertTrue(source.contains("vm.startStudyPlan(url: urlText, deadline: deadline, capacityMinutes: capacityMinutes)"))
+        XCTAssertTrue(source.contains("vm.submitStudyPlanClarification(answers: clarificationAnswers, skip: false)"))
+        XCTAssertTrue(source.contains("vm.skipStudyPlanClarification()"))
+        XCTAssertTrue(source.contains("vm.updateStudyPlanDraftTaskDuration(orderIndex: task.orderIndex, estimatedMinutes: minutes)"))
+        XCTAssertTrue(source.contains("vm.cancelStudyPlanDraft()"))
+        XCTAssertTrue(source.contains("vm.confirmStudyPlanDraft()"))
+        XCTAssertTrue(source.contains("生成学习计划"))
+        XCTAssertTrue(source.contains("生成粗略计划"))
+        XCTAssertTrue(source.contains("确认创建计划"))
+        XCTAssertTrue(source.contains("截止日期（必填）"))
+        XCTAssertTrue(source.contains("低校准"))
+        XCTAssertTrue(source.contains("超出每日容量"))
+        XCTAssertTrue(source.contains("预计晚于截止日期"))
+    }
+
+    func testStudyPlanClarificationRadioOptionsUseUniqueOptionIdTagsAndSubmitAnswerValues() throws {
+        let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
+
+        XCTAssertTrue(source.contains("clarificationOptionSelectionBinding"))
+        XCTAssertTrue(source.contains("answerValue(for: question"))
+        XCTAssertTrue(source.contains(".tag(option.id)"))
+        XCTAssertFalse(source.contains(".tag(option.value)"))
+    }
+
+    func testStudyPlanIntakeResetsClarificationAndDurationDraftsForNewDraftIdentity() throws {
+        let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
+
+        XCTAssertTrue(source.contains("lastClarificationDraftId"))
+        XCTAssertTrue(source.contains("lastDurationDraftId"))
+        XCTAssertTrue(source.contains("clarificationDraftId(for: clarification)"))
+        XCTAssertTrue(source.contains("lastDurationDraftIdentity"))
+        XCTAssertTrue(source.contains("durationDraftIdentity(for: draft)"))
+        XCTAssertTrue(source.contains(".onChange(of: durationDraftIdentity(for: draft))"))
+        XCTAssertTrue(source.contains("\\($0.orderIndex):\\($0.estimatedMinutes)"))
+        XCTAssertTrue(source.contains("durationDrafts = Dictionary(uniqueKeysWithValues:"))
+    }
+
+    func testStudyPlanIntakeAcceptsDefaultDeadlineWithoutHiddenRequiredGate() throws {
+        let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
+
+        XCTAssertTrue(source.contains("DatePicker(\"截止日期（必填）\""))
+        XCTAssertFalse(source.contains("hasSelectedDeadline"))
+        XCTAssertFalse(source.contains("deadlineRequiredMessage"))
+        XCTAssertFalse(source.contains("guard hasSelectedDeadline"))
     }
 
     func testChatViewConsumesResourceAdjustPlanDraftText() throws {
@@ -741,6 +1073,365 @@ final class LearningAssistantViewModelTests: XCTestCase {
 
         XCTAssertEqual(vm.learningLink(for: resourceOnly), .available(URL(string: "https://example.com/resource")!))
         XCTAssertEqual(vm.learningLink(for: noLink), .unavailable)
+    }
+
+    func testStudyPlanProtocolAndMockRepresentDraftFlow() async throws {
+        let mock = MockAssistantAPIClient()
+        mock.studyPlanStartResult = sampleStudyPlanStartResponse()
+        mock.studyPlanDraftResult = sampleStudyPlanDraft()
+        mock.studyPlanActivationResult = StudyPlanActivationResult(
+            id: 42,
+            resourceId: 101,
+            status: "active",
+            sourceURL: URL(string: "https://example.com/course")!,
+            deadline: "2026-07-01",
+            capacityMinutes: 60,
+            clarificationSkipped: true
+        )
+        let api: any AssistantAPIClientProtocol = mock
+
+        let start = try await api.startStudyPlan(
+            url: "https://example.com/course",
+            deadline: "2026-07-01",
+            capacityMinutes: 60
+        )
+        let draft = try await api.submitStudyPlanClarification(
+            draftId: start.draftId,
+            answers: ["goal_depth": "apply"],
+            skip: true
+        )
+        let updatedDraft = try await api.updateStudyPlanDraftTaskDuration(
+            draftId: start.draftId,
+            taskOrderIndex: 1,
+            estimatedMinutes: 35
+        )
+        try await api.cancelStudyPlanDraft(draftId: start.draftId)
+        let activation = try await api.confirmStudyPlanDraft(draftId: start.draftId)
+
+        XCTAssertEqual(start.draftId, 42)
+        XCTAssertEqual(start.clarification.version, "d30-guided-clarification-v1")
+        XCTAssertEqual(draft.id, 42)
+        XCTAssertEqual(updatedDraft.tasks.first?.estimatedMinutes, 25)
+        XCTAssertEqual(activation.resourceId, 101)
+        XCTAssertEqual(mock.lastStudyPlanStartURL, "https://example.com/course")
+        XCTAssertEqual(mock.lastStudyPlanStartDeadline, "2026-07-01")
+        XCTAssertEqual(mock.lastStudyPlanStartCapacityMinutes, 60)
+        XCTAssertEqual(mock.lastStudyPlanClarificationDraftId, start.draftId)
+        XCTAssertEqual(mock.lastStudyPlanClarificationAnswers["goal_depth"], "apply")
+        XCTAssertEqual(mock.lastStudyPlanClarificationSkip, true)
+        XCTAssertEqual(mock.lastStudyPlanDurationDraftId, start.draftId)
+        XCTAssertEqual(mock.lastStudyPlanDurationTaskOrderIndex, 1)
+        XCTAssertEqual(mock.lastStudyPlanDurationEstimatedMinutes, 35)
+        XCTAssertEqual(mock.lastCancelledStudyPlanDraftId, start.draftId)
+        XCTAssertEqual(mock.lastConfirmedStudyPlanDraftId, start.draftId)
+    }
+
+    func testStartStudyPlanStoresDraftIdAndClarificationAndClearsPreviousDraftError() async throws {
+        let mock = MockAssistantAPIClient()
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        vm.studyPlanDraft = sampleStudyPlanDraft()
+        vm.studyPlanError = "旧错误"
+        let deadline = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-07-01T12:00:00Z"))
+
+        await vm.startStudyPlan(
+            url: "https://example.com/course",
+            deadline: deadline,
+            capacityMinutes: 75
+        )
+
+        XCTAssertEqual(vm.studyPlanDraftId, 42)
+        XCTAssertEqual(vm.studyPlanClarification?.version, "d30-guided-clarification-v1")
+        XCTAssertNil(vm.studyPlanDraft)
+        XCTAssertNil(vm.studyPlanError)
+        XCTAssertFalse(vm.isOffline)
+        XCTAssertEqual(mock.lastStudyPlanStartURL, "https://example.com/course")
+        XCTAssertEqual(mock.lastStudyPlanStartDeadline, "2026-07-01")
+        XCTAssertEqual(mock.lastStudyPlanStartCapacityMinutes, 75)
+    }
+
+    func testStartStudyPlanFailurePreservesExistingDraftFlowAndResetsLoading() async throws {
+        let mock = MockAssistantAPIClient()
+        mock.shouldThrowOffline = true
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        vm.studyPlanDraftId = 42
+        vm.studyPlanClarification = sampleStudyPlanClarification()
+        vm.studyPlanDraft = sampleStudyPlanDraft()
+        let deadline = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-07-01T12:00:00Z"))
+
+        await vm.startStudyPlan(
+            url: "https://example.com/new-course",
+            deadline: deadline,
+            capacityMinutes: 90
+        )
+
+        XCTAssertEqual(vm.studyPlanDraftId, 42)
+        XCTAssertEqual(vm.studyPlanClarification?.version, "d30-guided-clarification-v1")
+        XCTAssertEqual(vm.studyPlanDraft?.id, 42)
+        XCTAssertFalse(vm.isStartingStudyPlan)
+        XCTAssertTrue(vm.isOffline)
+        XCTAssertNotNil(vm.studyPlanError)
+    }
+
+    func testSkipStudyPlanClarificationUsesDefaultsAndStoresReviewDraft() async {
+        let mock = MockAssistantAPIClient()
+        mock.studyPlanDraftResult = sampleStudyPlanDraft(lowCalibration: true, clarificationSkipped: true)
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        vm.studyPlanDraftId = 42
+        vm.studyPlanClarification = sampleStudyPlanClarification()
+
+        await vm.skipStudyPlanClarification()
+
+        XCTAssertEqual(mock.lastStudyPlanClarificationDraftId, 42)
+        XCTAssertEqual(mock.lastStudyPlanClarificationAnswers, ["goal_depth": "understand_and_apply"])
+        XCTAssertEqual(mock.lastStudyPlanClarificationSkip, true)
+        XCTAssertEqual(vm.studyPlanDraft?.status, "review")
+        XCTAssertTrue(vm.studyPlanDraft?.lowCalibration ?? false)
+        XCTAssertNil(mock.lastConfirmedStudyPlanDraftId)
+        XCTAssertEqual(mock.fetchBriefingCallCount, 0)
+    }
+
+    func testSubmitStudyPlanClarificationPassesAnswersWithoutSkip() async {
+        let mock = MockAssistantAPIClient()
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        vm.studyPlanDraftId = 42
+
+        await vm.submitStudyPlanClarification(
+            answers: ["goal_depth": "mastery", "focus_scope": "consensus"],
+            skip: false
+        )
+
+        XCTAssertEqual(mock.lastStudyPlanClarificationDraftId, 42)
+        XCTAssertEqual(mock.lastStudyPlanClarificationAnswers["goal_depth"], "mastery")
+        XCTAssertEqual(mock.lastStudyPlanClarificationAnswers["focus_scope"], "consensus")
+        XCTAssertEqual(mock.lastStudyPlanClarificationSkip, false)
+        XCTAssertEqual(vm.studyPlanDraft?.id, 42)
+        XCTAssertNil(mock.lastConfirmedStudyPlanDraftId)
+    }
+
+    func testUpdateStudyPlanDraftTaskDurationKeepsDraftInReviewState() async {
+        let mock = MockAssistantAPIClient()
+        mock.studyPlanDraftResult = sampleStudyPlanDraft(estimatedMinutes: 45, status: "review")
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        vm.studyPlanDraftId = 42
+        vm.studyPlanDraft = sampleStudyPlanDraft(estimatedMinutes: 25, status: "review")
+
+        await vm.updateStudyPlanDraftTaskDuration(orderIndex: 0, estimatedMinutes: 45)
+
+        XCTAssertEqual(mock.lastStudyPlanDurationDraftId, 42)
+        XCTAssertEqual(mock.lastStudyPlanDurationTaskOrderIndex, 0)
+        XCTAssertEqual(mock.lastStudyPlanDurationEstimatedMinutes, 45)
+        XCTAssertEqual(vm.studyPlanDraft?.status, "review")
+        XCTAssertEqual(vm.studyPlanDraft?.tasks.first?.estimatedMinutes, 45)
+        XCTAssertNil(mock.lastConfirmedStudyPlanDraftId)
+    }
+
+    func testUpdateStudyPlanDraftTaskDurationRequiresReviewDraftBeforeCallingAPI() async {
+        let mock = MockAssistantAPIClient()
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        vm.studyPlanDraftId = 42
+        vm.studyPlanClarification = sampleStudyPlanClarification()
+        vm.studyPlanDraft = nil
+
+        await vm.updateStudyPlanDraftTaskDuration(orderIndex: 0, estimatedMinutes: 45)
+
+        XCTAssertNil(mock.lastStudyPlanDurationDraftId)
+        XCTAssertNotNil(vm.studyPlanError)
+        XCTAssertFalse(vm.isUpdatingStudyPlanDraft)
+    }
+
+    func testCancelStudyPlanDraftClearsLocalStateAndDoesNotRefreshDashboard() async {
+        let mock = MockAssistantAPIClient()
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        vm.studyPlanDraftId = 42
+        vm.studyPlanClarification = sampleStudyPlanClarification()
+        vm.studyPlanDraft = sampleStudyPlanDraft()
+        vm.studyPlanError = "待清理"
+
+        await vm.cancelStudyPlanDraft()
+
+        XCTAssertEqual(mock.lastCancelledStudyPlanDraftId, 42)
+        XCTAssertNil(vm.studyPlanDraftId)
+        XCTAssertNil(vm.studyPlanClarification)
+        XCTAssertNil(vm.studyPlanDraft)
+        XCTAssertNil(vm.studyPlanError)
+        XCTAssertEqual(mock.fetchBriefingCallCount, 0)
+        XCTAssertEqual(mock.fetchResourcesCallCount, 0)
+    }
+
+    func testConfirmStudyPlanDraftRequiresExplicitConfirmAndRefreshesDashboardOnce() async {
+        let mock = MockAssistantAPIClient()
+        mock.briefingResult = TodayBriefing(
+            tasks: [AssistantTask(id: 7, title: "Activated", targetMinutes: 30,
+                                  completedAt: nil, resourceTitle: "Course", priority: 1)],
+            totalMinutes: 30,
+            highlights: "已刷新"
+        )
+        mock.resourcesResult = [sampleResource(id: 101, title: "Course")]
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        vm.studyPlanDraftId = 42
+        vm.studyPlanClarification = sampleStudyPlanClarification()
+        vm.studyPlanDraft = sampleStudyPlanDraft()
+
+        await vm.confirmStudyPlanDraft()
+
+        XCTAssertEqual(mock.lastConfirmedStudyPlanDraftId, 42)
+        XCTAssertNil(vm.studyPlanDraftId)
+        XCTAssertNil(vm.studyPlanClarification)
+        XCTAssertNil(vm.studyPlanDraft)
+        XCTAssertEqual(mock.fetchBriefingCallCount, 1)
+        XCTAssertEqual(mock.fetchResourcesCallCount, 1)
+        XCTAssertEqual(vm.tasks.map(\.id), [7])
+        XCTAssertEqual(vm.resources.map(\.id), [101])
+    }
+
+    func testConfirmStudyPlanDraftRequiresReviewDraftBeforeCallingAPIOrRefreshingDashboard() async {
+        let mock = MockAssistantAPIClient()
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        vm.studyPlanDraftId = 42
+        vm.studyPlanClarification = sampleStudyPlanClarification()
+        vm.studyPlanDraft = nil
+
+        await vm.confirmStudyPlanDraft()
+
+        XCTAssertNil(mock.lastConfirmedStudyPlanDraftId)
+        XCTAssertEqual(mock.confirmStudyPlanDraftCallCount, 0)
+        XCTAssertEqual(mock.fetchBriefingCallCount, 0)
+        XCTAssertEqual(mock.fetchResourcesCallCount, 0)
+        XCTAssertNotNil(vm.studyPlanError)
+        XCTAssertFalse(vm.isConfirmingStudyPlanDraft)
+    }
+
+    func testConfirmStudyPlanDraftIgnoresDuplicateSubmitWhileInFlight() async {
+        let mock = MockAssistantAPIClient()
+        mock.studyPlanConfirmDelayNanoseconds = 50_000_000
+        mock.dashboardFetchDelayNanoseconds = 10_000_000
+        mock.briefingResult = TodayBriefing(
+            tasks: [AssistantTask(id: 7, title: "Activated", targetMinutes: 30,
+                                  completedAt: nil, resourceTitle: "Course", priority: 1)],
+            totalMinutes: 30,
+            highlights: "已刷新"
+        )
+        mock.resourcesResult = [sampleResource(id: 101, title: "Course")]
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        vm.studyPlanDraftId = 42
+        vm.studyPlanClarification = sampleStudyPlanClarification()
+        vm.studyPlanDraft = sampleStudyPlanDraft()
+
+        let first = Task { await vm.confirmStudyPlanDraft() }
+        await mock.waitForStudyPlanConfirmToStart()
+        XCTAssertTrue(vm.isConfirmingStudyPlanDraft)
+        XCTAssertEqual(mock.confirmStudyPlanDraftCallCount, 1)
+        let second = Task { await vm.confirmStudyPlanDraft() }
+        await first.value
+        await second.value
+
+        XCTAssertEqual(mock.confirmStudyPlanDraftCallCount, 1)
+        XCTAssertEqual(mock.fetchBriefingCallCount, 1)
+        XCTAssertEqual(mock.fetchResourcesCallCount, 1)
+        XCTAssertFalse(vm.isConfirmingStudyPlanDraft)
+        XCTAssertNil(vm.studyPlanDraftId)
+    }
+
+    func testWaitForStudyPlanConfirmToStartReturnsWhenConfirmAlreadyStartedBeforeWaiterRegisters() async {
+        let mock = MockAssistantAPIClient()
+
+        mock.recordStudyPlanConfirmStartedForWaiterTest()
+        await mock.waitForStudyPlanConfirmToStart()
+
+        XCTAssertEqual(mock.confirmStudyPlanDraftCallCount, 1)
+    }
+
+    func testConfirmStudyPlanDraftBlocksStartAndStillClearsDraftAndRefreshesDashboard() async throws {
+        let mock = MockAssistantAPIClient()
+        mock.studyPlanConfirmDelayNanoseconds = 50_000_000
+        mock.briefingResult = TodayBriefing(
+            tasks: [AssistantTask(id: 7, title: "Activated", targetMinutes: 30,
+                                  completedAt: nil, resourceTitle: "Course", priority: 1)],
+            totalMinutes: 30,
+            highlights: "已刷新"
+        )
+        mock.resourcesResult = [sampleResource(id: 101, title: "Course")]
+        mock.studyPlanStartResult = StudyPlanStartResponse(
+            draftId: 84,
+            clarification: sampleStudyPlanClarification()
+        )
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        vm.studyPlanDraftId = 42
+        vm.studyPlanClarification = sampleStudyPlanClarification()
+        vm.studyPlanDraft = sampleStudyPlanDraft()
+        let deadline = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-07-01T12:00:00Z"))
+
+        let confirm = Task { await vm.confirmStudyPlanDraft() }
+        await mock.waitForStudyPlanConfirmToStart()
+        XCTAssertTrue(vm.isConfirmingStudyPlanDraft)
+        await vm.startStudyPlan(
+            url: "https://example.com/new-course",
+            deadline: deadline,
+            capacityMinutes: 90
+        )
+        await confirm.value
+
+        XCTAssertNil(mock.lastStudyPlanStartURL)
+        XCTAssertEqual(mock.lastConfirmedStudyPlanDraftId, 42)
+        XCTAssertNil(vm.studyPlanDraftId)
+        XCTAssertNil(vm.studyPlanClarification)
+        XCTAssertNil(vm.studyPlanDraft)
+        XCTAssertEqual(mock.fetchBriefingCallCount, 1)
+        XCTAssertEqual(mock.fetchResourcesCallCount, 1)
+        XCTAssertEqual(vm.tasks.map(\.id), [7])
+        XCTAssertEqual(vm.resources.map(\.id), [101])
+        XCTAssertFalse(vm.isStartingStudyPlan)
+        XCTAssertFalse(vm.isConfirmingStudyPlanDraft)
+    }
+
+    func testConfirmStudyPlanDraftBlocksCancelAndStillClearsDraftAndRefreshesDashboard() async {
+        let mock = MockAssistantAPIClient()
+        mock.studyPlanConfirmDelayNanoseconds = 50_000_000
+        mock.briefingResult = TodayBriefing(
+            tasks: [AssistantTask(id: 7, title: "Activated", targetMinutes: 30,
+                                  completedAt: nil, resourceTitle: "Course", priority: 1)],
+            totalMinutes: 30,
+            highlights: "已刷新"
+        )
+        mock.resourcesResult = [sampleResource(id: 101, title: "Course")]
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        vm.studyPlanDraftId = 42
+        vm.studyPlanClarification = sampleStudyPlanClarification()
+        vm.studyPlanDraft = sampleStudyPlanDraft()
+
+        let confirm = Task { await vm.confirmStudyPlanDraft() }
+        await mock.waitForStudyPlanConfirmToStart()
+        XCTAssertTrue(vm.isConfirmingStudyPlanDraft)
+        await vm.cancelStudyPlanDraft()
+        await confirm.value
+
+        XCTAssertNil(mock.lastCancelledStudyPlanDraftId)
+        XCTAssertEqual(mock.lastConfirmedStudyPlanDraftId, 42)
+        XCTAssertNil(vm.studyPlanDraftId)
+        XCTAssertNil(vm.studyPlanClarification)
+        XCTAssertNil(vm.studyPlanDraft)
+        XCTAssertEqual(mock.fetchBriefingCallCount, 1)
+        XCTAssertEqual(mock.fetchResourcesCallCount, 1)
+        XCTAssertFalse(vm.isConfirmingStudyPlanDraft)
+    }
+
+    func testStudyPlanAPIFailureSetsErrorAndDoesNotSilentlyConfirm() async {
+        let mock = MockAssistantAPIClient()
+        mock.shouldThrowOffline = true
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        vm.studyPlanDraftId = 42
+        vm.studyPlanClarification = sampleStudyPlanClarification()
+        vm.studyPlanDraft = sampleStudyPlanDraft()
+
+        await vm.confirmStudyPlanDraft()
+
+        XCTAssertTrue(vm.isOffline)
+        XCTAssertNotNil(vm.studyPlanError)
+        XCTAssertEqual(vm.studyPlanDraftId, 42)
+        XCTAssertNotNil(vm.studyPlanDraft)
+        XCTAssertNil(mock.lastConfirmedStudyPlanDraftId)
+        XCTAssertEqual(mock.fetchBriefingCallCount, 0)
+        XCTAssertEqual(mock.fetchResourcesCallCount, 0)
     }
 
     // MARK: 2-3 面板任务列表 — fetchTodayBriefing
@@ -1145,6 +1836,7 @@ private final class MockAssistantAPIClient: AssistantAPIClientProtocol, @uncheck
     var shouldThrowResourceManagement = false
     var dashboardFetchDelayNanoseconds: UInt64 = 0
     var resourceManagementDelayNanoseconds: UInt64 = 0
+    var studyPlanConfirmDelayNanoseconds: UInt64 = 0
     var briefingResultsQueue: [TodayBriefing] = []
     var resourcesResultsQueue: [[AssistantResource]] = []
     // New: for updated protocol methods
@@ -1153,6 +1845,9 @@ private final class MockAssistantAPIClient: AssistantAPIClientProtocol, @uncheck
     var rescheduleResult: IngestionDraftDetail?
     var rescheduleError: Error?
     var learningPreferencesResult = LearningPreferences(dailyCapacityMin: 60)
+    var studyPlanStartResult = sampleStudyPlanStartResponse()
+    var studyPlanDraftResult = sampleStudyPlanDraft()
+    var studyPlanActivationResult = sampleStudyPlanActivationResult()
 
     // Captured call arguments for assertions
     private(set) var fetchBriefingCallCount = 0
@@ -1173,6 +1868,39 @@ private final class MockAssistantAPIClient: AssistantAPIClientProtocol, @uncheck
     private(set) var lastConfirmIngestionSpeedFactor: Double?
     private(set) var lastRescheduleDeadline: String?
     private(set) var lastRescheduleSpeedFactor: Double?
+    private(set) var lastStudyPlanStartURL: String?
+    private(set) var lastStudyPlanStartDeadline: String?
+    private(set) var lastStudyPlanStartCapacityMinutes: Int?
+    private(set) var lastStudyPlanClarificationDraftId: Int?
+    private(set) var lastStudyPlanClarificationAnswers: [String: String] = [:]
+    private(set) var lastStudyPlanClarificationSkip: Bool?
+    private(set) var lastStudyPlanDurationDraftId: Int?
+    private(set) var lastStudyPlanDurationTaskOrderIndex: Int?
+    private(set) var lastStudyPlanDurationEstimatedMinutes: Int?
+    private(set) var lastCancelledStudyPlanDraftId: Int?
+    private(set) var lastConfirmedStudyPlanDraftId: Int?
+    private(set) var confirmStudyPlanDraftCallCount = 0
+    private let studyPlanConfirmGateLock = NSLock()
+    private var studyPlanConfirmStartedContinuations: [CheckedContinuation<Void, Never>] = []
+
+    func waitForStudyPlanConfirmToStart() async {
+        await withCheckedContinuation { continuation in
+            let shouldResumeImmediately = withStudyPlanConfirmGateLock {
+                if confirmStudyPlanDraftCallCount > 0 {
+                    return true
+                }
+                studyPlanConfirmStartedContinuations.append(continuation)
+                return false
+            }
+            if shouldResumeImmediately {
+                continuation.resume()
+            }
+        }
+    }
+
+    func recordStudyPlanConfirmStartedForWaiterTest() {
+        signalStudyPlanConfirmStartedAfterRecordingCall()
+    }
 
     func fetchTodayBriefing() async throws -> TodayBriefing {
         fetchBriefingCallCount += 1
@@ -1254,6 +1982,69 @@ private final class MockAssistantAPIClient: AssistantAPIClientProtocol, @uncheck
         lastConfirmIngestionSpeedFactor = speedFactor
     }
 
+    func startStudyPlan(url: String, deadline: String, capacityMinutes: Int) async throws -> StudyPlanStartResponse {
+        if shouldThrowOffline { throw AssistantOfflineError() }
+        lastStudyPlanStartURL = url
+        lastStudyPlanStartDeadline = deadline
+        lastStudyPlanStartCapacityMinutes = capacityMinutes
+        return studyPlanStartResult
+    }
+
+    func submitStudyPlanClarification(
+        draftId: Int,
+        answers: [String: String],
+        skip: Bool
+    ) async throws -> StudyPlanDraft {
+        if shouldThrowOffline { throw AssistantOfflineError() }
+        lastStudyPlanClarificationDraftId = draftId
+        lastStudyPlanClarificationAnswers = answers
+        lastStudyPlanClarificationSkip = skip
+        return studyPlanDraftResult
+    }
+
+    func updateStudyPlanDraftTaskDuration(
+        draftId: Int,
+        taskOrderIndex: Int,
+        estimatedMinutes: Int
+    ) async throws -> StudyPlanDraft {
+        if shouldThrowOffline { throw AssistantOfflineError() }
+        lastStudyPlanDurationDraftId = draftId
+        lastStudyPlanDurationTaskOrderIndex = taskOrderIndex
+        lastStudyPlanDurationEstimatedMinutes = estimatedMinutes
+        return studyPlanDraftResult
+    }
+
+    func cancelStudyPlanDraft(draftId: Int) async throws {
+        if shouldThrowOffline { throw AssistantOfflineError() }
+        lastCancelledStudyPlanDraftId = draftId
+    }
+
+    func confirmStudyPlanDraft(draftId: Int) async throws -> StudyPlanActivationResult {
+        signalStudyPlanConfirmStartedAfterRecordingCall()
+        if studyPlanConfirmDelayNanoseconds > 0 {
+            try? await Task.sleep(nanoseconds: studyPlanConfirmDelayNanoseconds)
+        }
+        if shouldThrowOffline { throw AssistantOfflineError() }
+        lastConfirmedStudyPlanDraftId = draftId
+        return studyPlanActivationResult
+    }
+
+    private func signalStudyPlanConfirmStartedAfterRecordingCall() {
+        let continuations = withStudyPlanConfirmGateLock {
+            confirmStudyPlanDraftCallCount += 1
+            let continuations = studyPlanConfirmStartedContinuations
+            studyPlanConfirmStartedContinuations.removeAll()
+            return continuations
+        }
+        continuations.forEach { $0.resume() }
+    }
+
+    private func withStudyPlanConfirmGateLock<T>(_ body: () -> T) -> T {
+        studyPlanConfirmGateLock.lock()
+        defer { studyPlanConfirmGateLock.unlock() }
+        return body()
+    }
+
     func fetchResources() async throws -> [AssistantResource] {
         fetchResourcesCallCount += 1
         activeResourceFetches += 1
@@ -1320,6 +2111,82 @@ private func sampleResource(id: Int, title: String) -> AssistantResource {
         deadline: nil,
         status: "active",
         resourceURL: URL(string: "https://example.com/resources/\(id)")
+    )
+}
+
+private func sampleStudyPlanClarification() -> StudyPlanClarification {
+    StudyPlanClarification(
+        version: "d30-guided-clarification-v1",
+        materialType: "documentation",
+        questions: [
+            StudyPlanClarificationQuestion(
+                id: "goal_depth",
+                prompt: "What learning goal should guide the plan?",
+                options: [
+                    StudyPlanClarificationOption(
+                        id: "recommended",
+                        label: "Use recommended goal",
+                        value: "understand_and_apply",
+                        recommended: true,
+                        isDefault: true
+                    )
+                ]
+            )
+        ],
+        defaults: ["goal_depth": "understand_and_apply"],
+        skipAction: StudyPlanSkipAction(
+            id: "generate_rough_draft",
+            label: "Generate rough draft",
+            usesDefaults: true
+        )
+    )
+}
+
+private func sampleStudyPlanStartResponse() -> StudyPlanStartResponse {
+    StudyPlanStartResponse(
+        draftId: 42,
+        clarification: sampleStudyPlanClarification()
+    )
+}
+
+private func sampleStudyPlanDraft(
+    estimatedMinutes: Int = 25,
+    status: String = "review",
+    lowCalibration: Bool = true,
+    clarificationSkipped: Bool = true
+) -> StudyPlanDraft {
+    StudyPlanDraft(
+        id: 42,
+        title: "Sample Study Plan",
+        sourceURL: URL(string: "https://example.com/course")!,
+        deadline: "2026-07-01",
+        status: status,
+        capacityMinutes: 60,
+        clarificationSkipped: clarificationSkipped,
+        lowCalibration: lowCalibration,
+        tasks: [
+            StudyPlanDraftTask(
+                title: "Map the course structure",
+                orderIndex: 0,
+                estimatedMinutes: estimatedMinutes,
+                scheduledDate: "2026-06-20",
+                targetMinutes: estimatedMinutes
+            )
+        ],
+        expectedLate: false,
+        overCapacityDays: []
+    )
+}
+
+private func sampleStudyPlanActivationResult() -> StudyPlanActivationResult {
+    StudyPlanActivationResult(
+        id: 42,
+        resourceId: 101,
+        status: "active",
+        sourceURL: URL(string: "https://example.com/course")!,
+        deadline: "2026-07-01",
+        capacityMinutes: 60,
+        clarificationSkipped: true
     )
 }
 

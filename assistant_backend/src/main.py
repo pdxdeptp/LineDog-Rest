@@ -74,6 +74,7 @@ async def lifespan(app: FastAPI):
         morning,
         chat,
         review,
+        study_plan,
         resources as resources_router,
         tasks as tasks_router,
         settings as settings_router,
@@ -82,6 +83,7 @@ async def lifespan(app: FastAPI):
     app.include_router(morning.router, prefix="/api")
     app.include_router(chat.router, prefix="/api")
     app.include_router(review.router, prefix="/api")
+    app.include_router(study_plan.router, prefix="/api")
     app.include_router(resources_router.router, prefix="/api")
     app.include_router(tasks_router.router, prefix="/api")
     app.include_router(settings_router.router, prefix="/api")

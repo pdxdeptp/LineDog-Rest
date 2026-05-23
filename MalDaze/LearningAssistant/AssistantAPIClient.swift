@@ -217,6 +217,341 @@ struct LearningPreferences: Codable {
     enum CodingKeys: String, CodingKey { case dailyCapacityMin = "daily_capacity_min" }
 }
 
+// MARK: - Study Plan v2 Models
+
+struct StudyPlanClarification: Codable {
+    let version: String
+    let materialType: String
+    let questions: [StudyPlanClarificationQuestion]
+    let defaults: [String: String]
+    let skipAction: StudyPlanSkipAction
+
+    enum CodingKeys: String, CodingKey {
+        case version
+        case materialType = "material_type"
+        case questions
+        case defaults
+        case skipAction = "skip_action"
+    }
+}
+
+struct StudyPlanStartResponse: Codable {
+    let draftId: Int
+    let clarification: StudyPlanClarification
+
+    init(draftId: Int, clarification: StudyPlanClarification) {
+        self.draftId = draftId
+        self.clarification = clarification
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case draftId = "draft_id"
+        case clarification
+    }
+}
+
+struct StudyPlanClarificationQuestion: Codable {
+    let id: String
+    let prompt: String
+    let options: [StudyPlanClarificationOption]
+    let allowsCustomText: Bool
+
+    init(
+        id: String,
+        prompt: String,
+        options: [StudyPlanClarificationOption],
+        allowsCustomText: Bool = false
+    ) {
+        self.id = id
+        self.prompt = prompt
+        self.options = options
+        self.allowsCustomText = allowsCustomText
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        prompt = try container.decode(String.self, forKey: .prompt)
+        options = try container.decode([StudyPlanClarificationOption].self, forKey: .options)
+        allowsCustomText = try container.decodeIfPresent(Bool.self, forKey: .allowsCustomText) ?? false
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, prompt, options
+        case allowsCustomText = "allows_custom_text"
+    }
+}
+
+struct StudyPlanClarificationOption: Codable {
+    let id: String
+    let label: String
+    let value: String
+    let recommended: Bool
+    let isDefault: Bool
+    let usesDefault: Bool
+
+    init(
+        id: String,
+        label: String,
+        value: String,
+        recommended: Bool = false,
+        isDefault: Bool = false,
+        usesDefault: Bool = false
+    ) {
+        self.id = id
+        self.label = label
+        self.value = value
+        self.recommended = recommended
+        self.isDefault = isDefault
+        self.usesDefault = usesDefault
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        label = try container.decode(String.self, forKey: .label)
+        value = try container.decode(String.self, forKey: .value)
+        recommended = try container.decodeIfPresent(Bool.self, forKey: .recommended) ?? false
+        isDefault = try container.decodeIfPresent(Bool.self, forKey: .isDefault) ?? false
+        usesDefault = try container.decodeIfPresent(Bool.self, forKey: .usesDefault) ?? false
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, label, value, recommended
+        case isDefault = "default"
+        case usesDefault = "uses_default"
+    }
+}
+
+struct StudyPlanSkipAction: Codable {
+    let id: String
+    let label: String
+    let usesDefaults: Bool
+
+    init(id: String, label: String, usesDefaults: Bool = false) {
+        self.id = id
+        self.label = label
+        self.usesDefaults = usesDefaults
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        label = try container.decode(String.self, forKey: .label)
+        usesDefaults = try container.decodeIfPresent(Bool.self, forKey: .usesDefaults) ?? false
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, label
+        case usesDefaults = "uses_defaults"
+    }
+}
+
+struct StudyPlanSkipClarificationResponse: Codable {
+    let answers: [String: String]
+    let defaults: [String: String]
+    let clarificationSkipped: Bool
+    let lowCalibration: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case answers, defaults
+        case clarificationSkipped = "clarification_skipped"
+        case lowCalibration = "low_calibration"
+    }
+}
+
+struct StudyPlanDraftTask: Codable {
+    let title: String
+    let orderIndex: Int
+    let estimatedMinutes: Int
+    let scheduledDate: String
+    let targetMinutes: Int
+
+    init(
+        title: String,
+        orderIndex: Int,
+        estimatedMinutes: Int,
+        scheduledDate: String,
+        targetMinutes: Int
+    ) {
+        self.title = title
+        self.orderIndex = orderIndex
+        self.estimatedMinutes = estimatedMinutes
+        self.scheduledDate = scheduledDate
+        self.targetMinutes = targetMinutes
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case title
+        case orderIndex = "order_index"
+        case estimatedMinutes = "estimated_minutes"
+        case scheduledDate = "scheduled_date"
+        case targetMinutes = "target_minutes"
+    }
+}
+
+struct StudyPlanDraft: Codable {
+    let id: Int
+    let title: String
+    let sourceURL: URL
+    let deadline: String
+    let status: String
+    let capacityMinutes: Int
+    let clarificationSkipped: Bool
+    let lowCalibration: Bool
+    let tasks: [StudyPlanDraftTask]
+    let expectedLate: Bool
+    let overCapacityDays: [StudyPlanOverCapacityDay]
+
+    init(
+        id: Int,
+        title: String,
+        sourceURL: URL,
+        deadline: String,
+        status: String,
+        capacityMinutes: Int,
+        clarificationSkipped: Bool,
+        lowCalibration: Bool = false,
+        tasks: [StudyPlanDraftTask],
+        expectedLate: Bool = false,
+        overCapacityDays: [StudyPlanOverCapacityDay] = []
+    ) {
+        self.id = id
+        self.title = title
+        self.sourceURL = sourceURL
+        self.deadline = deadline
+        self.status = status
+        self.capacityMinutes = capacityMinutes
+        self.clarificationSkipped = clarificationSkipped
+        self.lowCalibration = lowCalibration
+        self.tasks = tasks
+        self.expectedLate = expectedLate
+        self.overCapacityDays = overCapacityDays
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(Int.self, forKey: .id)
+        title = try container.decode(String.self, forKey: .title)
+        sourceURL = try container.decode(URL.self, forKey: .sourceURL)
+        deadline = try container.decode(String.self, forKey: .deadline)
+        status = try container.decode(String.self, forKey: .status)
+        capacityMinutes = try container.decode(Int.self, forKey: .capacityMinutes)
+        clarificationSkipped = try container.decodeIfPresent(Bool.self, forKey: .clarificationSkipped) ?? false
+        lowCalibration = try container.decodeIfPresent(Bool.self, forKey: .lowCalibration) ?? false
+        tasks = try container.decode([StudyPlanDraftTask].self, forKey: .tasks)
+        expectedLate = try container.decodeIfPresent(Bool.self, forKey: .expectedLate) ?? false
+        overCapacityDays = try container.decodeIfPresent([StudyPlanOverCapacityDay].self, forKey: .overCapacityDays) ?? []
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, title, deadline, status, tasks
+        case sourceURL = "source_url"
+        case capacityMinutes = "capacity_minutes"
+        case clarificationSkipped = "clarification_skipped"
+        case lowCalibration = "low_calibration"
+        case expectedLate = "expected_late"
+        case overCapacityDays = "over_capacity_days"
+    }
+}
+
+struct StudyPlanOverCapacityDay: Codable {
+    let date: String
+    let scheduledMinutes: Int
+    let existingMinutes: Int
+    let capacityMinutes: Int
+    let overByMinutes: Int
+
+    init(
+        date: String,
+        scheduledMinutes: Int,
+        existingMinutes: Int,
+        capacityMinutes: Int,
+        overByMinutes: Int
+    ) {
+        self.date = date
+        self.scheduledMinutes = scheduledMinutes
+        self.existingMinutes = existingMinutes
+        self.capacityMinutes = capacityMinutes
+        self.overByMinutes = overByMinutes
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case date
+        case scheduledMinutes = "scheduled_minutes"
+        case existingMinutes = "existing_minutes"
+        case capacityMinutes = "capacity_minutes"
+        case overByMinutes = "over_by_minutes"
+    }
+}
+
+struct StudyPlanStartRequest: Codable {
+    let url: String
+    let deadline: String
+    let capacityMinutes: Int
+
+    enum CodingKeys: String, CodingKey {
+        case url, deadline
+        case capacityMinutes = "capacity_minutes"
+    }
+}
+
+struct StudyPlanClarificationSubmission: Codable {
+    let answers: [String: String]
+    let clarificationSkipped: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case answers
+        case clarificationSkipped = "clarification_skipped"
+    }
+}
+
+struct StudyPlanDraftTaskDurationUpdateRequest: Codable {
+    let estimatedMinutes: Int
+
+    enum CodingKeys: String, CodingKey {
+        case estimatedMinutes = "estimated_minutes"
+    }
+}
+
+struct StudyPlanActivationResult: Codable {
+    let id: Int
+    let resourceId: Int
+    let status: String
+    let sourceURL: URL
+    let deadline: String
+    let capacityMinutes: Int
+    let clarificationSkipped: Bool
+
+    init(
+        id: Int,
+        resourceId: Int,
+        status: String,
+        sourceURL: URL,
+        deadline: String,
+        capacityMinutes: Int,
+        clarificationSkipped: Bool
+    ) {
+        self.id = id
+        self.resourceId = resourceId
+        self.status = status
+        self.sourceURL = sourceURL
+        self.deadline = deadline
+        self.capacityMinutes = capacityMinutes
+        self.clarificationSkipped = clarificationSkipped
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, status, deadline
+        case resourceId = "resource_id"
+        case sourceURL = "source_url"
+        case capacityMinutes = "capacity_minutes"
+        case clarificationSkipped = "clarification_skipped"
+    }
+}
+
+private struct EmptyRequestBody: Encodable {}
+
 // Keep IngestionDraft for backward-compatible test decoding tests only
 struct IngestionDraft: Codable {
     let threadId: String
@@ -290,6 +625,13 @@ final class AssistantAPIClient {
         let url  = baseURL.appendingPathComponent(path)
         let bodyData = try JSONEncoder().encode(body)
         _ = try await fetch(url: url, method: "POST", body: bodyData)
+    }
+
+    private func put<B: Encodable, T: Decodable>(_ path: String, body: B) async throws -> T {
+        let url = baseURL.appendingPathComponent(path)
+        let bodyData = try JSONEncoder().encode(body)
+        let data = try await fetch(url: url, method: "PUT", body: bodyData)
+        return try decode(data)
     }
 
     private func putVoid<B: Encodable>(_ path: String, body: B) async throws {
@@ -467,6 +809,58 @@ final class AssistantAPIClient {
         try await postVoid("/api/ingest/confirm",
                            body: Body(threadId: threadId, confirmed: confirmed, selectedOption: selectedOption,
                                      deadline: deadline, speedFactor: speedFactor))
+    }
+
+    // MARK: - Study Plan v2
+
+    func startStudyPlan(url: String, deadline: String, capacityMinutes: Int) async throws -> StudyPlanStartResponse {
+        try await post(
+            "/api/study-plan/start",
+            body: StudyPlanStartRequest(
+                url: url,
+                deadline: deadline,
+                capacityMinutes: capacityMinutes
+            )
+        )
+    }
+
+    func submitStudyPlanClarification(
+        draftId: Int,
+        answers: [String: String],
+        skip: Bool
+    ) async throws -> StudyPlanDraft {
+        try await post(
+            "/api/study-plan/drafts/\(draftId)/clarification",
+            body: StudyPlanClarificationSubmission(
+                answers: answers,
+                clarificationSkipped: skip
+            )
+        )
+    }
+
+    func updateStudyPlanDraftTaskDuration(
+        draftId: Int,
+        taskOrderIndex: Int,
+        estimatedMinutes: Int
+    ) async throws -> StudyPlanDraft {
+        try await put(
+            "/api/study-plan/drafts/\(draftId)/tasks/\(taskOrderIndex)/duration",
+            body: StudyPlanDraftTaskDurationUpdateRequest(estimatedMinutes: estimatedMinutes)
+        )
+    }
+
+    func cancelStudyPlanDraft(draftId: Int) async throws {
+        try await postVoid(
+            "/api/study-plan/drafts/\(draftId)/cancel",
+            body: EmptyRequestBody()
+        )
+    }
+
+    func confirmStudyPlanDraft(draftId: Int) async throws -> StudyPlanActivationResult {
+        try await post(
+            "/api/study-plan/drafts/\(draftId)/confirm",
+            body: EmptyRequestBody()
+        )
     }
 
     func fetchResources() async throws -> [AssistantResource] {
