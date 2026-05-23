@@ -662,6 +662,96 @@ final class ControlPanelPresentationTests: XCTestCase {
         )
     }
 
+    func testMalDazeSettingsUsesCategorizedDetailShell() throws {
+        let settingsSource = try readProjectSource("MalDaze/Settings/MalDazeSettingsView.swift")
+        let viewSource = try structSource(named: "MalDazeSettingsView", in: settingsSource)
+
+        XCTAssertTrue(settingsSource.contains("private enum SettingsCategory: String, CaseIterable, Identifiable"))
+        XCTAssertTrue(settingsSource.contains("private struct SettingsSidebarButton"))
+        XCTAssertTrue(settingsSource.contains("private struct SettingsPane"))
+        XCTAssertTrue(settingsSource.contains("private struct SettingsGroup"))
+        XCTAssertTrue(viewSource.contains("@State private var selectedCategory: SettingsCategory"))
+        XCTAssertTrue(viewSource.contains("settingsSidebar"))
+        XCTAssertTrue(viewSource.contains("settingsDetailPane"))
+        XCTAssertFalse(
+            viewSource.contains(".formStyle(.grouped)"),
+            "The redesigned settings view should not be only the old raw grouped Form."
+        )
+    }
+
+    func testMalDazeSettingsAPIKeyRowsExposeStateAndVisibilityControls() throws {
+        let settingsSource = try readProjectSource("MalDaze/Settings/MalDazeSettingsView.swift")
+        let apiKeyRowSource = try structSource(named: "APIKeySettingRow", in: settingsSource)
+
+        XCTAssertTrue(apiKeyRowSource.contains("visibleLabel"))
+        XCTAssertTrue(apiKeyRowSource.contains("isKeyVisible"))
+        XCTAssertTrue(apiKeyRowSource.contains("SecureField"))
+        XCTAssertTrue(apiKeyRowSource.contains("TextField"))
+        XCTAssertTrue(apiKeyRowSource.contains("已保存在本机"))
+        XCTAssertTrue(apiKeyRowSource.contains("未填写"))
+        XCTAssertTrue(apiKeyRowSource.contains("仅保存在本机 UserDefaults"))
+        XCTAssertTrue(apiKeyRowSource.contains("显示 API Key"))
+        XCTAssertTrue(apiKeyRowSource.contains("隐藏 API Key"))
+        XCTAssertTrue(apiKeyRowSource.contains(".accessibilityLabel"))
+    }
+
+    func testSmartInputGeminiAPIKeyRowMatchesLearningAssistantGeminiPresentation() throws {
+        let settingsSource = try readProjectSource("MalDaze/Settings/MalDazeSettingsView.swift")
+        let smartInputSource = try propertySource(named: "smartInputSettingsPane", in: settingsSource)
+
+        XCTAssertTrue(smartInputSource.contains("title: \"Google Gemini API Key\""))
+        XCTAssertTrue(smartInputSource.contains("visibleLabel: \"Google Gemini API Key\""))
+        XCTAssertTrue(smartInputSource.contains("providerName: \"Google Gemini\""))
+        XCTAssertTrue(smartInputSource.contains("systemImage: \"diamond.fill\""))
+        XCTAssertFalse(
+            smartInputSource.contains("Smart Input Gemini Key") || smartInputSource.contains("Smart Input Gemini API Key"),
+            "Smart Input should not look like a separate API-key input pattern from the learning-assistant Gemini row."
+        )
+        XCTAssertFalse(
+            smartInputSource.contains("Gemini for reminders") || smartInputSource.contains("sparkle.magnifyingglass"),
+            "Smart Input should reuse the same Gemini provider identity as the learning-assistant Gemini API-key card."
+        )
+    }
+
+    func testMalDazeSettingsShortcutRowsUseReusableKeycapPresentation() throws {
+        let settingsSource = try readProjectSource("MalDaze/Settings/MalDazeSettingsView.swift")
+        let shortcutRowSource = try structSource(named: "ShortcutSettingRow", in: settingsSource)
+
+        XCTAssertTrue(shortcutRowSource.contains("keycap"))
+        XCTAssertTrue(shortcutRowSource.contains("等待按键"))
+        XCTAssertTrue(shortcutRowSource.contains("录制"))
+        XCTAssertTrue(shortcutRowSource.contains("恢复默认"))
+        XCTAssertTrue(shortcutRowSource.contains("shortcutRecorderBusy && !isRecording"))
+        XCTAssertTrue(shortcutRowSource.contains("font(.system(.body, design: .monospaced))"))
+    }
+
+    func testMalDazeSettingsPreserveStorageHooksAndPanelBlueAccent() throws {
+        let settingsSource = try readProjectSource("MalDaze/Settings/MalDazeSettingsView.swift")
+
+        let requiredTokens = [
+            "@AppStorage(MalDazeDefaults.backendLLMProvider)",
+            "@AppStorage(MalDazeDefaults.backendLLMModel)",
+            "@AppStorage(MalDazeDefaults.backendGeminiAPIKey)",
+            "@AppStorage(MalDazeDefaults.backendOpenAIAPIKey)",
+            "@AppStorage(MalDazeDefaults.backendDeepSeekAPIKey)",
+            "@AppStorage(MalDazeDefaults.geminiAPIKey)",
+            "@AppStorage(MalDazeDefaults.geminiModelId)",
+            "BackendLLMCatalog.defaultModel(for: newProvider)",
+            "MalDazeGeminiModelCatalog.pickerOptions",
+            "GlobalShortcutKeyRecorder(",
+            "SettingsEscapeKeyMonitor(shortcutRecorderBusy: shortcutRecorderBusy)",
+            "NSHostingController(rootView: MalDazeSettingsView())",
+            "Color(red: 0.45, green: 0.72, blue: 0.98)"
+        ]
+
+        for token in requiredTokens {
+            XCTAssertTrue(
+                settingsSource.contains(token),
+                "Settings redesign should preserve required token: \(token)"
+            )
+        }
+    }
+
     func testAppDelegateStartupModeUsesInjectedUserDefaults() throws {
         let appDelegateSource = try readProjectSource("MalDaze/MalDazeAppDelegate.swift")
 

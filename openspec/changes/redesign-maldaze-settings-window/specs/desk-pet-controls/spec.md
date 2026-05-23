@@ -38,6 +38,7 @@ The system SHALL provide polished, provider-aware API key entry controls that ma
 - **THEN** the model picker updates using the existing provider catalog behavior
 - **AND** the visible API key entry corresponds to the selected backend provider
 - **AND** Smart Input Gemini key entry remains separate from the learning-assistant backend provider key
+- **AND** Smart Input Gemini key entry uses the same Google Gemini provider identity and visual API key row treatment as the learning-assistant Gemini entry
 
 ### Requirement: Shortcut recorder presentation
 The system SHALL present global shortcut settings as consistent, readable rows while preserving the existing recorder behavior.

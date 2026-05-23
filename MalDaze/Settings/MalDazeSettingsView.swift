@@ -35,6 +35,9 @@ struct MalDazeSettingsView: View {
     @State private var isRecordingDeskShortcut = false
     @State private var isRecordingSevenMinuteShortcut = false
     @State private var isRecordingResetPetShortcut = false
+    @State private var selectedCategory: SettingsCategory = .learningAssistant
+    @State private var isBackendAPIKeyVisible = false
+    @State private var isSmartInputAPIKeyVisible = false
 
     private var shortcutRecorderBusy: Bool {
         isRecordingSmartShortcut || isRecordingDeskShortcut || isRecordingSevenMinuteShortcut || isRecordingResetPetShortcut
@@ -72,206 +75,54 @@ struct MalDazeSettingsView: View {
         )
     }
 
-    var body: some View {
-        Form {
-            Section {
-                LabeledContent("服务商") {
-                    Picker("", selection: $backendProvider) {
-                        Text("Google Gemini").tag("gemini")
-                        Text("OpenAI").tag("openai")
-                        Text("DeepSeek").tag("deepseek")
-                    }
-                    .labelsHidden().pickerStyle(.menu).frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .onChange(of: backendProvider) { newProvider in
-                    backendModel = BackendLLMCatalog.defaultModel(for: newProvider)
-                }
-                LabeledContent("模型") {
-                    Picker("", selection: $backendModel) {
-                        ForEach(BackendLLMCatalog.models(for: backendProvider), id: \.id) { m in
-                            Text(m.label).tag(m.id)
-                        }
-                    }
-                    .labelsHidden().pickerStyle(.menu).frame(maxWidth: .infinity, alignment: .leading)
-                }
+    private var selectedBackendAPIKey: Binding<String> {
+        Binding(
+            get: {
                 switch backendProvider {
-                case "openai":
-                    SecureField("OpenAI API Key", text: $backendOpenAIKey)
-                        .textFieldStyle(.roundedBorder)
-                case "deepseek":
-                    SecureField("DeepSeek API Key", text: $backendDeepSeekKey)
-                        .textFieldStyle(.roundedBorder)
-                default:
-                    SecureField("Gemini API Key", text: $backendGeminiKey)
-                        .textFieldStyle(.roundedBorder)
+                case "openai": return backendOpenAIKey
+                case "deepseek": return backendDeepSeekKey
+                default: return backendGeminiKey
                 }
-                Text("LLM 服务商、模型和 API Key 会在下次学习助手后端启动时生效。API Key 仅保存在本机 UserDefaults。")
-                    .font(.caption).foregroundStyle(.secondary)
-                Toggle("懒启动学习助手后端", isOn: $assistantBackendLazyStartupEnabled)
-                Text("影响下次 App 启动策略：开启时更省电，启动不会拉起后端，首次打开学习助手可能需要等待；关闭后会在 App 启动完成后预先启动后端。切换此项不会立即启动或停止当前后端。")
-                    .font(.caption).foregroundStyle(.secondary)
-            } header: {
-                Text("学习助手 LLM")
+            },
+            set: { newValue in
+                switch backendProvider {
+                case "openai": backendOpenAIKey = newValue
+                case "deepseek": backendDeepSeekKey = newValue
+                default: backendGeminiKey = newValue
+                }
             }
+        )
+    }
 
-            Section {
-                SecureField("Gemini API Key", text: $geminiAPIKey)
-                    .textFieldStyle(.roundedBorder)
-                LabeledContent("Gemini 模型") {
-                    Picker("", selection: $geminiModelId) {
-                        ForEach(MalDazeGeminiModelCatalog.pickerOptions) { opt in
-                            Text(opt.label).tag(opt.id)
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                Text("用于自然语言解析提醒事项；仅保存在本机 UserDefaults。列表以 Google 当前开放为准，若请求失败可换一款或到 AI Studio 核对模型名。")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                HStack(alignment: .firstTextBaseline, spacing: 12) {
-                    Text(smartShortcutModel.displayString)
-                        .font(.system(.body, design: .monospaced))
-                        .frame(minWidth: 120, alignment: .leading)
-                    Button(isRecordingSmartShortcut ? "等待按键…" : "修改快捷键…") {
-                        isRecordingSmartShortcut = true
-                    }
-                    .disabled(shortcutRecorderBusy)
-                    Button("恢复默认") {
-                        let d = SmartReminderInputShortcut.default
-                        smartKeyCode = Int(d.keyCode)
-                        smartModifiersRaw = SmartReminderInputShortcut.defaultModifiersStorageInt
-                        smartKeyLabel = d.keyLabel
-                    }
-                    .disabled(shortcutRecorderBusy)
-                }
-                Text("默认 ⌘⇧<（小于号，物理键为逗号 + Shift）。须带 ⌘ / ⌥ / ⌃ / ⇧ 之一；按 Esc 取消录制。")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                GlobalShortcutKeyRecorder(
-                    isRecording: $isRecordingSmartShortcut,
-                    onCaptured: { keyCode, modRaw, label in
-                        smartKeyCode = Int(keyCode)
-                        smartModifiersRaw = Int(modRaw)
-                        smartKeyLabel = label
-                    },
-                    onCancel: {}
-                )
-                .frame(width: 0, height: 0)
-            } header: {
-                Text("智能输入 (Smart Input)")
-            } footer: {
-                Text("上述「添加提醒」快捷键由系统全局热键注册，通常无需「辅助功能」。另可选用 ⌥⌘R（需在「隐私与安全性 → 辅助功能」中授权 MalDaze）。")
-                    .font(.caption)
-            }
-
-            Section {
-                HStack(alignment: .firstTextBaseline, spacing: 12) {
-                    Text(deskShortcutModel.displayString)
-                        .font(.system(.body, design: .monospaced))
-                        .frame(minWidth: 120, alignment: .leading)
-                    Button(isRecordingDeskShortcut ? "等待按键…" : "修改快捷键…") {
-                        isRecordingDeskShortcut = true
-                    }
-                    .disabled(shortcutRecorderBusy)
-                    Button("恢复默认") {
-                        let d = DeskPetMenuShortcut.default
-                        deskKeyCode = Int(d.keyCode)
-                        deskModifiersRaw = DeskPetMenuShortcut.defaultModifiersStorageInt
-                        deskKeyLabel = d.keyLabel
-                    }
-                    .disabled(shortcutRecorderBusy)
-                }
-                Text("默认 ⌘⇧.（句号）。录制时须带 ⌘ / ⌥ / ⌃ / ⇧ 之一；按 Esc 取消录制。")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                GlobalShortcutKeyRecorder(
-                    isRecording: $isRecordingDeskShortcut,
-                    onCaptured: { keyCode, modRaw, label in
-                        deskKeyCode = Int(keyCode)
-                        deskModifiersRaw = Int(modRaw)
-                        deskKeyLabel = label
-                    },
-                    onCancel: {}
-                )
-                .frame(width: 0, height: 0)
-            } header: {
-                Text("桌宠菜单")
-            }
-
-            Section {
-                HStack(alignment: .firstTextBaseline, spacing: 12) {
-                    Text(resetPetShortcutModel.displayString)
-                        .font(.system(.body, design: .monospaced))
-                        .frame(minWidth: 120, alignment: .leading)
-                    Button(isRecordingResetPetShortcut ? "等待按键…" : "修改快捷键…") {
-                        isRecordingResetPetShortcut = true
-                    }
-                    .disabled(shortcutRecorderBusy)
-                    Button("恢复默认") {
-                        let d = ResetIdlePetPositionShortcut.default
-                        resetPetKeyCode = Int(d.keyCode)
-                        resetPetModifiersRaw = ResetIdlePetPositionShortcut.defaultModifiersStorageInt
-                        resetPetKeyLabel = d.keyLabel
-                    }
-                    .disabled(shortcutRecorderBusy)
-                }
-                Text("一键把桌宠移回菜单栏屏可见区右下角（与面板里按钮相同）。默认 ⌘⇧R；须带 ⌘ / ⌥ / ⌃ / ⇧ 之一；按 Esc 取消录制。")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                GlobalShortcutKeyRecorder(
-                    isRecording: $isRecordingResetPetShortcut,
-                    onCaptured: { keyCode, modRaw, label in
-                        resetPetKeyCode = Int(keyCode)
-                        resetPetModifiersRaw = Int(modRaw)
-                        resetPetKeyLabel = label
-                    },
-                    onCancel: {}
-                )
-                .frame(width: 0, height: 0)
-            } header: {
-                Text("桌宠回到右下角")
-            }
-
-            Section {
-                HStack(alignment: .firstTextBaseline, spacing: 12) {
-                    Text(sevenShortcutModel.displayString)
-                        .font(.system(.body, design: .monospaced))
-                        .frame(minWidth: 120, alignment: .leading)
-                    Button(isRecordingSevenMinuteShortcut ? "等待按键…" : "修改快捷键…") {
-                        isRecordingSevenMinuteShortcut = true
-                    }
-                    .disabled(shortcutRecorderBusy)
-                    Button("恢复默认") {
-                        let d = SevenMinuteReminderShortcut.default
-                        sevenKeyCode = Int(d.keyCode)
-                        sevenModifiersRaw = SevenMinuteReminderShortcut.defaultModifiersStorageInt
-                        sevenKeyLabel = d.keyLabel
-                    }
-                    .disabled(shortcutRecorderBusy)
-                }
-                Text("默认 ⌘⇧M。再按一次可取消进行中的倒计时。须带 ⌘ / ⌥ / ⌃ / ⇧ 之一；按 Esc 取消录制。")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                GlobalShortcutKeyRecorder(
-                    isRecording: $isRecordingSevenMinuteShortcut,
-                    onCaptured: { keyCode, modRaw, label in
-                        sevenKeyCode = Int(keyCode)
-                        sevenModifiersRaw = Int(modRaw)
-                        sevenKeyLabel = label
-                    },
-                    onCancel: {}
-                )
-                .frame(width: 0, height: 0)
-            } header: {
-                Text("独立倒计时提醒（快捷键）")
-            } footer: {
-                Text("倒计时时长在菜单栏本应用面板里调整。此处仅配置全局快捷键（默认 ⌘⇧M，再按取消）。")
-                    .font(.caption)
-            }
+    private var backendProviderDisplayName: String {
+        switch backendProvider {
+        case "openai": return "OpenAI"
+        case "deepseek": return "DeepSeek"
+        default: return "Google Gemini"
         }
+    }
+
+    private var backendProviderSymbol: String {
+        switch backendProvider {
+        case "openai": return "sparkles"
+        case "deepseek": return "brain.head.profile"
+        default: return "diamond.fill"
+        }
+    }
+
+    private var backendAPIKeyVisibleLabel: String {
+        "\(backendProviderDisplayName) API Key"
+    }
+
+    var body: some View {
+        HStack(spacing: 0) {
+            settingsSidebar
+
+            Divider()
+
+            settingsDetailPane
+        }
+        .background(SettingsDesignPalette.windowBackground)
         .overlay(alignment: .topLeading) {
             // `onExitCommand` 在系统设置窗 / Form 里往往收不到 Esc，会落到系统里变成「咚」一声。
             // 本地监视器在快捷键录制之后注册，`GlobalShortcutKeyRecorder` 会先消费 Esc。
@@ -279,15 +130,670 @@ struct MalDazeSettingsView: View {
                 .frame(width: 0, height: 0)
                 .allowsHitTesting(false)
         }
-        .formStyle(.grouped)
-        .frame(minWidth: 420, minHeight: 480)
-        .padding()
+        .overlay(alignment: .topLeading) {
+            shortcutRecorders
+        }
+        .tint(SettingsDesignPalette.paleBlueAccent)
+        .frame(minWidth: 720, minHeight: 520)
         .onAppear {
             let ids = Set(MalDazeGeminiModelCatalog.pickerOptions.map(\.id))
             if !ids.contains(geminiModelId) {
                 geminiModelId = MalDazeDefaults.defaultGeminiModelId
             }
         }
+    }
+
+    private var settingsSidebar: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text("MalDaze")
+                    .font(.title3.bold())
+                Text("桌宠、学习助手与提醒")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 10)
+            .padding(.top, 8)
+
+            VStack(spacing: 6) {
+                ForEach(SettingsCategory.allCases) { category in
+                    SettingsSidebarButton(
+                        category: category,
+                        isSelected: selectedCategory == category
+                    ) {
+                        selectedCategory = category
+                    }
+                }
+            }
+
+            Spacer(minLength: 12)
+
+            Text("API Key 按当前实现即时保存到本机设置；本页只改善入口、说明与可读性。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(10)
+                .background(SettingsDesignPalette.paleBlueAccent.opacity(0.14), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }
+        .padding(12)
+        .frame(width: 206)
+        .frame(maxHeight: .infinity, alignment: .topLeading)
+        .background(SettingsDesignPalette.sidebarBackground)
+    }
+
+    private var settingsDetailPane: some View {
+        SettingsPane(category: selectedCategory) {
+            switch selectedCategory {
+            case .learningAssistant:
+                learningAssistantSettingsPane
+            case .smartInput:
+                smartInputSettingsPane
+            case .shortcuts:
+                shortcutsSettingsPane
+            }
+        }
+    }
+
+    private var learningAssistantSettingsPane: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SettingsGroup(
+                title: "学习助手 LLM",
+                subtitle: "影响中栏学习助手，下次后端启动时生效。",
+                systemImage: "server.rack",
+                trailing: "本机即时保存"
+            ) {
+                SettingsLabeledRow(
+                    title: "服务商与模型",
+                    subtitle: "切换服务商时会回到该服务商默认模型。"
+                ) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Picker("服务商", selection: $backendProvider) {
+                            Text("Google Gemini").tag("gemini")
+                            Text("OpenAI").tag("openai")
+                            Text("DeepSeek").tag("deepseek")
+                        }
+                        .pickerStyle(.segmented)
+                        .onChange(of: backendProvider) { newProvider in
+                            backendModel = BackendLLMCatalog.defaultModel(for: newProvider)
+                        }
+
+                        Picker("模型", selection: $backendModel) {
+                            ForEach(BackendLLMCatalog.models(for: backendProvider), id: \.id) { model in
+                                Text(model.label).tag(model.id)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+
+                SettingsLabeledRow(
+                    title: backendAPIKeyVisibleLabel,
+                    subtitle: "用于学习助手后端生成计划、复盘与对话。"
+                ) {
+                    APIKeySettingRow(
+                        visibleLabel: backendAPIKeyVisibleLabel,
+                        providerName: backendProviderDisplayName,
+                        providerContext: "学习助手后端",
+                        systemImage: backendProviderSymbol,
+                        key: selectedBackendAPIKey,
+                        isKeyVisible: $isBackendAPIKeyVisible
+                    )
+                }
+
+                SettingsLabeledRow(
+                    title: "懒启动学习助手后端",
+                    subtitle: "更省电，但首次打开学习助手可能需要等待。"
+                ) {
+                    Toggle(isOn: $assistantBackendLazyStartupEnabled) {
+                        Text("开启懒启动")
+                    }
+                    .toggleStyle(.switch)
+                    .help("影响下次 App 启动策略：开启时更省电，启动不会拉起后端，首次打开学习助手可能需要等待；关闭后会在 App 启动完成后预先启动后端。切换此项不会立即启动或停止当前后端。")
+
+                    Text("下次 App 启动时生效，不会立即启动或停止当前后端。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+    }
+
+    private var smartInputSettingsPane: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SettingsGroup(
+                title: "智能输入",
+                subtitle: "用于自然语言解析提醒事项。",
+                systemImage: "text.bubble",
+                trailing: "本机即时保存"
+            ) {
+                SettingsLabeledRow(
+                    title: "Google Gemini API Key",
+                    subtitle: "用于智能输入自然语言提醒解析，与学习助手后端 Key 分开保存。"
+                ) {
+                    APIKeySettingRow(
+                        visibleLabel: "Google Gemini API Key",
+                        providerName: "Google Gemini",
+                        providerContext: "智能输入提醒解析",
+                        systemImage: "diamond.fill",
+                        key: $geminiAPIKey,
+                        isKeyVisible: $isSmartInputAPIKeyVisible
+                    )
+                }
+
+                SettingsLabeledRow(
+                    title: "Gemini 模型",
+                    subtitle: "若请求失败，可换一款或到 AI Studio 核对模型名。"
+                ) {
+                    Picker("Gemini 模型", selection: $geminiModelId) {
+                        ForEach(MalDazeGeminiModelCatalog.pickerOptions) { option in
+                            Text(option.label).tag(option.id)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
+                ShortcutSettingRow(
+                    title: "添加提醒",
+                    subtitle: "默认 ⌘⇧<（小于号，物理键为逗号 + Shift）。通常无需辅助功能授权。",
+                    displayString: smartShortcutModel.displayString,
+                    isRecording: isRecordingSmartShortcut,
+                    shortcutRecorderBusy: shortcutRecorderBusy,
+                    onRecord: { isRecordingSmartShortcut = true },
+                    onRestoreDefault: {
+                        let d = SmartReminderInputShortcut.default
+                        smartKeyCode = Int(d.keyCode)
+                        smartModifiersRaw = SmartReminderInputShortcut.defaultModifiersStorageInt
+                        smartKeyLabel = d.keyLabel
+                    }
+                )
+            }
+        }
+    }
+
+    private var shortcutsSettingsPane: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SettingsGroup(
+                title: "全局快捷键",
+                subtitle: "录制时须带 ⌘ / ⌥ / ⌃ / ⇧ 之一；按 Esc 取消录制。",
+                systemImage: "keyboard",
+                trailing: "须带修饰键"
+            ) {
+                ShortcutSettingRow(
+                    title: "桌宠菜单",
+                    subtitle: "默认 ⌘⇧.（句号），打开桌宠 Dashboard 面板。",
+                    displayString: deskShortcutModel.displayString,
+                    isRecording: isRecordingDeskShortcut,
+                    shortcutRecorderBusy: shortcutRecorderBusy,
+                    onRecord: { isRecordingDeskShortcut = true },
+                    onRestoreDefault: {
+                        let d = DeskPetMenuShortcut.default
+                        deskKeyCode = Int(d.keyCode)
+                        deskModifiersRaw = DeskPetMenuShortcut.defaultModifiersStorageInt
+                        deskKeyLabel = d.keyLabel
+                    }
+                )
+
+                ShortcutSettingRow(
+                    title: "桌宠回到右下角",
+                    subtitle: "一键把桌宠移回菜单栏屏可见区右下角。",
+                    displayString: resetPetShortcutModel.displayString,
+                    isRecording: isRecordingResetPetShortcut,
+                    shortcutRecorderBusy: shortcutRecorderBusy,
+                    onRecord: { isRecordingResetPetShortcut = true },
+                    onRestoreDefault: {
+                        let d = ResetIdlePetPositionShortcut.default
+                        resetPetKeyCode = Int(d.keyCode)
+                        resetPetModifiersRaw = ResetIdlePetPositionShortcut.defaultModifiersStorageInt
+                        resetPetKeyLabel = d.keyLabel
+                    }
+                )
+
+                ShortcutSettingRow(
+                    title: "独立倒计时提醒",
+                    subtitle: "默认 ⌘⇧M。再按一次可取消进行中的倒计时。",
+                    displayString: sevenShortcutModel.displayString,
+                    isRecording: isRecordingSevenMinuteShortcut,
+                    shortcutRecorderBusy: shortcutRecorderBusy,
+                    onRecord: { isRecordingSevenMinuteShortcut = true },
+                    onRestoreDefault: {
+                        let d = SevenMinuteReminderShortcut.default
+                        sevenKeyCode = Int(d.keyCode)
+                        sevenModifiersRaw = SevenMinuteReminderShortcut.defaultModifiersStorageInt
+                        sevenKeyLabel = d.keyLabel
+                    }
+                )
+            }
+        }
+    }
+
+    private var shortcutRecorders: some View {
+        VStack(spacing: 0) {
+            GlobalShortcutKeyRecorder(
+                isRecording: $isRecordingSmartShortcut,
+                onCaptured: { keyCode, modRaw, label in
+                    smartKeyCode = Int(keyCode)
+                    smartModifiersRaw = Int(modRaw)
+                    smartKeyLabel = label
+                },
+                onCancel: {}
+            )
+
+            GlobalShortcutKeyRecorder(
+                isRecording: $isRecordingDeskShortcut,
+                onCaptured: { keyCode, modRaw, label in
+                    deskKeyCode = Int(keyCode)
+                    deskModifiersRaw = Int(modRaw)
+                    deskKeyLabel = label
+                },
+                onCancel: {}
+            )
+
+            GlobalShortcutKeyRecorder(
+                isRecording: $isRecordingResetPetShortcut,
+                onCaptured: { keyCode, modRaw, label in
+                    resetPetKeyCode = Int(keyCode)
+                    resetPetModifiersRaw = Int(modRaw)
+                    resetPetKeyLabel = label
+                },
+                onCancel: {}
+            )
+
+            GlobalShortcutKeyRecorder(
+                isRecording: $isRecordingSevenMinuteShortcut,
+                onCaptured: { keyCode, modRaw, label in
+                    sevenKeyCode = Int(keyCode)
+                    sevenModifiersRaw = Int(modRaw)
+                    sevenKeyLabel = label
+                },
+                onCancel: {}
+            )
+        }
+        .frame(width: 0, height: 0)
+        .allowsHitTesting(false)
+    }
+}
+
+// MARK: - Settings redesign helpers
+
+private enum SettingsDesignPalette {
+    static let paleBlueAccent = Color(red: 0.45, green: 0.72, blue: 0.98)
+    static let windowBackground = Color(.windowBackgroundColor)
+    static let sidebarBackground = Color(.controlBackgroundColor).opacity(0.72)
+    static let groupBackground = Color(.textBackgroundColor).opacity(0.82)
+    static let rowBackground = Color(.controlBackgroundColor).opacity(0.46)
+    static let border = Color(.separatorColor).opacity(0.42)
+}
+
+private enum SettingsCategory: String, CaseIterable, Identifiable {
+    case learningAssistant
+    case smartInput
+    case shortcuts
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .learningAssistant: return "学习助手"
+        case .smartInput: return "智能输入"
+        case .shortcuts: return "快捷键"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .learningAssistant: return "后端模型与凭据"
+        case .smartInput: return "提醒解析"
+        case .shortcuts: return "全局操作"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .learningAssistant: return "sparkles"
+        case .smartInput: return "text.bubble"
+        case .shortcuts: return "keyboard"
+        }
+    }
+}
+
+private struct SettingsSidebarButton: View {
+    let category: SettingsCategory
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 9) {
+                Image(systemName: category.systemImage)
+                    .font(.system(size: 14, weight: .semibold))
+                    .frame(width: 24, height: 24)
+                    .foregroundStyle(isSelected ? SettingsDesignPalette.paleBlueAccent : Color.secondary)
+                    .background(
+                        (isSelected ? SettingsDesignPalette.paleBlueAccent.opacity(0.18) : Color(.separatorColor).opacity(0.10)),
+                        in: RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    )
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(category.title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(isSelected ? Color.primary : Color.secondary)
+                    Text(category.subtitle)
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                }
+
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 7)
+            .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
+            .contentShape(Rectangle())
+            .background(
+                isSelected ? Color(.textBackgroundColor).opacity(0.88) : Color.clear,
+                in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(isSelected ? SettingsDesignPalette.paleBlueAccent.opacity(0.28) : Color.clear, lineWidth: 0.75)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text(category.title))
+        .accessibilityValue(Text(isSelected ? "已选择" : "未选择"))
+    }
+}
+
+private struct SettingsPane<Content: View>: View {
+    let category: SettingsCategory
+    let content: Content
+
+    init(category: SettingsCategory, @ViewBuilder content: () -> Content) {
+        self.category = category
+        self.content = content()
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(alignment: .top, spacing: 14) {
+                    Image(systemName: category.systemImage)
+                        .font(.title3.weight(.semibold))
+                        .frame(width: 34, height: 34)
+                        .foregroundStyle(SettingsDesignPalette.paleBlueAccent)
+                        .background(SettingsDesignPalette.paleBlueAccent.opacity(0.16), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(category.title)
+                            .font(.title2.bold())
+                        Text(category.subtitle)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Spacer(minLength: 0)
+                }
+
+                content
+            }
+            .padding(22)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(SettingsDesignPalette.windowBackground)
+    }
+}
+
+private struct SettingsGroup<Content: View>: View {
+    let title: String
+    let subtitle: String
+    let systemImage: String
+    var trailing: String?
+    let content: Content
+
+    init(
+        title: String,
+        subtitle: String,
+        systemImage: String,
+        trailing: String? = nil,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.title = title
+        self.subtitle = subtitle
+        self.systemImage = systemImage
+        self.trailing = trailing
+        self.content = content()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .center, spacing: 10) {
+                Image(systemName: systemImage)
+                    .font(.subheadline.weight(.semibold))
+                    .frame(width: 28, height: 28)
+                    .foregroundStyle(SettingsDesignPalette.paleBlueAccent)
+                    .background(SettingsDesignPalette.paleBlueAccent.opacity(0.15), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.headline)
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 8)
+
+                if let trailing {
+                    Text(trailing)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color(.controlBackgroundColor), in: Capsule())
+                }
+            }
+            .padding(12)
+            .background(SettingsDesignPalette.rowBackground)
+
+            Divider()
+
+            content
+        }
+        .background(SettingsDesignPalette.groupBackground, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .strokeBorder(SettingsDesignPalette.border, lineWidth: 0.75)
+        )
+    }
+}
+
+private struct SettingsLabeledRow<Content: View>: View {
+    let title: String
+    let subtitle: String
+    let content: Content
+
+    init(title: String, subtitle: String, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.subtitle = subtitle
+        self.content = content()
+    }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 18) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(width: 168, alignment: .topLeading)
+
+            VStack(alignment: .leading, spacing: 8) {
+                content
+            }
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+        .padding(12)
+
+        Divider()
+            .padding(.leading, 198)
+    }
+}
+
+private struct APIKeySettingRow: View {
+    let visibleLabel: String
+    let providerName: String
+    let providerContext: String
+    let systemImage: String
+    @Binding var key: String
+    @Binding var isKeyVisible: Bool
+
+    private var keyStateText: String {
+        key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "未填写" : "已保存在本机"
+    }
+
+    private var keyStateColor: Color {
+        key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color.orange : SettingsDesignPalette.paleBlueAccent
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(alignment: .center, spacing: 8) {
+                Image(systemName: systemImage)
+                    .font(.subheadline.weight(.semibold))
+                    .frame(width: 24, height: 24)
+                    .foregroundStyle(SettingsDesignPalette.paleBlueAccent)
+                    .background(SettingsDesignPalette.paleBlueAccent.opacity(0.16), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(providerName)
+                        .font(.subheadline.weight(.semibold))
+                    Text(providerContext)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer(minLength: 8)
+
+                Text(keyStateText)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(keyStateColor)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(keyStateColor.opacity(0.14), in: Capsule())
+            }
+
+            Text(visibleLabel)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            HStack(spacing: 8) {
+                Group {
+                    if isKeyVisible {
+                        TextField(visibleLabel, text: $key)
+                    } else {
+                        SecureField(visibleLabel, text: $key)
+                    }
+                }
+                .textFieldStyle(.roundedBorder)
+                .font(.system(.body, design: .monospaced))
+
+                Button {
+                    isKeyVisible.toggle()
+                } label: {
+                    Image(systemName: isKeyVisible ? "eye.slash" : "eye")
+                        .frame(width: 18, height: 18)
+                }
+                .buttonStyle(.bordered)
+                .accessibilityLabel(Text(isKeyVisible ? "隐藏 API Key" : "显示 API Key"))
+                .help(isKeyVisible ? "隐藏 API Key" : "显示 API Key")
+            }
+
+            Text("仅保存在本机 UserDefaults；本页不会上传、测试或转存 API Key。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(10)
+        .background(SettingsDesignPalette.paleBlueAccent.opacity(0.08), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(SettingsDesignPalette.paleBlueAccent.opacity(0.22), lineWidth: 0.75)
+        )
+    }
+}
+
+private struct ShortcutSettingRow: View {
+    let title: String
+    let subtitle: String
+    let displayString: String
+    let isRecording: Bool
+    let shortcutRecorderBusy: Bool
+    let onRecord: () -> Void
+    let onRestoreDefault: () -> Void
+
+    private var keycap: some View {
+        Text(isRecording ? "等待按键…" : displayString)
+            .font(.system(.body, design: .monospaced))
+            .fontWeight(.semibold)
+            .lineLimit(1)
+            .minimumScaleFactor(0.78)
+            .padding(.horizontal, 10)
+            .frame(minWidth: 94, minHeight: 32)
+            .background(
+                LinearGradient(
+                    colors: [Color(.textBackgroundColor), Color(.controlBackgroundColor)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                ),
+                in: RoundedRectangle(cornerRadius: 7, style: .continuous)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .strokeBorder(SettingsDesignPalette.border, lineWidth: 0.75)
+            )
+    }
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 8)
+
+            keycap
+
+            Button(isRecording ? "等待按键…" : "录制") {
+                onRecord()
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(SettingsDesignPalette.paleBlueAccent)
+            .disabled(shortcutRecorderBusy && !isRecording)
+
+            Button("恢复默认") {
+                onRestoreDefault()
+            }
+            .buttonStyle(.bordered)
+            .disabled(shortcutRecorderBusy)
+        }
+        .padding(12)
+        .background(isRecording ? SettingsDesignPalette.paleBlueAccent.opacity(0.12) : Color.clear)
+
+        Divider()
+            .padding(.leading, 12)
     }
 }
 
@@ -499,8 +1005,9 @@ enum MalDazeSettingsWindowPresenter {
     static func present() {
         NSApp.activate(ignoringOtherApps: true)
         if window == nil {
+            let contentSize = NSSize(width: 760, height: 560)
             let w = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 480, height: 440),
+                contentRect: NSRect(origin: .zero, size: contentSize),
                 styleMask: [.titled, .closable, .miniaturizable],
                 backing: .buffered,
                 defer: false
@@ -511,7 +1018,6 @@ enum MalDazeSettingsWindowPresenter {
             w.level = .floating
             let host = NSHostingController(rootView: MalDazeSettingsView())
             w.contentViewController = host
-            let contentSize = NSSize(width: 480, height: 440)
             let outerSize = w.frameRect(forContentRect: NSRect(origin: .zero, size: contentSize)).size
             w.setFrame(MalDazePresentationAnchor.centeredFrame(forWindowContent: outerSize), display: false)
             window = w
