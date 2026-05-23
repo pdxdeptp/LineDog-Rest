@@ -44,7 +44,7 @@ struct FullPlanSheetView: View {
                 if unscheduledCount == 0 {
                     Label("全部 \(totalUnitCount) 集已排入计划", systemImage: "checkmark.circle")
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(.green)
+                        .foregroundStyle(Color.accentColor)
                 } else {
                     Label("\(unscheduledCount) 集因容量不足未能排入截止日前", systemImage: "exclamationmark.triangle")
                         .font(.caption.weight(.semibold))

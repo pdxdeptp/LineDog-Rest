@@ -42,7 +42,7 @@ struct TaskRowView: View {
             if isCompleting {
                 ProgressView(value: progressFill)
                     .progressViewStyle(.linear)
-                    .tint(.green)
+                    .tint(Color.accentColor)
                     .animation(.easeInOut(duration: 0.4), value: progressFill)
             }
         }
@@ -97,7 +97,7 @@ struct TaskRowView: View {
         } label: {
             Image(systemName: task.isCompleted ? "checkmark.circle.fill" : "circle")
                 .font(.title3)
-                .foregroundStyle(task.isCompleted ? Color.green : Color.secondary)
+                .foregroundStyle(task.isCompleted ? Color.accentColor : Color.secondary)
                 .frame(width: 28, height: 28)
         }
         .buttonStyle(.plain)

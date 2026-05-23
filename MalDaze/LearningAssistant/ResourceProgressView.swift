@@ -146,7 +146,7 @@ struct ResourceProgressView: View {
 
     private var progressTint: Color {
         switch resource.status {
-        case "completed": return .green
+        case "completed": return Color.accentColor
         case "overdue":   return .red
         default:          return .blue
         }
@@ -155,7 +155,7 @@ struct ResourceProgressView: View {
     private var statusBadge: some View {
         let (label, color): (String, Color) = {
             switch resource.status {
-            case "completed": return ("已完成", .green)
+            case "completed": return ("已完成", Color.accentColor)
             case "overdue":   return ("已超期", .red)
             case "active":    return ("进行中", .blue)
             default:          return (resource.status, .secondary)

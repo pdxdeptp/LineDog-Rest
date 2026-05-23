@@ -101,6 +101,128 @@ private struct CardGroupBoxStyle: GroupBoxStyle {
     }
 }
 
+private struct DashboardControlDisclosureSection<Content: View>: View {
+    let title: String
+    let systemImage: String
+    @Binding var isExpanded: Bool
+    let content: Content
+
+    init(
+        title: String,
+        systemImage: String,
+        isExpanded: Binding<Bool>,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.title = title
+        self.systemImage = systemImage
+        _isExpanded = isExpanded
+        self.content = content()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                isExpanded.toggle()
+            } label: {
+                HStack(spacing: 8) {
+                    Label(title, systemImage: systemImage)
+                        .font(.footnote.weight(.semibold))
+                    Spacer(minLength: 8)
+                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Text(title))
+            .accessibilityValue(Text(isExpanded ? "已展开" : "已折叠"))
+            .accessibilityHint(Text(isExpanded ? "折叠此设置组" : "展开此设置组"))
+
+            if isExpanded {
+                Divider()
+                    .padding(.vertical, 8)
+                content
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(Color(.separatorColor).opacity(0.45), lineWidth: 0.5)
+        )
+    }
+}
+
+private struct DashboardQuickActionButton: View {
+    let title: String
+    let subtitle: String
+    let systemImage: String
+    var isProminent = false
+    var isDisabled = false
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(alignment: .center, spacing: 10) {
+                Image(systemName: systemImage)
+                    .font(.title3.weight(.semibold))
+                    .frame(width: 24, height: 24)
+                    .foregroundStyle(isProminent ? Color.white : Color.accentColor)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(isProminent ? Color.white : Color.primary)
+                        .lineLimit(1)
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(isProminent ? Color.white.opacity(0.82) : Color.secondary)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 4)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 9)
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .background(
+                isProminent ? Color.accentColor : Color(.controlBackgroundColor),
+                in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(Color(.separatorColor).opacity(isProminent ? 0 : 0.45), lineWidth: 0.5)
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(isDisabled)
+        .opacity(isDisabled ? 0.62 : 1)
+        .accessibilityLabel(Text(title))
+        .accessibilityValue(Text(subtitle))
+    }
+}
+
+private struct DashboardUtilityButton: View {
+    let title: String
+    let systemImage: String
+    var role: ButtonRole?
+    let action: () -> Void
+
+    var body: some View {
+        Button(role: role, action: action) {
+            Label(title, systemImage: systemImage)
+                .font(.caption.weight(.semibold))
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, minHeight: 28)
+        }
+        .buttonStyle(.bordered)
+        .accessibilityLabel(Text(title))
+    }
+}
+
 /// Dashboard 主内容：三栏看板，由桌宠 Dashboard Panel 展示。
 struct DashboardRootView: View {
     @ObservedObject var viewModel: AppViewModel
@@ -128,6 +250,10 @@ struct DashboardRootView: View {
     @State private var deleteConfirmationId: String?
     /// 拖动中预览；松手后写入 `@AppStorage` 并发帖，避免拖动每一帧写偏好。
     @State private var idlePetIconSideSliderLive = Double(MalDazeDefaults.idlePetIconSideDefault)
+    @State private var focusSettingsExpanded = true
+    @State private var restBehaviorExpanded = false
+    @State private var petAppearanceExpanded = false
+    @State private var hydrationSettingsExpanded = false
 
     init(viewModel: AppViewModel, assistantViewModel: LearningAssistantViewModel? = nil) {
         self.viewModel = viewModel
@@ -307,6 +433,7 @@ struct DashboardRootView: View {
                     .foregroundStyle(.secondary)
             }
             .buttonStyle(.borderless)
+            .accessibilityLabel(Text("打开 MalDaze 设置"))
             .help("设置…")
             .frame(width: MainPanelHeaderLayout.gearTapSide, height: MainPanelHeaderLayout.gearTapSide)
             .contentShape(Rectangle())
@@ -486,27 +613,13 @@ struct DashboardRootView: View {
 
                 statusChip
 
-                timerSection
+                dashboardModeControl
 
-                countdownSection
+                controlsQuickActions
 
-                hydrationSection
+                controlsSettingsGroups
 
-                catSection
-
-                Divider()
-                    .padding(.top, 2)
-
-                Text(restBlockingHint(viewModel.restBlocksClicksDuringRest))
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                Button("退出应用…") {
-                    viewModel.quitApp()
-                }
-                .buttonStyle(.bordered)
-                .keyboardShortcut("q", modifiers: [.command])
+                controlsUtilityFooter
             }
             .padding(.bottom, 8)
             .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -521,11 +634,11 @@ struct DashboardRootView: View {
     private var statusChip: some View {
         HStack(spacing: 7) {
             Circle()
-                .fill(isResting ? Color.orange : Color.green)
+                .fill(isResting ? Color.orange : Color.accentColor)
                 .frame(width: 8, height: 8)
             Text(viewModel.statusLine)
                 .font(.subheadline.weight(.medium))
-                .foregroundStyle(isResting ? Color.orange : Color.green)
+                .foregroundStyle(isResting ? Color.orange : Color.accentColor)
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -533,87 +646,200 @@ struct DashboardRootView: View {
         .padding(.vertical, 7)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            (isResting ? Color.orange : Color.green).opacity(0.10),
+            (isResting ? Color.orange : Color.accentColor).opacity(0.10),
             in: RoundedRectangle(cornerRadius: 8, style: .continuous)
         )
     }
 
-    // MARK: – Timer section
+    // MARK: – Controls hierarchy
 
-    private var timerSection: some View {
-        GroupBox {
-            VStack(alignment: .leading, spacing: 8) {
-                Picker("模式", selection: Binding(
-                    get: { viewModel.mode },
-                    set: { newMode in
-                        scheduleViewModelWork { viewModel.setMode(newMode) }
+    private var dashboardModeControl: some View {
+        Picker("模式", selection: Binding(
+            get: { viewModel.mode },
+            set: { newMode in
+                scheduleViewModelWork { viewModel.setMode(newMode) }
+            }
+        )) {
+            ForEach(AppViewModel.Mode.allCases, id: \.self) { m in
+                Text(m.rawValue).tag(m)
+            }
+        }
+        .pickerStyle(.segmented)
+    }
+
+    private var controlsQuickActions: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            dashboardTimerQuickAction
+            dashboardCountdownQuickAction
+            dashboardCatQuickAction
+        }
+    }
+
+    @ViewBuilder
+    private var dashboardTimerQuickAction: some View {
+        let isManualIdle = viewModel.mode == .manual && !viewModel.canStopChronoButton && !viewModel.showResumeChronoButton
+        let isAutomaticIdle = viewModel.mode != .manual && !viewModel.canStopChronoButton && !viewModel.showResumeChronoButton
+
+        if isManualIdle {
+            DashboardQuickActionButton(
+                title: "开始专注",
+                subtitle: "\(pomodoroWorkMinutesResolved) 分钟手动专注。",
+                systemImage: "timer",
+                isProminent: true
+            ) {
+                viewModel.startManualFocus()
+            }
+            .keyboardShortcut("s", modifiers: [.command])
+        } else if viewModel.showResumeChronoButton {
+            DashboardQuickActionButton(
+                title: "恢复计时",
+                subtitle: "继续暂停前的休息或专注计时。",
+                systemImage: "play.fill",
+                isProminent: true
+            ) {
+                viewModel.resumeTimers()
+            }
+        } else if viewModel.canStopChronoButton {
+            DashboardQuickActionButton(
+                title: "停止计时",
+                subtitle: "结束当前计时状态。",
+                systemImage: "stop.fill"
+            ) {
+                viewModel.stopTimers()
+            }
+        } else {
+            DashboardQuickActionButton(
+                title: "自动计时",
+                subtitle: "自动计时由当前模式控制。",
+                systemImage: "timer",
+                isDisabled: isAutomaticIdle
+            ) {}
+            .disabled(isAutomaticIdle)
+        }
+    }
+
+    private var dashboardCountdownQuickAction: some View {
+        DashboardQuickActionButton(
+            title: viewModel.isSevenMinuteReminderRunning ? "取消倒计时" : "开始倒计时",
+            subtitle: viewModel.isSevenMinuteReminderRunning ? "关闭正在运行的倒计时提醒。" : "\(sevenMinuteMinutesResolved) 分钟后提醒。",
+            systemImage: viewModel.isSevenMinuteReminderRunning ? "bell.slash.fill" : "bell.fill"
+        ) {
+            if viewModel.isSevenMinuteReminderRunning {
+                viewModel.cancelSevenMinuteReminder()
+            } else {
+                viewModel.startSevenMinuteReminder()
+            }
+        }
+    }
+
+    private var dashboardHydrationQuickAction: some View {
+        DashboardQuickActionButton(
+            title: viewModel.isHydrationReminderEnabled ? "暂停喝水提醒" : "开启喝水提醒",
+            subtitle: viewModel.isHydrationReminderEnabled ? "保留间隔与安静时段设置。" : "按当前间隔开始提醒。",
+            systemImage: viewModel.isHydrationReminderEnabled ? "drop.slash.fill" : "drop.fill"
+        ) {
+            if viewModel.isHydrationReminderEnabled {
+                viewModel.setHydrationReminderEnabled(false)
+            } else {
+                viewModel.setHydrationReminderEnabled(true)
+            }
+        }
+    }
+
+    private var dashboardCatQuickAction: some View {
+        DashboardQuickActionButton(
+            title: viewModel.isFiveMinuteCatCompanionActive ? "提前关闭小猫" : "召唤小猫",
+            subtitle: viewModel.isFiveMinuteCatCompanionActive ? "结束当前 5 分钟陪伴。" : "在桌宠旁显示 5 分钟。",
+            systemImage: viewModel.isFiveMinuteCatCompanionActive ? "xmark.circle.fill" : "pawprint.fill"
+        ) {
+            if viewModel.isFiveMinuteCatCompanionActive {
+                viewModel.cancelFiveMinuteCatCompanion()
+            } else {
+                viewModel.startFiveMinuteCatCompanion()
+            }
+        }
+    }
+
+    private var controlsSettingsGroups: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            DashboardControlDisclosureSection(
+                title: "专注计时",
+                systemImage: "timer",
+                isExpanded: $focusSettingsExpanded
+            ) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Stepper(value: $pomodoroRestMinutesStored, in: 1...60, step: 1) {
+                        Text("休息时长：\(pomodoroRestMinutesResolved) 分钟")
+                            .font(.subheadline)
                     }
-                )) {
-                    ForEach(AppViewModel.Mode.allCases, id: \.self) { m in
-                        Text(m.rawValue).tag(m)
+                    .help("手动番茄与「整点 / 半点」模式下的休息段长度；霸屏 / 跑屏与计时器一致。")
+
+                    Stepper(value: $pomodoroWorkMinutesStored, in: 5...120, step: 1) {
+                        Text("专注间隔（仅手动）：\(pomodoroWorkMinutesResolved) 分钟")
+                            .font(.subheadline)
                     }
-                }
-                .pickerStyle(.segmented)
-
-                Stepper(value: $pomodoroRestMinutesStored, in: 1...60, step: 1) {
-                    Text("休息时长：\(pomodoroRestMinutesResolved) 分钟")
-                        .font(.subheadline)
-                }
-                .help("手动番茄与「整点 / 半点」模式下的休息段长度；霸屏 / 跑屏与计时器一致。")
-
-                Stepper(value: $pomodoroWorkMinutesStored, in: 5...120, step: 1) {
-                    Text("专注间隔（仅手动）：\(pomodoroWorkMinutesResolved) 分钟")
-                        .font(.subheadline)
-                }
-                .disabled(viewModel.mode != .manual)
-                .help("仅「手动番茄」下每段专注长度；整点模式仍按系统时钟对齐，不受此项影响。")
-
-                HStack(spacing: 8) {
-                    Button("开始专注（\(pomodoroWorkMinutesResolved) 分钟）") {
-                        viewModel.startManualFocus()
-                    }
-                    .buttonStyle(.borderedProminent)
                     .disabled(viewModel.mode != .manual)
-                    .keyboardShortcut("s", modifiers: [.command])
+                    .help("仅「手动番茄」下每段专注长度；整点模式仍按系统时钟对齐，不受此项影响。")
 
-                    if viewModel.showResumeChronoButton {
-                        Button("恢复计时") {
-                            viewModel.resumeTimers()
-                        }
-                        .buttonStyle(.bordered)
-                    } else {
-                        Button("停止计时") {
-                            viewModel.stopTimers()
-                        }
-                        .buttonStyle(.bordered)
-                        .disabled(!viewModel.canStopChronoButton)
+                    Stepper(value: $sevenMinuteMinutesStored, in: 1...180) {
+                        Text("倒计时：\(sevenMinuteMinutesResolved) 分钟")
+                            .font(.subheadline)
                     }
+                    .disabled(viewModel.isSevenMinuteReminderRunning)
+
+                    Picker("休息风格", selection: Binding(
+                        get: { viewModel.breakInterruptStyle },
+                        set: { v in scheduleViewModelWork { viewModel.setBreakInterruptStyle(v) } }
+                    )) {
+                        Text("霸屏（强）").tag(AppViewModel.BreakInterruptStyle.fullscreen)
+                        Text("跑屏（轻）").tag(AppViewModel.BreakInterruptStyle.breakRun)
+                    }
+                    .pickerStyle(.segmented)
+                    .help("霸屏：休息时全屏渐暗，小狗居中。跑屏：小狗在桌面漫游，不遮挡工作内容（PawPal 风格）。")
                 }
-
-                Divider()
-
-                Toggle(isOn: Binding(
-                    get: { viewModel.restBlocksClicksDuringRest },
-                    set: { v in scheduleViewModelWork { viewModel.setRestBlocksClicksDuringRest(v) } }
-                )) {
-                    Text("休息期间阻止点击桌面")
-                        .font(.subheadline)
+                .onChange(of: pomodoroRestMinutesStored) { _ in
+                    scheduleViewModelWork { viewModel.syncPomodoroDurationsFromDefaults() }
                 }
-                .toggleStyle(.switch)
-                .tint(SwitchOnTrackTint.paleBlue)
-                .help("打开时休息全屏会挡住背后窗口的鼠标操作（默认）；关闭时休息画面仍在，但可正常使用桌面。")
-
-                Toggle(isOn: Binding(
-                    get: { viewModel.restDoubleClickEndsRest },
-                    set: { v in scheduleViewModelWork { viewModel.setRestDoubleClickEndsRest(v) } }
-                )) {
-                    Text("单击 20 下桌宠可提前结束休息")
-                        .font(.subheadline)
+                .onChange(of: pomodoroWorkMinutesStored) { _ in
+                    scheduleViewModelWork { viewModel.syncPomodoroDurationsFromDefaults() }
                 }
-                .toggleStyle(.switch)
-                .tint(SwitchOnTrackTint.paleBlue)
-                .help("开启时休息霸屏期间连续单击屏幕中央小狗 20 下（每次间隔 ≤ 3 秒）即可提前结束休息（默认）；关闭后点击无效，只能等计时自然结束。")
+            }
 
+            DashboardControlDisclosureSection(
+                title: "休息行为",
+                systemImage: "hand.raised.fill",
+                isExpanded: $restBehaviorExpanded
+            ) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Toggle(isOn: Binding(
+                        get: { viewModel.restBlocksClicksDuringRest },
+                        set: { v in scheduleViewModelWork { viewModel.setRestBlocksClicksDuringRest(v) } }
+                    )) {
+                        Text("休息期间阻止点击桌面")
+                            .font(.subheadline)
+                    }
+                    .toggleStyle(.switch)
+                    .tint(SwitchOnTrackTint.paleBlue)
+                    .help("打开时休息全屏会挡住背后窗口的鼠标操作（默认）；关闭时休息画面仍在，但可正常使用桌面。")
+
+                    Toggle(isOn: Binding(
+                        get: { viewModel.restDoubleClickEndsRest },
+                        set: { v in scheduleViewModelWork { viewModel.setRestDoubleClickEndsRest(v) } }
+                    )) {
+                        Text("单击 20 下桌宠可提前结束休息")
+                            .font(.subheadline)
+                    }
+                    .toggleStyle(.switch)
+                    .tint(SwitchOnTrackTint.paleBlue)
+                    .help("开启时休息霸屏期间连续单击屏幕中央小狗 20 下（每次间隔 ≤ 3 秒）即可提前结束休息（默认）；关闭后点击无效，只能等计时自然结束。")
+                }
+            }
+
+            DashboardControlDisclosureSection(
+                title: "桌宠外观",
+                systemImage: "sparkles",
+                isExpanded: $petAppearanceExpanded
+            ) {
                 VStack(alignment: .leading, spacing: 12) {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("桌宠图标边长")
@@ -676,107 +902,15 @@ struct DashboardRootView: View {
                     let clamped = MalDazeDefaults.clampedIdlePetIconSidePoints(stored: idlePetIconSideStored)
                     idlePetIconSideSliderLive = Double(clamped)
                 }
-
-                Divider()
-
-                Picker("休息风格", selection: Binding(
-                    get: { viewModel.breakInterruptStyle },
-                    set: { v in scheduleViewModelWork { viewModel.setBreakInterruptStyle(v) } }
-                )) {
-                    Text("霸屏（强）").tag(AppViewModel.BreakInterruptStyle.fullscreen)
-                    Text("跑屏（轻）").tag(AppViewModel.BreakInterruptStyle.breakRun)
-                }
-                .pickerStyle(.segmented)
-                .help("霸屏：休息时全屏渐暗，小狗居中。跑屏：小狗在桌面漫游，不遮挡工作内容（PawPal 风格）。")
-
-                HStack(spacing: 8) {
-                    Button("桌宠归位（\(resetPetShortcutDisplay)）") {
-                        viewModel.resetIdlePetPositionFromUserAction()
-                    }
-                    .buttonStyle(.bordered)
-                    .help("将小狗窗口移回菜单栏所在屏可见区右下角并保存；休息霸屏时无效。快捷键可在设置中修改。")
-
-                    Button("立即休息（测试）") {
-                        viewModel.startTestRestNow()
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(.secondary)
-                }
             }
-            .onChange(of: pomodoroRestMinutesStored) { _ in
-                scheduleViewModelWork { viewModel.syncPomodoroDurationsFromDefaults() }
-            }
-            .onChange(of: pomodoroWorkMinutesStored) { _ in
-                scheduleViewModelWork { viewModel.syncPomodoroDurationsFromDefaults() }
-            }
-        } label: {
-            Label("专注计时", systemImage: "timer")
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(.primary)
-                .textCase(nil)
-        }
-        .groupBoxStyle(CardGroupBoxStyle())
-    }
 
-    // MARK: – Countdown section
-
-    private var countdownSection: some View {
-        GroupBox {
-            HStack(alignment: .top, spacing: 12) {
+            DashboardControlDisclosureSection(
+                title: "喝水设置",
+                systemImage: "drop.fill",
+                isExpanded: $hydrationSettingsExpanded
+            ) {
                 VStack(alignment: .leading, spacing: 8) {
-                    Stepper(value: $sevenMinuteMinutesStored, in: 1...180) {
-                        Text("时长：\(sevenMinuteMinutesResolved) 分钟")
-                            .font(.subheadline)
-                    }
-                    .disabled(viewModel.isSevenMinuteReminderRunning)
-
-                    HStack(spacing: 8) {
-                        Button("开始 \(sevenMinuteMinutesResolved) 分钟倒计时") {
-                            viewModel.startSevenMinuteReminder()
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(viewModel.isSevenMinuteReminderRunning)
-
-                        if viewModel.isSevenMinuteReminderRunning {
-                            Button("取消") {
-                                viewModel.cancelSevenMinuteReminder()
-                            }
-                            .buttonStyle(.bordered)
-                            .tint(.secondary)
-                        }
-                    }
-                }
-
-                Text("倒计时显示在右下角，结束后铃铛居中提示，点一下关闭。快捷键默认 ⌘⇧M，可在设置里改。")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: 100, alignment: .leading)
-            }
-        } label: {
-            Label("倒计时提醒", systemImage: "bell")
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(.primary)
-                .textCase(nil)
-        }
-        .groupBoxStyle(CardGroupBoxStyle())
-    }
-
-    // MARK: – Hydration section
-
-    private var hydrationSection: some View {
-        GroupBox {
-            HStack(alignment: .top, spacing: 12) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Toggle(isOn: Binding(
-                        get: { viewModel.isHydrationReminderEnabled },
-                        set: { v in scheduleViewModelWork { viewModel.setHydrationReminderEnabled(v) } }
-                    )) {
-                        Text("开启喝水提醒")
-                            .font(.subheadline)
-                    }
-                    .toggleStyle(.switch)
-                    .tint(SwitchOnTrackTint.paleBlue)
+                    dashboardHydrationQuickAction
 
                     Stepper(
                         value: $hydrationIntervalStored,
@@ -792,8 +926,6 @@ struct DashboardRootView: View {
                             .font(.subheadline)
                     }
                     .disabled(!viewModel.isHydrationReminderEnabled)
-
-                    Divider()
 
                     Toggle(isOn: $hydrationQuietHoursEnabled) {
                         Text("开启安静时段")
@@ -837,69 +969,44 @@ struct DashboardRootView: View {
                     }
                     .disabled(!viewModel.isHydrationReminderEnabled || !hydrationQuietHoursEnabled)
 
-                    Button("立即触发（测试）") {
-                        viewModel.testFireHydrationReminder()
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(.secondary)
-                }
-
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("弹出提醒后：「已喝水 💧」重新开始计时，「稍后提醒」15 分钟后再次提醒。")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    Text("安静时段内计时器照常运行，到点静默跳过，并在恢复时间后自动弹出下一次提醒。")
+                    Text("弹出提醒后：「已喝水」重新开始计时，「稍后提醒」15 分钟后再次提醒。")
                         .font(.caption)
                         .foregroundStyle(.tertiary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                .frame(maxWidth: 100, alignment: .leading)
             }
-        } label: {
-            Label("喝水提醒", systemImage: "drop.fill")
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(.primary)
-                .textCase(nil)
         }
-        .groupBoxStyle(CardGroupBoxStyle())
     }
 
-    // MARK: – Cat companion section
+    private var controlsUtilityFooter: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Divider()
 
-    private var catSection: some View {
-        GroupBox {
-            HStack(alignment: .top, spacing: 12) {
-                HStack(spacing: 8) {
-                    Button("召唤小猫") {
-                        viewModel.startFiveMinuteCatCompanion()
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(viewModel.isFiveMinuteCatCompanionActive)
+            Text(restBlockingHint(viewModel.restBlocksClicksDuringRest))
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
 
-                    if viewModel.isFiveMinuteCatCompanionActive {
-                        Button("提前关掉") {
-                            viewModel.cancelFiveMinuteCatCompanion()
-                        }
-                        .buttonStyle(.bordered)
-                        .tint(.secondary)
-                    }
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                DashboardUtilityButton(title: "桌宠归位", systemImage: "arrow.down.right.and.arrow.up.left") {
+                    viewModel.resetIdlePetPositionFromUserAction()
+                }
+                .help("将小狗窗口移回菜单栏所在屏可见区右下角并保存；快捷键：\(resetPetShortcutDisplay)。")
+
+                DashboardUtilityButton(title: "测试休息", systemImage: "play.rectangle") {
+                    viewModel.startTestRestNow()
                 }
 
-                Text("与线条小狗分层显示；小猫出现在小狗左侧（贴边时改到右侧），5 分钟后渐隐消失。")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: 100, alignment: .leading)
+                DashboardUtilityButton(title: "测试喝水", systemImage: "drop.triangle") {
+                    viewModel.testFireHydrationReminder()
+                }
+
+                DashboardUtilityButton(title: "退出应用", systemImage: "power", role: .destructive) {
+                    viewModel.quitApp()
+                }
+                .keyboardShortcut("q", modifiers: [.command])
             }
-        } label: {
-            Label("5 分钟小猫", systemImage: "pawprint.fill")
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(.primary)
-                .textCase(nil)
         }
-        .groupBoxStyle(CardGroupBoxStyle())
     }
 
     private func restBlockingHint(_ blocks: Bool) -> String {

@@ -405,6 +405,210 @@ final class ControlPanelPresentationTests: XCTestCase {
         )
     }
 
+    func testDashboardControlsColumnUsesFourZoneHierarchyWithQuickActionsBeforeSettings() throws {
+        let source = try readProjectSource("MalDaze/DashboardRootView.swift")
+        let controlsSource = try propertySource(named: "mainControlsColumn", in: source)
+
+        XCTAssertOrdered(
+            ["mainPanelHeader", "statusChip", "controlsQuickActions", "controlsSettingsGroups", "controlsUtilityFooter"],
+            in: controlsSource,
+            "The right controls column should render header/status, quick actions, settings groups, then utility footer."
+        )
+        XCTAssertTrue(
+            source.contains("private var controlsQuickActions: some View"),
+            "DashboardRootView should expose the primary everyday actions as controlsQuickActions."
+        )
+        XCTAssertTrue(
+            source.contains("private var controlsSettingsGroups: some View"),
+            "DashboardRootView should group lower-frequency settings behind controlsSettingsGroups."
+        )
+        XCTAssertTrue(
+            source.contains("private var controlsUtilityFooter: some View"),
+            "DashboardRootView should isolate reset, test, and quit utilities in controlsUtilityFooter."
+        )
+        XCTAssertTrue(
+            source.contains("DashboardControlDisclosureSection"),
+            "Dashboard settings groups should use a local disclosure helper so headers only expand or collapse presentation state."
+        )
+        XCTAssertTrue(
+            source.contains("DashboardQuickActionButton"),
+            "Primary actions should use a local quick-action helper with SF Symbol labels."
+        )
+        XCTAssertTrue(
+            source.contains("DashboardUtilityButton"),
+            "Footer actions should use a local utility-action helper instead of competing with primary controls."
+        )
+    }
+
+    func testDashboardQuickActionsWireStateAwareExistingViewModelActions() throws {
+        let source = try readProjectSource("MalDaze/DashboardRootView.swift")
+        let quickActionsSource = try propertySource(named: "controlsQuickActions", in: source)
+        let timerSource = try propertySource(named: "dashboardTimerQuickAction", in: source)
+        let countdownSource = try propertySource(named: "dashboardCountdownQuickAction", in: source)
+        let hydrationSource = try propertySource(named: "dashboardHydrationQuickAction", in: source)
+        let catSource = try propertySource(named: "dashboardCatQuickAction", in: source)
+
+        XCTAssertOrdered(
+            ["dashboardTimerQuickAction", "dashboardCountdownQuickAction", "dashboardCatQuickAction"],
+            in: quickActionsSource,
+            "Everyday controls should keep timer, countdown, and cat actions together before settings."
+        )
+        XCTAssertFalse(
+            quickActionsSource.contains("dashboardHydrationQuickAction"),
+            "Hydration pause and enable actions should live with hydration settings instead of competing in the quick-action stack."
+        )
+
+        XCTAssertTrue(timerSource.contains("viewModel.startManualFocus()"))
+        XCTAssertTrue(timerSource.contains("viewModel.stopTimers()"))
+        XCTAssertTrue(timerSource.contains("viewModel.resumeTimers()"))
+        XCTAssertTrue(timerSource.contains("viewModel.mode == .manual"))
+        XCTAssertTrue(timerSource.contains("自动计时由当前模式控制"))
+        XCTAssertTrue(timerSource.contains(".disabled("))
+
+        XCTAssertTrue(countdownSource.contains("viewModel.startSevenMinuteReminder()"))
+        XCTAssertTrue(countdownSource.contains("viewModel.cancelSevenMinuteReminder()"))
+        XCTAssertTrue(countdownSource.contains("viewModel.isSevenMinuteReminderRunning"))
+
+        XCTAssertTrue(hydrationSource.contains("viewModel.setHydrationReminderEnabled(true)"))
+        XCTAssertTrue(hydrationSource.contains("viewModel.setHydrationReminderEnabled(false)"))
+        XCTAssertTrue(hydrationSource.contains("viewModel.isHydrationReminderEnabled"))
+
+        XCTAssertTrue(catSource.contains("viewModel.startFiveMinuteCatCompanion()"))
+        XCTAssertTrue(catSource.contains("viewModel.cancelFiveMinuteCatCompanion()"))
+        XCTAssertTrue(catSource.contains("viewModel.isFiveMinuteCatCompanionActive"))
+    }
+
+    func testDashboardHydrationActionLivesInsideHydrationSettings() throws {
+        let source = try readProjectSource("MalDaze/DashboardRootView.swift")
+        let settingsSource = try propertySource(named: "controlsSettingsGroups", in: source)
+        let hydrationSource = try propertySource(named: "dashboardHydrationQuickAction", in: source)
+
+        XCTAssertOrdered(
+            ["title: \"喝水设置\"", "dashboardHydrationQuickAction", "$hydrationIntervalStored"],
+            in: settingsSource,
+            "The hydration enable or pause action should be the first control inside hydration settings."
+        )
+        XCTAssertTrue(hydrationSource.contains("暂停喝水提醒"))
+        XCTAssertTrue(hydrationSource.contains("开启喝水提醒"))
+        XCTAssertTrue(hydrationSource.contains("viewModel.setHydrationReminderEnabled(true)"))
+        XCTAssertTrue(hydrationSource.contains("viewModel.setHydrationReminderEnabled(false)"))
+    }
+
+    func testInterfaceSuccessAccentsUsePaleBlueInsteadOfGreen() throws {
+        let accentAsset = try readProjectSource("MalDaze/Assets.xcassets/AccentColor.colorset/Contents.json")
+        XCTAssertTrue(accentAsset.contains("\"red\" : \"0.450\""))
+        XCTAssertTrue(accentAsset.contains("\"green\" : \"0.720\""))
+        XCTAssertTrue(accentAsset.contains("\"blue\" : \"0.980\""))
+
+        for relativePath in [
+            "MalDaze/DashboardRootView.swift",
+            "MalDaze/LearningAssistant/FullPlanSheetView.swift",
+            "MalDaze/LearningAssistant/ResourceProgressView.swift",
+            "MalDaze/LearningAssistant/TaskRowView.swift"
+        ] {
+            let source = try readProjectSource(relativePath)
+            XCTAssertFalse(
+                source.contains(".green") || source.contains("Color.green"),
+                "\(relativePath) should use the pale-blue accent color for success and active UI instead of green."
+            )
+        }
+    }
+
+    func testDashboardTimerCommandSOnlyAppliesToManualStartBranch() throws {
+        let source = try readProjectSource("MalDaze/DashboardRootView.swift")
+        let timerSource = try propertySource(named: "dashboardTimerQuickAction", in: source)
+
+        XCTAssertTrue(
+            source.contains("@ViewBuilder\n    private var dashboardTimerQuickAction: some View"),
+            "Timer quick action should be a ViewBuilder so keyboard shortcuts can be attached only to the manual-start branch."
+        )
+        XCTAssertOrdered(
+            [
+                "if isManualIdle",
+                "viewModel.startManualFocus()",
+                ".keyboardShortcut(\"s\", modifiers: [.command])",
+                "} else if viewModel.showResumeChronoButton",
+                "viewModel.resumeTimers()",
+                "} else if viewModel.canStopChronoButton",
+                "viewModel.stopTimers()"
+            ],
+            in: timerSource,
+            "Command-S must be scoped to the manual-start action and must not attach to stop or resume states."
+        )
+        XCTAssertFalse(
+            timerSource.contains("return DashboardQuickActionButton"),
+            "A single returned stateful timer button would attach modifiers, including Command-S, to every timer state."
+        )
+    }
+
+    func testDashboardStopTimerActionIsNotProminent() throws {
+        let source = try readProjectSource("MalDaze/DashboardRootView.swift")
+        let timerSource = try propertySource(named: "dashboardTimerQuickAction", in: source)
+
+        let startTitleRange = try XCTUnwrap(timerSource.range(of: "title: \"开始专注\""))
+        let startActionRange = try XCTUnwrap(timerSource[startTitleRange.upperBound...].range(of: "viewModel.startManualFocus()"))
+        let startActionSource = String(timerSource[startTitleRange.lowerBound..<startActionRange.upperBound])
+
+        let stopTitleRange = try XCTUnwrap(timerSource.range(of: "title: \"停止计时\""))
+        let stopActionRange = try XCTUnwrap(timerSource[stopTitleRange.upperBound...].range(of: "viewModel.stopTimers()"))
+        let stopActionSource = String(timerSource[stopTitleRange.lowerBound..<stopActionRange.upperBound])
+
+        XCTAssertTrue(
+            startActionSource.contains("isProminent: true"),
+            "Starting focus should remain the single prominent timer call to action."
+        )
+        XCTAssertFalse(
+            stopActionSource.contains("isProminent: true"),
+            "Stopping a timer is a secondary action and should match the other regular quick actions."
+        )
+    }
+
+    func testDashboardControlHelpersExposeStatefulAccessibility() throws {
+        let source = try readProjectSource("MalDaze/DashboardRootView.swift")
+        let disclosureSource = try structSource(named: "DashboardControlDisclosureSection", in: source)
+        let quickActionSource = try structSource(named: "DashboardQuickActionButton", in: source)
+
+        XCTAssertTrue(
+            disclosureSource.contains(".accessibilityValue(Text(isExpanded ? \"已展开\" : \"已折叠\"))"),
+            "Disclosure headers should expose their expanded or collapsed state to assistive technologies."
+        )
+        XCTAssertTrue(
+            disclosureSource.contains(".accessibilityHint(Text(isExpanded ? \"折叠此设置组\" : \"展开此设置组\"))"),
+            "Disclosure headers should describe the action that activation will perform."
+        )
+        XCTAssertTrue(
+            quickActionSource.contains(".accessibilityValue(Text(subtitle))"),
+            "Quick action buttons should expose subtitle text so state and disabled-context copy is readable."
+        )
+    }
+
+    func testDashboardSettingsAndFooterPreserveExistingBindingsAndUtilities() throws {
+        let source = try readProjectSource("MalDaze/DashboardRootView.swift")
+        let settingsSource = try propertySource(named: "controlsSettingsGroups", in: source)
+        let footerSource = try propertySource(named: "controlsUtilityFooter", in: source)
+
+        XCTAssertTrue(settingsSource.contains("$pomodoroRestMinutesStored"))
+        XCTAssertTrue(settingsSource.contains("$pomodoroWorkMinutesStored"))
+        XCTAssertTrue(settingsSource.contains("viewModel.syncPomodoroDurationsFromDefaults()"))
+        XCTAssertTrue(settingsSource.contains("viewModel.setBreakInterruptStyle(v)"))
+        XCTAssertTrue(settingsSource.contains("viewModel.setRestBlocksClicksDuringRest(v)"))
+        XCTAssertTrue(settingsSource.contains("viewModel.setRestDoubleClickEndsRest(v)"))
+        XCTAssertTrue(settingsSource.contains("$idlePetIconSideSliderLive"))
+        XCTAssertTrue(settingsSource.contains("$idlePetAnimationIntensityStored"))
+        XCTAssertTrue(settingsSource.contains("$hydrationIntervalStored"))
+        XCTAssertTrue(settingsSource.contains("viewModel.setHydrationReminderInterval(hydrationIntervalStored)"))
+        XCTAssertTrue(settingsSource.contains("$hydrationQuietHoursEnabled"))
+        XCTAssertTrue(settingsSource.contains("hydrationQuietStartMinutes"))
+        XCTAssertTrue(settingsSource.contains("hydrationQuietResumeMinutes"))
+
+        XCTAssertTrue(footerSource.contains("viewModel.resetIdlePetPositionFromUserAction()"))
+        XCTAssertTrue(footerSource.contains("viewModel.startTestRestNow()"))
+        XCTAssertTrue(footerSource.contains("viewModel.testFireHydrationReminder()"))
+        XCTAssertTrue(footerSource.contains("viewModel.quitApp()"))
+        XCTAssertTrue(footerSource.contains(".keyboardShortcut(\"q\", modifiers: [.command])"))
+        XCTAssertTrue(footerSource.contains("restBlockingHint(viewModel.restBlocksClicksDuringRest)"))
+    }
+
     func testIdlePetIconSideSettingsChangesBroadcastToRunningAppViewModel() throws {
         let notificationSource = try readProjectSource("MalDaze/MalDazeBroadcastNotifications.swift")
         let panelSource = try readProjectSource("MalDaze/DashboardRootView.swift")
@@ -907,6 +1111,40 @@ final class ControlPanelPresentationTests: XCTestCase {
         return String(source[functionRange])
     }
 
+    private func propertySource(named propertyName: String, in source: String) throws -> String {
+        let propertyRange = try XCTUnwrap(
+            rangeOfProperty(named: propertyName, in: source),
+            "Expected to find computed property \(propertyName)."
+        )
+        return String(source[propertyRange])
+    }
+
+    private func structSource(named typeName: String, in source: String) throws -> String {
+        let structRange = try XCTUnwrap(
+            rangeOfStruct(named: typeName, in: source),
+            "Expected to find struct \(typeName)."
+        )
+        return String(source[structRange])
+    }
+
+    private func XCTAssertOrdered(
+        _ needles: [String],
+        in source: String,
+        _ message: String,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        var searchStart = source.startIndex
+
+        for needle in needles {
+            guard let range = source[searchStart...].range(of: needle) else {
+                XCTFail("\(message) Missing or out-of-order token: \(needle)", file: file, line: line)
+                return
+            }
+            searchStart = range.upperBound
+        }
+    }
+
     private func closureSource(assignedTo name: String, containing call: String, in source: String) -> String? {
         guard let assignmentRange = source.range(of: "\(name) = \(call)"),
               let openingBrace = source[assignmentRange.upperBound...].firstIndex(of: "{")
@@ -967,6 +1205,60 @@ final class ControlPanelPresentationTests: XCTestCase {
 
     private func rangeOfMember(named memberName: String, in source: String) -> Range<String.Index>? {
         guard let declarationRange = source.range(of: "static var \(memberName):"),
+              let openingBrace = source[declarationRange.upperBound...].firstIndex(of: "{")
+        else { return nil }
+
+        var depth = 0
+        var cursor = openingBrace
+        while cursor < source.endIndex {
+            switch source[cursor] {
+            case "{":
+                depth += 1
+            case "}":
+                depth -= 1
+                if depth == 0 {
+                    return declarationRange.lowerBound..<source.index(after: cursor)
+                }
+            default:
+                break
+            }
+            cursor = source.index(after: cursor)
+        }
+
+        return nil
+    }
+
+    private func rangeOfProperty(named propertyName: String, in source: String) -> Range<String.Index>? {
+        let declarationNeedles = [
+            "private var \(propertyName): some View",
+            "var \(propertyName): some View"
+        ]
+        guard let declarationRange = declarationNeedles.compactMap({ source.range(of: $0) }).first,
+              let openingBrace = source[declarationRange.upperBound...].firstIndex(of: "{")
+        else { return nil }
+
+        var depth = 0
+        var cursor = openingBrace
+        while cursor < source.endIndex {
+            switch source[cursor] {
+            case "{":
+                depth += 1
+            case "}":
+                depth -= 1
+                if depth == 0 {
+                    return declarationRange.lowerBound..<source.index(after: cursor)
+                }
+            default:
+                break
+            }
+            cursor = source.index(after: cursor)
+        }
+
+        return nil
+    }
+
+    private func rangeOfStruct(named typeName: String, in source: String) -> Range<String.Index>? {
+        guard let declarationRange = source.range(of: "struct \(typeName)"),
               let openingBrace = source[declarationRange.upperBound...].firstIndex(of: "{")
         else { return nil }
 

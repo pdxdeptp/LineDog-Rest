@@ -29,6 +29,7 @@ The Dashboard right controls column SHALL present existing desk-pet controls wit
 - **WHEN** the right controls column is redesigned
 - **THEN** existing capabilities for timer modes, manual focus, stop/resume, rest behavior, pet appearance, countdown reminder, hydration reminder, cat companion, settings, and quit remain available
 - **AND** the redesign does not change persistence keys or timer/reminder business logic
+- **AND** active accents, primary buttons, and non-rest status indicators use the app's pale-blue accent instead of green
 
 ### Requirement: Dashboard right controls interactions
 The Dashboard right controls column SHALL map each visible action to an explicit state-aware interaction while preserving existing view-model behavior.
@@ -64,9 +65,9 @@ The Dashboard right controls column SHALL map each visible action to an explicit
 - **THEN** the countdown action starts the reminder using the configured duration
 - **AND** when the countdown reminder is running, the same action changes to a cancel action
 
-#### Scenario: Hydration quick action
+#### Scenario: Hydration settings action
 - **WHEN** hydration reminders are disabled
-- **THEN** the hydration quick action enables hydration reminders
+- **THEN** the hydration action inside hydration settings enables hydration reminders
 - **AND** when hydration reminders are enabled, the same action disables hydration reminders
 
 #### Scenario: Cat companion action
