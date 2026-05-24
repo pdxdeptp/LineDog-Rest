@@ -1,3 +1,4 @@
+import EventKit
 import XCTest
 @testable import MalDaze
 
@@ -11,5 +12,22 @@ final class DeskReminderSidebarMergerTests: XCTestCase {
         let b = ReminderDisplayItem(calendarItemIdentifier: "b", title: "Sooner", dueDate: d2, hasRoutineTag: true)
         let merged = DeskReminderSidebarMerger.mergedDisplayItems(routineToday: [b], nonRoutineUpcomingWindow: [a])
         XCTAssertEqual(merged.map { $0.id }, ["b", "a"])
+    }
+
+    func testEventKitSidebarMappingPreservesPlainNotesAndStripsStandaloneRoutineMarker() {
+        let reminder = EKReminder(eventStore: EKEventStore())
+        reminder.title = "浇花"
+        reminder.notes = "阳台那盆\n#日常\n别忘了换水"
+
+        let item = EventKitRemindersBacking.mapReminder(reminder)
+
+        XCTAssertTrue(item.hasRoutineTag)
+        XCTAssertEqual(item.notesPlain, "阳台那盆\n别忘了换水")
+    }
+
+    func testDisplayItemCanRepresentReminderWithoutNotes() {
+        let item = ReminderDisplayItem(calendarItemIdentifier: "no-notes", title: "站起来走走")
+
+        XCTAssertEqual(item.notesPlain, "")
     }
 }

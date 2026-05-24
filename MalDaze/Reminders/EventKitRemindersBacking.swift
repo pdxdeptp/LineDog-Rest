@@ -173,17 +173,19 @@ final class EventKitRemindersBacking: NSObject, RemindersEventStoreBacking {
         }
     }
 
-    private static func mapReminder(_ rem: EKReminder) -> ReminderDisplayItem {
+    static func mapReminder(_ rem: EKReminder) -> ReminderDisplayItem {
         let dc = rem.dueDateComponents
         let due = dc.flatMap { Calendar.current.date(from: $0) }
         let hasTime = dc?.hour != nil || dc?.minute != nil
+        let rawNotes = rem.notes ?? ""
         let hasTag = MalDazeRoutineTag.notesContainRoutineMarker(rem.notes)
         return ReminderDisplayItem(
             calendarItemIdentifier: rem.calendarItemIdentifier,
             title: rem.title ?? "",
             dueDate: due,
             hasExplicitTime: hasTime,
-            hasRoutineTag: hasTag
+            hasRoutineTag: hasTag,
+            notesPlain: Self.notesPlainByStrippingRoutineMarker(rawNotes)
         )
     }
 

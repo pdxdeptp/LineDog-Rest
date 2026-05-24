@@ -60,7 +60,7 @@ final class MockRemindersEventStoreBacking: RemindersEventStoreBacking {
         return ReminderEditDetail(
             calendarItemIdentifier: item.calendarItemIdentifier,
             title: item.title,
-            notesPlain: "",
+            notesPlain: item.notesPlain,
             isRoutine: item.hasRoutineTag,
             dueDate: item.dueDate,
             includesTimeInDueDate: false
@@ -78,7 +78,8 @@ final class MockRemindersEventStoreBacking: RemindersEventStoreBacking {
                 calendarItemIdentifier: detail.calendarItemIdentifier,
                 title: detail.title,
                 dueDate: detail.dueDate,
-                hasRoutineTag: detail.isRoutine
+                hasRoutineTag: detail.isRoutine,
+                notesPlain: detail.notesPlain
             )
         }
     }
