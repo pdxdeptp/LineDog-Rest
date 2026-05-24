@@ -144,6 +144,63 @@
 
 - Continue `opsx:apply` for ITEM-004 with tasks 4.1-4.2: backend morning proposal options from lag, expected-late, and over-capacity facts, with structured side-by-side candidate previews and red-state impact.
 
+## Round 37 · 2026-05-24T14:55:46Z
+
+### ITEM-004 4.1-4.2 Backend Morning Proposal Options
+
+- Restored controller and Flow B state: `phase=flow-b`, `current_item=study-smart-mode`, `current_change=introduce-study-smart-mode`.
+- Start status was clean; feature commit `aa4ee8c` and state/progress commit `653546c` were already present.
+- Current checkout only; no worktree was created or used.
+
+### Completed
+
+- OpenSpec tasks 4.1 and 4.2 completed:
+  - added failing backend tests for morning proposal options from rolled-task lag, expected-late projects, and over-capacity days;
+  - implemented deterministic structured morning preview options;
+  - added stable canonical signatures using `signature_version` and `signature_payload`;
+  - kept disabled smart mode and `after_adjustment` returning empty options for this slice;
+  - kept proposal generation read-only before Apply, including pending-rollover projection without writing `tasks` or `events`;
+  - exposed over-capacity candidate selection with reviewable `selection_policy`.
+
+### Review Gates
+
+- Spec Compliance Review: PASS.
+- Code Quality Review: initially BLOCKED because proposal generation could run rollover, option signatures included display copy, the router imported a private capacity helper, and over-capacity selection needed a more reviewable policy.
+- Review fixes completed:
+  - separated read-only proposal snapshots from rollover-running briefing snapshots;
+  - added non-mutation coverage for pending rollover facts;
+  - canonicalized signatures;
+  - promoted `preview_over_capacity_impact` as a public helper;
+  - added candidate evaluations, selection reason, and explicit cascade-before-priority tradeoff for over-capacity options.
+- Code Quality Re-review: PASS.
+
+### Verification
+
+- RED/GREEN/REFACTOR evidence recorded in `openspec/learning-assistant-v2-flow-b/evidence/item-004/tdd-backend-smart-morning-proposals-report.md`.
+- `cd assistant_backend && .venv/bin/python -m pytest tests/test_study_smart_mode_proposals.py -q`: PASS, 6 passed, 2 existing dependency warnings.
+- `cd assistant_backend && .venv/bin/python -m pytest tests/test_study_smart_mode_settings.py tests/test_study_smart_mode_briefing.py tests/test_study_smart_mode_proposals.py tests/test_study_plan_adjustment_dialogue_preview.py tests/test_study_plan_adjustment_dialogue_apply.py -q`: PASS, 35 passed, 2 existing dependency warnings.
+- `openspec validate introduce-study-smart-mode --strict`: PASS.
+- `git diff --check`: PASS.
+
+### Auto Commit
+
+- Commit: `241183e`.
+- Scope: verified ITEM-004 backend morning proposal generation through OpenSpec tasks 4.1-4.2.
+- Pre-commit checks: focused smart-mode proposal tests, smart-mode setting/briefing tests, related dialogue preview/apply tests, `openspec validate introduce-study-smart-mode --strict`, `git diff --check`, Spec Compliance Review, and Code Quality Re-review all passed.
+
+### Files Added / Changed
+
+- Added `assistant_backend/tests/test_study_smart_mode_proposals.py`.
+- Updated `assistant_backend/src/routers/study_smart_mode.py`.
+- Updated `assistant_backend/src/db/queries.py`.
+- Updated `assistant_backend/tests/test_study_smart_mode_briefing.py`.
+- Updated `openspec/changes/introduce-study-smart-mode/tasks.md` to mark 4.1 and 4.2 complete.
+- Added `openspec/learning-assistant-v2-flow-b/evidence/item-004/tdd-backend-smart-morning-proposals-report.md`.
+
+### Next Task
+
+- Continue `opsx:apply` for ITEM-004 with tasks 4.3-4.4: backend after-adjustment proposal trigger tests and implementation, ensuring proposals appear only for newly created expected-late or over-capacity red state and lag alone does not trigger this path.
+
 ## Round 01 · 2026-05-23T14:50:55Z
 
 ### Git / Safety
