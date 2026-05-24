@@ -1063,3 +1063,50 @@ Before implementation, create a checkpoint commit in the current checkout, then 
 ### Next Task
 
 - Continue `opsx:apply` for ITEM-003 with tasks 5.3 and 5.4: deleting a single unfinished task with no cascade and completed-project transition when no unfinished tasks remain.
+
+## Round 23 · 2026-05-24T05:07:06Z
+
+### ITEM-003 5.3-5.4 Manual Task Deletion
+
+- Restored controller state: `phase=flow-b`, `current_item=study-plan-adjustment`.
+- Current checkout only; no worktree was created or used.
+- Created pre-apply checkpoint commit `ddff0f1 chore: checkpoint flow b after task insertion`.
+- Subagent TDD implementation completed OpenSpec tasks 5.3-5.4:
+  - `DELETE /api/study-plan-adjustment/tasks/{task_id}`;
+  - only unfinished tasks whose resource is an active `study_project` can be deleted;
+  - deleting one task removes only that task and does not move later same-project tasks;
+  - Calendar recalculates lighter day load from persisted facts;
+  - deleting the last unfinished task marks the project completed, removes it from active project views, and keeps completed history readable;
+  - deleted task orphan pending units are removed while completed unit/task history is preserved;
+  - resource `total_units` and `completed_units` are synchronized from remaining unit facts after deletion;
+  - today's `briefing_{today}` cache is invalidated after deletion;
+  - completed task, completed project task, non-study task, and missing task are rejected without mutation/event;
+  - `study_task_deleted` events record project id, task id, scheduled date, target minutes, title, source `manual_delete`, and `project_completed`.
+
+### Review Gates
+
+- Spec Compliance Review: PASS.
+- Initial Code Quality Review: CHANGES_REQUESTED with one P1 and one P2.
+- P1 fixed with TDD: deletion now removes orphan pending units and synchronizes resource counters before completed-project transition.
+- P2 fixed with TDD: deletion invalidates today's morning briefing cache while preserving other cached briefing days.
+- Code Quality Re-review: APPROVED with no P0/P1/P2/P3 findings.
+- Spec Compliance Re-review: PASS with no P0/P1/P2/P3 findings.
+
+### Verification
+
+- `assistant_backend/.venv/bin/pytest assistant_backend/tests/test_study_plan_adjustment_delete.py assistant_backend/tests/test_study_views_project_overview.py assistant_backend/tests/test_study_views_calendar.py assistant_backend/tests/test_resource_management.py -q`: `28 passed, 2 warnings`.
+- `openspec validate introduce-study-plan-adjustment --strict`: PASS.
+- `git diff --check`: PASS.
+- `openspec instructions apply --change introduce-study-plan-adjustment --json`: 37 tasks total, 19 complete, 18 remaining.
+
+### Files Added / Changed
+
+- Updated `assistant_backend/src/db/queries.py`.
+- Updated `assistant_backend/src/routers/study_plan_adjustment.py`.
+- Added `assistant_backend/tests/test_study_plan_adjustment_delete.py`.
+- Updated `openspec/changes/introduce-study-plan-adjustment/tasks.md` to mark 5.3 and 5.4 complete.
+- Added `openspec/learning-assistant-v2-flow-b/evidence/item-003/tdd-task-deletion-report.md`.
+
+### Next Task
+
+- Continue `opsx:apply` for ITEM-003 with tasks 6.1 and 6.2: weekly and one-off rest-day settings add/remove semantics.

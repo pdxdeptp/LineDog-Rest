@@ -8,9 +8,11 @@ from ..db.queries import (
     ResourceDeadlineEditNotAllowedError,
     ResourceNotFoundError,
     ResourceTaskInsertNotAllowedError,
+    TaskDeleteNotAllowedError,
     TaskMoveNotAllowedError,
     TaskMovePastDateError,
     TaskNotFoundError,
+    delete_active_study_task,
     insert_active_study_project_task,
     move_active_study_task,
     rollover_unfinished_study_tasks,
@@ -102,3 +104,14 @@ async def insert_study_project_task(project_id: int, request: InsertProjectTaskR
             raise HTTPException(status_code=404, detail="project not found") from exc
         except ResourceTaskInsertNotAllowedError as exc:
             raise HTTPException(status_code=409, detail="project task cannot be inserted") from exc
+
+
+@router.delete("/study-plan-adjustment/tasks/{task_id}")
+async def delete_study_task(task_id: int) -> dict:
+    async with get_db() as db:
+        try:
+            return await delete_active_study_task(db, task_id)
+        except TaskNotFoundError as exc:
+            raise HTTPException(status_code=404, detail="task not found") from exc
+        except TaskDeleteNotAllowedError as exc:
+            raise HTTPException(status_code=409, detail="task cannot be deleted") from exc

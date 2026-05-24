@@ -21,6 +21,10 @@ class ResourceTaskInsertNotAllowedError(Exception):
     pass
 
 
+class TaskDeleteNotAllowedError(Exception):
+    pass
+
+
 class TaskNotFoundError(Exception):
     pass
 
@@ -637,6 +641,155 @@ async def insert_active_study_project_task(
         raise
 
     return payload
+
+
+async def delete_active_study_task(db: aiosqlite.Connection, task_id: int) -> dict:
+    await db.execute("BEGIN IMMEDIATE")
+    try:
+        async with db.execute(
+            """
+            SELECT
+                t.id,
+                t.unit_id,
+                t.resource_id,
+                t.title,
+                t.target_minutes,
+                t.scheduled_date,
+                t.completed_at,
+                r.type AS resource_type,
+                r.status AS resource_status
+            FROM tasks t
+            JOIN resources r ON r.id = t.resource_id
+            WHERE t.id = ?
+            """,
+            (task_id,),
+        ) as cursor:
+            task = await cursor.fetchone()
+
+        if not task:
+            await db.rollback()
+            raise TaskNotFoundError
+        if (
+            task["resource_type"] != "study_project"
+            or task["resource_status"] != "active"
+            or task["completed_at"] is not None
+        ):
+            await db.rollback()
+            raise TaskDeleteNotAllowedError
+
+        project_id = int(task["resource_id"])
+        unit_id = int(task["unit_id"]) if task["unit_id"] is not None else None
+        today = date.today().isoformat()
+        payload = {
+            "project_id": project_id,
+            "task_id": task_id,
+            "scheduled_date": task["scheduled_date"],
+            "target_minutes": task["target_minutes"],
+            "title": task["title"],
+            "source": "manual_delete",
+            "project_completed": False,
+        }
+
+        cursor = await db.execute(
+            """
+            DELETE FROM tasks
+            WHERE id = ?
+              AND completed_at IS NULL
+            """,
+            (task_id,),
+        )
+        if cursor.rowcount != 1:
+            await db.rollback()
+            raise TaskDeleteNotAllowedError
+
+        if unit_id is not None:
+            await db.execute(
+                """
+                DELETE FROM units
+                WHERE id = ?
+                  AND resource_id = ?
+                  AND status != 'completed'
+                  AND completed_at IS NULL
+                  AND NOT EXISTS (
+                      SELECT 1 FROM tasks WHERE unit_id = ?
+                  )
+                """,
+                (unit_id, project_id, unit_id),
+            )
+
+        async with db.execute(
+            """
+            SELECT
+                COUNT(*) AS total_units,
+                SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed_units
+            FROM units
+            WHERE resource_id = ?
+            """,
+            (project_id,),
+        ) as cursor:
+            unit_counts = await cursor.fetchone()
+
+        total_units = int(unit_counts["total_units"] or 0)
+        completed_units = int(unit_counts["completed_units"] or 0)
+        await db.execute(
+            """
+            UPDATE resources
+            SET total_units = ?,
+                completed_units = ?
+            WHERE id = ?
+            """,
+            (total_units, completed_units, project_id),
+        )
+
+        async with db.execute(
+            """
+            SELECT COUNT(*) AS unfinished_count
+            FROM tasks
+            WHERE resource_id = ?
+              AND completed_at IS NULL
+            """,
+            (project_id,),
+        ) as cursor:
+            row = await cursor.fetchone()
+
+        if int(row["unfinished_count"] or 0) == 0:
+            complete_cursor = await db.execute(
+                """
+                UPDATE resources
+                SET status = 'completed'
+                WHERE id = ?
+                  AND status = 'active'
+                """,
+                (project_id,),
+            )
+            if complete_cursor.rowcount == 1:
+                payload["project_completed"] = True
+
+        await db.execute(
+            "INSERT INTO events (event_type, payload) VALUES (?, ?)",
+            ("study_task_deleted", json.dumps(payload)),
+        )
+        await db.execute("DELETE FROM system_state WHERE key = ?", (f"briefing_{today}",))
+        if payload["project_completed"]:
+            await db.execute(
+                "INSERT INTO events (event_type, payload) VALUES (?, ?)",
+                (
+                    "resource_completed",
+                    json.dumps({"resource_id": project_id, "source": "manual_delete"}),
+                ),
+            )
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise
+
+    return {
+        "project_id": payload["project_id"],
+        "task_id": payload["task_id"],
+        "scheduled_date": payload["scheduled_date"],
+        "source": payload["source"],
+        "project_completed": payload["project_completed"],
+    }
 
 
 async def mark_active_resource_complete(
