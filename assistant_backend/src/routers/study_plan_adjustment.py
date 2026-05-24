@@ -1,3 +1,4 @@
+import re
 from datetime import date
 
 from fastapi import APIRouter, HTTPException
@@ -16,6 +17,7 @@ from ..db.queries import (
     get_study_rest_day_settings,
     insert_active_study_project_task,
     move_active_study_task,
+    preview_active_study_project_shift,
     rollover_unfinished_study_tasks,
     update_study_rest_day_settings,
     update_active_study_project_deadline,
@@ -65,6 +67,66 @@ class RestDaySettingsRequest(BaseModel):
         return value
 
 
+class DialoguePreviewRequest(BaseModel):
+    instruction: str = Field(min_length=1, max_length=240)
+    project_id: int | None = None
+
+    @field_validator("instruction")
+    @classmethod
+    def instruction_must_not_be_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("instruction cannot be blank")
+        return value.strip()
+
+
+_NUMBER_WORDS = {
+    "one": 1,
+    "two": 2,
+    "three": 3,
+    "four": 4,
+    "five": 5,
+    "six": 6,
+    "seven": 7,
+    "eight": 8,
+    "nine": 9,
+    "ten": 10,
+    "a": 1,
+    "an": 1,
+}
+
+
+_PROJECT_SHIFT_PATTERN = re.compile(
+    r"^\s*(?:push|delay)\s+(?:(?:this\s+project)|(?:project\s+(?P<project_id>\d+)))\s+"
+    r"by\s+(?P<amount>\d+|one|two|three|four|five|six|seven|eight|nine|ten|a|an)\s+"
+    r"(?P<unit>days?|weeks?)\s*[.!?]?\s*$",
+    re.IGNORECASE,
+)
+
+
+def _parse_project_shift_instruction(
+    instruction: str,
+    request_project_id: int | None,
+) -> tuple[int, int] | None:
+    match = _PROJECT_SHIFT_PATTERN.fullmatch(instruction)
+    if not match:
+        return None
+
+    parsed_project_id = match.group("project_id")
+    project_id = int(parsed_project_id) if parsed_project_id is not None else request_project_id
+    if project_id is None:
+        return None
+    if request_project_id is not None and parsed_project_id is not None and request_project_id != project_id:
+        return None
+
+    amount_text = match.group("amount").lower()
+    amount = int(amount_text) if amount_text.isdigit() else _NUMBER_WORDS[amount_text]
+    unit = match.group("unit").lower()
+    delta_days = amount * (7 if unit.startswith("week") else 1)
+    if delta_days < 1 or delta_days > 365:
+        return None
+    return project_id, delta_days
+
+
 @router.post("/study-plan-adjustment/rollover")
 async def rollover_study_tasks() -> dict:
     async with get_db() as db:
@@ -85,6 +147,21 @@ async def update_rest_day_settings(request: RestDaySettingsRequest) -> dict:
             request.weekly_weekdays,
             request.one_off_dates,
         )
+
+
+@router.post("/study-plan-adjustment/dialogue/preview")
+async def preview_dialogue_adjustment(request: DialoguePreviewRequest) -> dict:
+    parsed = _parse_project_shift_instruction(request.instruction, request.project_id)
+    if parsed is None:
+        return {
+            "status": "unsupported",
+            "mutates": False,
+            "message": "unsupported or ambiguous dialogue adjustment",
+        }
+
+    project_id, delta_days = parsed
+    async with get_db() as db:
+        return await preview_active_study_project_shift(db, project_id, delta_days)
 
 
 @router.post("/study-plan-adjustment/tasks/{task_id}/move")

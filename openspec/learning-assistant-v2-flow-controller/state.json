@@ -1,16 +1,16 @@
 {
   "phase": "flow-b",
-  "round": 17,
+  "round": 19,
   "current_item": "study-plan-adjustment",
   "last_doc_hash": "d83fb77602961d4f3a9c3e17c307c6b499eb987b",
   "flow_a_readiness": "PASS",
   "flow_b_readiness": "PASS",
   "git_strategy": "current-checkout-only",
-  "last_checkpoint_commit": "30295dd",
+  "last_checkpoint_commit": "f0538c8",
   "last_feature_commit": "bd85269",
   "in_progress_step": null,
-  "last_completed_step": "flow-b-round-25-item-003-rest-day-cascade",
-  "next_step": "continue-opsx-apply-task-7.1-dialogue-preview",
+  "last_completed_step": "flow-b-round-26-item-003-dialogue-preview",
+  "next_step": "continue-opsx-apply-task-7.3-dialogue-apply",
   "blocker_reason": null,
-  "updated_at": "2026-05-24T05:40:06Z"
+  "updated_at": "2026-05-24T06:00:06Z"
 }

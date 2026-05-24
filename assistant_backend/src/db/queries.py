@@ -744,6 +744,175 @@ async def move_active_study_task(db: aiosqlite.Connection, task_id: int, new_dat
     }
 
 
+async def preview_active_study_project_shift(
+    db: aiosqlite.Connection,
+    project_id: int,
+    delta_days: int,
+    today: date | None = None,
+) -> dict:
+    async with db.execute(
+        """
+        SELECT id, type, status, deadline
+        FROM resources
+        WHERE id = ?
+        """,
+        (project_id,),
+    ) as cursor:
+        project = await cursor.fetchone()
+
+    if not project or project["type"] != "study_project" or project["status"] != "active":
+        return {
+            "status": "unsupported",
+            "mutates": False,
+            "message": "project is not an active study project",
+        }
+
+    async with db.execute(
+        """
+        SELECT
+            t.id,
+            t.resource_id,
+            t.scheduled_date,
+            u.order_index AS unit_order_index
+        FROM tasks t
+        LEFT JOIN units u ON u.id = t.unit_id
+        WHERE t.resource_id = ?
+          AND t.completed_at IS NULL
+        """,
+        (project_id,),
+    ) as cursor:
+        unfinished_tasks = await cursor.fetchall()
+
+    def project_order_key(task: aiosqlite.Row) -> tuple[int, int, str, int]:
+        unit_order = task["unit_order_index"]
+        if unit_order is not None:
+            return (0, int(unit_order), task["scheduled_date"], int(task["id"]))
+        return (1, 0, task["scheduled_date"], int(task["id"]))
+
+    ordered_tasks = sorted(unfinished_tasks, key=project_order_key)
+    changes = []
+    for task in ordered_tasks:
+        old_date = date.fromisoformat(task["scheduled_date"][:10])
+        changes.append(
+            {
+                "task_id": int(task["id"]),
+                "project_id": int(task["resource_id"]),
+                "old_date": old_date.isoformat(),
+                "new_date": (old_date + timedelta(days=delta_days)).isoformat(),
+            }
+        )
+
+    effective_today = today or date.today()
+    if any(date.fromisoformat(change["new_date"]) < effective_today for change in changes):
+        return {
+            "status": "unsupported",
+            "mutates": False,
+            "message": "preview would move a task before today",
+        }
+
+    deadline = project["deadline"]
+    before_expected_late = False
+    after_expected_late = False
+    if deadline:
+        deadline_date = date.fromisoformat(deadline[:10])
+        before_expected_late = any(
+            date.fromisoformat(change["old_date"]) > deadline_date for change in changes
+        )
+        after_expected_late = any(
+            date.fromisoformat(change["new_date"]) > deadline_date for change in changes
+        )
+
+    over_capacity_impact = await _preview_over_capacity_impact(db, changes)
+
+    return {
+        "status": "preview",
+        "source": "dialogue_preview",
+        "command": "project_shift",
+        "project_id": project_id,
+        "delta_days": delta_days,
+        "affected_task_ids": [change["task_id"] for change in changes],
+        "changes": changes,
+        "red_state_impact": {
+            "expected_late": {
+                "before": before_expected_late,
+                "after": after_expected_late,
+            },
+            "over_capacity": over_capacity_impact,
+        },
+        "mutates": False,
+    }
+
+
+async def _preview_over_capacity_impact(
+    db: aiosqlite.Connection,
+    changes: list[dict[str, Any]],
+) -> dict:
+    if not changes:
+        return {
+            "before_dates": [],
+            "after_dates": [],
+            "new_over_capacity_dates": [],
+        }
+
+    changed_dates = sorted(
+        {change["old_date"] for change in changes} | {change["new_date"] for change in changes}
+    )
+    changed_task_dates = {change["task_id"]: change["new_date"] for change in changes}
+    placeholders = ",".join("?" for _ in changed_dates)
+    async with db.execute(
+        f"""
+        SELECT
+            t.id,
+            t.scheduled_date,
+            COALESCE(t.target_minutes, 0) AS target_minutes
+        FROM tasks t
+        JOIN resources r ON r.id = t.resource_id
+        WHERE r.status = 'active'
+          AND r.type = 'study_project'
+          AND (
+              t.scheduled_date IN ({placeholders})
+              OR t.id IN ({",".join("?" for _ in changed_task_dates)})
+          )
+        """,
+        (*changed_dates, *changed_task_dates.keys()),
+    ) as cursor:
+        tasks = await cursor.fetchall()
+
+    daily_capacity_minutes = _parse_daily_capacity_minutes(await get_system_state(db, "daily_capacity_min"))
+    rest_day_settings = await get_study_rest_day_settings(db)
+    rest_weekdays = set(rest_day_settings["weekly_weekdays"])
+    rest_dates = set(rest_day_settings["one_off_dates"])
+
+    before_loads = {day: 0 for day in changed_dates}
+    after_loads = {day: 0 for day in changed_dates}
+    for task in tasks:
+        before_date = task["scheduled_date"][:10]
+        target_minutes = int(task["target_minutes"] or 0)
+        if before_date in before_loads:
+            before_loads[before_date] += target_minutes
+
+        after_date = changed_task_dates.get(int(task["id"]), before_date)
+        if after_date in after_loads:
+            after_loads[after_date] += target_minutes
+
+    def over_capacity_dates(loads: dict[str, int]) -> list[str]:
+        over_dates = []
+        for day, total_minutes in sorted(loads.items()):
+            current = date.fromisoformat(day)
+            capacity = 0 if current.weekday() in rest_weekdays or day in rest_dates else daily_capacity_minutes
+            if total_minutes > capacity:
+                over_dates.append(day)
+        return over_dates
+
+    before_dates = over_capacity_dates(before_loads)
+    after_dates = over_capacity_dates(after_loads)
+    return {
+        "before_dates": before_dates,
+        "after_dates": after_dates,
+        "new_over_capacity_dates": sorted(set(after_dates) - set(before_dates)),
+    }
+
+
 async def update_active_study_project_deadline(
     db: aiosqlite.Connection,
     project_id: int,

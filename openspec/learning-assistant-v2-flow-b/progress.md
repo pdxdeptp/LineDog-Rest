@@ -1228,3 +1228,61 @@ Before implementation, create a checkpoint commit in the current checkout, then 
 ### Next Task
 
 - Continue `opsx:apply` for ITEM-003 with tasks 7.1 and 7.2: supported dialogue adjustment preview without mutation.
+
+## Round 26 · 2026-05-24T06:00:06Z
+
+### ITEM-003 7.1-7.2 Dialogue Adjustment Preview
+
+- Restored controller state: `phase=flow-b`, `current_item=study-plan-adjustment`.
+- Current checkout only; no worktree was created or used.
+- Created pre-apply checkpoint commit `f0538c8 chore: checkpoint flow b after rest day cascade`.
+- Subagent TDD implementation completed OpenSpec tasks 7.1-7.2:
+  - `POST /api/study-plan-adjustment/dialogue/preview`;
+  - deterministic bounded parser for project shift commands such as `push project 6101 by one week` and `delay this project by 3 days`;
+  - explicit `project <id>` and request-body `project_id` context are supported, with conflicts rejected as unsupported;
+  - parser uses anchored matching, length limit, and 1..365 day delta bounds;
+  - negated, compound, trailing `ago`, zero-delta, too-large, and ambiguous commands return unsupported/no-op responses;
+  - preview returns affected task ids plus old/new dates for unfinished active study-project tasks only;
+  - preview reports `red_state_impact.expected_late` and `red_state_impact.over_capacity`;
+  - over-capacity impact includes other active study-project task load and treats rest days as zero capacity;
+  - preview performs no task/resource/system_state/event mutation;
+  - no LLM, old v1 conversational agent, apply route, or `dialogue_apply` event path was added.
+
+### Review Gates
+
+- Initial Spec Compliance Review: CHANGES_REQUESTED with two P1 findings.
+- Initial Code Quality Review: CHANGES_REQUESTED with two P1 findings and related P2/P3 observations.
+- P1 fixed with TDD: `red_state_impact` now includes over-capacity/day-load impact in addition to expected-late.
+- P1 fixed with TDD: parser now rejects partial sentence matches, negated commands, compound commands, trailing `ago`, conflicting project ids, and out-of-range amounts.
+- P2 fixed with TDD: instruction length and shift amount are bounded.
+- Spec Compliance Re-review: PASS with no P0/P1/P2/P3 findings.
+- Code Quality Re-review: PASS with no P0/P1/P2 findings; P3 past-boundary test naming observation accepted as non-blocking because the route currently supports only forward shifts and the DB guard still exists.
+
+### Verification
+
+- RED: `assistant_backend/.venv/bin/pytest assistant_backend/tests/test_study_plan_adjustment_dialogue_preview.py -q`: `2 failed` on missing endpoint.
+- GREEN: same command after initial implementation: `2 passed, 2 warnings`.
+- Review-fix RED: same command after adding review tests: `10 failed, 2 passed`.
+- Review-fix GREEN: same command after fixes: `12 passed, 2 warnings`.
+- `assistant_backend/.venv/bin/pytest assistant_backend/tests/test_study_plan_adjustment_*.py -q`: `47 passed, 2 warnings`.
+- `openspec validate introduce-study-plan-adjustment --strict`: PASS.
+- `git diff --check`: PASS.
+- `openspec instructions apply --change introduce-study-plan-adjustment --json`: 37 tasks total, 25 complete, 12 remaining.
+
+### Auto Commit
+
+- Commit: pending.
+- Scope: verified ITEM-003 dialogue preview through OpenSpec tasks 7.1-7.2.
+- Pre-commit checks: dialogue preview backend tests, full `test_study_plan_adjustment_*.py` suite, `openspec validate introduce-study-plan-adjustment --strict`, `git diff --check`, Spec Compliance Re-review, and Code Quality Re-review all passed.
+
+### Files Added / Changed
+
+- Updated `assistant_backend/src/db/queries.py`.
+- Updated `assistant_backend/src/routers/study_plan_adjustment.py`.
+- Added `assistant_backend/tests/test_study_plan_adjustment_dialogue_preview.py`.
+- Updated `openspec/changes/introduce-study-plan-adjustment/tasks.md` to mark 7.1 and 7.2 complete.
+- Added `openspec/learning-assistant-v2-flow-b/evidence/item-003/tdd-dialogue-preview-report.md`.
+
+### Next Task
+
+- Continue `opsx:apply` for ITEM-003 with tasks 7.3 and 7.4: apply exactly the previewed dialogue changes with event persistence.
