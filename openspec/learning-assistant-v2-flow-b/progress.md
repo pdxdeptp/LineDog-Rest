@@ -1484,7 +1484,7 @@ Before implementation, create a checkpoint commit in the current checkout, then 
 
 ### Auto Commit
 
-- Commit: pending.
+- Commit: `ffc8e72`.
 - Scope: verified ITEM-003 Swift UI adjustment controls through OpenSpec tasks 9.1-9.2.
 - Pre-commit checks: focused UI source tests, focused ViewModel tests, `openspec validate introduce-study-plan-adjustment --strict`, `git diff --check`, Spec Compliance Review, and Code Quality Re-review all passed.
 
