@@ -1271,7 +1271,7 @@ Before implementation, create a checkpoint commit in the current checkout, then 
 
 ### Auto Commit
 
-- Commit: pending.
+- Commit: `76e1d08`.
 - Scope: verified ITEM-003 dialogue preview through OpenSpec tasks 7.1-7.2.
 - Pre-commit checks: dialogue preview backend tests, full `test_study_plan_adjustment_*.py` suite, `openspec validate introduce-study-plan-adjustment --strict`, `git diff --check`, Spec Compliance Re-review, and Code Quality Re-review all passed.
 

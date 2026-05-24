@@ -7,7 +7,7 @@
   "flow_b_readiness": "PASS",
   "git_strategy": "current-checkout-only",
   "last_checkpoint_commit": "f0538c8",
-  "last_feature_commit": "bd85269",
+  "last_feature_commit": "76e1d08",
   "in_progress_step": null,
   "last_completed_step": "flow-b-round-26-item-003-dialogue-preview",
   "next_step": "continue-opsx-apply-task-7.3-dialogue-apply",
