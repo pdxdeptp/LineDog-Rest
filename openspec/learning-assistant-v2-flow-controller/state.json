@@ -1,16 +1,16 @@
 {
-  "phase": "flow-b",
-  "round": 28,
+  "phase": "blocked",
+  "round": 29,
   "current_item": "study-plan-adjustment",
   "last_doc_hash": "d83fb77602961d4f3a9c3e17c307c6b499eb987b",
   "flow_a_readiness": "PASS",
   "flow_b_readiness": "PASS",
   "git_strategy": "current-checkout-only",
-  "last_checkpoint_commit": "f7b30a1",
+  "last_checkpoint_commit": "0313507",
   "last_feature_commit": "919fa7b",
   "in_progress_step": null,
-  "last_completed_step": "flow-b-round-31-item-003-default-mode-silence-verification",
-  "next_step": "continue-opsx-apply-tasks-10.1-10.3-review-and-app-verification",
-  "blocker_reason": null,
-  "updated_at": "2026-05-24T07:55:36Z"
+  "last_completed_step": "flow-b-round-32-item-003-review-and-validation-with-app-verification-blocked",
+  "next_step": "resume-task-10.3-app-verification-after-user-unlocks-mac",
+  "blocker_reason": "Computer Use/App verification is blocked because the current desktop is at the macOS lock screen and MalDaze exposes no usable key window for UI inspection.",
+  "updated_at": "2026-05-24T08:16:36Z"
 }

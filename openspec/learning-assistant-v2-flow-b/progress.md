@@ -1548,3 +1548,33 @@ Before implementation, create a checkpoint commit in the current checkout, then 
 ### Next Task
 
 - Continue `opsx:apply` for ITEM-003 with tasks 10.1-10.3: full test/evidence summary, OpenSpec validation, and current-checkout App verification.
+
+## Round 32 · 2026-05-24T08:16:36Z
+
+### ITEM-003 10.1-10.3 Review And Verification
+
+- Restored controller state: `phase=flow-b`, `current_item=study-plan-adjustment`.
+- Current checkout only; no worktree was created or used.
+- Created checkpoint commit `0313507 chore: checkpoint flow b after default mode silence`.
+
+### Completed
+
+- 10.1 completed: relevant backend and Swift tests ran and were recorded in `evidence/item-003/final-test-and-validation-report.md`.
+- 10.2 completed: `openspec validate introduce-study-plan-adjustment --strict` passed.
+
+### Verification
+
+- Backend: `75 passed, 2 warnings in 12.63s` for study plan adjustment and study views pytest coverage.
+- Swift: `AssistantModelDecodingTests`, `LearningAssistantViewModelTests`, and `LearningAssistantUISourceTests` passed through `xcodebuild test`.
+- OpenSpec: `Change 'introduce-study-plan-adjustment' is valid`.
+- Diff hygiene: `git diff --check` passed.
+
+### Blocker
+
+- 10.3 is blocked. The current checkout Debug app and backend launched, but Computer Use could not attach to a usable MalDaze window (`cgWindowNotFound`), and the screen was at the macOS lock screen during UI verification.
+- The automation did not enter credentials or bypass the lock screen.
+- Evidence saved: `evidence/item-003/app-verification-blocked.md`.
+
+### Stop Decision
+
+- Set Flow B state to `blocked` until the user unlocks the Mac or provides another safe App verification route.
