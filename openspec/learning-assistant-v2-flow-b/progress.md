@@ -1395,3 +1395,52 @@ Before implementation, create a checkpoint commit in the current checkout, then 
 ### Next Task
 
 - Continue `opsx:apply` for ITEM-003 with tasks 8.3 and 8.4: ViewModel adjustment state and refresh sequencing.
+
+## Round 29 · 2026-05-24T07:12:36Z
+
+### ITEM-003 8.3-8.4 ViewModel Adjustments
+
+- Restored controller state: `phase=flow-b`, `current_item=study-plan-adjustment`.
+- Current checkout only; no worktree was created or used.
+- Created pre-apply checkpoint commit `1126c4c chore: checkpoint flow b after swift client`.
+- Subagent TDD implementation completed OpenSpec tasks 8.3-8.4:
+  - ViewModel adjustment methods for rollover, manual move, deadline edit, task insert/delete, rest-day fetch/update, dialogue preview, and dialogue apply;
+  - published state for rest-day settings, typed dialogue preview/apply result, adjustment error, and busy state;
+  - successful mutations refresh dashboard facts from backend and refresh the currently loaded calendar range;
+  - dialogue preview stores a typed preview without refreshing or mutating dashboard state;
+  - dialogue apply requires a stored typed preview, clears it only after successful apply, and preserves it on failure;
+  - failure paths set adjustment error/offline state and avoid refresh;
+  - tests assert the default path does not call old chat/confirm behavior.
+
+### Review Gates
+
+- Spec Compliance Review: PASS with no Critical, Important, or Minor blockers.
+- Code Quality Review: PASS with no Critical or Important findings.
+- Accepted non-blocking Minor: a previous dialogue apply result can remain visible after a later preview/apply failure.
+- Accepted non-blocking Minor: duplicate in-flight guard exists but lacks a dedicated concurrent test.
+
+### Verification
+
+- RED: `xcodebuild test -project MalDaze.xcodeproj -scheme MalDaze -only-testing:MalDazeTests/LearningAssistantViewModelTests -quiet` failed on missing ViewModel adjustment methods/state.
+- GREEN: same focused command passed after minimal ViewModel implementation.
+- REFACTOR: same focused command remained green after extracting adjustment refresh helpers.
+- Independent verification:
+  - `xcodebuild test -project MalDaze.xcodeproj -scheme MalDaze -only-testing:MalDazeTests/LearningAssistantViewModelTests -quiet`: PASS.
+  - `git diff --check`: PASS.
+
+### Auto Commit
+
+- Commit: pending.
+- Scope: verified ITEM-003 ViewModel adjustment state and refresh sequencing through OpenSpec tasks 8.3-8.4.
+- Pre-commit checks: focused `LearningAssistantViewModelTests`, `MalDazeTests/LearningAssistantTests`, `openspec validate introduce-study-plan-adjustment --strict`, `git diff --check`, Spec Compliance Review, and Code Quality Review all passed.
+
+### Files Added / Changed
+
+- Updated `MalDaze/LearningAssistant/LearningAssistantViewModel.swift`.
+- Updated `MalDazeTests/LearningAssistantTests.swift`.
+- Updated `openspec/changes/introduce-study-plan-adjustment/tasks.md` to mark 8.3 and 8.4 complete.
+- Added `openspec/learning-assistant-v2-flow-b/evidence/item-003/tdd-viewmodel-adjustments-report.md`.
+
+### Next Task
+
+- Continue `opsx:apply` for ITEM-003 with tasks 9.1 and 9.2: SwiftUI presentation/source tests and minimal UI controls for adjustment surfaces.

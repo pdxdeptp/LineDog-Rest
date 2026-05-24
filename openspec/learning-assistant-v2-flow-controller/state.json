@@ -1,16 +1,16 @@
 {
   "phase": "flow-b",
-  "round": 22,
+  "round": 24,
   "current_item": "study-plan-adjustment",
   "last_doc_hash": "d83fb77602961d4f3a9c3e17c307c6b499eb987b",
   "flow_a_readiness": "PASS",
   "flow_b_readiness": "PASS",
   "git_strategy": "current-checkout-only",
-  "last_checkpoint_commit": "04ae2db",
+  "last_checkpoint_commit": "1126c4c",
   "last_feature_commit": "f539b6c",
   "in_progress_step": null,
-  "last_completed_step": "flow-b-round-28-item-003-swift-api-client",
-  "next_step": "continue-opsx-apply-task-8.3-viewmodel-adjustments",
+  "last_completed_step": "flow-b-round-29-item-003-viewmodel-adjustments",
+  "next_step": "continue-opsx-apply-task-9.1-swift-ui-adjustment-controls",
   "blocker_reason": null,
-  "updated_at": "2026-05-24T06:49:36Z"
+  "updated_at": "2026-05-24T07:12:36Z"
 }

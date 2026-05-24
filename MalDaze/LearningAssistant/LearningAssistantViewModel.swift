@@ -89,9 +89,14 @@ final class LearningAssistantViewModel: ObservableObject {
     @Published var studyCalendarLoad: StudyCalendarLoad? = nil
     @Published var studyViewError: String? = nil
     @Published var studyCalendarLoadError: String? = nil
+    @Published var studyRestDaySettings: StudyRestDaySettings? = nil
+    @Published var studyDialogueAdjustmentPreview: StudyDialogueAdjustmentPreview? = nil
+    @Published var studyDialogueAdjustmentResult: StudyDialogueAdjustmentApplyResult? = nil
+    @Published var studyPlanAdjustmentError: String? = nil
 
     @Published var isFetchingBriefing = false
     @Published var isFetchingStudyCalendarLoad = false
+    @Published var isAdjustingStudyPlan = false
     @Published var isSendingMessage   = false
     @Published var isIngesting        = false
     @Published var isStartingStudyPlan = false
@@ -322,6 +327,119 @@ final class LearningAssistantViewModel: ObservableObject {
             await fetchDashboard()
             await refreshCalendarLoadIfNeeded()
         } catch {
+            isOffline = true
+        }
+    }
+
+    // MARK: - Study Plan Adjustment
+
+    func rolloverStudyTasks() async {
+        await performStudyPlanAdjustment {
+            _ = try await api.rolloverStudyTasks()
+        }
+    }
+
+    func moveStudyTask(id: Int, scheduledDate: String) async {
+        await performStudyPlanAdjustment {
+            _ = try await api.moveStudyTask(id: id, scheduledDate: scheduledDate)
+        }
+    }
+
+    func updateStudyProjectDeadline(projectId: Int, deadline: String) async {
+        await performStudyPlanAdjustment {
+            _ = try await api.updateStudyProjectDeadline(projectId: projectId, deadline: deadline)
+        }
+    }
+
+    func insertStudyProjectTask(
+        projectId: Int,
+        title: String,
+        targetMinutes: Int,
+        scheduledDate: String
+    ) async {
+        await performStudyPlanAdjustment {
+            _ = try await api.insertStudyProjectTask(
+                projectId: projectId,
+                title: title,
+                targetMinutes: targetMinutes,
+                scheduledDate: scheduledDate
+            )
+        }
+    }
+
+    func deleteStudyTask(id: Int) async {
+        await performStudyPlanAdjustment {
+            _ = try await api.deleteStudyTask(id: id)
+        }
+    }
+
+    func fetchStudyRestDaySettings() async {
+        guard !isAdjustingStudyPlan else { return }
+        isAdjustingStudyPlan = true
+        studyPlanAdjustmentError = nil
+        defer { isAdjustingStudyPlan = false }
+
+        do {
+            studyRestDaySettings = try await api.fetchStudyRestDaySettings()
+            isOffline = false
+        } catch {
+            studyPlanAdjustmentError = "休息日设置加载失败，请稍后重试。"
+            isOffline = true
+        }
+    }
+
+    func updateStudyRestDaySettings(_ settings: StudyRestDaySettings) async {
+        await performStudyPlanAdjustment {
+            let result = try await api.updateStudyRestDaySettings(settings)
+            studyRestDaySettings = StudyRestDaySettings(
+                weeklyWeekdays: result.weeklyWeekdays,
+                oneOffDates: result.oneOffDates
+            )
+        }
+    }
+
+    func previewStudyDialogueAdjustment(instruction: String, projectId: Int?) async {
+        guard !isAdjustingStudyPlan else { return }
+        isAdjustingStudyPlan = true
+        studyPlanAdjustmentError = nil
+        defer { isAdjustingStudyPlan = false }
+
+        do {
+            let preview = try await api.previewStudyDialogueAdjustment(
+                instruction: instruction,
+                projectId: projectId
+            )
+            studyDialogueAdjustmentPreview = preview
+            studyDialogueAdjustmentResult = nil
+            isOffline = false
+        } catch {
+            studyPlanAdjustmentError = "调整预览生成失败，请稍后重试。"
+            isOffline = true
+        }
+    }
+
+    func applyStudyDialogueAdjustment(instruction: String, projectId: Int?) async {
+        guard let preview = studyDialogueAdjustmentPreview else {
+            studyPlanAdjustmentError = "请先生成调整预览。"
+            return
+        }
+        guard !isAdjustingStudyPlan else { return }
+        isAdjustingStudyPlan = true
+        studyPlanAdjustmentError = nil
+        defer { isAdjustingStudyPlan = false }
+
+        do {
+            let result = try await api.applyStudyDialogueAdjustment(
+                instruction: instruction,
+                projectId: projectId,
+                preview: preview
+            )
+            studyDialogueAdjustmentResult = result
+            studyDialogueAdjustmentPreview = nil
+            isOffline = false
+            await refreshAfterStudyPlanAdjustment()
+        } catch {
+            studyPlanAdjustmentError = "调整应用失败，请稍后重试。"
             isOffline = true
         }
     }
@@ -799,6 +917,27 @@ final class LearningAssistantViewModel: ObservableObject {
     private func refreshCalendarLoadIfNeeded() async {
         guard let currentLoad = studyCalendarLoad else { return }
         await fetchStudyCalendarLoad(start: currentLoad.startDate, end: currentLoad.endDate)
+    }
+
+    private func performStudyPlanAdjustment(_ action: () async throws -> Void) async {
+        guard !isAdjustingStudyPlan else { return }
+        isAdjustingStudyPlan = true
+        studyPlanAdjustmentError = nil
+        defer { isAdjustingStudyPlan = false }
+
+        do {
+            try await action()
+            isOffline = false
+            await refreshAfterStudyPlanAdjustment()
+        } catch {
+            studyPlanAdjustmentError = "学习计划调整失败，请稍后重试。"
+            isOffline = true
+        }
+    }
+
+    private func refreshAfterStudyPlanAdjustment() async {
+        await fetchDashboard()
+        await refreshCalendarLoadIfNeeded()
     }
 
     private func factualTodayHighlights(taskCount: Int, totalMinutes: Int) -> String {

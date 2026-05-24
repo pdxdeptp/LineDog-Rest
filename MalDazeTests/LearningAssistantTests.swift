@@ -2923,6 +2923,267 @@ final class LearningAssistantViewModelTests: XCTestCase {
         XCTAssertTrue(draft?.contains("ID: 45") ?? false)
         XCTAssertNil(vm.adjustPlanDraftText)
     }
+
+    // MARK: 8.3 Study Plan Adjustment ViewModel
+
+    func testRolloverCallsAdjustmentEndpointAndRefreshesDashboardAndLoadedCalendar() async {
+        let mock = MockAssistantAPIClient()
+        mock.studyTodayViewResult = sampleStudyTodayView(
+            tasks: [
+                sampleStudyViewTaskJSON(id: 42, title: "Rolled", targetMinutes: 25, projectTitle: "Swift")
+            ]
+        )
+        mock.resourcesResult = [sampleResource(id: 7, title: "Swift")]
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        await vm.fetchStudyCalendarLoad(start: "2026-06-01", end: "2026-06-07")
+
+        await vm.rolloverStudyTasks()
+
+        XCTAssertEqual(mock.rolloverStudyTasksCallCount, 1)
+        XCTAssertEqual(mock.fetchStudyTodayViewCallCount, 1)
+        XCTAssertEqual(mock.fetchStudyProjectOverviewCallCount, 1)
+        XCTAssertEqual(mock.fetchResourcesCallCount, 1)
+        XCTAssertEqual(mock.fetchStudyCalendarLoadCallCount, 2)
+        XCTAssertEqual(mock.lastStudyCalendarLoadStart, "2026-06-01")
+        XCTAssertEqual(mock.lastStudyCalendarLoadEnd, "2026-06-07")
+        XCTAssertEqual(vm.studyTodayView?.tasks.map(\.id), [42])
+        XCTAssertNil(vm.studyPlanAdjustmentError)
+        XCTAssertFalse(vm.isAdjustingStudyPlan)
+        XCTAssertEqual(mock.sendMessageCallCount, 0)
+        XCTAssertEqual(mock.confirmChatCallCount, 0)
+    }
+
+    func testMoveStudyTaskCallsAPIAndRefreshesPersistedFactsWithoutLocalCascade() async {
+        let mock = MockAssistantAPIClient()
+        mock.studyCalendarLoadResult = sampleStudyCalendarLoad(start: "2026-06-08", end: "2026-06-14")
+        mock.studyTodayViewResult = sampleStudyTodayView(
+            tasks: [
+                sampleStudyViewTaskJSON(id: 42, title: "Moved from server", targetMinutes: 30, projectTitle: "Systems")
+            ]
+        )
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        await vm.fetchStudyCalendarLoad(start: "2026-06-08", end: "2026-06-14")
+
+        await vm.moveStudyTask(id: 42, scheduledDate: "2026-06-12")
+
+        XCTAssertEqual(mock.moveStudyTaskCallCount, 1)
+        XCTAssertEqual(mock.lastMovedStudyTaskId, 42)
+        XCTAssertEqual(mock.lastMovedStudyTaskScheduledDate, "2026-06-12")
+        XCTAssertEqual(mock.fetchStudyTodayViewCallCount, 1)
+        XCTAssertEqual(mock.fetchStudyProjectOverviewCallCount, 1)
+        XCTAssertEqual(mock.fetchResourcesCallCount, 1)
+        XCTAssertEqual(mock.fetchStudyCalendarLoadCallCount, 2)
+        XCTAssertEqual(mock.lastStudyCalendarLoadStart, "2026-06-08")
+        XCTAssertEqual(mock.lastStudyCalendarLoadEnd, "2026-06-14")
+        XCTAssertEqual(vm.visibleTodayTasks.map(\.id), [42])
+        XCTAssertNil(vm.studyPlanAdjustmentError)
+    }
+
+    func testDeadlineEditRefreshesDashboardAndCalendarWithoutLocalTaskDateMutation() async {
+        let mock = MockAssistantAPIClient()
+        mock.studyCalendarLoadResult = sampleStudyCalendarLoad(start: "2026-06-15", end: "2026-06-21")
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        await vm.fetchStudyCalendarLoad(start: "2026-06-15", end: "2026-06-21")
+
+        await vm.updateStudyProjectDeadline(projectId: 7, deadline: "2026-07-01")
+
+        XCTAssertEqual(mock.updateStudyProjectDeadlineCallCount, 1)
+        XCTAssertEqual(mock.lastUpdatedStudyProjectDeadlineProjectId, 7)
+        XCTAssertEqual(mock.lastUpdatedStudyProjectDeadline, "2026-07-01")
+        XCTAssertEqual(mock.fetchStudyTodayViewCallCount, 1)
+        XCTAssertEqual(mock.fetchStudyProjectOverviewCallCount, 1)
+        XCTAssertEqual(mock.fetchResourcesCallCount, 1)
+        XCTAssertEqual(mock.fetchStudyCalendarLoadCallCount, 2)
+        XCTAssertEqual(mock.lastStudyCalendarLoadStart, "2026-06-15")
+        XCTAssertEqual(mock.lastStudyCalendarLoadEnd, "2026-06-21")
+        XCTAssertNil(vm.studyPlanAdjustmentError)
+    }
+
+    func testInsertAndDeleteTaskCallAPIsAndRefreshDashboardAndCalendar() async {
+        let mock = MockAssistantAPIClient()
+        mock.studyCalendarLoadResult = sampleStudyCalendarLoad(start: "2026-06-01", end: "2026-06-30")
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        await vm.fetchStudyCalendarLoad(start: "2026-06-01", end: "2026-06-30")
+
+        await vm.insertStudyProjectTask(
+            projectId: 7,
+            title: "Practice actors",
+            targetMinutes: 40,
+            scheduledDate: "2026-06-10"
+        )
+        await vm.deleteStudyTask(id: 99)
+
+        XCTAssertEqual(mock.insertStudyProjectTaskCallCount, 1)
+        XCTAssertEqual(mock.lastInsertedStudyProjectId, 7)
+        XCTAssertEqual(mock.lastInsertedStudyProjectTaskTitle, "Practice actors")
+        XCTAssertEqual(mock.lastInsertedStudyProjectTaskTargetMinutes, 40)
+        XCTAssertEqual(mock.lastInsertedStudyProjectTaskScheduledDate, "2026-06-10")
+        XCTAssertEqual(mock.deleteStudyTaskCallCount, 1)
+        XCTAssertEqual(mock.lastDeletedStudyTaskId, 99)
+        XCTAssertEqual(mock.fetchStudyTodayViewCallCount, 2)
+        XCTAssertEqual(mock.fetchStudyProjectOverviewCallCount, 2)
+        XCTAssertEqual(mock.fetchResourcesCallCount, 2)
+        XCTAssertEqual(mock.fetchStudyCalendarLoadCallCount, 3)
+        XCTAssertEqual(mock.lastStudyCalendarLoadStart, "2026-06-01")
+        XCTAssertEqual(mock.lastStudyCalendarLoadEnd, "2026-06-30")
+        XCTAssertNil(vm.studyPlanAdjustmentError)
+    }
+
+    func testRestDayFetchAndUpdateStoreSettingsAndRefreshAfterMutation() async {
+        let mock = MockAssistantAPIClient()
+        mock.studyRestDaySettingsResult = StudyRestDaySettings(
+            weeklyWeekdays: [0, 6],
+            oneOffDates: ["2026-06-10"]
+        )
+        mock.studyRestDaySettingsUpdateResult = sampleStudyRestDaySettingsUpdateResult(
+            weeklyWeekdays: [5],
+            oneOffDates: ["2026-06-12"]
+        )
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+
+        await vm.fetchStudyRestDaySettings()
+        await vm.fetchStudyCalendarLoad(start: "2026-06-01", end: "2026-06-07")
+        await vm.updateStudyRestDaySettings(
+            StudyRestDaySettings(weeklyWeekdays: [5], oneOffDates: ["2026-06-12"])
+        )
+
+        XCTAssertEqual(mock.fetchStudyRestDaySettingsCallCount, 1)
+        XCTAssertEqual(mock.updateStudyRestDaySettingsCallCount, 1)
+        XCTAssertEqual(mock.lastUpdatedStudyRestDaySettings?.weeklyWeekdays, [5])
+        XCTAssertEqual(mock.lastUpdatedStudyRestDaySettings?.oneOffDates, ["2026-06-12"])
+        XCTAssertEqual(vm.studyRestDaySettings?.weeklyWeekdays, [5])
+        XCTAssertEqual(vm.studyRestDaySettings?.oneOffDates, ["2026-06-12"])
+        XCTAssertEqual(mock.fetchStudyTodayViewCallCount, 1)
+        XCTAssertEqual(mock.fetchStudyProjectOverviewCallCount, 1)
+        XCTAssertEqual(mock.fetchResourcesCallCount, 1)
+        XCTAssertEqual(mock.fetchStudyCalendarLoadCallCount, 2)
+        XCTAssertNil(vm.studyPlanAdjustmentError)
+    }
+
+    func testDialoguePreviewStoresTypedPreviewWithoutRefreshingOrMutatingDashboard() async {
+        let mock = MockAssistantAPIClient()
+        mock.studyDialogueAdjustmentPreviewResult = sampleStudyDialogueAdjustmentPreview(
+            affectedTaskIds: [42, 43]
+        )
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+
+        await vm.previewStudyDialogueAdjustment(
+            instruction: "push this project by one week",
+            projectId: 7
+        )
+
+        XCTAssertEqual(mock.previewStudyDialogueAdjustmentCallCount, 1)
+        XCTAssertEqual(mock.lastStudyDialoguePreviewInstruction, "push this project by one week")
+        XCTAssertEqual(mock.lastStudyDialoguePreviewProjectId, 7)
+        XCTAssertEqual(vm.studyDialogueAdjustmentPreview?.affectedTaskIds, [42, 43])
+        XCTAssertEqual(vm.studyDialogueAdjustmentPreview?.mutates, false)
+        XCTAssertNil(vm.studyDialogueAdjustmentResult)
+        XCTAssertEqual(mock.fetchStudyTodayViewCallCount, 0)
+        XCTAssertEqual(mock.fetchStudyProjectOverviewCallCount, 0)
+        XCTAssertEqual(mock.fetchResourcesCallCount, 0)
+        XCTAssertEqual(mock.fetchStudyCalendarLoadCallCount, 0)
+        XCTAssertEqual(mock.sendMessageCallCount, 0)
+        XCTAssertEqual(mock.confirmChatCallCount, 0)
+        XCTAssertNil(vm.studyPlanAdjustmentError)
+    }
+
+    func testDialogueApplyRequiresStoredPreviewThenClearsItAndRefreshes() async {
+        let mock = MockAssistantAPIClient()
+        let preview = sampleStudyDialogueAdjustmentPreview(affectedTaskIds: [42])
+        mock.studyDialogueAdjustmentApplyResult = sampleStudyDialogueAdjustmentApplyResult(
+            affectedTaskIds: [42]
+        )
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+
+        await vm.applyStudyDialogueAdjustment(
+            instruction: "push this project by one week",
+            projectId: 7
+        )
+        XCTAssertEqual(mock.applyStudyDialogueAdjustmentCallCount, 0)
+        XCTAssertNotNil(vm.studyPlanAdjustmentError)
+
+        vm.studyPlanAdjustmentError = nil
+        vm.studyDialogueAdjustmentPreview = preview
+        await vm.fetchStudyCalendarLoad(start: "2026-06-01", end: "2026-06-07")
+
+        await vm.applyStudyDialogueAdjustment(
+            instruction: "push this project by one week",
+            projectId: 7
+        )
+
+        XCTAssertEqual(mock.applyStudyDialogueAdjustmentCallCount, 1)
+        XCTAssertEqual(mock.lastStudyDialogueApplyInstruction, "push this project by one week")
+        XCTAssertEqual(mock.lastStudyDialogueApplyProjectId, 7)
+        XCTAssertEqual(mock.lastStudyDialogueApplyPreview?.affectedTaskIds, [42])
+        XCTAssertNil(vm.studyDialogueAdjustmentPreview)
+        XCTAssertEqual(vm.studyDialogueAdjustmentResult?.status, "applied")
+        XCTAssertEqual(mock.fetchStudyTodayViewCallCount, 1)
+        XCTAssertEqual(mock.fetchStudyProjectOverviewCallCount, 1)
+        XCTAssertEqual(mock.fetchResourcesCallCount, 1)
+        XCTAssertEqual(mock.fetchStudyCalendarLoadCallCount, 2)
+        XCTAssertEqual(mock.sendMessageCallCount, 0)
+        XCTAssertEqual(mock.confirmChatCallCount, 0)
+        XCTAssertNil(vm.studyPlanAdjustmentError)
+    }
+
+    func testAdjustmentFailureSetsErrorOfflineAndDoesNotRefresh() async {
+        let mock = MockAssistantAPIClient()
+        mock.adjustmentError = AssistantOfflineError()
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+
+        await vm.moveStudyTask(id: 42, scheduledDate: "2026-06-12")
+
+        XCTAssertEqual(mock.moveStudyTaskCallCount, 1)
+        XCTAssertTrue(vm.isOffline)
+        XCTAssertNotNil(vm.studyPlanAdjustmentError)
+        XCTAssertFalse(vm.isAdjustingStudyPlan)
+        XCTAssertEqual(mock.fetchStudyTodayViewCallCount, 0)
+        XCTAssertEqual(mock.fetchStudyProjectOverviewCallCount, 0)
+        XCTAssertEqual(mock.fetchStudyCalendarLoadCallCount, 0)
+    }
+
+    func testDialoguePreviewFailurePreservesExistingPreviewAndDoesNotRefresh() async {
+        let mock = MockAssistantAPIClient()
+        let existingPreview = sampleStudyDialogueAdjustmentPreview(affectedTaskIds: [1])
+        mock.adjustmentError = AssistantOfflineError()
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        vm.studyDialogueAdjustmentPreview = existingPreview
+
+        await vm.previewStudyDialogueAdjustment(
+            instruction: "ambiguous request",
+            projectId: 7
+        )
+
+        XCTAssertEqual(mock.previewStudyDialogueAdjustmentCallCount, 1)
+        XCTAssertEqual(vm.studyDialogueAdjustmentPreview?.affectedTaskIds, [1])
+        XCTAssertTrue(vm.isOffline)
+        XCTAssertNotNil(vm.studyPlanAdjustmentError)
+        XCTAssertEqual(mock.fetchStudyTodayViewCallCount, 0)
+        XCTAssertEqual(mock.fetchStudyProjectOverviewCallCount, 0)
+        XCTAssertEqual(mock.fetchStudyCalendarLoadCallCount, 0)
+    }
+
+    func testDialogueApplyFailureKeepsPreviewAndDoesNotRefresh() async {
+        let mock = MockAssistantAPIClient()
+        let preview = sampleStudyDialogueAdjustmentPreview(affectedTaskIds: [42])
+        mock.adjustmentError = AssistantOfflineError()
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        vm.studyDialogueAdjustmentPreview = preview
+
+        await vm.applyStudyDialogueAdjustment(
+            instruction: "push this project by one week",
+            projectId: 7
+        )
+
+        XCTAssertEqual(mock.applyStudyDialogueAdjustmentCallCount, 1)
+        XCTAssertEqual(vm.studyDialogueAdjustmentPreview?.affectedTaskIds, [42])
+        XCTAssertNil(vm.studyDialogueAdjustmentResult)
+        XCTAssertTrue(vm.isOffline)
+        XCTAssertNotNil(vm.studyPlanAdjustmentError)
+        XCTAssertEqual(mock.fetchStudyTodayViewCallCount, 0)
+        XCTAssertEqual(mock.fetchStudyProjectOverviewCallCount, 0)
+        XCTAssertEqual(mock.fetchStudyCalendarLoadCallCount, 0)
+    }
 }
 
 // MARK: - Mock API Client
@@ -2960,6 +3221,16 @@ private final class MockAssistantAPIClient: AssistantAPIClientProtocol, @uncheck
     var studyProjectOverviewResult = sampleStudyProjectOverview()
     var studyCalendarLoadResult = sampleStudyCalendarLoad()
     var studyCalendarLoadResultsQueue: [DelayedStudyCalendarLoadResult] = []
+    var studyRolloverResult = sampleStudyRolloverResult()
+    var studyTaskMoveResult = sampleStudyTaskMoveResult()
+    var studyProjectDeadlineUpdateResult = sampleStudyProjectDeadlineUpdateResult()
+    var studyTaskInsertResult = sampleStudyTaskInsertResult()
+    var studyTaskDeleteResult = sampleStudyTaskDeleteResult()
+    var studyRestDaySettingsResult = StudyRestDaySettings(weeklyWeekdays: [], oneOffDates: [])
+    var studyRestDaySettingsUpdateResult = sampleStudyRestDaySettingsUpdateResult()
+    var studyDialogueAdjustmentPreviewResult = sampleStudyDialogueAdjustmentPreview()
+    var studyDialogueAdjustmentApplyResult = sampleStudyDialogueAdjustmentApplyResult()
+    var adjustmentError: Error?
 
     // Captured call arguments for assertions
     private(set) var fetchBriefingCallCount = 0
@@ -2976,12 +3247,38 @@ private final class MockAssistantAPIClient: AssistantAPIClientProtocol, @uncheck
     var studyTodayViewResultsQueue: [StudyTodayView] = []
     var studyProjectOverviewResultsQueue: [StudyProjectOverview] = []
     private(set) var lastCompleteTaskId: Int?
+    private(set) var rolloverStudyTasksCallCount = 0
+    private(set) var moveStudyTaskCallCount = 0
+    private(set) var lastMovedStudyTaskId: Int?
+    private(set) var lastMovedStudyTaskScheduledDate: String?
+    private(set) var updateStudyProjectDeadlineCallCount = 0
+    private(set) var lastUpdatedStudyProjectDeadlineProjectId: Int?
+    private(set) var lastUpdatedStudyProjectDeadline: String?
+    private(set) var insertStudyProjectTaskCallCount = 0
+    private(set) var lastInsertedStudyProjectId: Int?
+    private(set) var lastInsertedStudyProjectTaskTitle: String?
+    private(set) var lastInsertedStudyProjectTaskTargetMinutes: Int?
+    private(set) var lastInsertedStudyProjectTaskScheduledDate: String?
+    private(set) var deleteStudyTaskCallCount = 0
+    private(set) var lastDeletedStudyTaskId: Int?
+    private(set) var fetchStudyRestDaySettingsCallCount = 0
+    private(set) var updateStudyRestDaySettingsCallCount = 0
+    private(set) var lastUpdatedStudyRestDaySettings: StudyRestDaySettings?
+    private(set) var previewStudyDialogueAdjustmentCallCount = 0
+    private(set) var lastStudyDialoguePreviewInstruction: String?
+    private(set) var lastStudyDialoguePreviewProjectId: Int?
+    private(set) var applyStudyDialogueAdjustmentCallCount = 0
+    private(set) var lastStudyDialogueApplyInstruction: String?
+    private(set) var lastStudyDialogueApplyProjectId: Int?
+    private(set) var lastStudyDialogueApplyPreview: StudyDialogueAdjustmentPreview?
     private(set) var lastStudyCalendarLoadStart: String?
     private(set) var lastStudyCalendarLoadEnd: String?
     private(set) var lastCompleteResourceId: Int?
     private(set) var lastArchiveResourceId: Int?
     private(set) var completeResourceCallCount = 0
     private(set) var archiveResourceCallCount = 0
+    private(set) var sendMessageCallCount = 0
+    private(set) var confirmChatCallCount = 0
     private(set) var lastConfirmChatConfirmed: Bool?
     private(set) var lastConfirmIngestionConfirmed: Bool?
     private(set) var lastConfirmIngestionOption: String?
@@ -3110,6 +3407,96 @@ private final class MockAssistantAPIClient: AssistantAPIClientProtocol, @uncheck
         return TaskCompletionResult(taskId: id, completedAt: "2026-06-01T12:30:00")
     }
 
+    func rolloverStudyTasks() async throws -> StudyRolloverResult {
+        rolloverStudyTasksCallCount += 1
+        if let adjustmentError { throw adjustmentError }
+        if shouldThrowOffline { throw AssistantOfflineError() }
+        return studyRolloverResult
+    }
+
+    func moveStudyTask(id: Int, scheduledDate: String) async throws -> StudyTaskMoveResult {
+        moveStudyTaskCallCount += 1
+        lastMovedStudyTaskId = id
+        lastMovedStudyTaskScheduledDate = scheduledDate
+        if let adjustmentError { throw adjustmentError }
+        if shouldThrowOffline { throw AssistantOfflineError() }
+        return studyTaskMoveResult
+    }
+
+    func updateStudyProjectDeadline(projectId: Int, deadline: String) async throws -> StudyProjectDeadlineUpdateResult {
+        updateStudyProjectDeadlineCallCount += 1
+        lastUpdatedStudyProjectDeadlineProjectId = projectId
+        lastUpdatedStudyProjectDeadline = deadline
+        if let adjustmentError { throw adjustmentError }
+        if shouldThrowOffline { throw AssistantOfflineError() }
+        return studyProjectDeadlineUpdateResult
+    }
+
+    func insertStudyProjectTask(
+        projectId: Int,
+        title: String,
+        targetMinutes: Int,
+        scheduledDate: String
+    ) async throws -> StudyTaskInsertResult {
+        insertStudyProjectTaskCallCount += 1
+        lastInsertedStudyProjectId = projectId
+        lastInsertedStudyProjectTaskTitle = title
+        lastInsertedStudyProjectTaskTargetMinutes = targetMinutes
+        lastInsertedStudyProjectTaskScheduledDate = scheduledDate
+        if let adjustmentError { throw adjustmentError }
+        if shouldThrowOffline { throw AssistantOfflineError() }
+        return studyTaskInsertResult
+    }
+
+    func deleteStudyTask(id: Int) async throws -> StudyTaskDeleteResult {
+        deleteStudyTaskCallCount += 1
+        lastDeletedStudyTaskId = id
+        if let adjustmentError { throw adjustmentError }
+        if shouldThrowOffline { throw AssistantOfflineError() }
+        return studyTaskDeleteResult
+    }
+
+    func fetchStudyRestDaySettings() async throws -> StudyRestDaySettings {
+        fetchStudyRestDaySettingsCallCount += 1
+        if let adjustmentError { throw adjustmentError }
+        if shouldThrowOffline { throw AssistantOfflineError() }
+        return studyRestDaySettingsResult
+    }
+
+    func updateStudyRestDaySettings(_ settings: StudyRestDaySettings) async throws -> StudyRestDaySettingsUpdateResult {
+        updateStudyRestDaySettingsCallCount += 1
+        lastUpdatedStudyRestDaySettings = settings
+        if let adjustmentError { throw adjustmentError }
+        if shouldThrowOffline { throw AssistantOfflineError() }
+        return studyRestDaySettingsUpdateResult
+    }
+
+    func previewStudyDialogueAdjustment(
+        instruction: String,
+        projectId: Int?
+    ) async throws -> StudyDialogueAdjustmentPreview {
+        previewStudyDialogueAdjustmentCallCount += 1
+        lastStudyDialoguePreviewInstruction = instruction
+        lastStudyDialoguePreviewProjectId = projectId
+        if let adjustmentError { throw adjustmentError }
+        if shouldThrowOffline { throw AssistantOfflineError() }
+        return studyDialogueAdjustmentPreviewResult
+    }
+
+    func applyStudyDialogueAdjustment(
+        instruction: String,
+        projectId: Int?,
+        preview: StudyDialogueAdjustmentPreview
+    ) async throws -> StudyDialogueAdjustmentApplyResult {
+        applyStudyDialogueAdjustmentCallCount += 1
+        lastStudyDialogueApplyInstruction = instruction
+        lastStudyDialogueApplyProjectId = projectId
+        lastStudyDialogueApplyPreview = preview
+        if let adjustmentError { throw adjustmentError }
+        if shouldThrowOffline { throw AssistantOfflineError() }
+        return studyDialogueAdjustmentApplyResult
+    }
+
     func completeResource(id: Int) async throws {
         completeResourceCallCount += 1
         lastCompleteResourceId = id
@@ -3129,11 +3516,13 @@ private final class MockAssistantAPIClient: AssistantAPIClientProtocol, @uncheck
     }
 
     func sendMessage(message: String, threadId: String?) async throws -> ChatResponse {
+        sendMessageCallCount += 1
         if shouldThrowOffline { throw AssistantOfflineError() }
         return chatResult ?? ChatResponse(threadId: "mock", response: "ok", proposal: nil)
     }
 
     func confirmChat(threadId: String, confirmed: Bool) async throws {
+        confirmChatCallCount += 1
         if shouldThrowOffline { throw AssistantOfflineError() }
         lastConfirmChatConfirmed = confirmed
     }
@@ -3524,6 +3913,128 @@ private func sampleStudyCalendarLoad(
     }
     """
     return try! JSONDecoder().decode(StudyCalendarLoad.self, from: Data(json.utf8))
+}
+
+private func sampleStudyRolloverResult() -> StudyRolloverResult {
+    StudyRolloverResult(
+        date: "2026-06-01",
+        rolledCount: 1,
+        rolledTasks: [
+            StudyRolloverTask(
+                taskId: 42,
+                projectId: 7,
+                oldDate: "2026-05-31",
+                newDate: "2026-06-01",
+                rolledDays: 1,
+                autoRollDays: 3
+            )
+        ]
+    )
+}
+
+private func sampleStudyTaskMoveResult() -> StudyTaskMoveResult {
+    StudyTaskMoveResult(
+        taskId: 42,
+        source: "manual_move",
+        affectedCount: 2,
+        changes: [
+            StudyAdjustmentChange(taskId: 42, projectId: 7, oldDate: "2026-06-01", newDate: "2026-06-12"),
+            StudyAdjustmentChange(taskId: 43, projectId: 7, oldDate: "2026-06-02", newDate: "2026-06-13")
+        ]
+    )
+}
+
+private func sampleStudyProjectDeadlineUpdateResult() -> StudyProjectDeadlineUpdateResult {
+    StudyProjectDeadlineUpdateResult(
+        projectId: 7,
+        oldDeadline: "2026-06-30",
+        newDeadline: "2026-07-01",
+        source: "deadline_edit"
+    )
+}
+
+private func sampleStudyTaskInsertResult() -> StudyTaskInsertResult {
+    StudyTaskInsertResult(
+        projectId: 7,
+        taskId: 99,
+        scheduledDate: "2026-06-10",
+        targetMinutes: 40,
+        title: "Practice actors",
+        source: "manual_insert"
+    )
+}
+
+private func sampleStudyTaskDeleteResult() -> StudyTaskDeleteResult {
+    StudyTaskDeleteResult(
+        projectId: 7,
+        taskId: 99,
+        scheduledDate: "2026-06-10",
+        source: "manual_delete",
+        projectCompleted: false
+    )
+}
+
+private func sampleStudyRestDaySettingsUpdateResult(
+    weeklyWeekdays: [Int] = [5],
+    oneOffDates: [String] = ["2026-06-12"]
+) -> StudyRestDaySettingsUpdateResult {
+    StudyRestDaySettingsUpdateResult(
+        weeklyWeekdays: weeklyWeekdays,
+        oneOffDates: oneOffDates,
+        addedWeeklyWeekdays: weeklyWeekdays,
+        removedWeeklyWeekdays: [],
+        addedOneOffDates: oneOffDates,
+        removedOneOffDates: [],
+        source: "manual_rest_day_settings"
+    )
+}
+
+private func sampleStudyDialogueAdjustmentPreview(
+    affectedTaskIds: [Int] = [42]
+) -> StudyDialogueAdjustmentPreview {
+    StudyDialogueAdjustmentPreview(
+        status: "preview",
+        source: "dialogue_preview",
+        command: "project_shift",
+        projectId: 7,
+        deltaDays: 7,
+        affectedTaskIds: affectedTaskIds,
+        changes: affectedTaskIds.map {
+            StudyAdjustmentChange(
+                taskId: $0,
+                projectId: 7,
+                oldDate: "2026-06-01",
+                newDate: "2026-06-08"
+            )
+        },
+        redStateImpact: nil,
+        mutates: false,
+        message: nil
+    )
+}
+
+private func sampleStudyDialogueAdjustmentApplyResult(
+    affectedTaskIds: [Int] = [42]
+) -> StudyDialogueAdjustmentApplyResult {
+    StudyDialogueAdjustmentApplyResult(
+        status: "applied",
+        source: "dialogue_apply",
+        command: "project_shift",
+        projectId: 7,
+        deltaDays: 7,
+        affectedTaskIds: affectedTaskIds,
+        changes: affectedTaskIds.map {
+            StudyAdjustmentChange(
+                taskId: $0,
+                projectId: 7,
+                oldDate: "2026-06-01",
+                newDate: "2026-06-08"
+            )
+        },
+        mutates: true,
+        refresh: StudyRefreshContract(today: true, projectOverview: true, calendar: true),
+        message: nil
+    )
 }
 
 // MARK: - New ViewModel Ingestion Tests (Tasks 3.1–3.6)
