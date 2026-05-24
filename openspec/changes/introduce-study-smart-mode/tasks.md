@@ -11,10 +11,10 @@
 
 ## 3. Backend Smart Snapshot And Morning Briefing
 
-- [ ] 3.1 Write failing backend tests for a fact-only smart snapshot built from v2 Today, Project Overview, Calendar, rollover, expected-late, and over-capacity facts.
-- [ ] 3.2 Implement smart snapshot and morning briefing service/route without calling the v1 Morning Agent.
-- [ ] 3.3 Write failing backend tests for quiet no-issue briefing and issue detection for lag, expected-late, and over-capacity.
-- [ ] 3.4 Implement deterministic smart briefing payloads and morning trigger eligibility.
+- [x] 3.1 Write failing backend tests for a fact-only smart snapshot built from v2 Today, Project Overview, Calendar, rollover, expected-late, and over-capacity facts.
+- [x] 3.2 Implement smart snapshot and morning briefing service/route without calling the v1 Morning Agent.
+- [x] 3.3 Write failing backend tests for quiet no-issue briefing and issue detection for lag, expected-late, and over-capacity.
+- [x] 3.4 Implement deterministic smart briefing payloads and morning trigger eligibility.
 
 ## 4. Backend Proposal Generation
 
