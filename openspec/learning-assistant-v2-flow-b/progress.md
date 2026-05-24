@@ -1173,3 +1173,58 @@ Before implementation, create a checkpoint commit in the current checkout, then 
 ### Next Task
 
 - Continue `opsx:apply` for ITEM-003 with tasks 6.3 and 6.4: D27 +1 day rest-day cascade in chronological order.
+
+## Round 25 · 2026-05-24T05:40:06Z
+
+### ITEM-003 6.3-6.4 Rest-Day Cascade
+
+- Restored controller state: `phase=flow-b`, `current_item=study-plan-adjustment`.
+- Current checkout only; no worktree was created or used.
+- Created pre-apply checkpoint commit `30295dd chore: checkpoint flow b after rest day settings`.
+- Subagent TDD implementation completed OpenSpec tasks 6.3-6.4:
+  - adding a new one-off rest date cascades unfinished active study tasks on and after that date by `+1 day`;
+  - adding a new weekly rest weekday expands into future occurrences through the active unfinished study task horizon and applies each occurrence chronologically;
+  - same-day one-off/weekly occurrences are deduplicated;
+  - dates already effective under old rest-day settings do not cascade again when added through the other setting type;
+  - completed tasks, completed study projects, non-study resources, and tasks before the affected occurrence are not moved;
+  - affected tasks reset `auto_roll_days`, clear `last_auto_rolled_at`, and stamp `user_adjusted_at`;
+  - `study_rest_day_cascaded` events record occurrence-level affected task ids plus final per-task original date, new date, and date delta;
+  - no cascade event is written when no task actually moves.
+
+### Review Gates
+
+- Initial Spec Compliance Review: CHANGES_REQUESTED with one P1.
+- Initial Code Quality Review: CHANGES_REQUESTED with one P1 and related P2/P3 observations.
+- P1 fixed with TDD: weekly recurring rest days now cascade every affected future occurrence through the active task horizon, not just the first occurrence.
+- P2 fixed with TDD: old effective rest days do not trigger duplicate cascade, and empty cascades do not write noisy events.
+- Spec Compliance Re-review: PASS with no P0/P1/P2/P3 findings.
+- Code Quality Re-review: PASS with no P0/P1/P2 findings; P3 scale/test-style observations accepted as non-blocking for local desktop plan sizes.
+
+### Verification
+
+- RED: `assistant_backend/.venv/bin/pytest assistant_backend/tests/test_study_plan_adjustment_rest_days.py::test_adding_new_rest_days_cascades_unfinished_active_study_tasks_chronologically -q`: `1 failed`.
+- GREEN: same focused cascade test: `1 passed`.
+- Review-fix RED: weekly multi-occurrence, old-effective-rest-day, and empty-event tests: `3 failed`.
+- Review-fix GREEN: same three tests: `3 passed`.
+- `assistant_backend/.venv/bin/pytest assistant_backend/tests/test_study_plan_adjustment_rest_days.py -q`: `11 passed, 2 warnings`.
+- `assistant_backend/.venv/bin/pytest assistant_backend/tests/test_study_plan_adjustment_*.py -q`: `35 passed, 2 warnings`.
+- `openspec validate introduce-study-plan-adjustment --strict`: PASS.
+- `git diff --check`: PASS.
+- `openspec instructions apply --change introduce-study-plan-adjustment --json`: 37 tasks total, 23 complete, 14 remaining.
+
+### Auto Commit
+
+- Commit: pending.
+- Scope: verified ITEM-003 rest-day cascade through OpenSpec tasks 6.3-6.4.
+- Pre-commit checks: related backend tests, full `test_study_plan_adjustment_*.py` suite, `openspec validate introduce-study-plan-adjustment --strict`, `git diff --check`, Spec Compliance Re-review, and Code Quality Re-review all passed.
+
+### Files Added / Changed
+
+- Updated `assistant_backend/src/db/queries.py`.
+- Updated `assistant_backend/tests/test_study_plan_adjustment_rest_days.py`.
+- Updated `openspec/changes/introduce-study-plan-adjustment/tasks.md` to mark 6.3 and 6.4 complete.
+- Added `openspec/learning-assistant-v2-flow-b/evidence/item-003/tdd-rest-day-cascade-report.md`.
+
+### Next Task
+
+- Continue `opsx:apply` for ITEM-003 with tasks 7.1 and 7.2: supported dialogue adjustment preview without mutation.

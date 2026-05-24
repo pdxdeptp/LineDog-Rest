@@ -249,7 +249,9 @@ async def update_study_rest_day_settings(
     db: aiosqlite.Connection,
     weekly_weekdays: list[int],
     one_off_dates: list[date],
+    today: date | None = None,
 ) -> dict:
+    effective_today = today or date.today()
     new_weekly = _normalize_rest_weekdays(weekly_weekdays)
     new_dates = _normalize_rest_dates(one_off_dates)
 
@@ -263,6 +265,14 @@ async def update_study_rest_day_settings(
         removed_weekly = sorted(set(old_weekly) - set(new_weekly))
         added_dates = sorted(set(new_dates) - set(old_dates))
         removed_dates = sorted(set(old_dates) - set(new_dates))
+        cascade = await _cascade_for_added_rest_days(
+            db,
+            added_weekly,
+            added_dates,
+            old_weekly,
+            old_dates,
+            effective_today,
+        )
 
         await db.execute(
             """
@@ -300,6 +310,11 @@ async def update_study_rest_day_settings(
             "INSERT INTO events (event_type, payload) VALUES (?, ?)",
             ("study_rest_days_updated", json.dumps(payload)),
         )
+        if cascade["affected_task_ids"]:
+            await db.execute(
+                "INSERT INTO events (event_type, payload) VALUES (?, ?)",
+                ("study_rest_day_cascaded", json.dumps(cascade)),
+            )
         await db.commit()
     except Exception:
         await db.rollback()
@@ -313,6 +328,132 @@ async def update_study_rest_day_settings(
         "added_one_off_dates": added_dates,
         "removed_one_off_dates": removed_dates,
         "source": "manual_rest_day_settings",
+    }
+
+
+async def _cascade_for_added_rest_days(
+    db: aiosqlite.Connection,
+    added_weekly: list[int],
+    added_dates: list[str],
+    old_weekly: list[int],
+    old_dates: list[str],
+    today: date,
+) -> dict:
+    async with db.execute(
+        """
+        SELECT MAX(date(t.scheduled_date)) AS horizon
+        FROM tasks t
+        JOIN resources r ON r.id = t.resource_id
+        WHERE r.type = 'study_project'
+          AND r.status = 'active'
+          AND t.completed_at IS NULL
+          AND date(t.scheduled_date) >= date(?)
+        """,
+        (today.isoformat(),),
+    ) as cursor:
+        horizon_row = await cursor.fetchone()
+
+    horizon_text = horizon_row["horizon"] if horizon_row else None
+    if horizon_text is None:
+        return {
+            "source": "manual_rest_day_settings",
+            "affected_task_ids": [],
+            "occurrences": [],
+            "changes": [],
+        }
+
+    horizon = date.fromisoformat(horizon_text)
+    old_weekly_set = set(old_weekly)
+    old_date_set = set(old_dates)
+    occurrences = set()
+    for weekday in added_weekly:
+        occurrence = today + timedelta(days=(weekday - today.weekday()) % 7)
+        while occurrence <= horizon:
+            if occurrence.isoformat() not in old_date_set:
+                occurrences.add(occurrence)
+            occurrence += timedelta(days=7)
+    for date_text in added_dates:
+        rest_date = date.fromisoformat(date_text)
+        if (
+            rest_date >= today
+            and rest_date <= horizon
+            and rest_date.weekday() not in old_weekly_set
+        ):
+            occurrences.add(rest_date)
+
+    now = datetime.now(UTC).isoformat()
+    original_dates: dict[int, str] = {}
+    latest_dates: dict[int, str] = {}
+    project_ids: dict[int, int] = {}
+    occurrence_payloads = []
+
+    for occurrence in sorted(occurrences):
+        async with db.execute(
+            """
+            SELECT
+                t.id,
+                t.resource_id,
+                t.scheduled_date
+            FROM tasks t
+            JOIN resources r ON r.id = t.resource_id
+            WHERE r.type = 'study_project'
+              AND r.status = 'active'
+              AND t.completed_at IS NULL
+              AND date(t.scheduled_date) >= date(?)
+            ORDER BY date(t.scheduled_date), t.id
+            """,
+            (occurrence.isoformat(),),
+        ) as cursor:
+            affected = await cursor.fetchall()
+
+        affected_ids = [int(task["id"]) for task in affected]
+        if affected_ids:
+            occurrence_payloads.append(
+                {
+                    "date": occurrence.isoformat(),
+                    "affected_task_ids": affected_ids,
+                    "date_delta_days": 1,
+                }
+            )
+        for task in affected:
+            task_id = int(task["id"])
+            old_date = task["scheduled_date"][:10]
+            new_date = (date.fromisoformat(old_date) + timedelta(days=1)).isoformat()
+            original_dates.setdefault(task_id, old_date)
+            latest_dates[task_id] = new_date
+            project_ids[task_id] = int(task["resource_id"])
+            await db.execute(
+                """
+                UPDATE tasks
+                SET scheduled_date = ?,
+                    auto_roll_days = 0,
+                    last_auto_rolled_at = NULL,
+                    user_adjusted_at = ?
+                WHERE id = ?
+                  AND completed_at IS NULL
+                """,
+                (new_date, now, task_id),
+            )
+
+    affected_task_ids = sorted(original_dates)
+    changes = [
+        {
+            "task_id": task_id,
+            "project_id": project_ids[task_id],
+            "original_date": original_dates[task_id],
+            "new_date": latest_dates[task_id],
+            "date_delta_days": (
+                date.fromisoformat(latest_dates[task_id])
+                - date.fromisoformat(original_dates[task_id])
+            ).days,
+        }
+        for task_id in affected_task_ids
+    ]
+    return {
+        "source": "manual_rest_day_settings",
+        "affected_task_ids": affected_task_ids,
+        "occurrences": occurrence_payloads,
+        "changes": changes,
     }
 
 

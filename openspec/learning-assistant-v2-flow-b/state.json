@@ -1,16 +1,16 @@
 {
   "phase": "flow-b",
-  "round": 14,
+  "round": 16,
   "current_item": "study-plan-adjustment",
   "current_change": "introduce-study-plan-adjustment",
   "current_spec": "study-plan-adjustment",
   "items_initialized": true,
   "in_progress_step": null,
-  "last_completed_step": "item-003-rest-day-settings",
+  "last_completed_step": "item-003-rest-day-cascade",
   "last_feature_commit": "610d5e3",
   "last_completed_item": "study-views",
   "last_completed_change": "introduce-study-views",
-  "next_step": "continue-opsx-apply-task-6.3-rest-day-cascade",
+  "next_step": "continue-opsx-apply-task-7.1-dialogue-preview",
   "blocker_reason": null,
-  "updated_at": "2026-05-24T05:22:06Z"
+  "updated_at": "2026-05-24T05:40:06Z"
 }
