@@ -6,11 +6,11 @@
   "flow_a_readiness": "PASS",
   "flow_b_readiness": "PASS",
   "git_strategy": "current-checkout-only",
-  "last_checkpoint_commit": "0313507",
+  "last_checkpoint_commit": "b8dd156",
   "last_feature_commit": "daa2f66",
   "in_progress_step": null,
   "last_completed_step": "flow-b-round-34-item-004-openspec-ready",
-  "next_step": "checkpoint-before-item-004-opsx-apply",
+  "next_step": "start-item-004-opsx-apply-tasks-2.1-2.2",
   "blocker_reason": null,
   "updated_at": "2026-05-24T14:14:19Z"
 }

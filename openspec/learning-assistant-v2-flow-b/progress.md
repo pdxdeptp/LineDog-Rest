@@ -35,11 +35,11 @@
 - Ran `openspec validate introduce-study-smart-mode --strict`: PASS.
 - `openspec instructions apply --change introduce-study-smart-mode --json` reports 28 tasks, 3 complete, state `ready`.
 - Readiness review saved: `openspec/learning-assistant-v2-flow-b/evidence/item-004/readiness-review.md`.
+- Proposal checkpoint commit: `b8dd156 chore: propose study smart mode`.
 
 ### Next Task
 
-- Before implementation, create a checkpoint commit in the current checkout if no unrelated user changes are present.
-- Then enter `opsx:apply` for `introduce-study-smart-mode` and start with tasks 2.1-2.2: backend smart-mode setting tests and minimal storage/routes.
+- Enter `opsx:apply` for `introduce-study-smart-mode` and start with tasks 2.1-2.2: backend smart-mode setting tests and minimal storage/routes.
 
 ## Round 01 · 2026-05-23T14:50:55Z
 
