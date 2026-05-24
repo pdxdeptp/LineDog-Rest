@@ -63,4 +63,4 @@
 
 - [x] 10.1 Run relevant backend and Swift tests and record RED/GREEN/REFACTOR evidence.
 - [x] 10.2 Run `openspec validate introduce-study-plan-adjustment --strict`.
-- [ ] 10.3 Use Computer Use/App Use on the current checkout app path to verify rollover facts, manual move cascade, deadline red state, add/delete, rest-day behavior, and dialogue preview/apply; save evidence under Flow B.
+- [x] 10.3 Use Computer Use/App Use on the current checkout app path to verify rollover facts, manual move cascade, deadline red state, add/delete, rest-day behavior, and dialogue preview/apply; save evidence under Flow B.

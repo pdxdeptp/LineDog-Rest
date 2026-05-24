@@ -1578,3 +1578,42 @@ Before implementation, create a checkpoint commit in the current checkout, then 
 ### Stop Decision
 
 - Set Flow B state to `blocked` until the user unlocks the Mac or provides another safe App verification route.
+
+## Round 33 · 2026-05-24T13:43:32Z
+
+### ITEM-003 10.3 Current-Checkout App Verification
+
+- Restored controller and Flow B state from lock-screen blocked back to `phase=flow-b`.
+- Current checkout only; no worktree was created or used.
+- Targeted the current checkout Debug app at `/Users/cpt/Library/Developer/Xcode/DerivedData/MalDaze-bpwxiacqyfwxjndsvopwqmqitret/Build/Products/Debug/MalDaze.app`.
+- Backend was available on `127.0.0.1:8765`.
+
+### Completed
+
+- 10.3 completed: current-checkout App verification recorded in `evidence/item-003/app-verification.md`.
+- Verified rollover facts, manual move cascade, deadline red state, add/delete controls and route behavior, rest-day cascade, dialogue preview/apply, and default-mode silence.
+- Temporary QA resource/task/unit rows were removed after verification.
+- Rest-day settings were restored to their baseline weekly `[5]` and one-off `[]` values.
+- No screenshots were saved because the app panel also exposed the user's Reminders sidebar.
+
+### Safety Note
+
+- Calendar UI add was performed through Computer Use.
+- Calendar UI delete control enablement was verified for the inserted task id.
+- The destructive delete mutation was executed through the backend route instead of a GUI click to avoid a local destructive Computer Use action without action-time user confirmation.
+
+### Review Gates
+
+- Spec Compliance Review: PASS.
+- Code Quality Review: PASS; verification evidence only, no implementation code changed.
+
+### Verification
+
+- Current checkout App UI/Accessibility evidence: PASS.
+- Runtime API/DB evidence: PASS.
+- OpenSpec task 10.3 marked complete.
+
+### Auto Commit
+
+- Commit: `a871b51`.
+- Scope: record ITEM-003 current-checkout App verification and unblock the Flow B state.
