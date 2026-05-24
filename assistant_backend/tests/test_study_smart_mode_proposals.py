@@ -2,6 +2,7 @@ import hashlib
 import inspect
 import json
 import os
+from copy import deepcopy
 from datetime import date, timedelta
 
 import aiosqlite
@@ -35,6 +36,32 @@ async def _snapshot_mutation_guard(db_path: str) -> dict[str, list[dict]]:
                 "SELECT id, event_type, payload FROM events ORDER BY id",
             ),
         }
+
+
+def _resign_proposal_for_test(proposal: dict) -> dict:
+    canonical = {
+        "id": proposal["id"],
+        "trigger": proposal["trigger"],
+        "reason": {
+            key: value
+            for key, value in proposal["reason"].items()
+            if key != "summary"
+        },
+        "affected_project_ids": proposal["affected_project_ids"],
+        "affected_task_ids": proposal["affected_task_ids"],
+        "preview": proposal["preview"],
+        "previewed_changes": proposal["previewed_changes"],
+        "red_state_impact": proposal["red_state_impact"],
+    }
+    proposal["signature_payload"] = canonical
+    proposal["signature"] = hashlib.sha256(
+        json.dumps(
+            {"version": proposal["signature_version"], "payload": canonical},
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
+    return proposal
 
 
 async def _seed_morning_proposal_facts(db_path: str, smart_mode_enabled: bool = True) -> dict[str, str]:
@@ -1006,6 +1033,138 @@ async def test_apply_current_task_date_proposal_writes_exact_previewed_changes_a
         "selected_preview": selected["preview"],
         "applied_changes": selected["previewed_changes"],
     }
+
+
+@pytest.mark.asyncio
+async def test_apply_rejects_stale_proposal_after_current_facts_drift_without_mutation(client):
+    days = await _seed_morning_proposal_facts(os.environ["DB_PATH"])
+    proposals_response = await client.post("/api/study-smart-mode/proposals", json={"trigger": "morning"})
+    selected = next(
+        option
+        for option in proposals_response.json()["options"]
+        if option["preview"]["command"] == "extend_project_deadline"
+    )
+
+    async with aiosqlite.connect(os.environ["DB_PATH"]) as db:
+        await db.execute(
+            "UPDATE resources SET deadline = ? WHERE id = ?",
+            (days["day_after"], 8102),
+        )
+        await db.commit()
+    before_apply = await _snapshot_mutation_guard(os.environ["DB_PATH"])
+
+    response = await client.post(
+        "/api/study-smart-mode/proposals/apply",
+        json={"proposal": selected},
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json() == {
+        "status": "stale_proposal",
+        "mutates": False,
+        "message": "submitted proposal does not match the current active plan",
+    }
+    assert await _snapshot_mutation_guard(os.environ["DB_PATH"]) == before_apply
+
+
+@pytest.mark.asyncio
+async def test_apply_rejects_disabled_smart_mode_without_mutation(client):
+    await _seed_morning_proposal_facts(os.environ["DB_PATH"])
+    proposals_response = await client.post("/api/study-smart-mode/proposals", json={"trigger": "morning"})
+    selected = proposals_response.json()["options"][0]
+    async with aiosqlite.connect(os.environ["DB_PATH"]) as db:
+        await db.execute(
+            "INSERT OR REPLACE INTO system_state (key, value) VALUES (?, ?)",
+            ("study_smart_mode_enabled", "false"),
+        )
+        await db.commit()
+    before_apply = await _snapshot_mutation_guard(os.environ["DB_PATH"])
+
+    response = await client.post(
+        "/api/study-smart-mode/proposals/apply",
+        json={"proposal": selected},
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json() == {
+        "status": "disabled",
+        "mutates": False,
+        "message": "smart mode is disabled",
+    }
+    assert await _snapshot_mutation_guard(os.environ["DB_PATH"]) == before_apply
+
+
+@pytest.mark.asyncio
+async def test_apply_rejects_unsupported_signed_command_without_mutation(client):
+    await _seed_morning_proposal_facts(os.environ["DB_PATH"])
+    proposals_response = await client.post("/api/study-smart-mode/proposals", json={"trigger": "morning"})
+    selected = deepcopy(proposals_response.json()["options"][0])
+    selected["preview"]["command"] = "rewrite_entire_study_plan"
+    selected = _resign_proposal_for_test(selected)
+    before_apply = await _snapshot_mutation_guard(os.environ["DB_PATH"])
+
+    response = await client.post(
+        "/api/study-smart-mode/proposals/apply",
+        json={"proposal": selected},
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json() == {
+        "status": "unsupported",
+        "mutates": False,
+        "message": "submitted proposal is unsupported",
+    }
+    assert await _snapshot_mutation_guard(os.environ["DB_PATH"]) == before_apply
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "request_body",
+    [
+        {},
+        {"proposal": {}},
+        {"proposal": {"id": "not-a-recognized-smart-mode-proposal"}},
+    ],
+)
+async def test_apply_rejects_missing_or_unrecognized_selected_proposal_without_mutation(
+    client,
+    request_body,
+):
+    await _seed_morning_proposal_facts(os.environ["DB_PATH"])
+    before_apply = await _snapshot_mutation_guard(os.environ["DB_PATH"])
+
+    response = await client.post(
+        "/api/study-smart-mode/proposals/apply",
+        json=request_body,
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "unsupported"
+    assert response.json()["mutates"] is False
+    assert await _snapshot_mutation_guard(os.environ["DB_PATH"]) == before_apply
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("tamper_target", ["preview", "signature_payload"])
+async def test_apply_rejects_tampered_proposal_without_mutation(client, tamper_target):
+    await _seed_morning_proposal_facts(os.environ["DB_PATH"])
+    proposals_response = await client.post("/api/study-smart-mode/proposals", json={"trigger": "morning"})
+    selected = deepcopy(proposals_response.json()["options"][0])
+    if tamper_target == "preview":
+        selected["preview"]["delta_days"] = 99
+    else:
+        selected["signature_payload"]["previewed_changes"] = []
+    before_apply = await _snapshot_mutation_guard(os.environ["DB_PATH"])
+
+    response = await client.post(
+        "/api/study-smart-mode/proposals/apply",
+        json={"proposal": selected},
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] in {"stale_proposal", "unsupported"}
+    assert response.json()["mutates"] is False
+    assert await _snapshot_mutation_guard(os.environ["DB_PATH"]) == before_apply
 
 
 def test_smart_mode_router_uses_public_capacity_preview_helper():

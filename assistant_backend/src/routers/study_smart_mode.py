@@ -21,6 +21,11 @@ router = APIRouter()
 
 SMART_MODE_KEY = "study_smart_mode_enabled"
 SIGNATURE_VERSION = 1
+SUPPORTED_APPLY_COMMANDS = {
+    "extend_project_deadline",
+    "make_room_after_lag",
+    "move_task_from_over_capacity_day",
+}
 
 
 class SmartModeSettingsUpdate(BaseModel):
@@ -649,6 +654,14 @@ def _selected_apply_proposal(request: SmartModeProposalApplyRequest) -> dict[str
     return request.proposal or request.selected_proposal
 
 
+def _submitted_apply_command(submitted: dict[str, Any]) -> str | None:
+    preview = submitted.get("preview")
+    if not isinstance(preview, dict):
+        return None
+    command = preview.get("command")
+    return command if isinstance(command, str) else None
+
+
 def _stale_apply_response() -> dict[str, Any]:
     return {
         "status": "stale_proposal",
@@ -995,6 +1008,10 @@ async def apply_study_smart_mode_proposal(request: SmartModeProposalApplyRequest
             if submitted is None:
                 await db.rollback()
                 return _unsupported_apply_response("missing selected proposal")
+
+            if _submitted_apply_command(submitted) not in SUPPORTED_APPLY_COMMANDS:
+                await db.rollback()
+                return _unsupported_apply_response()
 
             current_options = await _current_options_for_apply(db, submitted, request)
             if current_options is None:

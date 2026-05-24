@@ -27,8 +27,8 @@
 
 - [x] 5.1 Write failing backend tests for applying exactly the selected current smart proposal and recording smart-mode event evidence.
 - [x] 5.2 Implement proposal apply with refreshed fact recomputation, stable signature comparison, mutation, and view refresh contract.
-- [ ] 5.3 Write failing backend tests for stale, unsupported, and disabled smart-mode apply requests.
-- [ ] 5.4 Implement stale/disabled proposal rejection without mutation.
+- [x] 5.3 Write failing backend tests for stale, unsupported, and disabled smart-mode apply requests.
+- [x] 5.4 Implement stale/disabled proposal rejection without mutation.
 
 ## 6. Swift API And ViewModel
 
