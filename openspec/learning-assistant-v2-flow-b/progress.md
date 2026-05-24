@@ -73,6 +73,12 @@
 - `openspec validate introduce-study-smart-mode --strict`: PASS.
 - `git diff --check`: PASS.
 
+### Auto Commit
+
+- Commit: `8c54f0a`.
+- Scope: verified ITEM-004 backend smart-mode setting storage/routes through OpenSpec tasks 2.1-2.2.
+- Pre-commit checks: focused smart-mode settings tests, integration tests, `openspec validate introduce-study-smart-mode --strict`, `git diff --check`, Spec Compliance Review, and Code Quality Re-review all passed.
+
 ### Files Added / Changed
 
 - Added `assistant_backend/tests/test_study_smart_mode_settings.py`.
