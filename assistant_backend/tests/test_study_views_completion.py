@@ -194,6 +194,43 @@ async def _seed_final_task_non_study_resource(db_path: str) -> int:
     return 2601
 
 
+async def _seed_rolled_task_completion_facts(db_path: str) -> int:
+    today = date.today()
+    async with aiosqlite.connect(db_path) as db:
+        await db.execute(
+            """
+            INSERT INTO resources
+                (id, title, type, tracking_mode, url, status, total_units, completed_units, actual_minutes_total)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                3901,
+                "Rolled Completion Project",
+                "study_project",
+                "sequential",
+                "https://example.com/rolled-completion",
+                "active",
+                2,
+                0,
+                0,
+            ),
+        )
+        await db.executemany(
+            """
+            INSERT INTO tasks
+                (id, resource_id, title, task_kind, target_minutes, scheduled_date, priority, completed_at, auto_roll_days, last_auto_rolled_at)
+            VALUES (?, ?, ?, 'time', ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                (4001, 3901, "Complete rolled task", 30, today.isoformat(), 9, None, 4, today.isoformat()),
+                (4002, 3901, "Keep project active", 20, today.isoformat(), 8, None, 0, None),
+            ],
+        )
+        await db.commit()
+
+    return 4001
+
+
 @pytest.mark.asyncio
 async def test_task_completion_updates_v2_facts_and_duplicate_completion_is_idempotent(client):
     task_id = await _seed_completion_facts(os.environ["DB_PATH"])
@@ -424,6 +461,7 @@ async def test_final_study_project_task_completes_project_preserves_history_and_
             "target_minutes": 75,
             "actual_minutes": 80,
             "deadline": "2026-06-30",
+            "expected_late": False,
             "status": "completed",
         }
     ]
@@ -453,3 +491,42 @@ async def test_final_task_for_non_study_resource_does_not_auto_complete_resource
         "actual_minutes_total": 25,
     }
     assert resource_completed_events == []
+
+
+@pytest.mark.asyncio
+async def test_completing_rolled_task_resets_rollover_markers_and_clears_active_badge(client):
+    task_id = await _seed_rolled_task_completion_facts(os.environ["DB_PATH"])
+
+    response = await client.post(f"/api/tasks/{task_id}/complete", json={"actual_minutes": 33})
+
+    assert response.status_code == 200, response.text
+    completed_at = response.json()["completed_at"]
+
+    async with aiosqlite.connect(os.environ["DB_PATH"]) as db:
+        db.row_factory = aiosqlite.Row
+        task = await _fetchone(
+            db,
+            """
+            SELECT completed_at, actual_minutes, auto_roll_days, last_auto_rolled_at
+            FROM tasks
+            WHERE id = ?
+            """,
+            (task_id,),
+        )
+
+    assert task == {
+        "completed_at": completed_at,
+        "actual_minutes": 33,
+        "auto_roll_days": 0,
+        "last_auto_rolled_at": None,
+    }
+
+    today_response = await client.get("/api/study-views/today")
+
+    assert today_response.status_code == 200, today_response.text
+    tasks = today_response.json()["tasks"]
+    active_task_ids = {task["id"] for task in tasks if task["completed_at"] is None}
+    assert task_id not in active_task_ids
+    completed_payload = next(task for task in tasks if task["id"] == task_id)
+    assert completed_payload["rolled_day_count"] == 0
+    assert completed_payload["show_rolled_badge"] is False

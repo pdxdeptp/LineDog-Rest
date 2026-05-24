@@ -105,6 +105,73 @@ async def _seed_today_view_facts(db_path: str) -> int:
     return 301
 
 
+async def _fetchone(db: aiosqlite.Connection, sql: str, params: tuple = ()) -> dict | None:
+    async with db.execute(sql, params) as cur:
+        row = await cur.fetchone()
+    return dict(row) if row else None
+
+
+async def _seed_today_rollover_badge_facts(db_path: str) -> dict[str, str]:
+    today = date.today()
+    old_day = today - timedelta(days=3)
+    tomorrow = today + timedelta(days=1)
+
+    async with aiosqlite.connect(db_path) as db:
+        await db.executemany(
+            """
+            INSERT INTO resources
+                (id, title, type, tracking_mode, url, status, total_units)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                (3501, "Today Rollover Badge", "study_project", "sequential", "https://example.com/badge", "active", 2),
+                (3502, "Archived Badge Project", "study_project", "sequential", "https://example.com/archived-badge", "archived", 1),
+            ],
+        )
+        await db.executemany(
+            """
+            INSERT INTO tasks
+                (id, resource_id, title, task_kind, target_minutes, scheduled_date, priority, completed_at, auto_roll_days, last_auto_rolled_at)
+            VALUES (?, ?, ?, 'time', ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                (3601, 3501, "Overdue badge task", 45, old_day.isoformat(), 9, None, 0, None),
+                (3602, 3501, "Future same project task", 30, tomorrow.isoformat(), 8, None, 0, None),
+                (3603, 3502, "Archived overdue task", 20, old_day.isoformat(), 7, None, 0, None),
+            ],
+        )
+        await db.commit()
+
+    return {
+        "today": today.isoformat(),
+        "old_day": old_day.isoformat(),
+        "tomorrow": tomorrow.isoformat(),
+    }
+
+
+async def _seed_today_under_threshold_badge_facts(db_path: str) -> None:
+    today = date.today().isoformat()
+
+    async with aiosqlite.connect(db_path) as db:
+        await db.execute(
+            """
+            INSERT INTO resources
+                (id, title, type, tracking_mode, url, status, total_units)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (3701, "Today Under Threshold", "study_project", "sequential", "https://example.com/under", "active", 1),
+        )
+        await db.execute(
+            """
+            INSERT INTO tasks
+                (id, resource_id, title, task_kind, target_minutes, scheduled_date, priority, completed_at, auto_roll_days, last_auto_rolled_at)
+            VALUES (?, ?, ?, 'time', ?, ?, ?, ?, ?, ?)
+            """,
+            (3801, 3701, "Already rolled twice", 30, today, 9, None, 2, today),
+        )
+        await db.commit()
+
+
 @pytest.mark.asyncio
 async def test_today_study_view_returns_persisted_active_project_tasks_without_morning_agent(
     client,
@@ -137,5 +204,60 @@ async def test_today_study_view_returns_persisted_active_project_tasks_without_m
             "unit_id": 201,
             "unit_title": "Graph Search",
             "unit_url": None,
+            "rolled_day_count": 0,
+            "show_rolled_badge": False,
         }
     ]
+
+
+@pytest.mark.asyncio
+async def test_today_study_view_rolls_over_overdue_tasks_and_exposes_threshold_badge(client):
+    days = await _seed_today_rollover_badge_facts(os.environ["DB_PATH"])
+
+    response = await client.get("/api/study-views/today")
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    tasks_by_id = {task["id"]: task for task in payload["tasks"]}
+    assert tasks_by_id[3601]["rolled_day_count"] == 3
+    assert tasks_by_id[3601]["show_rolled_badge"] is True
+    assert 3602 not in tasks_by_id
+
+    async with aiosqlite.connect(os.environ["DB_PATH"]) as db:
+        db.row_factory = aiosqlite.Row
+        rolled_task = await _fetchone(
+            db,
+            """
+            SELECT scheduled_date, auto_roll_days, last_auto_rolled_at
+            FROM tasks
+            WHERE id = 3601
+            """,
+        )
+        future_task = await _fetchone(
+            db,
+            "SELECT scheduled_date, auto_roll_days, last_auto_rolled_at FROM tasks WHERE id = 3602",
+        )
+
+    assert rolled_task == {
+        "scheduled_date": days["today"],
+        "auto_roll_days": 3,
+        "last_auto_rolled_at": days["today"],
+    }
+    assert future_task == {
+        "scheduled_date": days["tomorrow"],
+        "auto_roll_days": 0,
+        "last_auto_rolled_at": None,
+    }
+
+
+@pytest.mark.asyncio
+async def test_today_study_view_exposes_rolled_count_without_badge_below_threshold(client):
+    await _seed_today_under_threshold_badge_facts(os.environ["DB_PATH"])
+
+    response = await client.get("/api/study-views/today")
+
+    assert response.status_code == 200, response.text
+    task = response.json()["tasks"][0]
+    assert task["id"] == 3801
+    assert task["rolled_day_count"] == 2
+    assert task["show_rolled_badge"] is False

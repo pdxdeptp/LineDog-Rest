@@ -15,8 +15,8 @@
 
 - [x] 3.1 Write failing backend tests for idempotent unfinished-task rollover into the current local day without same-project cascade.
 - [x] 3.2 Implement rollover service and route, including auto-roll counters and event persistence.
-- [ ] 3.3 Write failing backend tests that Today exposes rolled-day count and threshold badge facts.
-- [ ] 3.4 Implement rolled-day payloads for Today view and completion reset behavior.
+- [x] 3.3 Write failing backend tests that Today exposes rolled-day count and threshold badge facts.
+- [x] 3.4 Implement rolled-day payloads for Today view and completion reset behavior.
 
 ## 4. Manual Move And Deadline Editing
 

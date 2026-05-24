@@ -849,6 +849,12 @@ Before implementation, create a checkpoint commit in the current checkout, then 
 - `git diff --check`: PASS.
 - `openspec instructions apply --change introduce-study-plan-adjustment --json`: 37 tasks total, 9 complete, 28 remaining.
 
+### Auto Commit
+
+- Commit: `adff33a feat: add study plan adjustment rollover foundation`.
+- Scope: verified ITEM-003 backend schema/fact helpers plus rollover service/route through OpenSpec tasks 2.1-3.2.
+- Pre-commit checks: related backend tests, `openspec validate introduce-study-plan-adjustment --strict`, `git diff --check`, Spec Compliance Review, and Code Quality Review all passed.
+
 ### Files Added / Changed
 
 - Updated `assistant_backend/src/db/queries.py`.
@@ -861,3 +867,45 @@ Before implementation, create a checkpoint commit in the current checkout, then 
 ### Next Task
 
 - Continue `opsx:apply` for ITEM-003 with tasks 3.3 and 3.4: Today rolled-day count payload, threshold badge facts, and completion clearing active rolled badge state.
+
+## Round 19 · 2026-05-24T03:39:05Z
+
+### ITEM-003 3.3-3.4 Today Rolled Badge Payload
+
+- Restored controller state: `phase=flow-b`, `current_item=study-plan-adjustment`.
+- Current checkout only; no worktree was created or used.
+- Auto-commit rule was active this round.
+- Subagent TDD implementation completed OpenSpec tasks 3.3-3.4:
+  - Today view runs idempotent rollover before reading Today facts;
+  - Today task payload includes `rolled_day_count` and `show_rolled_badge`;
+  - badge threshold is `rolled_day_count >= 3`;
+  - task completion resets `auto_roll_days` and `last_auto_rolled_at`;
+  - existing Today fields remain additive-compatible.
+
+### Review Gates
+
+- Spec Compliance Review: PASS.
+- Code Quality Review: PASS.
+- No P0/P1 blocker found.
+- P2 residual risk: `GET /api/study-views/today` now calls rollover, which enters a SQLite `BEGIN IMMEDIATE` transaction even when no overdue task exists. This matches the current spec/design but may create avoidable lock contention; later optimization can add candidate short-circuiting.
+- P3 coverage gaps: no route-level double-GET idempotency test, and no duplicate-completion stale-marker test for the already-completed branch.
+
+### Verification
+
+- `assistant_backend/.venv/bin/pytest assistant_backend/tests/test_study_views_today.py assistant_backend/tests/test_study_views_completion.py assistant_backend/tests/test_study_plan_adjustment_rollover.py -q`: `11 passed, 2 warnings`.
+- `openspec validate introduce-study-plan-adjustment --strict`: PASS.
+- `git diff --check`: PASS.
+- `openspec instructions apply --change introduce-study-plan-adjustment --json`: 37 tasks total, 11 complete, 26 remaining.
+
+### Files Added / Changed
+
+- Updated `assistant_backend/src/db/queries.py`.
+- Updated `assistant_backend/src/routers/study_views.py`.
+- Updated `assistant_backend/tests/test_study_views_today.py`.
+- Updated `assistant_backend/tests/test_study_views_completion.py`.
+- Updated `openspec/changes/introduce-study-plan-adjustment/tasks.md` to mark 3.3 and 3.4 complete.
+- Added `openspec/learning-assistant-v2-flow-b/evidence/item-003/tdd-today-rolled-badge-report.md`.
+
+### Next Task
+
+- Continue `opsx:apply` for ITEM-003 with tasks 4.1 and 4.2: active unfinished task date move with same-project later-task cascade, no cross-project movement, past-date rejection, event persistence, and rollover reset.

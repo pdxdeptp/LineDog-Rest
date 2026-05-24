@@ -75,7 +75,8 @@ async def get_today_study_view_tasks(db: aiosqlite.Connection, target_date: date
             r.url AS resource_url,
             u.id AS unit_id,
             u.title AS unit_title,
-            NULL AS unit_url
+            NULL AS unit_url,
+            COALESCE(t.auto_roll_days, 0) AS rolled_day_count
         FROM tasks t
         JOIN resources r ON r.id = t.resource_id
         LEFT JOIN units u ON u.id = t.unit_id
@@ -88,7 +89,13 @@ async def get_today_study_view_tasks(db: aiosqlite.Connection, target_date: date
     ) as cursor:
         rows = await cursor.fetchall()
         cols = [d[0] for d in cursor.description]
-        return [dict(zip(cols, r)) for r in rows]
+        tasks = [dict(zip(cols, r)) for r in rows]
+
+    for task in tasks:
+        task["rolled_day_count"] = int(task["rolled_day_count"] or 0)
+        task["show_rolled_badge"] = task["rolled_day_count"] >= 3
+
+    return tasks
 
 
 async def get_study_project_overview(db: aiosqlite.Connection) -> dict[str, list[dict]]:
@@ -546,6 +553,15 @@ async def complete_task(db: aiosqlite.Connection, task_id: int, actual_minutes: 
 
         unit_id, resource_id, target_minutes, completed_at = task
         if completed_at is not None:
+            await db.execute(
+                """
+                UPDATE tasks
+                SET auto_roll_days = 0,
+                    last_auto_rolled_at = NULL
+                WHERE id = ?
+                """,
+                (task_id,),
+            )
             await db.commit()
             return {"task_id": task_id, "completed_at": completed_at}
 
@@ -557,7 +573,14 @@ async def complete_task(db: aiosqlite.Connection, task_id: int, actual_minutes: 
             unit_already_completed = bool(unit and unit[0] == "completed")
 
         await db.execute(
-            "UPDATE tasks SET completed_at = ?, actual_minutes = ? WHERE id = ?",
+            """
+            UPDATE tasks
+            SET completed_at = ?,
+                actual_minutes = ?,
+                auto_roll_days = 0,
+                last_auto_rolled_at = NULL
+            WHERE id = ?
+            """,
             (now, minutes, task_id),
         )
         if unit_id:
