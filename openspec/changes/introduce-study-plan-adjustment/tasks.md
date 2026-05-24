@@ -22,8 +22,8 @@
 
 - [x] 4.1 Write failing backend tests for active unfinished task date move with same-project later-task cascade and no cross-project movement.
 - [x] 4.2 Implement task move service/route with delta cascade, past-date rejection, event persistence, and rollover reset.
-- [ ] 4.3 Write failing backend tests for active project deadline edit that recalculates expected-late state without moving tasks.
-- [ ] 4.4 Implement project deadline edit service/route.
+- [x] 4.3 Write failing backend tests for active project deadline edit that recalculates expected-late state without moving tasks.
+- [x] 4.4 Implement project deadline edit service/route.
 
 ## 5. Task Add/Delete
 

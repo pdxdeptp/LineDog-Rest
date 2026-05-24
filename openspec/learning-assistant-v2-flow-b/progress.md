@@ -946,6 +946,12 @@ Before implementation, create a checkpoint commit in the current checkout, then 
 - `git diff --check`: PASS.
 - `openspec instructions apply --change introduce-study-plan-adjustment --json`: 37 tasks total, 13 complete, 24 remaining.
 
+### Auto Commit
+
+- Commit: `5850eb5 feat: add study plan manual move cascade`.
+- Scope: verified ITEM-003 manual task date move cascade through OpenSpec tasks 4.1-4.2.
+- Pre-commit checks: related backend tests, `openspec validate introduce-study-plan-adjustment --strict`, `git diff --check`, Spec Compliance Review, Code Quality Review, and P2 fix re-review all passed.
+
 ### Files Added / Changed
 
 - Updated `assistant_backend/src/db/queries.py`.
@@ -957,3 +963,47 @@ Before implementation, create a checkpoint commit in the current checkout, then 
 ### Next Task
 
 - Continue `opsx:apply` for ITEM-003 with tasks 4.3 and 4.4: active project deadline edit that recalculates expected-late state without moving tasks.
+
+## Round 21 · 2026-05-24T04:36:05Z
+
+### ITEM-003 4.3-4.4 Project Deadline Edit
+
+- Restored controller state: `phase=flow-b`, `current_item=study-plan-adjustment`.
+- Current checkout only; no worktree was created or used.
+- Subagent TDD implementation completed OpenSpec tasks 4.3-4.4:
+  - `POST /api/study-plan-adjustment/projects/{project_id}/deadline`;
+  - active study-project deadlines update `resources.deadline`;
+  - existing task `scheduled_date` values are not moved;
+  - Project Overview recalculates `expected_late` from persisted unfinished task facts after deadline changes;
+  - `study_project_deadline_updated` events record project id, old/new deadline, and source `deadline_edit`;
+  - completed projects, non-study resources, and missing projects are rejected safely;
+  - missing, `null`, and empty deadline payloads are rejected with an explanation that v2 active plans require deadlines for late-state detection.
+
+### Review Gates
+
+- Initial Spec Compliance Review: FAIL with one P1.
+- P1 fixed with TDD: clearing/missing deadline now returns explanatory 422 text and remains non-mutating.
+- Spec Compliance Re-review: PASS.
+- Code Quality Review: APPROVED with no P0/P1/P2 issues.
+- P3 residual risks:
+  - business error paths perform an explicit rollback before the broad exception rollback, matching adjacent query style but remaining slightly redundant;
+  - unknown project 404 is implemented but not separately covered by a dedicated no-event regression test.
+
+### Verification
+
+- `assistant_backend/.venv/bin/pytest assistant_backend/tests/test_study_plan_adjustment_deadline.py assistant_backend/tests/test_study_views_project_overview.py -q`: `12 passed, 2 warnings`.
+- `openspec validate introduce-study-plan-adjustment --strict`: PASS.
+- `git diff --check`: PASS.
+- `openspec instructions apply --change introduce-study-plan-adjustment --json`: 37 tasks total, 15 complete, 22 remaining.
+
+### Files Added / Changed
+
+- Updated `assistant_backend/src/db/queries.py`.
+- Updated `assistant_backend/src/routers/study_plan_adjustment.py`.
+- Added `assistant_backend/tests/test_study_plan_adjustment_deadline.py`.
+- Updated `openspec/changes/introduce-study-plan-adjustment/tasks.md` to mark 4.3 and 4.4 complete.
+- Added `openspec/learning-assistant-v2-flow-b/evidence/item-003/tdd-deadline-edit-report.md`.
+
+### Next Task
+
+- Continue `opsx:apply` for ITEM-003 with tasks 5.1 and 5.2: inserting an active project task on a selected date with no cascade and red-state recalculation.

@@ -1,16 +1,16 @@
 {
   "phase": "flow-b",
-  "round": 7,
+  "round": 8,
   "current_item": "study-plan-adjustment",
   "current_change": "introduce-study-plan-adjustment",
   "current_spec": "study-plan-adjustment",
   "items_initialized": true,
   "in_progress_step": null,
-  "last_completed_step": "item-003-manual-move-cascade",
-  "last_feature_commit": "511077b",
+  "last_completed_step": "item-003-project-deadline-edit",
+  "last_feature_commit": "5850eb5",
   "last_completed_item": "study-views",
   "last_completed_change": "introduce-study-views",
-  "next_step": "continue-opsx-apply-task-4.3-project-deadline-edit",
+  "next_step": "continue-opsx-apply-task-5.1-task-insertion",
   "blocker_reason": null,
-  "updated_at": "2026-05-24T04:16:05Z"
+  "updated_at": "2026-05-24T04:36:05Z"
 }

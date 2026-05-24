@@ -13,6 +13,10 @@ class ResourceNotActiveError(Exception):
     pass
 
 
+class ResourceDeadlineEditNotAllowedError(Exception):
+    pass
+
+
 class TaskNotFoundError(Exception):
     pass
 
@@ -459,6 +463,55 @@ async def move_active_study_task(db: aiosqlite.Connection, task_id: int, new_dat
         "affected_count": len(changes),
         "changes": changes,
     }
+
+
+async def update_active_study_project_deadline(
+    db: aiosqlite.Connection,
+    project_id: int,
+    new_deadline: date,
+) -> dict:
+    new_deadline_iso = new_deadline.isoformat()
+
+    await db.execute("BEGIN IMMEDIATE")
+    try:
+        async with db.execute(
+            """
+            SELECT id, type, status, deadline
+            FROM resources
+            WHERE id = ?
+            """,
+            (project_id,),
+        ) as cursor:
+            project = await cursor.fetchone()
+
+        if not project:
+            await db.rollback()
+            raise ResourceNotFoundError
+        if project["type"] != "study_project" or project["status"] != "active":
+            await db.rollback()
+            raise ResourceDeadlineEditNotAllowedError
+
+        old_deadline = project["deadline"]
+        await db.execute(
+            "UPDATE resources SET deadline = ? WHERE id = ?",
+            (new_deadline_iso, project_id),
+        )
+        payload = {
+            "project_id": project_id,
+            "old_deadline": old_deadline,
+            "new_deadline": new_deadline_iso,
+            "source": "deadline_edit",
+        }
+        await db.execute(
+            "INSERT INTO events (event_type, payload) VALUES (?, ?)",
+            ("study_project_deadline_updated", json.dumps(payload)),
+        )
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise
+
+    return payload
 
 
 async def mark_active_resource_complete(
