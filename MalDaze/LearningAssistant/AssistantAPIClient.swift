@@ -1239,7 +1239,7 @@ struct AnyCodable: Codable {
 // MARK: - API Client
 
 /// 封装所有对 localhost:8765 的 HTTP 调用；后端离线时抛出 AssistantOfflineError。
-final class AssistantAPIClient {
+final class AssistantAPIClient: @unchecked Sendable {
     static let shared = AssistantAPIClient()
 
     private let baseURL: URL

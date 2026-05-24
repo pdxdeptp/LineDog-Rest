@@ -1,7 +1,7 @@
 import Foundation
 
 /// 学习助手 API 客户端协议；生产代码用 AssistantAPIClient.shared，测试可注入 mock。
-protocol AssistantAPIClientProtocol {
+protocol AssistantAPIClientProtocol: Sendable {
     func fetchTodayBriefing() async throws -> TodayBriefing
     func fetchStudyTodayView() async throws -> StudyTodayView
     func fetchStudyProjectOverview() async throws -> StudyProjectOverview

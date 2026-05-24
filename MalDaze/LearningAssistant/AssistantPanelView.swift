@@ -137,6 +137,7 @@ struct AssistantPanelView: View {
         List {
             dashboardSummarySection
             todayV2Facts
+            studySmartDashboardSection
 
             switch vm.dashboardState.kind {
             case .emptyDatabase:
@@ -171,6 +172,41 @@ struct AssistantPanelView: View {
             }
             .padding(.vertical, 8)
         }
+    }
+
+    @ViewBuilder
+    private var studySmartDashboardSection: some View {
+        if vm.isStudySmartModeEnabled,
+           vm.studySmartMorningBriefing != nil || !dashboardVisibleStudySmartOptions.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                if let briefing = vm.studySmartMorningBriefing {
+                    Label("智能晨间简报", systemImage: "sparkles")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+
+                    Text(briefing.summary)
+                        .font(.callout)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    if !briefing.issues.isEmpty {
+                        VStack(alignment: .leading, spacing: 4) {
+                            ForEach(Array(briefing.issues.enumerated()), id: \.offset) { _, issue in
+                                Text(studySmartIssueText(issue))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+
+                StudySmartOptionsStrip(vm: vm, placement: .dashboard)
+            }
+            .padding(.vertical, 8)
+        }
+    }
+
+    private var dashboardVisibleStudySmartOptions: [StudySmartProposalOption] {
+        StudySmartOptionsFilter.visibleOptions(vm.studySmartProposalOptions, placement: .dashboard)
     }
 
     private var dashboardSummarySection: some View {
@@ -227,6 +263,23 @@ struct AssistantPanelView: View {
 
     private func studyUnitCount(in todayView: StudyTodayView) -> Int {
         Set(todayView.tasks.compactMap(\.unitId)).count
+    }
+
+    private func studySmartIssueText(_ issue: StudySmartBriefingIssue) -> String {
+        var parts = [issue.type]
+        if let projectId = issue.projectId {
+            parts.append("项目 \(projectId)")
+        }
+        if let taskId = issue.taskId {
+            parts.append("任务 \(taskId)")
+        }
+        if let rolledDayCount = issue.rolledDayCount {
+            parts.append("已滚动 \(rolledDayCount) 天")
+        }
+        if let date = issue.date {
+            parts.append(date)
+        }
+        return parts.joined(separator: " · ")
     }
 
     private var emptyDatabaseSection: some View {
@@ -1237,6 +1290,258 @@ private struct StudyPlanIntakeView: View {
     }
 }
 
+enum StudySmartOptionsPlacement {
+    case dashboard
+    case adjustment
+}
+
+enum StudySmartOptionsFilter {
+    static func visibleOptions(
+        _ options: [StudySmartProposalOption],
+        placement: StudySmartOptionsPlacement
+    ) -> [StudySmartProposalOption] {
+        options.filter { shouldShow($0, placement: placement) }
+    }
+
+    static func visibleMessage(
+        _ message: String?,
+        options: [StudySmartProposalOption],
+        placement: StudySmartOptionsPlacement
+    ) -> String? {
+        guard let message else { return nil }
+        switch placement {
+        case .dashboard:
+            return visibleOptions(options, placement: placement).isEmpty ? nil : message
+        case .adjustment:
+            return message
+        }
+    }
+
+    private static func shouldShow(
+        _ option: StudySmartProposalOption,
+        placement: StudySmartOptionsPlacement
+    ) -> Bool {
+        switch placement {
+        case .dashboard:
+            return option.trigger == .morning
+        case .adjustment:
+            return option.trigger == .afterAdjustment
+        }
+    }
+}
+
+private struct StudySmartOptionsStrip: View {
+    @ObservedObject var vm: LearningAssistantViewModel
+    let placement: StudySmartOptionsPlacement
+
+    var body: some View {
+        if shouldRender {
+            VStack(alignment: .leading, spacing: 10) {
+                if !visibleOptions.isEmpty {
+                    HStack(spacing: 8) {
+                        Label(title, systemImage: "wand.and.stars")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                        Spacer(minLength: 8)
+                        Button("忽略") {
+                            vm.ignoreStudySmartProposals()
+                        }
+                        .buttonStyle(.borderless)
+                        .disabled(vm.isApplyingStudySmartProposal)
+                        .help("忽略本次智能建议")
+                    }
+
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        LazyHStack(alignment: .top, spacing: 10) {
+                            ForEach(vm.studySmartProposalOptions, id: \.id) { option in
+                                if shouldShow(option) {
+                                    StudySmartProposalOptionCard(
+                                        option: option,
+                                        isApplying: vm.isApplyingStudySmartProposal,
+                                        onApply: {
+                                            Task { await vm.applyStudySmartProposal(option) }
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                        .padding(.vertical, 2)
+                    }
+                }
+
+                if let message = visibleProposalMessage {
+                    Label(message, systemImage: "info.circle")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    private var title: String {
+        switch placement {
+        case .dashboard:
+            return "智能建议"
+        case .adjustment:
+            return "调整后的智能建议"
+        }
+    }
+
+    private var shouldRender: Bool {
+        vm.isStudySmartModeEnabled &&
+            (!visibleOptions.isEmpty || visibleProposalMessage != nil)
+    }
+
+    private var visibleOptions: [StudySmartProposalOption] {
+        StudySmartOptionsFilter.visibleOptions(vm.studySmartProposalOptions, placement: placement)
+    }
+
+    private var visibleProposalMessage: String? {
+        StudySmartOptionsFilter.visibleMessage(
+            vm.studySmartProposalMessage,
+            options: vm.studySmartProposalOptions,
+            placement: placement
+        )
+    }
+
+    private func shouldShow(_ option: StudySmartProposalOption) -> Bool {
+        StudySmartOptionsFilter.visibleOptions([option], placement: placement).contains { $0.id == option.id }
+    }
+}
+
+private struct StudySmartProposalOptionCard: View {
+    let option: StudySmartProposalOption
+    let isApplying: Bool
+    let onApply: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(option.summary ?? "可预览的学习计划调整")
+                .font(.callout.weight(.semibold))
+                .fixedSize(horizontal: false, vertical: true)
+
+            if let reasonText {
+                Label(reasonText, systemImage: "lightbulb")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if !option.affectedProjectIds.isEmpty {
+                Label("影响项目：\(option.affectedProjectIds.map(String.init).joined(separator: ", "))", systemImage: "folder")
+            }
+
+            if !option.affectedTaskIds.isEmpty {
+                Label("影响任务：\(option.affectedTaskIds.map(String.init).joined(separator: ", "))", systemImage: "checklist")
+            }
+
+            if !option.previewedChanges.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("预览变更")
+                        .font(.caption.weight(.semibold))
+                    ForEach(Array(option.previewedChanges.enumerated()), id: \.offset) { _, change in
+                        Text(previewedChangeText(change))
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+
+            if let redStateImpact = option.redStateImpact {
+                redStateImpactView(redStateImpact)
+            }
+
+            if let tradeoff = option.tradeoff {
+                Text(tradeoff)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Text("仅预览；点击应用后才会更改计划。")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+
+            Button {
+                onApply()
+            } label: {
+                Label("应用", systemImage: "checkmark.circle")
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(isApplying)
+            .help("应用这个智能建议")
+        }
+        .font(.caption)
+        .padding(10)
+        .frame(width: 260, alignment: .topLeading)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color.accentColor.opacity(0.08))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.accentColor.opacity(0.16))
+        )
+    }
+
+    private var reasonText: String? {
+        if let reason = option.reason["reason"]?.value as? String {
+            return reason
+        }
+        if let message = option.reason["message"]?.value as? String {
+            return message
+        }
+        if let type = option.reason["type"]?.value as? String {
+            return type
+        }
+        return nil
+    }
+
+    private func previewedChangeText(_ change: StudySmartPreviewedChange) -> String {
+        var parts: [String] = []
+        if let projectId = change.projectId {
+            parts.append("项目 \(projectId)")
+        }
+        if let taskId = change.taskId {
+            parts.append("任务 \(taskId)")
+        }
+        if let field = change.field {
+            parts.append(field)
+        }
+        if let oldDate = change.oldDate, let newDate = change.newDate {
+            parts.append("\(oldDate) -> \(newDate)")
+        }
+        if let oldDeadline = change.oldDeadline, let newDeadline = change.newDeadline {
+            parts.append("\(oldDeadline) -> \(newDeadline)")
+        }
+        return parts.isEmpty ? "计划预览项" : parts.joined(separator: " · ")
+    }
+
+    @ViewBuilder
+    private func redStateImpactView(_ redStateImpact: StudyRedStateImpact) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if let expectedLate = redStateImpact.expectedLate {
+                Label(
+                    "预计晚于截止日期：\(expectedLate.before ? "是" : "否") -> \(expectedLate.after ? "是" : "否")",
+                    systemImage: "exclamationmark.triangle"
+                )
+                .foregroundStyle(expectedLate.after ? .red : .secondary)
+            }
+
+            if let overCapacity = redStateImpact.overCapacity {
+                if !overCapacity.newOverCapacityDates.isEmpty {
+                    Label("新增超载：\(overCapacity.newOverCapacityDates.joined(separator: ", "))", systemImage: "gauge")
+                        .foregroundStyle(.red)
+                } else if !overCapacity.afterDates.isEmpty {
+                    Label("超载日期：\(overCapacity.afterDates.joined(separator: ", "))", systemImage: "gauge")
+                        .foregroundStyle(.orange)
+                }
+            }
+        }
+    }
+}
+
 private struct StudySettingsView: View {
     @ObservedObject var vm: LearningAssistantViewModel
 
@@ -1248,6 +1553,10 @@ private struct StudySettingsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 LearningPreferencesView(api: vm.api)
+
+                Divider()
+
+                smartModeSettings
 
                 Divider()
 
@@ -1329,6 +1638,27 @@ private struct StudySettingsView: View {
             hasTouchedRestDaySettings = true
             seedDrafts(from: vm.studyRestDaySettings)
         }
+    }
+
+    private var smartModeSettings: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("智能模式", systemImage: "sparkles")
+                .font(.headline)
+
+            Toggle("智能学习模式", isOn: Binding(
+                get: { vm.isStudySmartModeEnabled },
+                set: { isOn in
+                    Task { await vm.updateStudySmartModeSetting(isOn) }
+                }
+            ))
+            .toggleStyle(.switch)
+
+            Text("默认关闭。开启后，首页会显示基于 v2 学习事实的晨间简报和可预览建议；只有点击应用才会更改计划。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var restDayErrorMessage: String? {
@@ -1469,6 +1799,7 @@ private struct StudyPlanAdjustmentView: View {
 
                 previewSection
                 resultSection
+                StudySmartOptionsStrip(vm: vm, placement: .adjustment)
             }
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)

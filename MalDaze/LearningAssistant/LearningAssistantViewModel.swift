@@ -157,6 +157,7 @@ final class LearningAssistantViewModel: ObservableObject {
     private var dashboardRefreshSequence = 0
     private var studyCalendarLoadRequestSequence = 0
     private var studySmartProposalContexts: [String: StudySmartRedState] = [:]
+    private var studySmartModeSettingRequestID = 0
 
     // MARK: - Init
 
@@ -349,6 +350,46 @@ final class LearningAssistantViewModel: ObservableObject {
         } catch {
             clearStudySmartModeState()
             return isStudySmartModeEnabled
+        }
+    }
+
+    func updateStudySmartModeSetting(_ enabled: Bool) async {
+        studySmartModeSettingRequestID += 1
+        let requestID = studySmartModeSettingRequestID
+        do {
+            let settings = try await api.updateStudySmartModeSettings(StudySmartModeSettings(enabled: enabled))
+            guard requestID == studySmartModeSettingRequestID else { return }
+            isStudySmartModeEnabled = settings.enabled
+            studySmartProposalMessage = nil
+            if settings.enabled {
+                do {
+                    let briefing = try await api.fetchStudySmartMorningBriefing()
+                    guard requestID == studySmartModeSettingRequestID else { return }
+                    isStudySmartModeEnabled = briefing.enabled
+                    if briefing.enabled {
+                        studySmartMorningBriefing = briefing
+                        studySmartProposalOptions = briefing.options
+                        studySmartProposalContexts = [:]
+                        studySmartProposalMessage = nil
+                    } else {
+                        clearStudySmartModeState()
+                    }
+                    isOffline = false
+                } catch {
+                    guard requestID == studySmartModeSettingRequestID else { return }
+                    isStudySmartModeEnabled = settings.enabled
+                    clearStudySmartModeState()
+                    studySmartProposalMessage = "智能模式已开启，但晨间简报暂时无法加载。请稍后刷新。"
+                    isOffline = true
+                }
+            } else {
+                clearStudySmartModeState()
+                isOffline = false
+            }
+        } catch {
+            guard requestID == studySmartModeSettingRequestID else { return }
+            studySmartProposalMessage = "智能模式设置更新失败，请稍后重试。"
+            isOffline = true
         }
     }
 

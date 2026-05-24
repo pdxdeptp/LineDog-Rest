@@ -1934,6 +1934,175 @@ final class LearningAssistantUISourceTests: XCTestCase {
         XCTAssertFalse(settingsSource.contains("Label(error, systemImage: \"exclamationmark.triangle\")"))
     }
 
+    func testAssistantPanelSettingsWiresStudySmartModeToggleToViewModelSettingUpdate() throws {
+        let panelSource = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
+        let viewModelSource = try sourceFile("MalDaze/LearningAssistant/LearningAssistantViewModel.swift")
+        guard let start = panelSource.range(of: "private struct StudySettingsView"),
+              let end = panelSource[start.upperBound...].range(of: "private struct StudyPlanAdjustmentView") else {
+            XCTFail("StudySettingsView source section not found")
+            return
+        }
+        let settingsSource = String(panelSource[start.lowerBound..<end.lowerBound])
+
+        XCTAssertTrue(settingsSource.contains("Toggle(\"智能学习模式\""))
+        XCTAssertTrue(settingsSource.contains("默认关闭"))
+        XCTAssertTrue(settingsSource.contains("vm.isStudySmartModeEnabled"))
+        XCTAssertTrue(settingsSource.contains("Task { await vm.updateStudySmartModeSetting(isOn) }"))
+        XCTAssertTrue(viewModelSource.contains("func updateStudySmartModeSetting(_ enabled: Bool) async"))
+        XCTAssertTrue(viewModelSource.contains("api.updateStudySmartModeSettings(StudySmartModeSettings(enabled: enabled))"))
+        XCTAssertFalse(settingsSource.contains("fetchTodayBriefing()"))
+        XCTAssertFalse(settingsSource.contains("sendMessage"))
+        XCTAssertFalse(settingsSource.contains("confirmProposal"))
+    }
+
+    func testLearningAssistantAPIInjectionUsesSendableProtocolWithoutUnsafeBypass() throws {
+        let viewModelSource = try sourceFile("MalDaze/LearningAssistant/LearningAssistantViewModel.swift")
+        let protocolSource = try sourceFile("MalDaze/LearningAssistant/AssistantAPIClientProtocol.swift")
+        let clientSource = try sourceFile("MalDaze/LearningAssistant/AssistantAPIClient.swift")
+
+        XCTAssertFalse(viewModelSource.contains("nonisolated(unsafe) let api"))
+        XCTAssertTrue(viewModelSource.contains("let api: any AssistantAPIClientProtocol"))
+        XCTAssertTrue(protocolSource.contains("protocol AssistantAPIClientProtocol: Sendable"))
+        XCTAssertTrue(clientSource.contains("final class AssistantAPIClient: @unchecked Sendable"))
+    }
+
+    func testAssistantPanelDashboardDisplaysStudySmartMorningBriefingAndProposalSurface() throws {
+        let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
+        guard let start = source.range(of: "private var homeDashboard"),
+              let end = source[start.upperBound...].range(of: "private var dashboardSummarySection") else {
+            XCTFail("homeDashboard source section not found")
+            return
+        }
+        let dashboardSource = String(source[start.lowerBound..<end.lowerBound])
+
+        XCTAssertTrue(dashboardSource.contains("studySmartDashboardSection"))
+        XCTAssertTrue(source.contains("private var studySmartDashboardSection"))
+        XCTAssertTrue(source.contains("vm.studySmartMorningBriefing"))
+        XCTAssertTrue(source.contains("vm.studySmartProposalOptions"))
+        XCTAssertTrue(source.contains("vm.studySmartProposalMessage"))
+        XCTAssertTrue(source.contains("智能晨间简报"))
+        XCTAssertTrue(source.contains("StudySmartOptionsStrip(vm: vm, placement: .dashboard)"))
+    }
+
+    func testAssistantPanelDashboardSmartSectionVisibilityUsesMorningScopedStateOnly() throws {
+        let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
+        guard let start = source.range(of: "private var studySmartDashboardSection"),
+              let end = source[start.upperBound...].range(of: "private var dashboardSummarySection") else {
+            XCTFail("studySmartDashboardSection source section not found")
+            return
+        }
+        let dashboardSmartSource = String(source[start.lowerBound..<end.lowerBound])
+
+        XCTAssertTrue(dashboardSmartSource.contains("dashboardVisibleStudySmartOptions"))
+        XCTAssertFalse(dashboardSmartSource.contains("!vm.studySmartProposalOptions.isEmpty"))
+        XCTAssertFalse(dashboardSmartSource.contains("|| vm.studySmartProposalMessage != nil"))
+    }
+
+    func testAssistantPanelSmartProposalCardsAreParallelPreviewOnlyWithPerOptionApplyAndIgnore() throws {
+        let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
+        guard let start = source.range(of: "private struct StudySmartOptionsStrip"),
+              let end = source[start.upperBound...].range(of: "private struct StudySettingsView") else {
+            XCTFail("StudySmartOptionsStrip source section not found")
+            return
+        }
+        let smartSource = String(source[start.lowerBound..<end.lowerBound])
+
+        XCTAssertTrue(smartSource.contains("ScrollView(.horizontal"))
+        XCTAssertTrue(smartSource.contains("LazyHStack"))
+        XCTAssertTrue(smartSource.contains("ForEach(vm.studySmartProposalOptions, id: \\.id)"))
+        XCTAssertTrue(smartSource.contains("Task { await vm.applyStudySmartProposal(option) }"))
+        XCTAssertTrue(smartSource.contains("vm.ignoreStudySmartProposals()"))
+        XCTAssertTrue(smartSource.contains("previewedChanges"))
+        XCTAssertTrue(smartSource.contains("redStateImpact"))
+        XCTAssertTrue(smartSource.contains("studySmartProposalMessage"))
+        XCTAssertFalse(smartSource.contains("ChatView"))
+        XCTAssertFalse(smartSource.contains("sendMessage"))
+        XCTAssertFalse(smartSource.contains("confirmProposal"))
+        XCTAssertFalse(smartSource.contains("chatMessages"))
+        XCTAssertFalse(smartSource.contains("currentProposal"))
+    }
+
+    func testAssistantPanelSmartProposalPlacementsFilterTriggers() throws {
+        let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
+        guard let start = source.range(of: "enum StudySmartOptionsFilter"),
+              let end = source[start.upperBound...].range(of: "private struct StudySmartOptionsStrip") else {
+            XCTFail("StudySmartOptionsFilter source section not found")
+            return
+        }
+        let smartSource = String(source[start.lowerBound..<end.lowerBound])
+
+        XCTAssertTrue(smartSource.contains("case .dashboard:\n            return option.trigger == .morning"))
+        XCTAssertTrue(smartSource.contains("case .adjustment:\n            return option.trigger == .afterAdjustment"))
+    }
+
+    func testStudySmartOptionsPlacementHelperFiltersByTrigger() {
+        let morning = sampleStudySmartProposalOption(trigger: .morning)
+        let afterAdjustment = sampleStudySmartProposalOption(trigger: .afterAdjustment)
+        let options = [morning, afterAdjustment]
+
+        XCTAssertEqual(
+            StudySmartOptionsFilter.visibleOptions(options, placement: .dashboard).map(\.trigger),
+            [.morning]
+        )
+        XCTAssertEqual(
+            StudySmartOptionsFilter.visibleOptions(options, placement: .adjustment).map(\.trigger),
+            [.afterAdjustment]
+        )
+    }
+
+    func testStudySmartOptionsDashboardMessageRequiresDashboardVisibleOption() {
+        let morning = sampleStudySmartProposalOption(trigger: .morning)
+        let afterAdjustment = sampleStudySmartProposalOption(trigger: .afterAdjustment)
+
+        XCTAssertNil(
+            StudySmartOptionsFilter.visibleMessage(
+                "after-adjustment message",
+                options: [afterAdjustment],
+                placement: .dashboard
+            )
+        )
+        XCTAssertNil(
+            StudySmartOptionsFilter.visibleMessage(
+                "global message without dashboard option",
+                options: [],
+                placement: .dashboard
+            )
+        )
+        XCTAssertEqual(
+            StudySmartOptionsFilter.visibleMessage(
+                "morning message",
+                options: [morning],
+                placement: .dashboard
+            ),
+            "morning message"
+        )
+        XCTAssertEqual(
+            StudySmartOptionsFilter.visibleMessage(
+                "after-adjustment message",
+                options: [afterAdjustment],
+                placement: .adjustment
+            ),
+            "after-adjustment message"
+        )
+    }
+
+    func testAssistantPanelAdjustmentContextDisplaysStudySmartOptionsWithoutLegacyChatState() throws {
+        let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
+        guard let start = source.range(of: "private struct StudyPlanAdjustmentView"),
+              let end = source[start.upperBound...].range(of: "#if DEBUG") else {
+            XCTFail("StudyPlanAdjustmentView source section not found")
+            return
+        }
+        let adjustmentSource = String(source[start.lowerBound..<end.lowerBound])
+
+        XCTAssertTrue(adjustmentSource.contains("StudySmartOptionsStrip(vm: vm, placement: .adjustment)"))
+        XCTAssertFalse(adjustmentSource.contains("ChatView"))
+        XCTAssertFalse(adjustmentSource.contains("sendMessage"))
+        XCTAssertFalse(adjustmentSource.contains("confirmProposal"))
+        XCTAssertFalse(adjustmentSource.contains("chatMessages"))
+        XCTAssertFalse(adjustmentSource.contains("currentProposal"))
+    }
+
     func testAssistantPanelAdjustPlanUsesPreviewApplyFlowWithoutOldChatRoute() throws {
         let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
         guard let start = source.range(of: "private struct StudyPlanAdjustmentView"),
@@ -3704,6 +3873,56 @@ final class LearningAssistantViewModelTests: XCTestCase {
         XCTAssertNil(vm.currentProposal)
     }
 
+    func testEnableStudySmartModeReportsBriefingFailureWithoutClearingPersistedEnabledState() async {
+        let mock = MockAssistantAPIClient()
+        mock.studySmartModeSettingsResult = StudySmartModeSettings(enabled: false)
+        mock.studySmartMorningBriefingError = AssistantOfflineError()
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+
+        await vm.updateStudySmartModeSetting(true)
+
+        XCTAssertEqual(mock.updateStudySmartModeSettingsCallCount, 1)
+        XCTAssertEqual(mock.fetchStudySmartMorningBriefingCallCount, 1)
+        XCTAssertTrue(vm.isStudySmartModeEnabled)
+        XCTAssertTrue(vm.isOffline)
+        XCTAssertNil(vm.studySmartMorningBriefing)
+        XCTAssertTrue(vm.studySmartProposalOptions.isEmpty)
+        XCTAssertEqual(vm.studySmartProposalMessage, "智能模式已开启，但晨间简报暂时无法加载。请稍后刷新。")
+    }
+
+    func testStudySmartModeSettingUpdateUsesLatestUserIntentWhenRequestsCompleteOutOfOrder() async {
+        let mock = MockAssistantAPIClient()
+        mock.studySmartModeSettingsUpdateResultsQueue = [
+            DelayedStudySmartModeSettingsUpdateResult(
+                settings: StudySmartModeSettings(enabled: true),
+                delayNanoseconds: 100_000_000
+            ),
+            DelayedStudySmartModeSettingsUpdateResult(
+                settings: StudySmartModeSettings(enabled: false),
+                delayNanoseconds: 0
+            )
+        ]
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+
+        let enable = Task {
+            await vm.updateStudySmartModeSetting(true)
+        }
+        await mock.waitForStudySmartModeSettingsUpdateCallCount(1)
+        let disable = Task {
+            await vm.updateStudySmartModeSetting(false)
+        }
+
+        await enable.value
+        await disable.value
+
+        XCTAssertEqual(mock.updateStudySmartModeSettingsCallCount, 2)
+        XCTAssertEqual(mock.lastUpdatedStudySmartModeSettings?.enabled, false)
+        XCTAssertFalse(vm.isStudySmartModeEnabled)
+        XCTAssertNil(vm.studySmartMorningBriefing)
+        XCTAssertTrue(vm.studySmartProposalOptions.isEmpty)
+        XCTAssertNil(vm.studySmartProposalMessage)
+    }
+
     func testIgnoreStudySmartProposalsClearsOptionsWithoutMutationOrLegacyChat() async {
         let mock = MockAssistantAPIClient()
         mock.studySmartModeSettingsResult = StudySmartModeSettings(enabled: true)
@@ -4298,6 +4517,11 @@ private struct DelayedStudyCalendarLoadResult {
     let delayNanoseconds: UInt64
 }
 
+private struct DelayedStudySmartModeSettingsUpdateResult {
+    let settings: StudySmartModeSettings
+    let delayNanoseconds: UInt64
+}
+
 private final class MockAssistantAPIClient: AssistantAPIClientProtocol, @unchecked Sendable {
 
     // Configurable results
@@ -4337,6 +4561,8 @@ private final class MockAssistantAPIClient: AssistantAPIClientProtocol, @uncheck
     var studySmartMorningBriefingResult = sampleStudySmartMorningBriefing()
     var studySmartProposalGenerationResult = sampleStudySmartProposalGenerationResponse()
     var studySmartProposalApplyResult = sampleStudySmartProposalApplyResult()
+    var studySmartMorningBriefingError: Error?
+    var studySmartModeSettingsUpdateResultsQueue: [DelayedStudySmartModeSettingsUpdateResult] = []
     var studyDialogueAdjustmentPreviewResult = sampleStudyDialogueAdjustmentPreview()
     var studyDialogueAdjustmentApplyResult = sampleStudyDialogueAdjustmentApplyResult()
     var adjustmentError: Error?
@@ -4419,6 +4645,8 @@ private final class MockAssistantAPIClient: AssistantAPIClientProtocol, @uncheck
     private var studyPlanConfirmStartedContinuations: [CheckedContinuation<Void, Never>] = []
     private let studyCalendarLoadGateLock = NSLock()
     private var studyCalendarLoadCallCountContinuations: [(expected: Int, continuation: CheckedContinuation<Void, Never>)] = []
+    private let studySmartModeSettingsUpdateGateLock = NSLock()
+    private var studySmartModeSettingsUpdateCallCountContinuations: [(expected: Int, continuation: CheckedContinuation<Void, Never>)] = []
 
     func waitForStudyPlanConfirmToStart() async {
         await withCheckedContinuation { continuation in
@@ -4446,6 +4674,21 @@ private final class MockAssistantAPIClient: AssistantAPIClientProtocol, @uncheck
                     return true
                 }
                 studyCalendarLoadCallCountContinuations.append((expected, continuation))
+                return false
+            }
+            if shouldResumeImmediately {
+                continuation.resume()
+            }
+        }
+    }
+
+    func waitForStudySmartModeSettingsUpdateCallCount(_ expected: Int) async {
+        await withCheckedContinuation { continuation in
+            let shouldResumeImmediately = withStudySmartModeSettingsUpdateGateLock {
+                if updateStudySmartModeSettingsCallCount >= expected {
+                    return true
+                }
+                studySmartModeSettingsUpdateCallCountContinuations.append((expected, continuation))
                 return false
             }
             if shouldResumeImmediately {
@@ -4598,8 +4841,17 @@ private final class MockAssistantAPIClient: AssistantAPIClientProtocol, @uncheck
     func updateStudySmartModeSettings(_ settings: StudySmartModeSettings) async throws -> StudySmartModeSettings {
         updateStudySmartModeSettingsCallCount += 1
         lastUpdatedStudySmartModeSettings = settings
+        signalStudySmartModeSettingsUpdateCallCountChanged()
         if let adjustmentError { throw adjustmentError }
         if shouldThrowOffline { throw AssistantOfflineError() }
+        if !studySmartModeSettingsUpdateResultsQueue.isEmpty {
+            let result = studySmartModeSettingsUpdateResultsQueue.removeFirst()
+            if result.delayNanoseconds > 0 {
+                try? await Task.sleep(nanoseconds: result.delayNanoseconds)
+            }
+            studySmartModeSettingsResult = result.settings
+            return studySmartModeSettingsResult
+        }
         studySmartModeSettingsResult = settings
         return studySmartModeSettingsResult
     }
@@ -4607,6 +4859,7 @@ private final class MockAssistantAPIClient: AssistantAPIClientProtocol, @uncheck
     func fetchStudySmartMorningBriefing() async throws -> StudySmartMorningBriefing {
         fetchStudySmartMorningBriefingCallCount += 1
         if let adjustmentError { throw adjustmentError }
+        if let studySmartMorningBriefingError { throw studySmartMorningBriefingError }
         if shouldThrowOffline { throw AssistantOfflineError() }
         return studySmartMorningBriefingResult
     }
@@ -4800,6 +5053,27 @@ private final class MockAssistantAPIClient: AssistantAPIClientProtocol, @uncheck
     private func withStudyCalendarLoadGateLock<T>(_ body: () -> T) -> T {
         studyCalendarLoadGateLock.lock()
         defer { studyCalendarLoadGateLock.unlock() }
+        return body()
+    }
+
+    private func signalStudySmartModeSettingsUpdateCallCountChanged() {
+        let continuations = withStudySmartModeSettingsUpdateGateLock {
+            var ready: [CheckedContinuation<Void, Never>] = []
+            studySmartModeSettingsUpdateCallCountContinuations.removeAll { waiter in
+                if updateStudySmartModeSettingsCallCount >= waiter.expected {
+                    ready.append(waiter.continuation)
+                    return true
+                }
+                return false
+            }
+            return ready
+        }
+        continuations.forEach { $0.resume() }
+    }
+
+    private func withStudySmartModeSettingsUpdateGateLock<T>(_ body: () -> T) -> T {
+        studySmartModeSettingsUpdateGateLock.lock()
+        defer { studySmartModeSettingsUpdateGateLock.unlock() }
         return body()
     }
 
