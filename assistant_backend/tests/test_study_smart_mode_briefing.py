@@ -113,7 +113,12 @@ async def test_smart_morning_briefing_returns_fact_only_snapshot_without_v1_agen
     payload = response.json()
     assert payload["enabled"] is True
     assert payload["date"] == days["today"]
-    assert payload["options"] == []
+    assert [option["id"] for option in payload["options"]] == [
+        "smart-morning-rolled-task-lag-6201",
+        "smart-morning-expected-late-project-6101",
+        f"smart-morning-over-capacity-day-{days['today']}",
+        f"smart-morning-over-capacity-day-{days['tomorrow']}",
+    ]
     assert payload["trigger_eligible"] is True
     assert (
         payload["summary"]

@@ -829,7 +829,7 @@ async def preview_active_study_project_shift(
             date.fromisoformat(change["new_date"]) > deadline_date for change in changes
         )
 
-    over_capacity_impact = await _preview_over_capacity_impact(db, changes)
+    over_capacity_impact = await preview_over_capacity_impact(db, changes)
 
     return {
         "status": "preview",
@@ -850,7 +850,7 @@ async def preview_active_study_project_shift(
     }
 
 
-async def _preview_over_capacity_impact(
+async def preview_over_capacity_impact(
     db: aiosqlite.Connection,
     changes: list[dict[str, Any]],
 ) -> dict:
