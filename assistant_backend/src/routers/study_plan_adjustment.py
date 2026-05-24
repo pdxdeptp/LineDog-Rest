@@ -1,15 +1,17 @@
 from datetime import date
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from ..db.connection import get_db
 from ..db.queries import (
     ResourceDeadlineEditNotAllowedError,
     ResourceNotFoundError,
+    ResourceTaskInsertNotAllowedError,
     TaskMoveNotAllowedError,
     TaskMovePastDateError,
     TaskNotFoundError,
+    insert_active_study_project_task,
     move_active_study_task,
     rollover_unfinished_study_tasks,
     update_active_study_project_deadline,
@@ -31,6 +33,19 @@ class UpdateProjectDeadlineRequest(BaseModel):
         if value == "":
             return None
         return value
+
+
+class InsertProjectTaskRequest(BaseModel):
+    title: str
+    target_minutes: int = Field(gt=0)
+    scheduled_date: date
+
+    @field_validator("title")
+    @classmethod
+    def title_must_not_be_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("title cannot be blank")
+        return value.strip()
 
 
 @router.post("/study-plan-adjustment/rollover")
@@ -70,3 +85,20 @@ async def update_study_project_deadline(
             raise HTTPException(status_code=404, detail="project not found") from exc
         except ResourceDeadlineEditNotAllowedError as exc:
             raise HTTPException(status_code=409, detail="project deadline cannot be edited") from exc
+
+
+@router.post("/study-plan-adjustment/projects/{project_id}/tasks")
+async def insert_study_project_task(project_id: int, request: InsertProjectTaskRequest) -> dict:
+    async with get_db() as db:
+        try:
+            return await insert_active_study_project_task(
+                db,
+                project_id,
+                request.title,
+                request.target_minutes,
+                request.scheduled_date,
+            )
+        except ResourceNotFoundError as exc:
+            raise HTTPException(status_code=404, detail="project not found") from exc
+        except ResourceTaskInsertNotAllowedError as exc:
+            raise HTTPException(status_code=409, detail="project task cannot be inserted") from exc

@@ -1013,3 +1013,47 @@ Before implementation, create a checkpoint commit in the current checkout, then 
 ### Next Task
 
 - Continue `opsx:apply` for ITEM-003 with tasks 5.1 and 5.2: inserting an active project task on a selected date with no cascade and red-state recalculation.
+
+## Round 22 · 2026-05-24T04:51:06Z
+
+### ITEM-003 5.1-5.2 Manual Task Insertion
+
+- Restored controller state: `phase=flow-b`, `current_item=study-plan-adjustment`.
+- Current checkout only; no worktree was created or used.
+- Created pre-apply checkpoint commit `81df1c8 chore: checkpoint flow b after deadline edit`.
+- Subagent TDD implementation completed OpenSpec tasks 5.1-5.2:
+  - `POST /api/study-plan-adjustment/projects/{project_id}/tasks`;
+  - active study projects can receive a new unfinished `time` task with title, target minutes, and scheduled date;
+  - existing task `scheduled_date` values are not moved during insertion;
+  - inserted tasks create `units` order facts and bind `tasks.unit_id`, so later manual move cascade can derive stable project order;
+  - Project Overview recalculates `expected_late` when the inserted task lands after the project deadline;
+  - Calendar recalculates `over_capacity` when insertion pushes a day over daily capacity;
+  - `study_task_inserted` events record project id, task id, scheduled date, target minutes, title, and source `manual_insert`;
+  - completed projects, non-study resources, missing projects, blank titles, and non-positive target minutes are rejected without mutation/event.
+
+### Review Gates
+
+- Spec Compliance Review: PASS.
+- Initial Code Quality Review: CHANGES_REQUESTED with one P1.
+- P1 fixed with TDD: inserted tasks now create durable project order facts, and a regression test verifies later move cascades successors instead of treating the inserted task as project tail.
+- Code Quality Re-review: APPROVED with no P0/P1/P2/P3 findings.
+- Spec Compliance Re-review: PASS with no P0/P1/P2/P3 findings.
+
+### Verification
+
+- `assistant_backend/.venv/bin/pytest assistant_backend/tests/test_study_plan_adjustment_insert.py assistant_backend/tests/test_study_plan_adjustment_move.py assistant_backend/tests/test_study_views_project_overview.py assistant_backend/tests/test_study_views_calendar.py -q`: `22 passed, 2 warnings`.
+- `openspec validate introduce-study-plan-adjustment --strict`: PASS.
+- `git diff --check`: PASS.
+- `openspec instructions apply --change introduce-study-plan-adjustment --json`: 37 tasks total, 17 complete, 20 remaining.
+
+### Files Added / Changed
+
+- Updated `assistant_backend/src/db/queries.py`.
+- Updated `assistant_backend/src/routers/study_plan_adjustment.py`.
+- Added `assistant_backend/tests/test_study_plan_adjustment_insert.py`.
+- Updated `openspec/changes/introduce-study-plan-adjustment/tasks.md` to mark 5.1 and 5.2 complete.
+- Added `openspec/learning-assistant-v2-flow-b/evidence/item-003/tdd-task-insertion-report.md`.
+
+### Next Task
+
+- Continue `opsx:apply` for ITEM-003 with tasks 5.3 and 5.4: deleting a single unfinished task with no cascade and completed-project transition when no unfinished tasks remain.

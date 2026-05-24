@@ -27,8 +27,8 @@
 
 ## 5. Task Add/Delete
 
-- [ ] 5.1 Write failing backend tests for inserting an active project task on a selected date with no cascade and red-state recalculation.
-- [ ] 5.2 Implement task insertion service/route.
+- [x] 5.1 Write failing backend tests for inserting an active project task on a selected date with no cascade and red-state recalculation.
+- [x] 5.2 Implement task insertion service/route.
 - [ ] 5.3 Write failing backend tests for deleting a single unfinished task with no cascade and completed-project transition when no unfinished tasks remain.
 - [ ] 5.4 Implement task deletion service/route and completed-history preservation.
 

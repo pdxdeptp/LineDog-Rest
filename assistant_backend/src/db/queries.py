@@ -17,6 +17,10 @@ class ResourceDeadlineEditNotAllowedError(Exception):
     pass
 
 
+class ResourceTaskInsertNotAllowedError(Exception):
+    pass
+
+
 class TaskNotFoundError(Exception):
     pass
 
@@ -505,6 +509,127 @@ async def update_active_study_project_deadline(
         await db.execute(
             "INSERT INTO events (event_type, payload) VALUES (?, ?)",
             ("study_project_deadline_updated", json.dumps(payload)),
+        )
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise
+
+    return payload
+
+
+async def insert_active_study_project_task(
+    db: aiosqlite.Connection,
+    project_id: int,
+    title: str,
+    target_minutes: int,
+    scheduled_date: date,
+) -> dict:
+    scheduled_date_iso = scheduled_date.isoformat()
+    normalized_title = title.strip()
+
+    await db.execute("BEGIN IMMEDIATE")
+    try:
+        async with db.execute(
+            """
+            SELECT id, type, status
+            FROM resources
+            WHERE id = ?
+            """,
+            (project_id,),
+        ) as cursor:
+            project = await cursor.fetchone()
+
+        if not project:
+            await db.rollback()
+            raise ResourceNotFoundError
+        if project["type"] != "study_project" or project["status"] != "active":
+            await db.rollback()
+            raise ResourceTaskInsertNotAllowedError
+
+        async with db.execute(
+            """
+            SELECT MIN(u.order_index) AS insertion_order
+            FROM tasks t
+            JOIN units u ON u.id = t.unit_id
+            WHERE t.resource_id = ?
+              AND t.completed_at IS NULL
+              AND date(t.scheduled_date) > date(?)
+            """,
+            (project_id, scheduled_date_iso),
+        ) as cursor:
+            insertion_row = await cursor.fetchone()
+
+        insertion_order = insertion_row["insertion_order"] if insertion_row else None
+        if insertion_order is None:
+            async with db.execute(
+                """
+                SELECT COALESCE(MAX(order_index), 0) + 1 AS next_order
+                FROM units
+                WHERE resource_id = ?
+                """,
+                (project_id,),
+            ) as cursor:
+                next_order_row = await cursor.fetchone()
+            insertion_order = int(next_order_row["next_order"])
+        else:
+            insertion_order = int(insertion_order)
+            await db.execute(
+                """
+                UPDATE units
+                SET order_index = order_index + 1
+                WHERE resource_id = ?
+                  AND order_index >= ?
+                """,
+                (project_id, insertion_order),
+            )
+
+        unit_cursor = await db.execute(
+            """
+            INSERT INTO units
+                (resource_id, title, order_index, estimated_minutes, status)
+            VALUES (?, ?, ?, ?, 'pending')
+            """,
+            (project_id, normalized_title, insertion_order, target_minutes),
+        )
+        unit_id = int(unit_cursor.lastrowid)
+
+        cursor = await db.execute(
+            """
+            INSERT INTO tasks
+                (
+                    unit_id,
+                    resource_id,
+                    title,
+                    task_kind,
+                    target_minutes,
+                    scheduled_date,
+                    originally_scheduled_date,
+                    completed_at
+                )
+            VALUES (?, ?, ?, 'time', ?, ?, ?, NULL)
+            """,
+            (
+                unit_id,
+                project_id,
+                normalized_title,
+                target_minutes,
+                scheduled_date_iso,
+                scheduled_date_iso,
+            ),
+        )
+        task_id = int(cursor.lastrowid)
+        payload = {
+            "project_id": project_id,
+            "task_id": task_id,
+            "scheduled_date": scheduled_date_iso,
+            "target_minutes": target_minutes,
+            "title": normalized_title,
+            "source": "manual_insert",
+        }
+        await db.execute(
+            "INSERT INTO events (event_type, payload) VALUES (?, ?)",
+            ("study_task_inserted", json.dumps(payload)),
         )
         await db.commit()
     except Exception:
