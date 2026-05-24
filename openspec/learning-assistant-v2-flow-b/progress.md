@@ -41,6 +41,50 @@
 
 - Enter `opsx:apply` for `introduce-study-smart-mode` and start with tasks 2.1-2.2: backend smart-mode setting tests and minimal storage/routes.
 
+## Round 35 · 2026-05-24T14:21:45Z
+
+### ITEM-004 2.1-2.2 Backend Smart Mode Setting
+
+- Restored controller and Flow B state: `phase=flow-b`, `current_item=study-smart-mode`, `current_change=introduce-study-smart-mode`.
+- Start status was clean; proposal checkpoint `b8dd156` and state/progress commit `d05c155` were already present, so no duplicate checkpoint commit was created.
+- Current checkout only; no worktree was created or used.
+
+### Completed
+
+- OpenSpec tasks 2.1 and 2.2 completed:
+  - added failing backend tests for off-by-default smart-mode setting persistence;
+  - added failing backend tests for disabled smart-mode proposal suppression;
+  - added invalid-trigger validation coverage after code quality review;
+  - implemented minimal backend storage/routes for `GET/PUT /api/study-smart-mode/settings`;
+  - implemented a minimal disabled no-op `POST /api/study-smart-mode/proposals` route;
+  - registered the new router in the FastAPI lifespan setup.
+
+### Review Gates
+
+- Spec Compliance Review: PASS.
+- Code Quality Review: initially CHANGES_REQUESTED for accepting arbitrary proposal trigger strings.
+- Review fix completed with `Literal["morning", "after_adjustment"]` and 422 invalid-trigger coverage.
+- Code Quality Re-review: APPROVED.
+
+### Verification
+
+- RED evidence and review loop recorded in `openspec/learning-assistant-v2-flow-b/evidence/item-004/tdd-backend-smart-mode-setting-report.md`.
+- `cd assistant_backend && .venv/bin/python -m pytest tests/test_study_smart_mode_settings.py tests/test_integration.py -q`: PASS, 20 passed, 2 existing dependency warnings.
+- `openspec validate introduce-study-smart-mode --strict`: PASS.
+- `git diff --check`: PASS.
+
+### Files Added / Changed
+
+- Added `assistant_backend/tests/test_study_smart_mode_settings.py`.
+- Added `assistant_backend/src/routers/study_smart_mode.py`.
+- Updated `assistant_backend/src/main.py`.
+- Updated `openspec/changes/introduce-study-smart-mode/tasks.md` to mark 2.1 and 2.2 complete.
+- Added `openspec/learning-assistant-v2-flow-b/evidence/item-004/tdd-backend-smart-mode-setting-report.md`.
+
+### Next Task
+
+- Continue `opsx:apply` for ITEM-004 with tasks 3.1-3.2: backend fact-only smart snapshot tests and minimal smart morning briefing route that does not call the v1 Morning Agent.
+
 ## Round 01 · 2026-05-23T14:50:55Z
 
 ### Git / Safety

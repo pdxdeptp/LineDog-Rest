@@ -6,8 +6,8 @@
 
 ## 2. Backend Smart Mode Setting
 
-- [ ] 2.1 Write failing backend tests for off-by-default smart-mode setting persistence and disabled smart-mode suppression.
-- [ ] 2.2 Implement minimal smart-mode setting storage and routes.
+- [x] 2.1 Write failing backend tests for off-by-default smart-mode setting persistence and disabled smart-mode suppression.
+- [x] 2.2 Implement minimal smart-mode setting storage and routes.
 
 ## 3. Backend Smart Snapshot And Morning Briefing
 
