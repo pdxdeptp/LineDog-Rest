@@ -1286,3 +1286,59 @@ Before implementation, create a checkpoint commit in the current checkout, then 
 ### Next Task
 
 - Continue `opsx:apply` for ITEM-003 with tasks 7.3 and 7.4: apply exactly the previewed dialogue changes with event persistence.
+
+## Round 27 · 2026-05-24T06:20:36Z
+
+### ITEM-003 7.3-7.4 Dialogue Adjustment Apply
+
+- Restored controller state: `phase=flow-b`, `current_item=study-plan-adjustment`.
+- Current checkout only; no worktree was created or used.
+- Created pre-apply checkpoint commit `a7055c2 chore: checkpoint flow b after dialogue preview`.
+- Subagent TDD implementation completed OpenSpec tasks 7.3-7.4:
+  - `POST /api/study-plan-adjustment/dialogue/apply`;
+  - apply accepts a bounded project-shift instruction plus the submitted preview object;
+  - apply recomputes the current preview inside a transaction and only writes when the submitted preview signature matches current persisted facts;
+  - affected unfinished active study-project tasks move exactly to the submitted old/new preview dates;
+  - affected tasks reset `auto_roll_days`, clear `last_auto_rolled_at`, and stamp `user_adjusted_at`;
+  - successful apply records `study_dialogue_adjustment_applied` with `source: dialogue_apply`, command, project id, delta days, affected task ids, and original/new dates;
+  - response returns `mutates: true` and a view refresh contract for Today, Project Overview, and Calendar;
+  - unsupported/ambiguous instructions, tampered previews, stale task dates, stale red-state impact, duplicate affected ids, and empty project shifts are no-op/no-event/no-mutation;
+  - no LLM, old v1 conversational agent, smart suggestion, or automatic repair path was added.
+
+### Review Gates
+
+- Initial Spec Compliance Review: PASS with no P0/P1/P2/P3 findings.
+- Initial Code Quality Review: PASS with no P0/P1 blockers, but one P2 and related P3 observations.
+- P2 fixed with TDD: apply signature now includes normalized `red_state_impact.expected_late` and `red_state_impact.over_capacity`, so risk-summary drift becomes `stale_preview`.
+- P3 fixed with TDD: project shifts with no unfinished tasks now return unsupported/no-op and cannot produce a mutating apply event.
+- Spec Compliance Re-review: PASS with no P0/P1/P2/P3 findings.
+- Code Quality Re-review: PASS with no P0/P1/P2/P3 findings.
+
+### Verification
+
+- RED: `assistant_backend/.venv/bin/pytest assistant_backend/tests/test_study_plan_adjustment_dialogue_apply.py -q`: `5 failed` on missing endpoint.
+- GREEN: same command after initial implementation: `5 passed, 2 warnings`.
+- Review-fix RED: same command after adding stale red-state and empty-project tests: `2 failed, 6 passed`.
+- Review-fix GREEN: same command after fixes: `8 passed, 2 warnings`.
+- `assistant_backend/.venv/bin/pytest assistant_backend/tests/test_study_plan_adjustment_*.py -q`: `55 passed, 2 warnings`.
+- `openspec validate introduce-study-plan-adjustment --strict`: PASS.
+- `git diff --check`: PASS.
+- `openspec instructions apply --change introduce-study-plan-adjustment --json`: 37 tasks total, 27 complete, 10 remaining.
+
+### Auto Commit
+
+- Commit: pending.
+- Scope: verified ITEM-003 dialogue apply through OpenSpec tasks 7.3-7.4.
+- Pre-commit checks: dialogue apply backend tests, full `test_study_plan_adjustment_*.py` suite, `openspec validate introduce-study-plan-adjustment --strict`, `git diff --check`, Spec Compliance Re-review, and Code Quality Re-review all passed.
+
+### Files Added / Changed
+
+- Updated `assistant_backend/src/db/queries.py`.
+- Updated `assistant_backend/src/routers/study_plan_adjustment.py`.
+- Added `assistant_backend/tests/test_study_plan_adjustment_dialogue_apply.py`.
+- Updated `openspec/changes/introduce-study-plan-adjustment/tasks.md` to mark 7.3 and 7.4 complete.
+- Added `openspec/learning-assistant-v2-flow-b/evidence/item-003/tdd-dialogue-apply-report.md`.
+
+### Next Task
+
+- Continue `opsx:apply` for ITEM-003 with tasks 8.1 and 8.2: Swift model/client support for adjustment endpoints and enriched study-view payloads.

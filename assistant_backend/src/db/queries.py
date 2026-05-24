@@ -802,6 +802,13 @@ async def preview_active_study_project_shift(
             }
         )
 
+    if not changes:
+        return {
+            "status": "unsupported",
+            "mutates": False,
+            "message": "project has no unfinished study tasks to shift",
+        }
+
     effective_today = today or date.today()
     if any(date.fromisoformat(change["new_date"]) < effective_today for change in changes):
         return {
@@ -910,6 +917,175 @@ async def _preview_over_capacity_impact(
         "before_dates": before_dates,
         "after_dates": after_dates,
         "new_over_capacity_dates": sorted(set(after_dates) - set(before_dates)),
+    }
+
+
+def _normalize_project_shift_red_state_impact(red_state_impact: Any) -> dict[str, Any] | None:
+    if not isinstance(red_state_impact, dict):
+        return None
+    try:
+        expected_late = red_state_impact["expected_late"]
+        over_capacity = red_state_impact["over_capacity"]
+        before_late = bool(expected_late["before"])
+        after_late = bool(expected_late["after"])
+        before_dates = sorted(str(day) for day in over_capacity["before_dates"])
+        after_dates = sorted(str(day) for day in over_capacity["after_dates"])
+        new_over_dates = sorted(str(day) for day in over_capacity["new_over_capacity_dates"])
+        for day in before_dates + after_dates + new_over_dates:
+            date.fromisoformat(day)
+    except (KeyError, TypeError, ValueError):
+        return None
+
+    return {
+        "expected_late": {
+            "before": before_late,
+            "after": after_late,
+        },
+        "over_capacity": {
+            "before_dates": before_dates,
+            "after_dates": after_dates,
+            "new_over_capacity_dates": new_over_dates,
+        },
+    }
+
+
+def _project_shift_preview_signature(preview: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not isinstance(preview, dict) or preview.get("status") != "preview":
+        return None
+    try:
+        command = str(preview["command"])
+        project_id = int(preview["project_id"])
+        delta_days = int(preview["delta_days"])
+        affected_task_ids = [int(task_id) for task_id in preview["affected_task_ids"]]
+        changes = []
+        for change in preview["changes"]:
+            old_date = date.fromisoformat(str(change["old_date"])[:10]).isoformat()
+            new_date = date.fromisoformat(str(change["new_date"])[:10]).isoformat()
+            changes.append(
+                {
+                    "task_id": int(change["task_id"]),
+                    "project_id": int(change["project_id"]),
+                    "old_date": old_date,
+                    "new_date": new_date,
+                }
+            )
+    except (KeyError, TypeError, ValueError):
+        return None
+
+    if not affected_task_ids or not changes:
+        return None
+    red_state_impact = _normalize_project_shift_red_state_impact(preview.get("red_state_impact"))
+    if red_state_impact is None:
+        return None
+
+    return {
+        "command": command,
+        "project_id": project_id,
+        "delta_days": delta_days,
+        "affected_task_ids": affected_task_ids,
+        "changes": changes,
+        "red_state_impact": red_state_impact,
+    }
+
+
+def _stale_dialogue_preview_response() -> dict:
+    return {
+        "status": "stale_preview",
+        "mutates": False,
+        "message": "submitted preview does not match the current active plan",
+    }
+
+
+async def apply_active_study_project_shift(
+    db: aiosqlite.Connection,
+    project_id: int,
+    delta_days: int,
+    submitted_preview: dict[str, Any] | None,
+    today: date | None = None,
+) -> dict:
+    submitted_signature = _project_shift_preview_signature(submitted_preview)
+    if submitted_signature is None:
+        return _stale_dialogue_preview_response()
+
+    await db.execute("BEGIN IMMEDIATE")
+    try:
+        current_preview = await preview_active_study_project_shift(
+            db,
+            project_id,
+            delta_days,
+            today,
+        )
+        current_signature = _project_shift_preview_signature(current_preview)
+        if current_signature is None or current_signature != submitted_signature:
+            await db.rollback()
+            return _stale_dialogue_preview_response()
+
+        now = datetime.now(UTC).isoformat()
+        for change in current_signature["changes"]:
+            cursor = await db.execute(
+                """
+                UPDATE tasks
+                SET scheduled_date = ?,
+                    auto_roll_days = 0,
+                    last_auto_rolled_at = NULL,
+                    user_adjusted_at = ?
+                WHERE id = ?
+                  AND resource_id = ?
+                  AND completed_at IS NULL
+                  AND date(scheduled_date) = date(?)
+                """,
+                (
+                    change["new_date"],
+                    now,
+                    change["task_id"],
+                    change["project_id"],
+                    change["old_date"],
+                ),
+            )
+            if cursor.rowcount != 1:
+                await db.rollback()
+                return _stale_dialogue_preview_response()
+
+        event_changes = [
+            {
+                "task_id": change["task_id"],
+                "project_id": change["project_id"],
+                "original_date": change["old_date"],
+                "new_date": change["new_date"],
+            }
+            for change in current_signature["changes"]
+        ]
+        payload = {
+            "source": "dialogue_apply",
+            "command": current_signature["command"],
+            "project_id": current_signature["project_id"],
+            "delta_days": current_signature["delta_days"],
+            "affected_task_ids": current_signature["affected_task_ids"],
+            "changes": event_changes,
+        }
+        await db.execute(
+            "INSERT INTO events (event_type, payload) VALUES (?, ?)",
+            ("study_dialogue_adjustment_applied", json.dumps(payload)),
+        )
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise
+
+    return {
+        "status": "applied",
+        "source": "dialogue_apply",
+        "command": current_signature["command"],
+        "project_id": current_signature["project_id"],
+        "delta_days": current_signature["delta_days"],
+        "affected_task_ids": current_signature["affected_task_ids"],
+        "changes": current_signature["changes"],
+        "mutates": True,
+        "refresh": {
+            "today": True,
+            "project_overview": True,
+            "calendar": True,
+        },
     }
 
 

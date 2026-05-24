@@ -1,5 +1,6 @@
 import re
 from datetime import date
+from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field, field_validator
@@ -13,6 +14,7 @@ from ..db.queries import (
     TaskMoveNotAllowedError,
     TaskMovePastDateError,
     TaskNotFoundError,
+    apply_active_study_project_shift,
     delete_active_study_task,
     get_study_rest_day_settings,
     insert_active_study_project_task,
@@ -77,6 +79,10 @@ class DialoguePreviewRequest(BaseModel):
         if not value.strip():
             raise ValueError("instruction cannot be blank")
         return value.strip()
+
+
+class DialogueApplyRequest(DialoguePreviewRequest):
+    preview: dict[str, Any] | None = None
 
 
 _NUMBER_WORDS = {
@@ -162,6 +168,26 @@ async def preview_dialogue_adjustment(request: DialoguePreviewRequest) -> dict:
     project_id, delta_days = parsed
     async with get_db() as db:
         return await preview_active_study_project_shift(db, project_id, delta_days)
+
+
+@router.post("/study-plan-adjustment/dialogue/apply")
+async def apply_dialogue_adjustment(request: DialogueApplyRequest) -> dict:
+    parsed = _parse_project_shift_instruction(request.instruction, request.project_id)
+    if parsed is None:
+        return {
+            "status": "unsupported",
+            "mutates": False,
+            "message": "unsupported or ambiguous dialogue adjustment",
+        }
+
+    project_id, delta_days = parsed
+    async with get_db() as db:
+        return await apply_active_study_project_shift(
+            db,
+            project_id,
+            delta_days,
+            request.preview,
+        )
 
 
 @router.post("/study-plan-adjustment/tasks/{task_id}/move")

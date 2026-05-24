@@ -43,8 +43,8 @@
 
 - [x] 7.1 Write failing backend tests for supported dialogue adjustment preview without mutation.
 - [x] 7.2 Implement bounded dialogue preview for project-level date shifts.
-- [ ] 7.3 Write failing backend tests for applying exactly the previewed changes and rejecting unsupported/ambiguous instructions safely.
-- [ ] 7.4 Implement dialogue apply route, event persistence, and view refresh contract.
+- [x] 7.3 Write failing backend tests for applying exactly the previewed changes and rejecting unsupported/ambiguous instructions safely.
+- [x] 7.4 Implement dialogue apply route, event persistence, and view refresh contract.
 
 ## 8. Swift API And ViewModel
 
