@@ -193,8 +193,134 @@ def _parse_daily_capacity_minutes(raw: str | None) -> int:
     return capacity if capacity > 0 else 60
 
 
+def _normalize_rest_weekdays(values: list[Any] | None) -> list[int]:
+    if not values:
+        return []
+    normalized = set()
+    for value in values:
+        try:
+            weekday = int(value)
+        except (TypeError, ValueError):
+            continue
+        if 0 <= weekday <= 6:
+            normalized.add(weekday)
+    return sorted(normalized)
+
+
+def _normalize_rest_dates(values: list[Any] | None) -> list[str]:
+    if not values:
+        return []
+    normalized = set()
+    for value in values:
+        if isinstance(value, date):
+            normalized.add(value.isoformat())
+        elif isinstance(value, str):
+            try:
+                normalized.add(date.fromisoformat(value[:10]).isoformat())
+            except ValueError:
+                continue
+    return sorted(normalized)
+
+
+def _parse_rest_json(raw: str | None, default: list[Any]) -> list[Any]:
+    if raw is None:
+        return default
+    try:
+        parsed = json.loads(raw)
+    except (TypeError, json.JSONDecodeError):
+        return default
+    return parsed if isinstance(parsed, list) else default
+
+
+async def get_study_rest_day_settings(db: aiosqlite.Connection) -> dict:
+    weekly = _normalize_rest_weekdays(
+        _parse_rest_json(await get_system_state(db, "study_rest_weekdays"), [5])
+    )
+    dates = _normalize_rest_dates(
+        _parse_rest_json(await get_system_state(db, "study_rest_dates"), [])
+    )
+    return {
+        "weekly_weekdays": weekly,
+        "one_off_dates": dates,
+    }
+
+
+async def update_study_rest_day_settings(
+    db: aiosqlite.Connection,
+    weekly_weekdays: list[int],
+    one_off_dates: list[date],
+) -> dict:
+    new_weekly = _normalize_rest_weekdays(weekly_weekdays)
+    new_dates = _normalize_rest_dates(one_off_dates)
+
+    await db.execute("BEGIN IMMEDIATE")
+    try:
+        old_settings = await get_study_rest_day_settings(db)
+        old_weekly = old_settings["weekly_weekdays"]
+        old_dates = old_settings["one_off_dates"]
+
+        added_weekly = sorted(set(new_weekly) - set(old_weekly))
+        removed_weekly = sorted(set(old_weekly) - set(new_weekly))
+        added_dates = sorted(set(new_dates) - set(old_dates))
+        removed_dates = sorted(set(old_dates) - set(new_dates))
+
+        await db.execute(
+            """
+            INSERT INTO system_state (key, value, updated_at)
+            VALUES (?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(key) DO UPDATE SET
+                value = excluded.value,
+                updated_at = excluded.updated_at
+            """,
+            ("study_rest_weekdays", json.dumps(new_weekly)),
+        )
+        await db.execute(
+            """
+            INSERT INTO system_state (key, value, updated_at)
+            VALUES (?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(key) DO UPDATE SET
+                value = excluded.value,
+                updated_at = excluded.updated_at
+            """,
+            ("study_rest_dates", json.dumps(new_dates)),
+        )
+
+        payload = {
+            "old_weekly_weekdays": old_weekly,
+            "new_weekly_weekdays": new_weekly,
+            "added_weekly_weekdays": added_weekly,
+            "removed_weekly_weekdays": removed_weekly,
+            "old_one_off_dates": old_dates,
+            "new_one_off_dates": new_dates,
+            "added_one_off_dates": added_dates,
+            "removed_one_off_dates": removed_dates,
+            "source": "manual_rest_day_settings",
+        }
+        await db.execute(
+            "INSERT INTO events (event_type, payload) VALUES (?, ?)",
+            ("study_rest_days_updated", json.dumps(payload)),
+        )
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise
+
+    return {
+        "weekly_weekdays": new_weekly,
+        "one_off_dates": new_dates,
+        "added_weekly_weekdays": added_weekly,
+        "removed_weekly_weekdays": removed_weekly,
+        "added_one_off_dates": added_dates,
+        "removed_one_off_dates": removed_dates,
+        "source": "manual_rest_day_settings",
+    }
+
+
 async def get_study_calendar_load(db: aiosqlite.Connection, start: date, end: date) -> dict:
     daily_capacity_minutes = _parse_daily_capacity_minutes(await get_system_state(db, "daily_capacity_min"))
+    rest_day_settings = await get_study_rest_day_settings(db)
+    rest_weekdays = set(rest_day_settings["weekly_weekdays"])
+    rest_dates = set(rest_day_settings["one_off_dates"])
     async with db.execute(
         """
         SELECT
@@ -221,13 +347,17 @@ async def get_study_calendar_load(db: aiosqlite.Connection, start: date, end: da
         day = current.isoformat()
         aggregate = aggregates.get(day, {})
         total_target_minutes = aggregate.get("total_target_minutes") or 0
+        is_rest_day = current.weekday() in rest_weekdays or day in rest_dates
+        day_capacity_minutes = 0 if is_rest_day else daily_capacity_minutes
         days.append(
             {
                 "date": day,
                 "scheduled_task_count": aggregate.get("scheduled_task_count") or 0,
                 "total_target_minutes": total_target_minutes,
                 "completed_task_count": aggregate.get("completed_task_count") or 0,
-                "over_capacity": total_target_minutes > daily_capacity_minutes,
+                "rest_day": is_rest_day,
+                "available_capacity_minutes": max(0, day_capacity_minutes - total_target_minutes),
+                "over_capacity": total_target_minutes > day_capacity_minutes,
             }
         )
         current += timedelta(days=1)

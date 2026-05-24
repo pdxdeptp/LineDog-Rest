@@ -71,6 +71,8 @@ async def test_calendar_load_aggregates_active_study_tasks_for_every_day_and_is_
                 "scheduled_task_count": 2,
                 "total_target_minutes": 65,
                 "completed_task_count": 1,
+                "rest_day": False,
+                "available_capacity_minutes": 0,
                 "over_capacity": True,
             },
             {
@@ -78,6 +80,8 @@ async def test_calendar_load_aggregates_active_study_tasks_for_every_day_and_is_
                 "scheduled_task_count": 1,
                 "total_target_minutes": 0,
                 "completed_task_count": 0,
+                "rest_day": False,
+                "available_capacity_minutes": 60,
                 "over_capacity": False,
             },
             {
@@ -85,6 +89,8 @@ async def test_calendar_load_aggregates_active_study_tasks_for_every_day_and_is_
                 "scheduled_task_count": 1,
                 "total_target_minutes": 60,
                 "completed_task_count": 0,
+                "rest_day": False,
+                "available_capacity_minutes": 0,
                 "over_capacity": False,
             },
         ],
@@ -134,6 +140,8 @@ async def test_calendar_load_returns_empty_day_buckets_and_falls_back_to_default
             "scheduled_task_count": 0,
             "total_target_minutes": 0,
             "completed_task_count": 0,
+            "rest_day": False,
+            "available_capacity_minutes": 60,
             "over_capacity": False,
         },
         {
@@ -141,6 +149,8 @@ async def test_calendar_load_returns_empty_day_buckets_and_falls_back_to_default
             "scheduled_task_count": 1,
             "total_target_minutes": 61,
             "completed_task_count": 0,
+            "rest_day": False,
+            "available_capacity_minutes": 0,
             "over_capacity": True,
         },
         {
@@ -148,6 +158,8 @@ async def test_calendar_load_returns_empty_day_buckets_and_falls_back_to_default
             "scheduled_task_count": 0,
             "total_target_minutes": 0,
             "completed_task_count": 0,
+            "rest_day": False,
+            "available_capacity_minutes": 60,
             "over_capacity": False,
         },
     ]
@@ -199,6 +211,8 @@ async def test_calendar_load_recalculates_over_capacity_after_persisted_task_fac
             "scheduled_task_count": 2,
             "total_target_minutes": 65,
             "completed_task_count": 0,
+            "rest_day": True,
+            "available_capacity_minutes": 0,
             "over_capacity": True,
         },
         {
@@ -206,6 +220,8 @@ async def test_calendar_load_recalculates_over_capacity_after_persisted_task_fac
             "scheduled_task_count": 0,
             "total_target_minutes": 0,
             "completed_task_count": 0,
+            "rest_day": False,
+            "available_capacity_minutes": 60,
             "over_capacity": False,
         },
     ]

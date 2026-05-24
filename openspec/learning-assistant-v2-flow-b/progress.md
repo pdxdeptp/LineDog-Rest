@@ -1116,3 +1116,60 @@ Before implementation, create a checkpoint commit in the current checkout, then 
 ### Next Task
 
 - Continue `opsx:apply` for ITEM-003 with tasks 6.1 and 6.2: weekly and one-off rest-day settings add/remove semantics.
+
+## Round 24 · 2026-05-24T05:22:06Z
+
+### ITEM-003 6.1-6.2 Rest-Day Settings
+
+- Restored controller state: `phase=flow-b`, `current_item=study-plan-adjustment`.
+- Current checkout only; no worktree was created or used.
+- Created pre-apply checkpoint commit `659bfe7 chore: checkpoint flow b after task deletion`.
+- Subagent TDD implementation completed OpenSpec tasks 6.1-6.2:
+  - `GET /api/study-plan-adjustment/rest-days`;
+  - `PUT /api/study-plan-adjustment/rest-days`;
+  - weekly rest weekdays default to `[5]` and one-off dates default to `[]` from `system_state`;
+  - PUT uses complete replacement semantics and normalizes duplicate/unsorted weekly weekdays and one-off dates;
+  - settings persist to `study_rest_weekdays` and `study_rest_dates`;
+  - `study_rest_days_updated` events record old/new, added/removed weekly weekdays, added/removed one-off dates, and source `manual_rest_day_settings`;
+  - invalid weekdays or date payloads are rejected without mutating settings or writing events;
+  - Calendar now exposes `rest_day` and `available_capacity_minutes`;
+  - rest days have zero learning capacity and can show `over_capacity` when tasks remain on them;
+  - removing a rest day updates Calendar availability without moving existing active task dates;
+  - D27 +1 day cascade was intentionally not implemented in this slice and remains scoped to tasks 6.3-6.4.
+
+### Review Gates
+
+- Spec Compliance Review: PASS with no P0/P1/P2/P3 findings.
+- Initial Code Quality Review: CHANGES_REQUESTED with one P1 and several non-blocking P2/P3 observations.
+- P1 fixed with TDD: insert/delete Calendar regression tests now assert the enriched `rest_day` and `available_capacity_minutes` payload and compute default-rest-day capacity from the asserted date.
+- Non-blocking observations recorded for future consideration: no-op rest-day update events, broader strict payload validation, atomic snapshot reads, and corrupted persisted JSON edge tests.
+
+### Verification
+
+- `assistant_backend/.venv/bin/pytest assistant_backend/tests/test_study_plan_adjustment_rest_days.py assistant_backend/tests/test_study_views_calendar.py assistant_backend/tests/test_study_plan_adjustment_schema.py -q`: `13 passed, 2 warnings`.
+- Review-fix RED: `assistant_backend/.venv/bin/pytest assistant_backend/tests/test_study_plan_adjustment_insert.py assistant_backend/tests/test_study_plan_adjustment_delete.py -q`: `2 failed, 10 passed`.
+- Review-fix GREEN: `assistant_backend/.venv/bin/pytest assistant_backend/tests/test_study_plan_adjustment_insert.py assistant_backend/tests/test_study_plan_adjustment_delete.py -q`: `12 passed, 2 warnings`.
+- `openspec validate introduce-study-plan-adjustment --strict`: PASS.
+- `git diff --check`: PASS.
+- `openspec instructions apply --change introduce-study-plan-adjustment --json`: 37 tasks total, 21 complete, 16 remaining.
+
+### Auto Commit
+
+- Commit: pending.
+- Scope: verified ITEM-003 rest-day settings through OpenSpec tasks 6.1-6.2.
+- Pre-commit checks: related backend tests, `openspec validate introduce-study-plan-adjustment --strict`, `git diff --check`, Spec Compliance Review, and Code Quality Review P1 fix verification passed.
+
+### Files Added / Changed
+
+- Updated `assistant_backend/src/db/queries.py`.
+- Updated `assistant_backend/src/routers/study_plan_adjustment.py`.
+- Added `assistant_backend/tests/test_study_plan_adjustment_rest_days.py`.
+- Updated `assistant_backend/tests/test_study_views_calendar.py`.
+- Updated `assistant_backend/tests/test_study_plan_adjustment_insert.py`.
+- Updated `assistant_backend/tests/test_study_plan_adjustment_delete.py`.
+- Updated `openspec/changes/introduce-study-plan-adjustment/tasks.md` to mark 6.1 and 6.2 complete.
+- Added `openspec/learning-assistant-v2-flow-b/evidence/item-003/tdd-rest-day-settings-report.md`.
+
+### Next Task
+
+- Continue `opsx:apply` for ITEM-003 with tasks 6.3 and 6.4: D27 +1 day rest-day cascade in chronological order.

@@ -34,8 +34,8 @@
 
 ## 6. Rest Days
 
-- [ ] 6.1 Write failing backend tests for weekly and one-off rest-day settings, including add/remove semantics.
-- [ ] 6.2 Implement rest-day settings service/route.
+- [x] 6.1 Write failing backend tests for weekly and one-off rest-day settings, including add/remove semantics.
+- [x] 6.2 Implement rest-day settings service/route.
 - [ ] 6.3 Write failing backend tests for D27 +1 day cascade when new rest days are added.
 - [ ] 6.4 Implement rest-day cascade in chronological order with event evidence and rollover reset for affected tasks.
 

@@ -18,6 +18,25 @@ async def _fetchone(db: aiosqlite.Connection, sql: str, params: tuple = ()) -> d
     return dict(row) if row else None
 
 
+def _expected_calendar_day(
+    day: str,
+    scheduled_task_count: int,
+    total_target_minutes: int,
+    completed_task_count: int = 0,
+) -> dict:
+    rest_day = date.fromisoformat(day).weekday() == 5
+    capacity = 0 if rest_day else 60
+    return {
+        "date": day,
+        "scheduled_task_count": scheduled_task_count,
+        "total_target_minutes": total_target_minutes,
+        "completed_task_count": completed_task_count,
+        "rest_day": rest_day,
+        "available_capacity_minutes": max(0, capacity - total_target_minutes),
+        "over_capacity": total_target_minutes > capacity,
+    }
+
+
 async def _seed_delete_project(db_path: str) -> dict[str, str]:
     today = date.today()
     delete_day = today + timedelta(days=1)
@@ -253,27 +272,13 @@ async def test_delete_unfinished_active_study_task_removes_only_that_task_and_re
     }
     assert calendar_response.status_code == 200, calendar_response.text
     assert calendar_response.json()["days"] == [
-        {
-            "date": days["delete_day"],
-            "scheduled_task_count": 0,
-            "total_target_minutes": 0,
-            "completed_task_count": 0,
-            "over_capacity": False,
-        },
-        {
-            "date": (date.fromisoformat(days["delete_day"]) + timedelta(days=1)).isoformat(),
-            "scheduled_task_count": 0,
-            "total_target_minutes": 0,
-            "completed_task_count": 0,
-            "over_capacity": False,
-        },
-        {
-            "date": days["later_day"],
-            "scheduled_task_count": 2,
-            "total_target_minutes": 70,
-            "completed_task_count": 0,
-            "over_capacity": True,
-        },
+        _expected_calendar_day(days["delete_day"], scheduled_task_count=0, total_target_minutes=0),
+        _expected_calendar_day(
+            (date.fromisoformat(days["delete_day"]) + timedelta(days=1)).isoformat(),
+            scheduled_task_count=0,
+            total_target_minutes=0,
+        ),
+        _expected_calendar_day(days["later_day"], scheduled_task_count=2, total_target_minutes=70),
     ]
 
     async with aiosqlite.connect(os.environ["DB_PATH"]) as db:

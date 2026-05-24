@@ -13,9 +13,11 @@ from ..db.queries import (
     TaskMovePastDateError,
     TaskNotFoundError,
     delete_active_study_task,
+    get_study_rest_day_settings,
     insert_active_study_project_task,
     move_active_study_task,
     rollover_unfinished_study_tasks,
+    update_study_rest_day_settings,
     update_active_study_project_deadline,
 )
 
@@ -50,10 +52,39 @@ class InsertProjectTaskRequest(BaseModel):
         return value.strip()
 
 
+class RestDaySettingsRequest(BaseModel):
+    weekly_weekdays: list[int] = Field(default_factory=list)
+    one_off_dates: list[date] = Field(default_factory=list)
+
+    @field_validator("weekly_weekdays")
+    @classmethod
+    def weekdays_must_be_python_weekday_values(cls, value: list[int]) -> list[int]:
+        invalid = [weekday for weekday in value if weekday < 0 or weekday > 6]
+        if invalid:
+            raise ValueError("weekly_weekdays must contain values from 0 to 6")
+        return value
+
+
 @router.post("/study-plan-adjustment/rollover")
 async def rollover_study_tasks() -> dict:
     async with get_db() as db:
         return await rollover_unfinished_study_tasks(db, date.today())
+
+
+@router.get("/study-plan-adjustment/rest-days")
+async def get_rest_day_settings() -> dict:
+    async with get_db() as db:
+        return await get_study_rest_day_settings(db)
+
+
+@router.put("/study-plan-adjustment/rest-days")
+async def update_rest_day_settings(request: RestDaySettingsRequest) -> dict:
+    async with get_db() as db:
+        return await update_study_rest_day_settings(
+            db,
+            request.weekly_weekdays,
+            request.one_off_dates,
+        )
 
 
 @router.post("/study-plan-adjustment/tasks/{task_id}/move")

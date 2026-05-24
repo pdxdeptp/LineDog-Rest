@@ -12,6 +12,25 @@ async def _fetchall(db: aiosqlite.Connection, sql: str, params: tuple = ()) -> l
     return [dict(row) for row in rows]
 
 
+def _expected_calendar_day(
+    day: str,
+    scheduled_task_count: int,
+    total_target_minutes: int,
+    completed_task_count: int = 0,
+) -> dict:
+    rest_day = date.fromisoformat(day).weekday() == 5
+    capacity = 0 if rest_day else 60
+    return {
+        "date": day,
+        "scheduled_task_count": scheduled_task_count,
+        "total_target_minutes": total_target_minutes,
+        "completed_task_count": completed_task_count,
+        "rest_day": rest_day,
+        "available_capacity_minutes": max(0, capacity - total_target_minutes),
+        "over_capacity": total_target_minutes > capacity,
+    }
+
+
 async def _seed_insert_project(db_path: str) -> dict[str, str]:
     today = date.today()
     scheduled_day = today + timedelta(days=2)
@@ -365,13 +384,7 @@ async def test_inserted_task_can_make_calendar_over_capacity_without_moving_task
     assert insert_response.status_code == 200, insert_response.text
     assert calendar_response.status_code == 200, calendar_response.text
     assert calendar_response.json()["days"] == [
-        {
-            "date": days["scheduled_day"],
-            "scheduled_task_count": 2,
-            "total_target_minutes": 65,
-            "completed_task_count": 0,
-            "over_capacity": True,
-        }
+        _expected_calendar_day(days["scheduled_day"], scheduled_task_count=2, total_target_minutes=65)
     ]
 
     async with aiosqlite.connect(os.environ["DB_PATH"]) as db:
