@@ -90,6 +90,10 @@ final class LearningAssistantViewModel: ObservableObject {
     @Published var studyViewError: String? = nil
     @Published var studyCalendarLoadError: String? = nil
     @Published var studyRestDaySettings: StudyRestDaySettings? = nil
+    @Published var isStudySmartModeEnabled: Bool = false
+    @Published var studySmartMorningBriefing: StudySmartMorningBriefing? = nil
+    @Published var studySmartProposalOptions: [StudySmartProposalOption] = []
+    @Published var studySmartProposalMessage: String? = nil
     @Published var studyDialogueAdjustmentPreview: StudyDialogueAdjustmentPreview? = nil
     @Published var studyDialogueAdjustmentResult: StudyDialogueAdjustmentApplyResult? = nil
     @Published var studyPlanAdjustmentError: String? = nil
@@ -97,6 +101,7 @@ final class LearningAssistantViewModel: ObservableObject {
     @Published var isFetchingBriefing = false
     @Published var isFetchingStudyCalendarLoad = false
     @Published var isAdjustingStudyPlan = false
+    @Published var isApplyingStudySmartProposal = false
     @Published var isSendingMessage   = false
     @Published var isIngesting        = false
     @Published var isStartingStudyPlan = false
@@ -151,6 +156,7 @@ final class LearningAssistantViewModel: ObservableObject {
     private var dashboardRefreshTail: Task<Void, Never>?
     private var dashboardRefreshSequence = 0
     private var studyCalendarLoadRequestSequence = 0
+    private var studySmartProposalContexts: [String: StudySmartRedState] = [:]
 
     // MARK: - Init
 
@@ -252,25 +258,8 @@ final class LearningAssistantViewModel: ObservableObject {
         isFetchingBriefing = true
         defer { isFetchingBriefing = false }
         do {
-            async let todayViewRequest = api.fetchStudyTodayView()
-            async let projectOverviewRequest = api.fetchStudyProjectOverview()
-            async let resourcesRequest = api.fetchResources()
-            let (todayView, projectOverview, fetchedResources) = try await (
-                todayViewRequest,
-                projectOverviewRequest,
-                resourcesRequest
-            )
-            apply(
-                studyTodayView: todayView,
-                projectOverview: projectOverview,
-                resources: fetchedResources
-            )
-            if resourceRefreshFailureMessage != nil {
-                resourceManagementError = nil
-            }
-            studyViewError = nil
-            isOffline = false
-            isConnecting = false
+            try await refreshDashboardFacts(resourceRefreshFailureMessage: resourceRefreshFailureMessage)
+            await refreshStudySmartModeForDashboard()
         } catch {
             if let resourceRefreshFailureMessage {
                 resourceManagementError = resourceRefreshFailureMessage
@@ -278,6 +267,40 @@ final class LearningAssistantViewModel: ObservableObject {
             studyViewError = "学习视图刷新失败，请稍后重试。"
             isOffline = true
             isConnecting = false
+        }
+    }
+
+    private func refreshDashboardFacts(resourceRefreshFailureMessage: String? = nil) async throws {
+        async let todayViewRequest = api.fetchStudyTodayView()
+        async let projectOverviewRequest = api.fetchStudyProjectOverview()
+        async let resourcesRequest = api.fetchResources()
+        let (todayView, projectOverview, fetchedResources) = try await (
+            todayViewRequest,
+            projectOverviewRequest,
+            resourcesRequest
+        )
+        apply(
+            studyTodayView: todayView,
+            projectOverview: projectOverview,
+            resources: fetchedResources
+        )
+        if resourceRefreshFailureMessage != nil {
+            resourceManagementError = nil
+        }
+        studyViewError = nil
+        isOffline = false
+        isConnecting = false
+    }
+
+    private func refreshDashboardFactsOnly() async -> Bool {
+        do {
+            try await refreshDashboardFacts()
+            return true
+        } catch {
+            studyViewError = "学习视图刷新失败，请稍后重试。"
+            isOffline = true
+            isConnecting = false
+            return false
         }
     }
 
@@ -290,6 +313,97 @@ final class LearningAssistantViewModel: ObservableObject {
             return
         }
         await fetchDashboard()
+    }
+
+    private func refreshStudySmartModeForDashboard() async {
+        do {
+            let settings = try await api.fetchStudySmartModeSettings()
+            isStudySmartModeEnabled = settings.enabled
+            guard settings.enabled else {
+                clearStudySmartModeState()
+                return
+            }
+            let briefing = try await api.fetchStudySmartMorningBriefing()
+            isStudySmartModeEnabled = briefing.enabled
+            guard briefing.enabled else {
+                clearStudySmartModeState()
+                return
+            }
+            studySmartMorningBriefing = briefing
+            studySmartProposalOptions = briefing.options
+            studySmartProposalContexts = [:]
+            studySmartProposalMessage = nil
+        } catch {
+            clearStudySmartModeState()
+        }
+    }
+
+    private func refreshStudySmartModeSetting() async -> Bool {
+        do {
+            let settings = try await api.fetchStudySmartModeSettings()
+            isStudySmartModeEnabled = settings.enabled
+            if !settings.enabled {
+                clearStudySmartModeState()
+            }
+            return settings.enabled
+        } catch {
+            clearStudySmartModeState()
+            return isStudySmartModeEnabled
+        }
+    }
+
+    func ignoreStudySmartProposals() {
+        studySmartProposalOptions = []
+        studySmartProposalContexts = [:]
+        studySmartProposalMessage = nil
+    }
+
+    func applyStudySmartProposal(_ option: StudySmartProposalOption) async {
+        guard !isApplyingStudySmartProposal else { return }
+        guard studySmartProposalOptions.contains(where: { $0.id == option.id }) else {
+            studySmartProposalMessage = "智能建议已过期，请刷新后重试。"
+            return
+        }
+        isApplyingStudySmartProposal = true
+        studySmartProposalMessage = nil
+        defer { isApplyingStudySmartProposal = false }
+
+        do {
+            let context = studySmartProposalContexts[option.id]
+            let result = try await api.applyStudySmartProposal(
+                StudySmartProposalApplyRequest(
+                    proposal: option,
+                    previousExpectedLateProjectIds: context?.expectedLateProjectIds,
+                    previousOverCapacityDates: context?.overCapacityDates
+                )
+            )
+            isOffline = false
+            guard result.status == "applied", result.mutates else {
+                studySmartProposalOptions = []
+                studySmartProposalContexts = [:]
+                if result.status == "disabled" {
+                    isStudySmartModeEnabled = false
+                }
+                studySmartProposalMessage = result.message ?? studySmartProposalStatusMessage(for: result.status)
+                return
+            }
+
+            studySmartProposalOptions = []
+            studySmartProposalContexts = [:]
+            studySmartMorningBriefing = nil
+            studySmartProposalMessage = result.message ?? "智能建议已应用。"
+            if result.refresh?.today == true || result.refresh?.projectOverview == true {
+                guard await refreshDashboardFactsOnly() else { return }
+            }
+            if result.refresh?.calendar == true {
+                await refreshCalendarLoadIfNeeded()
+            }
+            studySmartProposalOptions = []
+            studySmartProposalContexts = [:]
+        } catch {
+            studySmartProposalMessage = "智能建议应用失败，请稍后重试。"
+            isOffline = true
+        }
     }
 
     func fetchTodayBriefing() async {
@@ -427,6 +541,8 @@ final class LearningAssistantViewModel: ObservableObject {
         isAdjustingStudyPlan = true
         studyPlanAdjustmentError = nil
         defer { isAdjustingStudyPlan = false }
+        let previousRedState = currentStudySmartRedState()
+        let smartModeEnabled = await refreshStudySmartModeSetting()
 
         do {
             let result = try await api.applyStudyDialogueAdjustment(
@@ -437,7 +553,10 @@ final class LearningAssistantViewModel: ObservableObject {
             studyDialogueAdjustmentResult = result
             studyDialogueAdjustmentPreview = nil
             isOffline = false
-            await refreshAfterStudyPlanAdjustment()
+            await refreshAfterStudyPlanAdjustment(
+                previousRedState: previousRedState,
+                smartModeEnabled: smartModeEnabled
+            )
         } catch {
             studyPlanAdjustmentError = "调整应用失败，请稍后重试。"
             isOffline = true
@@ -914,9 +1033,88 @@ final class LearningAssistantViewModel: ObservableObject {
         expandedTaskIDs = []
     }
 
-    private func refreshCalendarLoadIfNeeded() async {
-        guard let currentLoad = studyCalendarLoad else { return }
+    private func clearStudySmartModeState() {
+        studySmartMorningBriefing = nil
+        studySmartProposalOptions = []
+        studySmartProposalContexts = [:]
+        studySmartProposalMessage = nil
+    }
+
+    private func studySmartProposalStatusMessage(for status: String) -> String {
+        switch status {
+        case "stale", "stale_proposal":
+            return "智能建议已过期，请刷新后重试。"
+        case "disabled":
+            return "智能模式已关闭，未应用建议。"
+        case "unsupported":
+            return "该智能建议暂不支持应用。"
+        case "noop", "no_op":
+            return "没有需要应用的变更。"
+        default:
+            return "智能建议未应用。"
+        }
+    }
+
+    private struct StudySmartRedState {
+        let expectedLateProjectIds: [Int]
+        let overCapacityDates: [String]
+    }
+
+    private func currentStudySmartRedState() -> StudySmartRedState {
+        StudySmartRedState(
+            expectedLateProjectIds: studyProjectOverview?.activeProjects
+                .filter(\.expectedLate)
+                .map(\.id)
+                .sorted() ?? [],
+            overCapacityDates: studyCalendarLoad?.days
+                .filter(\.overCapacity)
+                .map(\.date)
+                .sorted() ?? []
+        )
+    }
+
+    private func generateAfterAdjustmentProposalsIfNeeded(previousRedState: StudySmartRedState) async {
+        let refreshedRedState = currentStudySmartRedState()
+        let previousExpectedLateProjectIds = Set(previousRedState.expectedLateProjectIds)
+        let previousOverCapacityDates = Set(previousRedState.overCapacityDates)
+        let newExpectedLateProjectIds = refreshedRedState.expectedLateProjectIds.filter {
+            !previousExpectedLateProjectIds.contains($0)
+        }
+        let newOverCapacityDates = refreshedRedState.overCapacityDates.filter {
+            !previousOverCapacityDates.contains($0)
+        }
+        guard !newExpectedLateProjectIds.isEmpty || !newOverCapacityDates.isEmpty else { return }
+
+        do {
+            let response = try await api.generateStudySmartProposals(
+                StudySmartProposalGenerationRequest(
+                    trigger: .afterAdjustment,
+                    previousExpectedLateProjectIds: previousRedState.expectedLateProjectIds,
+                    previousOverCapacityDates: previousRedState.overCapacityDates
+                )
+            )
+            isStudySmartModeEnabled = response.enabled
+            guard response.enabled else {
+                clearStudySmartModeState()
+                return
+            }
+            studySmartProposalOptions = response.options
+            studySmartProposalContexts = Dictionary(
+                uniqueKeysWithValues: response.options.map { ($0.id, previousRedState) }
+            )
+            studySmartProposalMessage = response.message
+            isOffline = false
+        } catch {
+            studySmartProposalMessage = "智能建议生成失败，请稍后重试。"
+            isOffline = true
+        }
+    }
+
+    @discardableResult
+    private func refreshCalendarLoadIfNeeded() async -> Bool {
+        guard let currentLoad = studyCalendarLoad else { return true }
         await fetchStudyCalendarLoad(start: currentLoad.startDate, end: currentLoad.endDate)
+        return studyCalendarLoadError == nil
     }
 
     private func performStudyPlanAdjustment(_ action: () async throws -> Void) async {
@@ -924,20 +1122,34 @@ final class LearningAssistantViewModel: ObservableObject {
         isAdjustingStudyPlan = true
         studyPlanAdjustmentError = nil
         defer { isAdjustingStudyPlan = false }
+        let previousRedState = currentStudySmartRedState()
+        let smartModeEnabled = await refreshStudySmartModeSetting()
 
         do {
             try await action()
             isOffline = false
-            await refreshAfterStudyPlanAdjustment()
+            await refreshAfterStudyPlanAdjustment(
+                previousRedState: previousRedState,
+                smartModeEnabled: smartModeEnabled
+            )
         } catch {
             studyPlanAdjustmentError = "学习计划调整失败，请稍后重试。"
             isOffline = true
         }
     }
 
-    private func refreshAfterStudyPlanAdjustment() async {
-        await fetchDashboard()
-        await refreshCalendarLoadIfNeeded()
+    private func refreshAfterStudyPlanAdjustment(
+        previousRedState: StudySmartRedState,
+        smartModeEnabled: Bool
+    ) async {
+        studySmartProposalOptions = []
+        studySmartProposalMessage = nil
+        studySmartMorningBriefing = nil
+        studySmartProposalContexts = [:]
+        guard await refreshDashboardFactsOnly() else { return }
+        guard await refreshCalendarLoadIfNeeded() else { return }
+        guard smartModeEnabled else { return }
+        await generateAfterAdjustmentProposalsIfNeeded(previousRedState: previousRedState)
     }
 
     private func factualTodayHighlights(taskCount: Int, totalMinutes: Int) -> String {

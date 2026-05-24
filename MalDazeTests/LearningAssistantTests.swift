@@ -3659,6 +3659,512 @@ final class LearningAssistantViewModelTests: XCTestCase {
         XCTAssertNil(vm.studyPlanAdjustmentError)
     }
 
+    // MARK: 6.3 Study Smart Mode ViewModel
+
+    func testDashboardDefaultSmartModeRemainsSilentAndDoesNotTouchLegacyProposalState() async {
+        let mock = MockAssistantAPIClient()
+        mock.studySmartModeSettingsResult = StudySmartModeSettings(enabled: false)
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        vm.chatMessages = [ChatMessage(role: .assistant, text: "legacy")]
+        vm.currentProposal = "legacy proposal"
+
+        await vm.fetchDashboard()
+
+        XCTAssertEqual(mock.fetchStudySmartModeSettingsCallCount, 1)
+        XCTAssertEqual(mock.fetchStudySmartMorningBriefingCallCount, 0)
+        XCTAssertEqual(mock.generateStudySmartProposalsCallCount, 0)
+        XCTAssertEqual(mock.fetchBriefingCallCount, 0)
+        XCTAssertFalse(vm.isStudySmartModeEnabled)
+        XCTAssertNil(vm.studySmartMorningBriefing)
+        XCTAssertTrue(vm.studySmartProposalOptions.isEmpty)
+        XCTAssertEqual(vm.chatMessages.map(\.text), ["legacy"])
+        XCTAssertEqual(vm.currentProposal, "legacy proposal")
+    }
+
+    func testDashboardEnabledSmartModeFetchesMorningBriefingAndStoresProposalOptions() async {
+        let mock = MockAssistantAPIClient()
+        mock.studySmartModeSettingsResult = StudySmartModeSettings(enabled: true)
+        mock.studySmartMorningBriefingResult = sampleStudySmartMorningBriefing()
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        vm.studySmartProposalMessage = "old proposal status"
+
+        await vm.fetchDashboard()
+
+        XCTAssertEqual(mock.fetchStudySmartModeSettingsCallCount, 1)
+        XCTAssertEqual(mock.fetchStudySmartMorningBriefingCallCount, 1)
+        XCTAssertEqual(mock.generateStudySmartProposalsCallCount, 0)
+        XCTAssertEqual(mock.fetchBriefingCallCount, 0)
+        XCTAssertEqual(mock.sendMessageCallCount, 0)
+        XCTAssertEqual(mock.confirmChatCallCount, 0)
+        XCTAssertTrue(vm.isStudySmartModeEnabled)
+        XCTAssertEqual(vm.studySmartMorningBriefing?.summary, "One study-plan issue needs attention.")
+        XCTAssertEqual(vm.studySmartProposalOptions.map(\.id), ["morning-extend-deadline-7"])
+        XCTAssertNil(vm.studySmartProposalMessage)
+        XCTAssertTrue(vm.chatMessages.isEmpty)
+        XCTAssertNil(vm.currentProposal)
+    }
+
+    func testIgnoreStudySmartProposalsClearsOptionsWithoutMutationOrLegacyChat() async {
+        let mock = MockAssistantAPIClient()
+        mock.studySmartModeSettingsResult = StudySmartModeSettings(enabled: true)
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        await vm.fetchDashboard()
+
+        vm.ignoreStudySmartProposals()
+
+        XCTAssertTrue(vm.studySmartProposalOptions.isEmpty)
+        XCTAssertEqual(mock.applyStudySmartProposalCallCount, 0)
+        XCTAssertEqual(mock.sendMessageCallCount, 0)
+        XCTAssertEqual(mock.confirmChatCallCount, 0)
+        XCTAssertTrue(vm.chatMessages.isEmpty)
+        XCTAssertNil(vm.currentProposal)
+    }
+
+    func testApplySelectedStudySmartProposalUsesSelectedOptionAndRefreshesFactsAndLoadedCalendar() async {
+        let mock = MockAssistantAPIClient()
+        mock.studySmartModeSettingsResult = StudySmartModeSettings(enabled: true)
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        await vm.fetchDashboard()
+        await vm.fetchStudyCalendarLoad(start: "2026-06-01", end: "2026-06-07")
+        let option = try! XCTUnwrap(vm.studySmartProposalOptions.first)
+
+        await vm.applyStudySmartProposal(option)
+
+        XCTAssertEqual(mock.applyStudySmartProposalCallCount, 1)
+        XCTAssertEqual(mock.lastStudySmartProposalApplyRequest?.proposal.id, option.id)
+        XCTAssertEqual(mock.fetchStudyTodayViewCallCount, 2)
+        XCTAssertEqual(mock.fetchStudyProjectOverviewCallCount, 2)
+        XCTAssertEqual(mock.fetchResourcesCallCount, 2)
+        XCTAssertEqual(mock.fetchStudyCalendarLoadCallCount, 2)
+        XCTAssertTrue(vm.studySmartProposalOptions.isEmpty)
+        XCTAssertEqual(vm.studySmartProposalMessage, "智能建议已应用。")
+        XCTAssertEqual(mock.sendMessageCallCount, 0)
+        XCTAssertEqual(mock.confirmChatCallCount, 0)
+        XCTAssertTrue(vm.chatMessages.isEmpty)
+        XCTAssertNil(vm.currentProposal)
+    }
+
+    func testApplyStudySmartProposalDashboardRefreshFailureDoesNotProceedToCalendarOrMaskOffline() async {
+        let mock = MockAssistantAPIClient()
+        mock.studySmartModeSettingsResult = StudySmartModeSettings(enabled: true)
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        await vm.fetchDashboard()
+        await vm.fetchStudyCalendarLoad(start: "2026-06-01", end: "2026-06-07")
+        let calendarCallsBeforeApply = mock.fetchStudyCalendarLoadCallCount
+        let option = try! XCTUnwrap(vm.studySmartProposalOptions.first)
+        mock.shouldThrowResources = true
+
+        await vm.applyStudySmartProposal(option)
+
+        XCTAssertEqual(mock.applyStudySmartProposalCallCount, 1)
+        XCTAssertEqual(mock.fetchStudyTodayViewCallCount, 2)
+        XCTAssertEqual(mock.fetchStudyProjectOverviewCallCount, 2)
+        XCTAssertEqual(mock.fetchResourcesCallCount, 2)
+        XCTAssertEqual(mock.fetchStudyCalendarLoadCallCount, calendarCallsBeforeApply)
+        XCTAssertTrue(vm.isOffline)
+        XCTAssertEqual(vm.studyViewError, "学习视图刷新失败，请稍后重试。")
+    }
+
+    func testStaleStudySmartProposalApplyClearsOptionsWithoutRefreshingOrMutatingLegacyChat() async {
+        let mock = MockAssistantAPIClient()
+        mock.studySmartProposalApplyResult = StudySmartProposalApplyResult(
+            status: "stale_proposal",
+            source: "smart_mode_apply",
+            proposalId: "morning-extend-deadline-7",
+            signature: "abc123",
+            trigger: .morning,
+            command: nil,
+            affectedProjectIds: nil,
+            affectedTaskIds: nil,
+            appliedChanges: nil,
+            mutates: false,
+            refresh: StudyRefreshContract(today: true, projectOverview: true, calendar: true),
+            message: nil
+        )
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        let option = sampleStudySmartProposalOption()
+        vm.studySmartProposalOptions = [option]
+
+        await vm.applyStudySmartProposal(option)
+
+        XCTAssertEqual(mock.applyStudySmartProposalCallCount, 1)
+        XCTAssertEqual(mock.fetchStudyTodayViewCallCount, 0)
+        XCTAssertEqual(mock.fetchStudyProjectOverviewCallCount, 0)
+        XCTAssertEqual(mock.fetchResourcesCallCount, 0)
+        XCTAssertEqual(mock.fetchStudyCalendarLoadCallCount, 0)
+        XCTAssertTrue(vm.studySmartProposalOptions.isEmpty)
+        XCTAssertEqual(vm.studySmartProposalMessage, "智能建议已过期，请刷新后重试。")
+        XCTAssertTrue(vm.chatMessages.isEmpty)
+        XCTAssertNil(vm.currentProposal)
+    }
+
+    func testManualAdjustmentCreatesExpectedLateOrOverCapacityRedStateGeneratesAfterAdjustmentProposals() async {
+        let mock = MockAssistantAPIClient()
+        mock.studySmartModeSettingsResult = StudySmartModeSettings(enabled: true)
+        mock.studyProjectOverviewResult = sampleStudyProjectOverview(activeProjects: [
+            sampleStudyProjectSummaryJSON(
+                id: 7,
+                title: "Before",
+                completedUnits: 1,
+                totalUnits: 4,
+                progressRatio: 0.25,
+                status: "active",
+                expectedLate: false
+            )
+        ])
+        mock.studyCalendarLoadResult = sampleStudyCalendarLoad(start: "2026-06-01", end: "2026-06-07")
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        await vm.fetchDashboard()
+        await vm.fetchStudyCalendarLoad(start: "2026-06-01", end: "2026-06-07")
+        mock.studyProjectOverviewResult = sampleStudyProjectOverview(activeProjects: [
+            sampleStudyProjectSummaryJSON(
+                id: 7,
+                title: "After",
+                completedUnits: 1,
+                totalUnits: 4,
+                progressRatio: 0.25,
+                status: "active",
+                expectedLate: true
+            )
+        ])
+        mock.studyCalendarLoadResult = sampleStudyCalendarLoad(
+            start: "2026-06-01",
+            end: "2026-06-07",
+            dayJSON: """
+            {
+                "date": "2026-06-03",
+                "scheduled_task_count": 3,
+                "total_target_minutes": 180,
+                "completed_task_count": 0,
+                "available_capacity_minutes": 75,
+                "over_capacity": true,
+                "rest_day": false
+            }
+            """
+        )
+        mock.studySmartProposalGenerationResult = StudySmartProposalGenerationResponse(
+            enabled: true,
+            trigger: .afterAdjustment,
+            options: [sampleStudySmartProposalOption(trigger: .afterAdjustment)],
+            message: nil
+        )
+
+        await vm.moveStudyTask(id: 42, scheduledDate: "2026-06-03")
+
+        XCTAssertEqual(mock.generateStudySmartProposalsCallCount, 1)
+        XCTAssertEqual(mock.lastStudySmartProposalGenerationRequest?.trigger, .afterAdjustment)
+        XCTAssertEqual(mock.lastStudySmartProposalGenerationRequest?.previousExpectedLateProjectIds, [])
+        XCTAssertEqual(mock.lastStudySmartProposalGenerationRequest?.previousOverCapacityDates, [])
+        XCTAssertEqual(vm.studySmartProposalOptions.map(\.trigger), [.afterAdjustment])
+        XCTAssertEqual(mock.sendMessageCallCount, 0)
+        XCTAssertEqual(mock.confirmChatCallCount, 0)
+        XCTAssertTrue(vm.chatMessages.isEmpty)
+        XCTAssertNil(vm.currentProposal)
+    }
+
+    func testAfterAdjustmentGeneratedProposalApplyIncludesGenerationRedStateContext() async {
+        let mock = MockAssistantAPIClient()
+        mock.studySmartModeSettingsResult = StudySmartModeSettings(enabled: true)
+        mock.studyProjectOverviewResult = sampleStudyProjectOverview(activeProjects: [
+            sampleStudyProjectSummaryJSON(
+                id: 7,
+                title: "Already Late",
+                completedUnits: 1,
+                totalUnits: 4,
+                progressRatio: 0.25,
+                status: "active",
+                expectedLate: true
+            ),
+            sampleStudyProjectSummaryJSON(
+                id: 8,
+                title: "Before",
+                completedUnits: 1,
+                totalUnits: 4,
+                progressRatio: 0.25,
+                status: "active",
+                expectedLate: false
+            )
+        ])
+        mock.studyCalendarLoadResult = sampleStudyCalendarLoad(
+            start: "2026-06-01",
+            end: "2026-06-07",
+            dayJSON: """
+            {
+                "date": "2026-06-02",
+                "scheduled_task_count": 3,
+                "total_target_minutes": 180,
+                "completed_task_count": 0,
+                "available_capacity_minutes": 75,
+                "over_capacity": true,
+                "rest_day": false
+            }
+            """
+        )
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        await vm.fetchDashboard()
+        await vm.fetchStudyCalendarLoad(start: "2026-06-01", end: "2026-06-07")
+        mock.studyProjectOverviewResult = sampleStudyProjectOverview(activeProjects: [
+            sampleStudyProjectSummaryJSON(
+                id: 7,
+                title: "Already Late",
+                completedUnits: 1,
+                totalUnits: 4,
+                progressRatio: 0.25,
+                status: "active",
+                expectedLate: true
+            ),
+            sampleStudyProjectSummaryJSON(
+                id: 8,
+                title: "Newly Late",
+                completedUnits: 1,
+                totalUnits: 4,
+                progressRatio: 0.25,
+                status: "active",
+                expectedLate: true
+            )
+        ])
+        mock.studyCalendarLoadResult = sampleStudyCalendarLoad(
+            start: "2026-06-01",
+            end: "2026-06-07",
+            dayJSON: """
+            {
+                "date": "2026-06-03",
+                "scheduled_task_count": 3,
+                "total_target_minutes": 180,
+                "completed_task_count": 0,
+                "available_capacity_minutes": 75,
+                "over_capacity": true,
+                "rest_day": false
+            }
+            """
+        )
+        mock.studySmartProposalGenerationResult = StudySmartProposalGenerationResponse(
+            enabled: true,
+            trigger: .afterAdjustment,
+            options: [sampleStudySmartProposalOption(trigger: .afterAdjustment)],
+            message: nil
+        )
+        await vm.moveStudyTask(id: 42, scheduledDate: "2026-06-03")
+        let option = try! XCTUnwrap(vm.studySmartProposalOptions.first)
+
+        await vm.applyStudySmartProposal(option)
+
+        XCTAssertEqual(mock.lastStudySmartProposalGenerationRequest?.previousExpectedLateProjectIds, [7])
+        XCTAssertEqual(mock.lastStudySmartProposalGenerationRequest?.previousOverCapacityDates, ["2026-06-02"])
+        XCTAssertEqual(mock.lastStudySmartProposalApplyRequest?.proposal.id, option.id)
+        XCTAssertEqual(mock.lastStudySmartProposalApplyRequest?.previousExpectedLateProjectIds, [7])
+        XCTAssertEqual(mock.lastStudySmartProposalApplyRequest?.previousOverCapacityDates, ["2026-06-02"])
+        XCTAssertEqual(mock.sendMessageCallCount, 0)
+        XCTAssertEqual(mock.confirmChatCallCount, 0)
+    }
+
+    func testSubsequentNonRedAdjustmentClearsAfterAdjustmentContextAndRejectsOldOptionApply() async {
+        let mock = MockAssistantAPIClient()
+        mock.studySmartModeSettingsResult = StudySmartModeSettings(enabled: true)
+        mock.studyProjectOverviewResult = sampleStudyProjectOverview(activeProjects: [
+            sampleStudyProjectSummaryJSON(
+                id: 7,
+                title: "Already Late",
+                completedUnits: 1,
+                totalUnits: 4,
+                progressRatio: 0.25,
+                status: "active",
+                expectedLate: true
+            ),
+            sampleStudyProjectSummaryJSON(
+                id: 8,
+                title: "Before",
+                completedUnits: 1,
+                totalUnits: 4,
+                progressRatio: 0.25,
+                status: "active",
+                expectedLate: false
+            )
+        ])
+        mock.studyCalendarLoadResult = sampleStudyCalendarLoad(
+            start: "2026-06-01",
+            end: "2026-06-07",
+            dayJSON: """
+            {
+                "date": "2026-06-02",
+                "scheduled_task_count": 3,
+                "total_target_minutes": 180,
+                "completed_task_count": 0,
+                "available_capacity_minutes": 75,
+                "over_capacity": true,
+                "rest_day": false
+            }
+            """
+        )
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        await vm.fetchDashboard()
+        await vm.fetchStudyCalendarLoad(start: "2026-06-01", end: "2026-06-07")
+        mock.studyProjectOverviewResult = sampleStudyProjectOverview(activeProjects: [
+            sampleStudyProjectSummaryJSON(
+                id: 7,
+                title: "Already Late",
+                completedUnits: 1,
+                totalUnits: 4,
+                progressRatio: 0.25,
+                status: "active",
+                expectedLate: true
+            ),
+            sampleStudyProjectSummaryJSON(
+                id: 8,
+                title: "Newly Late",
+                completedUnits: 1,
+                totalUnits: 4,
+                progressRatio: 0.25,
+                status: "active",
+                expectedLate: true
+            )
+        ])
+        mock.studySmartProposalGenerationResult = StudySmartProposalGenerationResponse(
+            enabled: true,
+            trigger: .afterAdjustment,
+            options: [sampleStudySmartProposalOption(trigger: .afterAdjustment)],
+            message: nil
+        )
+        await vm.moveStudyTask(id: 42, scheduledDate: "2026-06-03")
+        let oldOption = try! XCTUnwrap(vm.studySmartProposalOptions.first)
+
+        mock.studyProjectOverviewResult = sampleStudyProjectOverview(activeProjects: [
+            sampleStudyProjectSummaryJSON(
+                id: 7,
+                title: "Still Late",
+                completedUnits: 1,
+                totalUnits: 4,
+                progressRatio: 0.25,
+                status: "active",
+                expectedLate: true
+            ),
+            sampleStudyProjectSummaryJSON(
+                id: 8,
+                title: "Still Late",
+                completedUnits: 1,
+                totalUnits: 4,
+                progressRatio: 0.25,
+                status: "active",
+                expectedLate: true
+            )
+        ])
+        mock.studyCalendarLoadResult = sampleStudyCalendarLoad(
+            start: "2026-06-01",
+            end: "2026-06-07",
+            dayJSON: """
+            {
+                "date": "2026-06-02",
+                "scheduled_task_count": 3,
+                "total_target_minutes": 180,
+                "completed_task_count": 0,
+                "available_capacity_minutes": 75,
+                "over_capacity": true,
+                "rest_day": false
+            }
+            """
+        )
+
+        await vm.moveStudyTask(id: 42, scheduledDate: "2026-06-04")
+        await vm.applyStudySmartProposal(oldOption)
+
+        XCTAssertTrue(vm.studySmartProposalOptions.isEmpty)
+        XCTAssertEqual(mock.generateStudySmartProposalsCallCount, 1)
+        XCTAssertEqual(mock.applyStudySmartProposalCallCount, 0)
+        XCTAssertNil(mock.lastStudySmartProposalApplyRequest)
+    }
+
+    func testManualAdjustmentFactsRefreshFailureDoesNotGenerateAfterAdjustmentProposalsOrMaskOffline() async {
+        let mock = MockAssistantAPIClient()
+        mock.studySmartModeSettingsResult = StudySmartModeSettings(enabled: true)
+        mock.studyProjectOverviewResult = sampleStudyProjectOverview(activeProjects: [
+            sampleStudyProjectSummaryJSON(
+                id: 7,
+                title: "Before",
+                completedUnits: 1,
+                totalUnits: 4,
+                progressRatio: 0.25,
+                status: "active",
+                expectedLate: false
+            )
+        ])
+        mock.studyCalendarLoadResult = sampleStudyCalendarLoad(start: "2026-06-01", end: "2026-06-07")
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        await vm.fetchDashboard()
+        await vm.fetchStudyCalendarLoad(start: "2026-06-01", end: "2026-06-07")
+        mock.shouldThrowResources = true
+        mock.studyProjectOverviewResult = sampleStudyProjectOverview(activeProjects: [
+            sampleStudyProjectSummaryJSON(
+                id: 7,
+                title: "After",
+                completedUnits: 1,
+                totalUnits: 4,
+                progressRatio: 0.25,
+                status: "active",
+                expectedLate: true
+            )
+        ])
+        mock.studyCalendarLoadResult = sampleStudyCalendarLoad(
+            start: "2026-06-01",
+            end: "2026-06-07",
+            dayJSON: """
+            {
+                "date": "2026-06-03",
+                "scheduled_task_count": 3,
+                "total_target_minutes": 180,
+                "completed_task_count": 0,
+                "available_capacity_minutes": 75,
+                "over_capacity": true,
+                "rest_day": false
+            }
+            """
+        )
+
+        await vm.moveStudyTask(id: 42, scheduledDate: "2026-06-03")
+
+        XCTAssertEqual(mock.generateStudySmartProposalsCallCount, 0)
+        XCTAssertTrue(vm.studySmartProposalOptions.isEmpty)
+        XCTAssertTrue(vm.isOffline)
+        XCTAssertEqual(vm.studyViewError, "学习视图刷新失败，请稍后重试。")
+    }
+
+    func testManualAdjustmentWithLagOnlyDoesNotGenerateAfterAdjustmentProposals() async {
+        let mock = MockAssistantAPIClient()
+        mock.studySmartModeSettingsResult = StudySmartModeSettings(enabled: true)
+        mock.studyTodayViewResult = sampleStudyTodayView(tasks: [
+            sampleStudyViewTaskJSON(
+                id: 42,
+                title: "Lag only",
+                targetMinutes: 30,
+                projectTitle: "Lag Project",
+                rolledDayCount: 4
+            )
+        ])
+        mock.studyProjectOverviewResult = sampleStudyProjectOverview(activeProjects: [
+            sampleStudyProjectSummaryJSON(
+                id: 7,
+                title: "On Track",
+                completedUnits: 1,
+                totalUnits: 4,
+                progressRatio: 0.25,
+                status: "active",
+                expectedLate: false
+            )
+        ])
+        mock.studyCalendarLoadResult = sampleStudyCalendarLoad(start: "2026-06-01", end: "2026-06-07")
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        await vm.fetchDashboard()
+        await vm.fetchStudyCalendarLoad(start: "2026-06-01", end: "2026-06-07")
+
+        await vm.moveStudyTask(id: 42, scheduledDate: "2026-06-04")
+
+        XCTAssertEqual(mock.generateStudySmartProposalsCallCount, 0)
+        XCTAssertTrue(vm.studySmartProposalOptions.isEmpty)
+        XCTAssertEqual(mock.sendMessageCallCount, 0)
+        XCTAssertEqual(mock.confirmChatCallCount, 0)
+        XCTAssertTrue(vm.chatMessages.isEmpty)
+        XCTAssertNil(vm.currentProposal)
+    }
+
     func testDialoguePreviewStoresTypedPreviewWithoutRefreshingOrMutatingDashboard() async {
         let mock = MockAssistantAPIClient()
         mock.studyDialogueAdjustmentPreviewResult = sampleStudyDialogueAdjustmentPreview(
@@ -4489,7 +4995,9 @@ private func sampleStudyViewTaskJSON(
     completedAt: String? = nil,
     projectTitle: String? = nil,
     resourceTitle: String? = nil,
-    unitTitle: String? = nil
+    unitTitle: String? = nil,
+    rolledDayCount: Int = 0,
+    showRolledBadge: Bool = false
 ) -> String {
     """
     {
@@ -4504,7 +5012,9 @@ private func sampleStudyViewTaskJSON(
         "resource_url": "https://example.com/resource/\(id)",
         "unit_id": 3,
         "unit_title": \(unitTitle.map { "\"\($0)\"" } ?? "null"),
-        "unit_url": "https://example.com/unit/\(id)"
+        "unit_url": "https://example.com/unit/\(id)",
+        "rolled_day_count": \(rolledDayCount),
+        "show_rolled_badge": \(showRolledBadge)
     }
     """
 }
@@ -4669,10 +5179,12 @@ private func sampleStudySmartMorningBriefing() -> StudySmartMorningBriefing {
     )
 }
 
-private func sampleStudySmartProposalOption() -> StudySmartProposalOption {
+private func sampleStudySmartProposalOption(
+    trigger: StudySmartProposalTrigger = .morning
+) -> StudySmartProposalOption {
     StudySmartProposalOption(
-        id: "morning-extend-deadline-7",
-        trigger: .morning,
+        id: trigger == .morning ? "morning-extend-deadline-7" : "after-adjustment-extend-deadline-7",
+        trigger: trigger,
         reason: [
             "type": AnyCodable("expected_late_project"),
             "project_id": AnyCodable(7),
@@ -4685,7 +5197,7 @@ private func sampleStudySmartProposalOption() -> StudySmartProposalOption {
             "status": AnyCodable("preview"),
             "source": AnyCodable("smart_mode_preview"),
             "command": AnyCodable("extend_project_deadline"),
-            "trigger": AnyCodable("morning"),
+            "trigger": AnyCodable(trigger.rawValue),
             "project_id": AnyCodable(7),
             "mutates": AnyCodable(false)
         ],
@@ -4709,7 +5221,7 @@ private func sampleStudySmartProposalOption() -> StudySmartProposalOption {
         signatureVersion: 1,
         signature: "abc123",
         signaturePayload: [
-            "trigger": AnyCodable("morning"),
+            "trigger": AnyCodable(trigger.rawValue),
             "project_id": AnyCodable(7)
         ]
     )
