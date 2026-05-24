@@ -996,6 +996,12 @@ Before implementation, create a checkpoint commit in the current checkout, then 
 - `git diff --check`: PASS.
 - `openspec instructions apply --change introduce-study-plan-adjustment --json`: 37 tasks total, 15 complete, 22 remaining.
 
+### Auto Commit
+
+- Commit: `dd9dce4 feat: add study plan deadline editing`.
+- Scope: verified ITEM-003 project deadline editing through OpenSpec tasks 4.3-4.4.
+- Pre-commit checks: related backend tests, `openspec validate introduce-study-plan-adjustment --strict`, `git diff --check`, Spec Compliance Review plus re-review, and Code Quality Review all passed.
+
 ### Files Added / Changed
 
 - Updated `assistant_backend/src/db/queries.py`.
