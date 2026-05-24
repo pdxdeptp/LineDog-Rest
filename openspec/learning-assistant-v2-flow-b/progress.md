@@ -1046,6 +1046,12 @@ Before implementation, create a checkpoint commit in the current checkout, then 
 - `git diff --check`: PASS.
 - `openspec instructions apply --change introduce-study-plan-adjustment --json`: 37 tasks total, 17 complete, 20 remaining.
 
+### Auto Commit
+
+- Commit: `7ce6dc7 feat: add study plan task insertion`.
+- Scope: verified ITEM-003 manual task insertion through OpenSpec tasks 5.1-5.2.
+- Pre-commit checks: related backend tests, `openspec validate introduce-study-plan-adjustment --strict`, `git diff --check`, Spec Compliance Review plus re-review, and Code Quality Review plus P1 fix re-review all passed.
+
 ### Files Added / Changed
 
 - Updated `assistant_backend/src/db/queries.py`.
