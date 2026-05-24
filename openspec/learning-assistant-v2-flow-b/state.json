@@ -1,16 +1,16 @@
 {
   "phase": "flow-b",
-  "round": 39,
+  "round": 40,
   "current_item": "study-smart-mode",
   "current_change": "introduce-study-smart-mode",
   "current_spec": "study-smart-mode",
   "items_initialized": true,
   "in_progress_step": null,
-  "last_completed_step": "item-004-tasks-5.1-5.2-complete",
-  "last_feature_commit": "5805e6a",
+  "last_completed_step": "item-004-tasks-5.3-5.4-complete",
+  "last_feature_commit": "29cf96e",
   "last_completed_item": "study-plan-adjustment",
   "last_completed_change": "introduce-study-plan-adjustment",
-  "next_step": "start-item-004-opsx-apply-tasks-5.3-5.4",
+  "next_step": "start-item-004-opsx-apply-tasks-6.1-6.2",
   "blocker_reason": null,
-  "updated_at": "2026-05-24T16:00:09Z"
+  "updated_at": "2026-05-24T16:08:16Z"
 }

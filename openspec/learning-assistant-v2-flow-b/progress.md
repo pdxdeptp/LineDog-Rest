@@ -1922,3 +1922,54 @@ Before implementation, create a checkpoint commit in the current checkout, then 
 ### Next Task
 
 - Continue `opsx:apply` for ITEM-004 with tasks 5.3-5.4: stale, disabled, unsupported, missing, and tampered apply rejection tests and implementation, ensuring no mutation when the submitted proposal is no longer current or valid.
+
+## Round 40 · 2026-05-24T16:08:16Z
+
+### ITEM-004 5.3-5.4 Backend Proposal Rejection
+
+- Restored controller and Flow B state: `phase=flow-b`, `current_item=study-smart-mode`, `current_change=introduce-study-smart-mode`.
+- Start status was clean after committing the progress ordering normalization.
+- Current checkout only; no worktree was created or used.
+- `openspec instructions apply --change introduce-study-smart-mode --json` reported 28 tasks, 15 complete, with tasks 5.3-5.4 next.
+
+### Completed
+
+- OpenSpec tasks 5.3 and 5.4 completed:
+  - added failing backend tests for stale proposal rejection after current facts drift;
+  - added disabled smart-mode apply rejection coverage;
+  - added signed unsupported command rejection coverage;
+  - added missing or unrecognized selected proposal rejection coverage;
+  - added tampered preview and `signature_payload` rejection coverage;
+  - implemented explicit supported apply command validation before current option recomputation;
+  - preserved no-mutation semantics for rejected apply requests.
+
+### Review Gates
+
+- Spec Compliance Review: PASS.
+- Code Quality Review: APPROVED.
+- Review notes confirmed no v1 Morning Agent, `/api/today-briefing`, `/api/chat`, `/api/chat/confirm`, or legacy broad proposal state was introduced.
+
+### Verification
+
+- RED/GREEN/REFACTOR evidence recorded in `openspec/learning-assistant-v2-flow-b/evidence/item-004/tdd-backend-smart-proposal-rejection-report.md`.
+- `cd assistant_backend && .venv/bin/python -m pytest tests/test_study_smart_mode_proposals.py -q`: PASS, 23 passed, 2 existing dependency warnings.
+- `cd assistant_backend && .venv/bin/python -m pytest tests/test_study_smart_mode_settings.py tests/test_study_smart_mode_briefing.py tests/test_study_smart_mode_proposals.py tests/test_study_plan_adjustment_dialogue_preview.py tests/test_study_plan_adjustment_dialogue_apply.py -q`: PASS, 52 passed, 2 existing dependency warnings.
+- `openspec validate introduce-study-smart-mode --strict`: PASS.
+- `git diff --check`: PASS.
+
+### Auto Commit
+
+- Commit: `29cf96e`.
+- Scope: verified ITEM-004 backend proposal rejection through OpenSpec tasks 5.3-5.4.
+- Pre-commit checks: focused smart-mode proposal tests, smart-mode setting/briefing tests, related dialogue preview/apply tests, `openspec validate introduce-study-smart-mode --strict`, `git diff --check`, Spec Compliance Review, and Code Quality Review all passed.
+
+### Files Added / Changed
+
+- Updated `assistant_backend/src/routers/study_smart_mode.py`.
+- Updated `assistant_backend/tests/test_study_smart_mode_proposals.py`.
+- Updated `openspec/changes/introduce-study-smart-mode/tasks.md` to mark 5.3 and 5.4 complete.
+- Added `openspec/learning-assistant-v2-flow-b/evidence/item-004/tdd-backend-smart-proposal-rejection-report.md`.
+
+### Next Task
+
+- Continue `opsx:apply` for ITEM-004 with tasks 6.1-6.2: Swift model/client tests and implementation for smart-mode setting, briefing, proposal generation, and proposal apply endpoints.
