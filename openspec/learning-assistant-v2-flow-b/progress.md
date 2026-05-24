@@ -201,6 +201,56 @@
 
 - Continue `opsx:apply` for ITEM-004 with tasks 4.3-4.4: backend after-adjustment proposal trigger tests and implementation, ensuring proposals appear only for newly created expected-late or over-capacity red state and lag alone does not trigger this path.
 
+## Round 38 · 2026-05-24T15:25:46Z
+
+### ITEM-004 4.3-4.4 Backend After-Adjustment Proposal Options
+
+- Restored controller and Flow B state: `phase=flow-b`, `current_item=study-smart-mode`, `current_change=introduce-study-smart-mode`.
+- Start status had only runtime SQLite `learning.db-shm` / `learning.db-wal` noise; these were not staged or committed.
+- Current checkout only; no worktree was created or used.
+
+### Completed
+
+- OpenSpec tasks 4.3 and 4.4 completed:
+  - added failing backend tests for after-adjustment proposals only when newly created expected-late or over-capacity red state exists;
+  - implemented after-adjustment proposal generation from read-only v2 fact snapshots;
+  - kept after-adjustment generation preview-only with `mutates: false`;
+  - ensured lag/rolled-task facts never trigger after-adjustment proposal options;
+  - preserved morning proposal behavior from tasks 4.1 and 4.2;
+  - fixed code-review feedback so partial previous red-state context cannot misclassify missing categories as newly created red state.
+
+### Review Gates
+
+- Spec Compliance Review: PASS.
+- Code Quality Review: initially CHANGES_REQUESTED for partial previous-context false positives.
+- Review fix completed with RED tests for both partial-context directions.
+- Code Quality Re-review: APPROVED.
+
+### Verification
+
+- RED/GREEN/REFACTOR evidence recorded in `openspec/learning-assistant-v2-flow-b/evidence/item-004/tdd-backend-smart-after-adjustment-proposals-report.md`.
+- `cd assistant_backend && .venv/bin/python -m pytest tests/test_study_smart_mode_proposals.py -q`: PASS, 12 passed, 2 existing dependency warnings.
+- `cd assistant_backend && .venv/bin/python -m pytest tests/test_study_smart_mode_settings.py tests/test_study_smart_mode_briefing.py tests/test_study_smart_mode_proposals.py tests/test_study_plan_adjustment_dialogue_preview.py tests/test_study_plan_adjustment_dialogue_apply.py -q`: PASS, 41 passed, 2 existing dependency warnings.
+- `openspec validate introduce-study-smart-mode --strict`: PASS.
+- `git diff --check`: PASS.
+
+### Auto Commit
+
+- Commit: `4d663e4`.
+- Scope: verified ITEM-004 backend after-adjustment proposal generation through OpenSpec tasks 4.3-4.4.
+- Pre-commit checks: focused smart-mode proposal tests, smart-mode setting/briefing tests, related dialogue preview/apply tests, `openspec validate introduce-study-smart-mode --strict`, `git diff --check`, Spec Compliance Review, and Code Quality Re-review all passed.
+
+### Files Added / Changed
+
+- Updated `assistant_backend/src/routers/study_smart_mode.py`.
+- Updated `assistant_backend/tests/test_study_smart_mode_proposals.py`.
+- Updated `openspec/changes/introduce-study-smart-mode/tasks.md` to mark 4.3 and 4.4 complete.
+- Added `openspec/learning-assistant-v2-flow-b/evidence/item-004/tdd-backend-smart-after-adjustment-proposals-report.md`.
+
+### Next Task
+
+- Continue `opsx:apply` for ITEM-004 with tasks 5.1-5.2: backend proposal apply tests and implementation, including refreshed fact recomputation, stable signature comparison, mutation, event evidence, and view refresh contract.
+
 ## Round 01 · 2026-05-23T14:50:55Z
 
 ### Git / Safety
