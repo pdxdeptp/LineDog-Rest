@@ -1342,3 +1342,56 @@ Before implementation, create a checkpoint commit in the current checkout, then 
 ### Next Task
 
 - Continue `opsx:apply` for ITEM-003 with tasks 8.1 and 8.2: Swift model/client support for adjustment endpoints and enriched study-view payloads.
+
+## Round 28 · 2026-05-24T06:49:36Z
+
+### ITEM-003 8.1-8.2 Swift API And Client
+
+- Restored controller state: `phase=flow-b`, `current_item=study-plan-adjustment`.
+- Current checkout only; no worktree was created or used.
+- Created pre-apply checkpoint commit `04ae2db chore: checkpoint flow b after dialogue apply`.
+- Subagent TDD implementation completed OpenSpec tasks 8.1-8.2:
+  - Swift decoding for Today `rolled_day_count` and `show_rolled_badge`;
+  - Swift decoding for Project Overview `expected_late`;
+  - Swift decoding for Calendar `rest_day`, `available_capacity_minutes`, and existing `over_capacity`;
+  - typed request/result models for rollover, manual task move, project deadline edit, task insertion, task deletion, rest-day settings, dialogue preview, and dialogue apply;
+  - concrete `AssistantAPIClient` methods for all adjustment endpoints;
+  - `AssistantAPIClientProtocol` methods with offline defaults for mock/preview compatibility;
+  - typed `StudyDialogueAdjustmentPreview` in dialogue apply request payloads;
+  - no ViewModel, SwiftUI, backend, smart-mode, or LLM behavior was implemented in this slice.
+
+### Review Gates
+
+- Spec Compliance Review: PASS with no Critical, Important, or Minor blockers.
+- Code Quality Review: PASS with no Critical or Important findings.
+- Accepted non-blocking Minor: legacy payload tests already prove backward-compatible decoding, but do not explicitly assert all newly added default values when fields are absent. This is safe for this slice and can be strengthened later if nearby tests change.
+- Worker evidence states the subagent did not edit state/progress files; the controller updated state/progress separately for automation tracking.
+
+### Verification
+
+- RED: `xcodebuild test -project MalDaze.xcodeproj -scheme MalDaze -only-testing:MalDazeTests/LearningAssistantTests -quiet` failed on missing enriched fields, adjustment request/response models, and client methods.
+- GREEN: same focused command passed after minimal Swift API/client implementation.
+- REFACTOR: same focused command passed after protocol formatting cleanup.
+- Independent verification:
+  - `xcodebuild test -project MalDaze.xcodeproj -scheme MalDaze -only-testing:MalDazeTests/LearningAssistantTests -quiet`: PASS.
+  - `openspec validate introduce-study-plan-adjustment --strict`: PASS.
+  - `git diff --check`: PASS.
+  - `openspec instructions apply --change introduce-study-plan-adjustment --json`: 37 tasks total, 29 complete, 8 remaining.
+
+### Auto Commit
+
+- Commit: pending.
+- Scope: verified ITEM-003 Swift API/client through OpenSpec tasks 8.1-8.2.
+- Pre-commit checks: focused Swift `LearningAssistantTests`, `openspec validate introduce-study-plan-adjustment --strict`, `git diff --check`, Spec Compliance Review, and Code Quality Review all passed.
+
+### Files Added / Changed
+
+- Updated `MalDaze/LearningAssistant/AssistantAPIClient.swift`.
+- Updated `MalDaze/LearningAssistant/AssistantAPIClientProtocol.swift`.
+- Updated `MalDazeTests/LearningAssistantTests.swift`.
+- Updated `openspec/changes/introduce-study-plan-adjustment/tasks.md` to mark 8.1 and 8.2 complete.
+- Added `openspec/learning-assistant-v2-flow-b/evidence/item-003/tdd-swift-api-client-report.md`.
+
+### Next Task
+
+- Continue `opsx:apply` for ITEM-003 with tasks 8.3 and 8.4: ViewModel adjustment state and refresh sequencing.

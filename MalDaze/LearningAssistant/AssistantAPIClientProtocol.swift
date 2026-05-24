@@ -7,6 +7,30 @@ protocol AssistantAPIClientProtocol {
     func fetchStudyProjectOverview() async throws -> StudyProjectOverview
     func fetchStudyCalendarLoad(start: String, end: String) async throws -> StudyCalendarLoad
     func completeTask(id: Int, actualMinutes: Int?) async throws -> TaskCompletionResult
+    func rolloverStudyTasks() async throws -> StudyRolloverResult
+    func moveStudyTask(id: Int, scheduledDate: String) async throws -> StudyTaskMoveResult
+    func updateStudyProjectDeadline(
+        projectId: Int,
+        deadline: String
+    ) async throws -> StudyProjectDeadlineUpdateResult
+    func insertStudyProjectTask(
+        projectId: Int,
+        title: String,
+        targetMinutes: Int,
+        scheduledDate: String
+    ) async throws -> StudyTaskInsertResult
+    func deleteStudyTask(id: Int) async throws -> StudyTaskDeleteResult
+    func fetchStudyRestDaySettings() async throws -> StudyRestDaySettings
+    func updateStudyRestDaySettings(_ settings: StudyRestDaySettings) async throws -> StudyRestDaySettingsUpdateResult
+    func previewStudyDialogueAdjustment(
+        instruction: String,
+        projectId: Int?
+    ) async throws -> StudyDialogueAdjustmentPreview
+    func applyStudyDialogueAdjustment(
+        instruction: String,
+        projectId: Int?,
+        preview: StudyDialogueAdjustmentPreview
+    ) async throws -> StudyDialogueAdjustmentApplyResult
     func completeResource(id: Int) async throws
     func archiveResource(id: Int) async throws
     func sendMessage(message: String, threadId: String?) async throws -> ChatResponse
@@ -39,6 +63,54 @@ extension AssistantAPIClientProtocol {
     }
 
     func completeTask(id: Int, actualMinutes: Int?) async throws -> TaskCompletionResult {
+        throw AssistantOfflineError()
+    }
+
+    func rolloverStudyTasks() async throws -> StudyRolloverResult {
+        throw AssistantOfflineError()
+    }
+
+    func moveStudyTask(id: Int, scheduledDate: String) async throws -> StudyTaskMoveResult {
+        throw AssistantOfflineError()
+    }
+
+    func updateStudyProjectDeadline(projectId: Int, deadline: String) async throws -> StudyProjectDeadlineUpdateResult {
+        throw AssistantOfflineError()
+    }
+
+    func insertStudyProjectTask(
+        projectId: Int,
+        title: String,
+        targetMinutes: Int,
+        scheduledDate: String
+    ) async throws -> StudyTaskInsertResult {
+        throw AssistantOfflineError()
+    }
+
+    func deleteStudyTask(id: Int) async throws -> StudyTaskDeleteResult {
+        throw AssistantOfflineError()
+    }
+
+    func fetchStudyRestDaySettings() async throws -> StudyRestDaySettings {
+        throw AssistantOfflineError()
+    }
+
+    func updateStudyRestDaySettings(_ settings: StudyRestDaySettings) async throws -> StudyRestDaySettingsUpdateResult {
+        throw AssistantOfflineError()
+    }
+
+    func previewStudyDialogueAdjustment(
+        instruction: String,
+        projectId: Int?
+    ) async throws -> StudyDialogueAdjustmentPreview {
+        throw AssistantOfflineError()
+    }
+
+    func applyStudyDialogueAdjustment(
+        instruction: String,
+        projectId: Int?,
+        preview: StudyDialogueAdjustmentPreview
+    ) async throws -> StudyDialogueAdjustmentApplyResult {
         throw AssistantOfflineError()
     }
 }

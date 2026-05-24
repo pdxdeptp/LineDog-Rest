@@ -223,6 +223,8 @@ struct StudyViewTask: Codable, Identifiable {
     let unitId: Int?
     let unitTitle: String?
     let unitURL: URL?
+    let rolledDayCount: Int
+    let showRolledBadge: Bool
 
     var isCompleted: Bool { completedAt != nil }
 
@@ -240,6 +242,8 @@ struct StudyViewTask: Codable, Identifiable {
         unitId = try container.decodeIfPresent(Int.self, forKey: .unitId)
         unitTitle = try container.decodeIfPresent(String.self, forKey: .unitTitle)
         unitURL = validWebURL(from: try container.decodeIfPresent(String.self, forKey: .unitURL))
+        rolledDayCount = try container.decodeIfPresent(Int.self, forKey: .rolledDayCount) ?? 0
+        showRolledBadge = try container.decodeIfPresent(Bool.self, forKey: .showRolledBadge) ?? false
     }
 
     func encode(to encoder: Encoder) throws {
@@ -256,6 +260,8 @@ struct StudyViewTask: Codable, Identifiable {
         try container.encodeIfPresent(unitId, forKey: .unitId)
         try container.encodeIfPresent(unitTitle, forKey: .unitTitle)
         try container.encodeIfPresent(unitURL?.absoluteString, forKey: .unitURL)
+        try container.encode(rolledDayCount, forKey: .rolledDayCount)
+        try container.encode(showRolledBadge, forKey: .showRolledBadge)
     }
 
     enum CodingKeys: String, CodingKey {
@@ -270,6 +276,8 @@ struct StudyViewTask: Codable, Identifiable {
         case unitId = "unit_id"
         case unitTitle = "unit_title"
         case unitURL = "unit_url"
+        case rolledDayCount = "rolled_day_count"
+        case showRolledBadge = "show_rolled_badge"
     }
 
 }
@@ -294,6 +302,7 @@ struct StudyProjectSummary: Codable, Identifiable {
     let actualMinutes: Int
     let deadline: String?
     let status: String
+    let expectedLate: Bool
 
     enum CodingKeys: String, CodingKey {
         case id, title, deadline, status
@@ -302,6 +311,35 @@ struct StudyProjectSummary: Codable, Identifiable {
         case progressRatio = "progress_ratio"
         case targetMinutes = "target_minutes"
         case actualMinutes = "actual_minutes"
+        case expectedLate = "expected_late"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(Int.self, forKey: .id)
+        title = try container.decode(String.self, forKey: .title)
+        completedUnits = try container.decode(Int.self, forKey: .completedUnits)
+        totalUnits = try container.decode(Int.self, forKey: .totalUnits)
+        progressRatio = try container.decode(Double.self, forKey: .progressRatio)
+        targetMinutes = try container.decode(Int.self, forKey: .targetMinutes)
+        actualMinutes = try container.decode(Int.self, forKey: .actualMinutes)
+        deadline = try container.decodeIfPresent(String.self, forKey: .deadline)
+        status = try container.decode(String.self, forKey: .status)
+        expectedLate = try container.decodeIfPresent(Bool.self, forKey: .expectedLate) ?? false
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(title, forKey: .title)
+        try container.encode(completedUnits, forKey: .completedUnits)
+        try container.encode(totalUnits, forKey: .totalUnits)
+        try container.encode(progressRatio, forKey: .progressRatio)
+        try container.encode(targetMinutes, forKey: .targetMinutes)
+        try container.encode(actualMinutes, forKey: .actualMinutes)
+        try container.encodeIfPresent(deadline, forKey: .deadline)
+        try container.encode(status, forKey: .status)
+        try container.encode(expectedLate, forKey: .expectedLate)
     }
 }
 
@@ -324,6 +362,8 @@ struct StudyCalendarDay: Codable {
     let scheduledTaskCount: Int
     let totalTargetMinutes: Int
     let completedTaskCount: Int
+    let restDay: Bool
+    let availableCapacityMinutes: Int
     let overCapacity: Bool
 
     enum CodingKeys: String, CodingKey {
@@ -331,7 +371,31 @@ struct StudyCalendarDay: Codable {
         case scheduledTaskCount = "scheduled_task_count"
         case totalTargetMinutes = "total_target_minutes"
         case completedTaskCount = "completed_task_count"
+        case restDay = "rest_day"
+        case availableCapacityMinutes = "available_capacity_minutes"
         case overCapacity = "over_capacity"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        date = try container.decode(String.self, forKey: .date)
+        scheduledTaskCount = try container.decode(Int.self, forKey: .scheduledTaskCount)
+        totalTargetMinutes = try container.decode(Int.self, forKey: .totalTargetMinutes)
+        completedTaskCount = try container.decode(Int.self, forKey: .completedTaskCount)
+        restDay = try container.decodeIfPresent(Bool.self, forKey: .restDay) ?? false
+        availableCapacityMinutes = try container.decodeIfPresent(Int.self, forKey: .availableCapacityMinutes) ?? 0
+        overCapacity = try container.decode(Bool.self, forKey: .overCapacity)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(date, forKey: .date)
+        try container.encode(scheduledTaskCount, forKey: .scheduledTaskCount)
+        try container.encode(totalTargetMinutes, forKey: .totalTargetMinutes)
+        try container.encode(completedTaskCount, forKey: .completedTaskCount)
+        try container.encode(restDay, forKey: .restDay)
+        try container.encode(availableCapacityMinutes, forKey: .availableCapacityMinutes)
+        try container.encode(overCapacity, forKey: .overCapacity)
     }
 }
 
@@ -342,6 +406,270 @@ struct TaskCompletionResult: Codable {
     enum CodingKeys: String, CodingKey {
         case taskId = "task_id"
         case completedAt = "completed_at"
+    }
+}
+
+// MARK: - Study Plan Adjustment Models
+
+struct StudyAdjustmentChange: Codable {
+    let taskId: Int
+    let projectId: Int
+    let oldDate: String
+    let newDate: String
+
+    enum CodingKeys: String, CodingKey {
+        case taskId = "task_id"
+        case projectId = "project_id"
+        case oldDate = "old_date"
+        case newDate = "new_date"
+    }
+}
+
+struct StudyRolloverResult: Codable {
+    let date: String
+    let rolledCount: Int
+    let rolledTasks: [StudyRolloverTask]
+
+    enum CodingKeys: String, CodingKey {
+        case date
+        case rolledCount = "rolled_count"
+        case rolledTasks = "rolled_tasks"
+    }
+}
+
+struct StudyRolloverTask: Codable {
+    let taskId: Int
+    let projectId: Int
+    let oldDate: String
+    let newDate: String
+    let rolledDays: Int
+    let autoRollDays: Int
+
+    enum CodingKeys: String, CodingKey {
+        case taskId = "task_id"
+        case projectId = "project_id"
+        case oldDate = "old_date"
+        case newDate = "new_date"
+        case rolledDays = "rolled_days"
+        case autoRollDays = "auto_roll_days"
+    }
+}
+
+struct StudyTaskMoveRequest: Codable {
+    let scheduledDate: String
+
+    enum CodingKeys: String, CodingKey {
+        case scheduledDate = "scheduled_date"
+    }
+}
+
+struct StudyTaskMoveResult: Codable {
+    let taskId: Int
+    let source: String
+    let affectedCount: Int
+    let changes: [StudyAdjustmentChange]
+
+    enum CodingKeys: String, CodingKey {
+        case taskId = "task_id"
+        case source
+        case affectedCount = "affected_count"
+        case changes
+    }
+}
+
+struct StudyProjectDeadlineUpdateRequest: Codable {
+    let deadline: String
+}
+
+struct StudyProjectDeadlineUpdateResult: Codable {
+    let projectId: Int
+    let oldDeadline: String?
+    let newDeadline: String
+    let source: String
+
+    enum CodingKeys: String, CodingKey {
+        case projectId = "project_id"
+        case oldDeadline = "old_deadline"
+        case newDeadline = "new_deadline"
+        case source
+    }
+}
+
+struct StudyTaskInsertRequest: Codable {
+    let title: String
+    let targetMinutes: Int
+    let scheduledDate: String
+
+    enum CodingKeys: String, CodingKey {
+        case title
+        case targetMinutes = "target_minutes"
+        case scheduledDate = "scheduled_date"
+    }
+}
+
+struct StudyTaskInsertResult: Codable {
+    let projectId: Int
+    let taskId: Int
+    let scheduledDate: String
+    let targetMinutes: Int
+    let title: String
+    let source: String
+
+    enum CodingKeys: String, CodingKey {
+        case projectId = "project_id"
+        case taskId = "task_id"
+        case scheduledDate = "scheduled_date"
+        case targetMinutes = "target_minutes"
+        case title
+        case source
+    }
+}
+
+struct StudyTaskDeleteResult: Codable {
+    let projectId: Int
+    let taskId: Int
+    let scheduledDate: String
+    let source: String
+    let projectCompleted: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case projectId = "project_id"
+        case taskId = "task_id"
+        case scheduledDate = "scheduled_date"
+        case source
+        case projectCompleted = "project_completed"
+    }
+}
+
+struct StudyRestDaySettings: Codable {
+    let weeklyWeekdays: [Int]
+    let oneOffDates: [String]
+
+    enum CodingKeys: String, CodingKey {
+        case weeklyWeekdays = "weekly_weekdays"
+        case oneOffDates = "one_off_dates"
+    }
+}
+
+struct StudyRestDaySettingsUpdateResult: Codable {
+    let weeklyWeekdays: [Int]
+    let oneOffDates: [String]
+    let addedWeeklyWeekdays: [Int]
+    let removedWeeklyWeekdays: [Int]
+    let addedOneOffDates: [String]
+    let removedOneOffDates: [String]
+    let source: String
+
+    enum CodingKeys: String, CodingKey {
+        case weeklyWeekdays = "weekly_weekdays"
+        case oneOffDates = "one_off_dates"
+        case addedWeeklyWeekdays = "added_weekly_weekdays"
+        case removedWeeklyWeekdays = "removed_weekly_weekdays"
+        case addedOneOffDates = "added_one_off_dates"
+        case removedOneOffDates = "removed_one_off_dates"
+        case source
+    }
+}
+
+struct StudyDialogueAdjustmentRequest: Codable {
+    let instruction: String
+    let projectId: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case instruction
+        case projectId = "project_id"
+    }
+}
+
+struct StudyExpectedLateImpact: Codable {
+    let before: Bool
+    let after: Bool
+}
+
+struct StudyOverCapacityImpact: Codable {
+    let beforeDates: [String]
+    let afterDates: [String]
+    let newOverCapacityDates: [String]
+
+    enum CodingKeys: String, CodingKey {
+        case beforeDates = "before_dates"
+        case afterDates = "after_dates"
+        case newOverCapacityDates = "new_over_capacity_dates"
+    }
+}
+
+struct StudyRedStateImpact: Codable {
+    let expectedLate: StudyExpectedLateImpact?
+    let overCapacity: StudyOverCapacityImpact?
+
+    enum CodingKeys: String, CodingKey {
+        case expectedLate = "expected_late"
+        case overCapacity = "over_capacity"
+    }
+}
+
+struct StudyRefreshContract: Codable {
+    let today: Bool
+    let projectOverview: Bool
+    let calendar: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case today
+        case projectOverview = "project_overview"
+        case calendar
+    }
+}
+
+struct StudyDialogueAdjustmentPreview: Codable {
+    let status: String
+    let source: String?
+    let command: String?
+    let projectId: Int?
+    let deltaDays: Int?
+    let affectedTaskIds: [Int]?
+    let changes: [StudyAdjustmentChange]?
+    let redStateImpact: StudyRedStateImpact?
+    let mutates: Bool
+    let message: String?
+
+    enum CodingKeys: String, CodingKey {
+        case status, source, command, changes, mutates, message
+        case projectId = "project_id"
+        case deltaDays = "delta_days"
+        case affectedTaskIds = "affected_task_ids"
+        case redStateImpact = "red_state_impact"
+    }
+}
+
+struct StudyDialogueAdjustmentApplyRequest: Codable {
+    let instruction: String
+    let projectId: Int?
+    let preview: StudyDialogueAdjustmentPreview
+
+    enum CodingKeys: String, CodingKey {
+        case instruction
+        case projectId = "project_id"
+        case preview
+    }
+}
+
+struct StudyDialogueAdjustmentApplyResult: Codable {
+    let status: String
+    let source: String?
+    let command: String?
+    let projectId: Int?
+    let deltaDays: Int?
+    let affectedTaskIds: [Int]?
+    let changes: [StudyAdjustmentChange]?
+    let mutates: Bool
+    let refresh: StudyRefreshContract?
+    let message: String?
+
+    enum CodingKeys: String, CodingKey {
+        case status, source, command, changes, mutates, refresh, message
+        case projectId = "project_id"
+        case deltaDays = "delta_days"
+        case affectedTaskIds = "affected_task_ids"
     }
 }
 
@@ -797,6 +1125,12 @@ final class AssistantAPIClient {
         _ = try await fetch(url: url, method: "PUT", body: bodyData)
     }
 
+    private func delete<T: Decodable>(_ path: String) async throws -> T {
+        let url = requestURL(path: path)
+        let data = try await fetch(url: url, method: "DELETE", body: nil)
+        return try decode(data)
+    }
+
     private func fetch(url: URL, method: String, body: Data?) async throws -> Data {
         var request        = URLRequest(url: url)
         request.httpMethod = method
@@ -863,6 +1197,86 @@ final class AssistantAPIClient {
             enum CodingKeys: String, CodingKey { case actualMinutes = "actual_minutes" }
         }
         return try await post("/api/tasks/\(id)/complete", body: Body(actualMinutes: actualMinutes))
+    }
+
+    func rolloverStudyTasks() async throws -> StudyRolloverResult {
+        try await post(
+            "/api/study-plan-adjustment/rollover",
+            body: EmptyRequestBody()
+        )
+    }
+
+    func moveStudyTask(id: Int, scheduledDate: String) async throws -> StudyTaskMoveResult {
+        try await post(
+            "/api/study-plan-adjustment/tasks/\(id)/move",
+            body: StudyTaskMoveRequest(scheduledDate: scheduledDate)
+        )
+    }
+
+    func updateStudyProjectDeadline(projectId: Int, deadline: String) async throws -> StudyProjectDeadlineUpdateResult {
+        try await post(
+            "/api/study-plan-adjustment/projects/\(projectId)/deadline",
+            body: StudyProjectDeadlineUpdateRequest(deadline: deadline)
+        )
+    }
+
+    func insertStudyProjectTask(
+        projectId: Int,
+        title: String,
+        targetMinutes: Int,
+        scheduledDate: String
+    ) async throws -> StudyTaskInsertResult {
+        try await post(
+            "/api/study-plan-adjustment/projects/\(projectId)/tasks",
+            body: StudyTaskInsertRequest(
+                title: title,
+                targetMinutes: targetMinutes,
+                scheduledDate: scheduledDate
+            )
+        )
+    }
+
+    func deleteStudyTask(id: Int) async throws -> StudyTaskDeleteResult {
+        try await delete("/api/study-plan-adjustment/tasks/\(id)")
+    }
+
+    func fetchStudyRestDaySettings() async throws -> StudyRestDaySettings {
+        try await get("/api/study-plan-adjustment/rest-days")
+    }
+
+    func updateStudyRestDaySettings(_ settings: StudyRestDaySettings) async throws -> StudyRestDaySettingsUpdateResult {
+        try await put(
+            "/api/study-plan-adjustment/rest-days",
+            body: settings
+        )
+    }
+
+    func previewStudyDialogueAdjustment(
+        instruction: String,
+        projectId: Int?
+    ) async throws -> StudyDialogueAdjustmentPreview {
+        try await post(
+            "/api/study-plan-adjustment/dialogue/preview",
+            body: StudyDialogueAdjustmentRequest(
+                instruction: instruction,
+                projectId: projectId
+            )
+        )
+    }
+
+    func applyStudyDialogueAdjustment(
+        instruction: String,
+        projectId: Int?,
+        preview: StudyDialogueAdjustmentPreview
+    ) async throws -> StudyDialogueAdjustmentApplyResult {
+        try await post(
+            "/api/study-plan-adjustment/dialogue/apply",
+            body: StudyDialogueAdjustmentApplyRequest(
+                instruction: instruction,
+                projectId: projectId,
+                preview: preview
+            )
+        )
     }
 
     func completeResource(id: Int) async throws {

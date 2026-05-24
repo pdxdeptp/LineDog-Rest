@@ -48,8 +48,8 @@
 
 ## 8. Swift API And ViewModel
 
-- [ ] 8.1 Write failing Swift model/client tests for adjustment endpoints and enriched study-view payloads.
-- [ ] 8.2 Implement Swift API models, protocol methods, and concrete client calls.
+- [x] 8.1 Write failing Swift model/client tests for adjustment endpoints and enriched study-view payloads.
+- [x] 8.2 Implement Swift API models, protocol methods, and concrete client calls.
 - [ ] 8.3 Write failing ViewModel tests for rollover refresh, manual move cascade refresh, deadline edit, add/delete task, rest-day changes, and dialogue preview/apply state.
 - [ ] 8.4 Implement ViewModel adjustment state and refresh sequencing.
 

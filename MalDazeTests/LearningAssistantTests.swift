@@ -512,6 +512,382 @@ final class AssistantModelDecodingTests: XCTestCase {
         XCTAssertFalse(load.days[1].overCapacity)
     }
 
+    func testStudyViewsDecodeAdjustmentFacts() throws {
+        let todayJSON = """
+        {
+            "date": "2026-06-01",
+            "tasks": [
+                {
+                    "id": 42,
+                    "title": "Rolled task",
+                    "target_minutes": 45,
+                    "completed_at": null,
+                    "project_id": 7,
+                    "project_title": "Swift",
+                    "resource_id": 7,
+                    "resource_title": "Swift",
+                    "resource_url": "https://example.com/swift",
+                    "unit_id": 8,
+                    "unit_title": "Actors",
+                    "unit_url": "https://example.com/actors",
+                    "rolled_day_count": 3,
+                    "show_rolled_badge": true
+                }
+            ]
+        }
+        """
+        let overviewJSON = """
+        {
+            "active_projects": [
+                {
+                    "id": 7,
+                    "title": "Swift",
+                    "completed_units": 1,
+                    "total_units": 4,
+                    "progress_ratio": 0.25,
+                    "target_minutes": 200,
+                    "actual_minutes": 50,
+                    "deadline": "2026-06-03",
+                    "expected_late": true,
+                    "status": "active"
+                }
+            ],
+            "completed_projects": []
+        }
+        """
+        let calendarJSON = """
+        {
+            "start_date": "2026-06-01",
+            "end_date": "2026-06-02",
+            "daily_capacity_minutes": 75,
+            "days": [
+                {
+                    "date": "2026-06-01",
+                    "scheduled_task_count": 2,
+                    "total_target_minutes": 90,
+                    "completed_task_count": 0,
+                    "rest_day": true,
+                    "available_capacity_minutes": 0,
+                    "over_capacity": true
+                }
+            ]
+        }
+        """
+
+        let today = try decode(StudyTodayView.self, from: todayJSON)
+        let overview = try decode(StudyProjectOverview.self, from: overviewJSON)
+        let calendar = try decode(StudyCalendarLoad.self, from: calendarJSON)
+
+        XCTAssertEqual(today.tasks.first?.rolledDayCount, 3)
+        XCTAssertEqual(today.tasks.first?.showRolledBadge, true)
+        XCTAssertEqual(overview.activeProjects.first?.expectedLate, true)
+        XCTAssertEqual(calendar.days.first?.restDay, true)
+        XCTAssertEqual(calendar.days.first?.availableCapacityMinutes, 0)
+        XCTAssertEqual(calendar.days.first?.overCapacity, true)
+    }
+
+    func testStudyPlanAdjustmentRequestBodiesEncodeSnakeCaseFields() throws {
+        let move = StudyTaskMoveRequest(scheduledDate: "2026-06-05")
+        let deadline = StudyProjectDeadlineUpdateRequest(deadline: "2026-06-30")
+        let insert = StudyTaskInsertRequest(
+            title: "Practice actors",
+            targetMinutes: 40,
+            scheduledDate: "2026-06-06"
+        )
+        let restDays = StudyRestDaySettings(
+            weeklyWeekdays: [5, 6],
+            oneOffDates: ["2026-06-10"]
+        )
+        let dialogue = StudyDialogueAdjustmentRequest(
+            instruction: "push this project by one week",
+            projectId: 7
+        )
+
+        let movePayload = try jsonDictionary(from: move)
+        XCTAssertEqual(movePayload["scheduled_date"] as? String, "2026-06-05")
+        XCTAssertNil(movePayload["scheduledDate"])
+
+        let deadlinePayload = try jsonDictionary(from: deadline)
+        XCTAssertEqual(deadlinePayload["deadline"] as? String, "2026-06-30")
+
+        let insertPayload = try jsonDictionary(from: insert)
+        XCTAssertEqual(insertPayload["title"] as? String, "Practice actors")
+        XCTAssertEqual(insertPayload["target_minutes"] as? Int, 40)
+        XCTAssertEqual(insertPayload["scheduled_date"] as? String, "2026-06-06")
+        XCTAssertNil(insertPayload["targetMinutes"])
+        XCTAssertNil(insertPayload["scheduledDate"])
+
+        let restPayload = try jsonDictionary(from: restDays)
+        XCTAssertEqual(restPayload["weekly_weekdays"] as? [Int], [5, 6])
+        XCTAssertEqual(restPayload["one_off_dates"] as? [String], ["2026-06-10"])
+
+        let dialoguePayload = try jsonDictionary(from: dialogue)
+        XCTAssertEqual(dialoguePayload["instruction"] as? String, "push this project by one week")
+        XCTAssertEqual(dialoguePayload["project_id"] as? Int, 7)
+        XCTAssertNil(dialoguePayload["projectId"])
+    }
+
+    func testStudyPlanAdjustmentResultsDecodeBackendPayloads() throws {
+        let rolloverJSON = """
+        {
+            "date": "2026-06-01",
+            "rolled_count": 1,
+            "rolled_tasks": [
+                {
+                    "task_id": 42,
+                    "project_id": 7,
+                    "old_date": "2026-05-29",
+                    "new_date": "2026-06-01",
+                    "rolled_days": 3,
+                    "auto_roll_days": 5
+                }
+            ]
+        }
+        """
+        let moveJSON = """
+        {
+            "task_id": 42,
+            "source": "manual_move",
+            "affected_count": 2,
+            "changes": [
+                {"task_id": 42, "project_id": 7, "old_date": "2026-06-01", "new_date": "2026-06-03"},
+                {"task_id": 43, "project_id": 7, "old_date": "2026-06-02", "new_date": "2026-06-04"}
+            ]
+        }
+        """
+        let restUpdateJSON = """
+        {
+            "weekly_weekdays": [5],
+            "one_off_dates": ["2026-06-10"],
+            "added_weekly_weekdays": [5],
+            "removed_weekly_weekdays": [],
+            "added_one_off_dates": ["2026-06-10"],
+            "removed_one_off_dates": [],
+            "source": "manual_rest_day_settings"
+        }
+        """
+        let previewJSON = """
+        {
+            "status": "preview",
+            "source": "dialogue_preview",
+            "command": "project_shift",
+            "project_id": 7,
+            "delta_days": 7,
+            "affected_task_ids": [42, 43],
+            "changes": [
+                {"task_id": 42, "project_id": 7, "old_date": "2026-06-01", "new_date": "2026-06-08"}
+            ],
+            "red_state_impact": {
+                "expected_late": {"before": false, "after": true},
+                "over_capacity": {
+                    "before_dates": [],
+                    "after_dates": ["2026-06-08"],
+                    "new_over_capacity_dates": ["2026-06-08"]
+                }
+            },
+            "mutates": false
+        }
+        """
+        let applyJSON = """
+        {
+            "status": "applied",
+            "source": "dialogue_apply",
+            "command": "project_shift",
+            "project_id": 7,
+            "delta_days": 7,
+            "affected_task_ids": [42],
+            "changes": [
+                {"task_id": 42, "project_id": 7, "old_date": "2026-06-01", "new_date": "2026-06-08"}
+            ],
+            "mutates": true,
+            "refresh": {"today": true, "project_overview": true, "calendar": true}
+        }
+        """
+
+        let rollover = try decode(StudyRolloverResult.self, from: rolloverJSON)
+        let move = try decode(StudyTaskMoveResult.self, from: moveJSON)
+        let restUpdate = try decode(StudyRestDaySettingsUpdateResult.self, from: restUpdateJSON)
+        let preview = try decode(StudyDialogueAdjustmentPreview.self, from: previewJSON)
+        let apply = try decode(StudyDialogueAdjustmentApplyResult.self, from: applyJSON)
+
+        XCTAssertEqual(rollover.rolledCount, 1)
+        XCTAssertEqual(rollover.rolledTasks.first?.autoRollDays, 5)
+        XCTAssertEqual(move.source, "manual_move")
+        XCTAssertEqual(move.changes.map(\.newDate), ["2026-06-03", "2026-06-04"])
+        XCTAssertEqual(restUpdate.addedOneOffDates, ["2026-06-10"])
+        XCTAssertEqual(preview.redStateImpact?.expectedLate?.after, true)
+        XCTAssertEqual(preview.redStateImpact?.overCapacity?.newOverCapacityDates, ["2026-06-08"])
+        XCTAssertEqual(apply.refresh?.projectOverview, true)
+    }
+
+    func testDialogueApplyRequestEncodesTypedPreviewObject() throws {
+        let preview = StudyDialogueAdjustmentPreview(
+            status: "preview",
+            source: "dialogue_preview",
+            command: "project_shift",
+            projectId: 7,
+            deltaDays: 7,
+            affectedTaskIds: [42],
+            changes: [
+                StudyAdjustmentChange(
+                    taskId: 42,
+                    projectId: 7,
+                    oldDate: "2026-06-01",
+                    newDate: "2026-06-08"
+                )
+            ],
+            redStateImpact: StudyRedStateImpact(
+                expectedLate: StudyExpectedLateImpact(before: false, after: true),
+                overCapacity: StudyOverCapacityImpact(
+                    beforeDates: [],
+                    afterDates: ["2026-06-08"],
+                    newOverCapacityDates: ["2026-06-08"]
+                )
+            ),
+            mutates: false,
+            message: nil
+        )
+        let request = StudyDialogueAdjustmentApplyRequest(
+            instruction: "push this project by one week",
+            projectId: 7,
+            preview: preview
+        )
+
+        let payload = try jsonDictionary(from: request)
+        let encodedPreview = try XCTUnwrap(payload["preview"] as? [String: Any])
+        let redStateImpact = try XCTUnwrap(encodedPreview["red_state_impact"] as? [String: Any])
+        let expectedLate = try XCTUnwrap(redStateImpact["expected_late"] as? [String: Any])
+        let overCapacity = try XCTUnwrap(redStateImpact["over_capacity"] as? [String: Any])
+
+        XCTAssertEqual(payload["instruction"] as? String, "push this project by one week")
+        XCTAssertEqual(payload["project_id"] as? Int, 7)
+        XCTAssertEqual(encodedPreview["command"] as? String, "project_shift")
+        XCTAssertEqual(expectedLate["after"] as? Bool, true)
+        XCTAssertEqual(overCapacity["new_over_capacity_dates"] as? [String], ["2026-06-08"])
+    }
+
+    func testStudyPlanAdjustmentClientRequestsUseExpectedMethodsPathsAndBodies() async throws {
+        let rolloverClient = makeRecordingClient(responseBody: """
+        {"date":"2026-06-01","rolled_count":0,"rolled_tasks":[]}
+        """)
+        _ = try await rolloverClient.rolloverStudyTasks()
+        var request = try XCTUnwrap(URLProtocolBackedAPIClientTests.lastRequest)
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertEqual(request.url?.path, "/api/study-plan-adjustment/rollover")
+
+        let moveClient = makeRecordingClient(responseBody: """
+        {"task_id":42,"source":"manual_move","affected_count":1,"changes":[{"task_id":42,"project_id":7,"old_date":"2026-06-01","new_date":"2026-06-05"}]}
+        """)
+        _ = try await moveClient.moveStudyTask(id: 42, scheduledDate: "2026-06-05")
+        request = try XCTUnwrap(URLProtocolBackedAPIClientTests.lastRequest)
+        var body = try XCTUnwrap(request.httpBodyStreamData)
+        var payload = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertEqual(request.url?.path, "/api/study-plan-adjustment/tasks/42/move")
+        XCTAssertEqual(payload["scheduled_date"] as? String, "2026-06-05")
+
+        let deadlineClient = makeRecordingClient(responseBody: """
+        {"project_id":7,"old_deadline":"2026-06-01","new_deadline":"2026-06-30","source":"deadline_edit"}
+        """)
+        _ = try await deadlineClient.updateStudyProjectDeadline(projectId: 7, deadline: "2026-06-30")
+        request = try XCTUnwrap(URLProtocolBackedAPIClientTests.lastRequest)
+        body = try XCTUnwrap(request.httpBodyStreamData)
+        payload = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertEqual(request.url?.path, "/api/study-plan-adjustment/projects/7/deadline")
+        XCTAssertEqual(payload["deadline"] as? String, "2026-06-30")
+
+        let insertClient = makeRecordingClient(responseBody: """
+        {"project_id":7,"task_id":99,"scheduled_date":"2026-06-06","target_minutes":40,"title":"Practice actors","source":"manual_insert"}
+        """)
+        _ = try await insertClient.insertStudyProjectTask(
+            projectId: 7,
+            title: "Practice actors",
+            targetMinutes: 40,
+            scheduledDate: "2026-06-06"
+        )
+        request = try XCTUnwrap(URLProtocolBackedAPIClientTests.lastRequest)
+        body = try XCTUnwrap(request.httpBodyStreamData)
+        payload = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertEqual(request.url?.path, "/api/study-plan-adjustment/projects/7/tasks")
+        XCTAssertEqual(payload["target_minutes"] as? Int, 40)
+        XCTAssertEqual(payload["scheduled_date"] as? String, "2026-06-06")
+
+        let deleteClient = makeRecordingClient(responseBody: """
+        {"project_id":7,"task_id":99,"scheduled_date":"2026-06-06","source":"manual_delete","project_completed":false}
+        """)
+        _ = try await deleteClient.deleteStudyTask(id: 99)
+        request = try XCTUnwrap(URLProtocolBackedAPIClientTests.lastRequest)
+        XCTAssertEqual(request.httpMethod, "DELETE")
+        XCTAssertEqual(request.url?.path, "/api/study-plan-adjustment/tasks/99")
+    }
+
+    func testStudyPlanAdjustmentRestDayAndDialogueClientRequestsUseExpectedMethodsPathsAndBodies() async throws {
+        let restFetchClient = makeRecordingClient(responseBody: """
+        {"weekly_weekdays":[5],"one_off_dates":["2026-06-10"]}
+        """)
+        _ = try await restFetchClient.fetchStudyRestDaySettings()
+        var request = try XCTUnwrap(URLProtocolBackedAPIClientTests.lastRequest)
+        XCTAssertEqual(request.httpMethod, "GET")
+        XCTAssertEqual(request.url?.path, "/api/study-plan-adjustment/rest-days")
+
+        let restUpdateClient = makeRecordingClient(responseBody: """
+        {"weekly_weekdays":[5],"one_off_dates":["2026-06-10"],"added_weekly_weekdays":[5],"removed_weekly_weekdays":[],"added_one_off_dates":["2026-06-10"],"removed_one_off_dates":[],"source":"manual_rest_day_settings"}
+        """)
+        _ = try await restUpdateClient.updateStudyRestDaySettings(
+            StudyRestDaySettings(weeklyWeekdays: [5], oneOffDates: ["2026-06-10"])
+        )
+        request = try XCTUnwrap(URLProtocolBackedAPIClientTests.lastRequest)
+        var body = try XCTUnwrap(request.httpBodyStreamData)
+        var payload = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+        XCTAssertEqual(request.httpMethod, "PUT")
+        XCTAssertEqual(request.url?.path, "/api/study-plan-adjustment/rest-days")
+        XCTAssertEqual(payload["weekly_weekdays"] as? [Int], [5])
+        XCTAssertEqual(payload["one_off_dates"] as? [String], ["2026-06-10"])
+
+        let previewBody = """
+        {
+            "status":"preview",
+            "source":"dialogue_preview",
+            "command":"project_shift",
+            "project_id":7,
+            "delta_days":7,
+            "affected_task_ids":[42],
+            "changes":[{"task_id":42,"project_id":7,"old_date":"2026-06-01","new_date":"2026-06-08"}],
+            "red_state_impact":{"expected_late":{"before":false,"after":false},"over_capacity":{"before_dates":[],"after_dates":[],"new_over_capacity_dates":[]}},
+            "mutates":false
+        }
+        """
+        let previewClient = makeRecordingClient(responseBody: previewBody)
+        let preview = try await previewClient.previewStudyDialogueAdjustment(
+            instruction: "push this project by one week",
+            projectId: 7
+        )
+        request = try XCTUnwrap(URLProtocolBackedAPIClientTests.lastRequest)
+        body = try XCTUnwrap(request.httpBodyStreamData)
+        payload = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertEqual(request.url?.path, "/api/study-plan-adjustment/dialogue/preview")
+        XCTAssertEqual(payload["instruction"] as? String, "push this project by one week")
+        XCTAssertEqual(payload["project_id"] as? Int, 7)
+
+        let applyClient = makeRecordingClient(responseBody: """
+        {"status":"applied","source":"dialogue_apply","command":"project_shift","project_id":7,"delta_days":7,"affected_task_ids":[42],"changes":[{"task_id":42,"project_id":7,"old_date":"2026-06-01","new_date":"2026-06-08"}],"mutates":true,"refresh":{"today":true,"project_overview":true,"calendar":true}}
+        """)
+        _ = try await applyClient.applyStudyDialogueAdjustment(
+            instruction: "push this project by one week",
+            projectId: 7,
+            preview: preview
+        )
+        request = try XCTUnwrap(URLProtocolBackedAPIClientTests.lastRequest)
+        body = try XCTUnwrap(request.httpBodyStreamData)
+        payload = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertEqual(request.url?.path, "/api/study-plan-adjustment/dialogue/apply")
+        XCTAssertNotNil(payload["preview"] as? [String: Any])
+    }
+
     func testTaskCompletionResultDecodesSnakeCaseFields() throws {
         let json = """
         {
