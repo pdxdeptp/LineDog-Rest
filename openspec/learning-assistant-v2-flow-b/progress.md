@@ -91,6 +91,59 @@
 
 - Continue `opsx:apply` for ITEM-004 with tasks 3.1-3.2: backend fact-only smart snapshot tests and minimal smart morning briefing route that does not call the v1 Morning Agent.
 
+## Round 36 · 2026-05-24T14:35:15Z
+
+### ITEM-004 3.1-3.4 Backend Smart Snapshot And Morning Briefing
+
+- Restored controller and Flow B state: `phase=flow-b`, `current_item=study-smart-mode`, `current_change=introduce-study-smart-mode`.
+- Start status was clean; proposal checkpoint `b8dd156`, setting feature commit `8c54f0a`, and state/progress commit `93035d3` were already present.
+- Current checkout only; no worktree was created or used.
+
+### Completed
+
+- OpenSpec tasks 3.1 through 3.4 completed:
+  - added failing backend tests for a fact-only smart snapshot built from v2 Today, Project Overview, Calendar, rollover, expected-late, and over-capacity facts;
+  - implemented `GET /api/study-smart-mode/morning-briefing`;
+  - kept the route isolated from the v1 Morning Agent and `/api/today-briefing`;
+  - added quiet no-issue coverage;
+  - added deterministic `issues`, summary text, and `trigger_eligible`;
+  - kept `options` empty because proposal generation remains tasks 4.1-4.2.
+
+### Review Gates
+
+- Spec Compliance Review: initially BLOCKED because issue detection had no matching task status and the v1 isolation test was too narrow.
+- Review fix completed by expanding this backend briefing slice to all 3.x tasks, adding quiet no-issue coverage, `trigger_eligible`, and a source-level v1 dependency guard.
+- Spec Compliance Re-review: PASS.
+- Code Quality Review: initially BLOCKED because test data depended on default Saturday rest-day behavior and disabled empty briefing reused a shared nested dict.
+- Review fix completed by setting `study_rest_weekdays=[]` in tests and returning fresh empty snapshots.
+- Code Quality Re-review: PASS.
+
+### Verification
+
+- RED/GREEN/REFACTOR evidence recorded in `openspec/learning-assistant-v2-flow-b/evidence/item-004/tdd-backend-smart-briefing-report.md`.
+- `cd assistant_backend && .venv/bin/python -m pytest tests/test_study_smart_mode_briefing.py -q`: PASS, 5 passed, 2 existing dependency warnings.
+- `cd assistant_backend && .venv/bin/python -m pytest tests/test_study_smart_mode_settings.py tests/test_study_smart_mode_briefing.py -q`: PASS, 9 passed, 2 existing dependency warnings.
+- `cd assistant_backend && .venv/bin/python -m pytest tests/test_study_smart_mode_settings.py tests/test_study_smart_mode_briefing.py tests/test_study_plan_adjustment_rollover.py tests/test_study_views_today.py tests/test_study_views_calendar.py -q`: PASS, 18 passed, 2 existing dependency warnings.
+- `openspec validate introduce-study-smart-mode --strict`: PASS.
+- `git diff --check`: PASS.
+
+### Auto Commit
+
+- Commit: `aa4ee8c`.
+- Scope: verified ITEM-004 backend smart snapshot and morning briefing through OpenSpec tasks 3.1-3.4.
+- Pre-commit checks: focused smart-mode briefing tests, smart-mode settings tests, related rollover/view tests, `openspec validate introduce-study-smart-mode --strict`, `git diff --check`, Spec Compliance Re-review, and Code Quality Re-review all passed.
+
+### Files Added / Changed
+
+- Added `assistant_backend/tests/test_study_smart_mode_briefing.py`.
+- Updated `assistant_backend/src/routers/study_smart_mode.py`.
+- Updated `openspec/changes/introduce-study-smart-mode/tasks.md` to mark 3.1 through 3.4 complete.
+- Added `openspec/learning-assistant-v2-flow-b/evidence/item-004/tdd-backend-smart-briefing-report.md`.
+
+### Next Task
+
+- Continue `opsx:apply` for ITEM-004 with tasks 4.1-4.2: backend morning proposal options from lag, expected-late, and over-capacity facts, with structured side-by-side candidate previews and red-state impact.
+
 ## Round 01 · 2026-05-23T14:50:55Z
 
 ### Git / Safety
