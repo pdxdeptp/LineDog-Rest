@@ -1444,3 +1444,57 @@ Before implementation, create a checkpoint commit in the current checkout, then 
 ### Next Task
 
 - Continue `opsx:apply` for ITEM-003 with tasks 9.1 and 9.2: SwiftUI presentation/source tests and minimal UI controls for adjustment surfaces.
+
+## Round 30 · 2026-05-24T07:30:36Z
+
+### ITEM-003 9.1-9.2 Swift UI Adjustment Controls
+
+- Restored controller state: `phase=flow-b`, `current_item=study-plan-adjustment`.
+- Current checkout only; no worktree was created or used.
+- Created pre-apply checkpoint commit `66b9c62 chore: checkpoint flow b after viewmodel adjustments`.
+- Subagent TDD implementation completed OpenSpec tasks 9.1-9.2:
+  - Today rows show rolled-task facts from `showRolledBadge` and `rolledDayCount`;
+  - Today task movement is wired through `vm.moveStudyTask` and is disabled until the user changes the default date draft;
+  - Project Overview shows `expectedLate` as a red factual state and exposes deadline editing only for active projects;
+  - Calendar shows rest days, available capacity, and over-capacity facts, with split add/delete/move controls wired to ViewModel adjustment methods;
+  - Settings routes through a rest-day capable settings view and preserves daily capacity preferences;
+  - Adjust Plan routes through a preview/apply flow using `vm.previewStudyDialogueAdjustment` and `vm.applyStudyDialogueAdjustment`, not the old chat route.
+
+### Review Gates
+
+- Spec Compliance Review: PASS with no blockers.
+- Code Quality Review: initially BLOCKED on narrow-column layout, stale preview/apply risk, shared adjustment error context, and weak source constraints.
+- Review fixes completed:
+  - Calendar add/delete/move controls split into narrow-column sections;
+  - Adjust Plan Apply requires a preview identity matching the current instruction and optional project id;
+  - Settings and Adjust Plan show domain-specific adjustment error context;
+  - Source tests now assert layout split, current-preview guard, contextual errors, and Today date-change gating.
+- Code Quality Re-review: PASS; all previous Important findings closed.
+
+### Verification
+
+- RED: `xcodebuild test -project MalDaze.xcodeproj -scheme MalDaze -only-testing:MalDazeTests/LearningAssistantUISourceTests -quiet` failed on missing UI controls and source constraints before implementation.
+- GREEN: same focused command passed after minimal SwiftUI implementation.
+- REFACTOR: same focused command stayed green after review-fix refinements.
+- Independent verification:
+  - `xcodebuild test -project MalDaze.xcodeproj -scheme MalDaze -only-testing:MalDazeTests/LearningAssistantUISourceTests -quiet`: PASS.
+  - `xcodebuild test -project MalDaze.xcodeproj -scheme MalDaze -only-testing:MalDazeTests/LearningAssistantViewModelTests -quiet`: PASS.
+  - `openspec validate introduce-study-plan-adjustment --strict`: PASS.
+  - `git diff --check`: PASS.
+
+### Auto Commit
+
+- Commit: pending.
+- Scope: verified ITEM-003 Swift UI adjustment controls through OpenSpec tasks 9.1-9.2.
+- Pre-commit checks: focused UI source tests, focused ViewModel tests, `openspec validate introduce-study-plan-adjustment --strict`, `git diff --check`, Spec Compliance Review, and Code Quality Re-review all passed.
+
+### Files Added / Changed
+
+- Updated `MalDaze/LearningAssistant/AssistantPanelView.swift`.
+- Updated `MalDazeTests/LearningAssistantTests.swift`.
+- Updated `openspec/changes/introduce-study-plan-adjustment/tasks.md` to mark 9.1 and 9.2 complete.
+- Added `openspec/learning-assistant-v2-flow-b/evidence/item-003/tdd-swift-ui-adjustment-controls-report.md`.
+
+### Next Task
+
+- Continue `opsx:apply` for ITEM-003 with task 9.3: verify default mode stays silent after red-state-producing manual adjustments.

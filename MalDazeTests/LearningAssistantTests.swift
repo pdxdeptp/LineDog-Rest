@@ -1412,6 +1412,24 @@ final class LearningAssistantUISourceTests: XCTestCase {
         XCTAssertTrue(source.contains("单元"))
     }
 
+    func testAssistantPanelTodayShowsRolledBadgeAndMoveTaskWiring() throws {
+        let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
+
+        XCTAssertTrue(source.contains("showRolledBadge"))
+        XCTAssertTrue(source.contains("rolledDayCount"))
+        XCTAssertTrue(source.contains("已滚动"))
+        XCTAssertTrue(source.contains("滚动"))
+        XCTAssertTrue(source.contains("vm.moveStudyTask(id: task.id, scheduledDate:"))
+        XCTAssertTrue(source.contains("todayStudyTask(for: task.id)"))
+    }
+
+    func testAssistantPanelTodayMoveRequiresUserChangedDateBeforeEnabling() throws {
+        let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
+
+        XCTAssertTrue(source.contains("todayMoveDateChanged(for: task)"))
+        XCTAssertTrue(source.contains(".disabled(!todayMoveDateChanged(for: task) || todayMoveDate(for: task).isEmpty || vm.isAdjustingStudyPlan)"))
+    }
+
     func testAssistantPanelProjectOverviewDisplaysActiveCompletedAndFacts() throws {
         let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
 
@@ -1426,18 +1444,36 @@ final class LearningAssistantUISourceTests: XCTestCase {
         XCTAssertTrue(source.contains("actualMinutes"))
     }
 
-    func testAssistantPanelCalendarDisplaysReadOnlyDailyLoadAndFetchesDefaultWindow() throws {
+    func testAssistantPanelProjectOverviewShowsExpectedLateAndDeadlineEditWiring() throws {
+        let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
+        guard let start = source.range(of: "private struct ProjectOverviewView"),
+              let end = source[start.upperBound...].range(of: "private struct StudyPlanIntakeView") else {
+            XCTFail("ProjectOverviewView source section not found")
+            return
+        }
+        let projectSource = String(source[start.lowerBound..<end.lowerBound])
+
+        XCTAssertTrue(projectSource.contains("expectedLate"))
+        XCTAssertTrue(projectSource.contains("预计晚于截止日期"))
+        XCTAssertTrue(projectSource.contains(".foregroundStyle(.red)"))
+        XCTAssertTrue(projectSource.contains("vm.updateStudyProjectDeadline(projectId: project.id, deadline:"))
+        XCTAssertTrue(projectSource.contains("isCompletedHistory"))
+        XCTAssertTrue(projectSource.contains("if !isCompletedHistory"))
+    }
+
+    func testAssistantPanelCalendarDisplaysDailyLoadAndFetchesDefaultWindow() throws {
         let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
 
         XCTAssertTrue(source.contains("private struct StudyCalendarLoadView"))
         XCTAssertTrue(source.contains("vm.studyCalendarLoad"))
         XCTAssertTrue(source.contains("fetchDefaultWindowIfNeeded"))
         XCTAssertTrue(source.contains("vm.fetchStudyCalendarLoad(start: start, end: end)"))
-        XCTAssertTrue(source.contains("只读日历"))
         XCTAssertTrue(source.contains("scheduledTaskCount"))
         XCTAssertTrue(source.contains("totalTargetMinutes"))
         XCTAssertTrue(source.contains("completedTaskCount"))
         XCTAssertTrue(source.contains("overCapacity"))
+        XCTAssertTrue(source.contains("restDay"))
+        XCTAssertTrue(source.contains("availableCapacityMinutes"))
     }
 
     func testAssistantPanelCalendarDefaultWindowCoversNextSeveralWeeks() throws {
@@ -1483,7 +1519,7 @@ final class LearningAssistantUISourceTests: XCTestCase {
         XCTAssertFalse(source.contains("project.deadline ?? \"无\""))
     }
 
-    func testAssistantPanelCalendarSourceHasNoMutationWiring() throws {
+    func testAssistantPanelCalendarSourceHasAdjustmentMutationWiring() throws {
         let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
         guard let start = source.range(of: "private struct StudyCalendarLoadView"),
               let end = source[start.upperBound...].range(of: "private struct ProjectOverviewView") else {
@@ -1492,12 +1528,121 @@ final class LearningAssistantUISourceTests: XCTestCase {
         }
         let calendarSource = String(source[start.lowerBound..<end.lowerBound])
 
-        XCTAssertFalse(calendarSource.contains(".onMove"))
-        XCTAssertFalse(calendarSource.contains(".onDelete"))
-        XCTAssertFalse(calendarSource.localizedCaseInsensitiveContains("reschedule"))
-        XCTAssertFalse(calendarSource.localizedCaseInsensitiveContains("delete"))
-        XCTAssertFalse(calendarSource.localizedCaseInsensitiveContains("add task"))
+        XCTAssertTrue(calendarSource.contains("vm.insertStudyProjectTask("))
+        XCTAssertTrue(calendarSource.contains("vm.deleteStudyTask(id:"))
+        XCTAssertTrue(calendarSource.contains("vm.moveStudyTask(id:"))
+        XCTAssertTrue(calendarSource.contains("restDay"))
+        XCTAssertTrue(calendarSource.contains("availableCapacityMinutes"))
+        XCTAssertTrue(calendarSource.contains("overCapacity"))
+        XCTAssertTrue(calendarSource.contains("添加任务"))
+        XCTAssertTrue(calendarSource.contains("删除任务"))
+        XCTAssertTrue(calendarSource.contains("移动任务"))
         XCTAssertFalse(calendarSource.contains("moveVisibleTasks"))
+    }
+
+    func testAssistantPanelCalendarAdjustmentControlsAreSplitForNarrowColumn() throws {
+        let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
+        guard let start = source.range(of: "private struct StudyCalendarLoadView"),
+              let end = source[start.upperBound...].range(of: "private struct ProjectOverviewView") else {
+            XCTFail("StudyCalendarLoadView source section not found")
+            return
+        }
+        let calendarSource = String(source[start.lowerBound..<end.lowerBound])
+
+        XCTAssertTrue(calendarSource.contains("private var calendarAddTaskControls"))
+        XCTAssertTrue(calendarSource.contains("private var calendarDeleteTaskControls"))
+        XCTAssertTrue(calendarSource.contains("private var calendarMoveTaskControls"))
+        XCTAssertTrue(calendarSource.contains("calendarAddTaskControls"))
+        XCTAssertTrue(calendarSource.contains("calendarDeleteTaskControls"))
+        XCTAssertTrue(calendarSource.contains("calendarMoveTaskControls"))
+        XCTAssertTrue(calendarSource.contains("VStack(alignment: .leading, spacing: 8)"))
+        XCTAssertFalse(calendarSource.contains("Divider()\n\n                    Text(\"移动任务\")"))
+    }
+
+    func testAssistantPanelSettingsWiresRestDayFetchAndUpdate() throws {
+        let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
+
+        XCTAssertTrue(source.contains("case .settings:"))
+        XCTAssertTrue(source.contains("StudySettingsView(vm: vm)"))
+        XCTAssertTrue(source.contains("private struct StudySettingsView"))
+        XCTAssertTrue(source.contains("vm.fetchStudyRestDaySettings()"))
+        XCTAssertTrue(source.contains("vm.updateStudyRestDaySettings("))
+        XCTAssertTrue(source.contains("studyRestDaySettings"))
+        XCTAssertTrue(source.contains("休息日"))
+    }
+
+    func testAssistantPanelSettingsShowsContextualRestDayErrorOnlyAfterRestDayOperation() throws {
+        let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
+        guard let start = source.range(of: "private struct StudySettingsView"),
+              let end = source[start.upperBound...].range(of: "private struct StudyPlanAdjustmentView") else {
+            XCTFail("StudySettingsView source section not found")
+            return
+        }
+        let settingsSource = String(source[start.lowerBound..<end.lowerBound])
+
+        XCTAssertTrue(settingsSource.contains("hasTouchedRestDaySettings"))
+        XCTAssertTrue(settingsSource.contains("restDayErrorMessage"))
+        XCTAssertTrue(settingsSource.contains("休息日设置失败"))
+        XCTAssertFalse(settingsSource.contains("Label(error, systemImage: \"exclamationmark.triangle\")"))
+    }
+
+    func testAssistantPanelAdjustPlanUsesPreviewApplyFlowWithoutOldChatRoute() throws {
+        let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
+        guard let start = source.range(of: "private struct StudyPlanAdjustmentView"),
+              let end = source[start.upperBound...].range(of: "#if DEBUG") else {
+            XCTFail("StudyPlanAdjustmentView source section not found")
+            return
+        }
+        let adjustmentSource = String(source[start.lowerBound..<end.lowerBound])
+
+        XCTAssertTrue(source.contains("case .adjustPlan:"))
+        XCTAssertTrue(source.contains("StudyPlanAdjustmentView(vm: vm)"))
+        XCTAssertTrue(adjustmentSource.contains("private struct StudyPlanAdjustmentView"))
+        XCTAssertTrue(adjustmentSource.contains("vm.previewStudyDialogueAdjustment(instruction:"))
+        XCTAssertTrue(adjustmentSource.contains("vm.applyStudyDialogueAdjustment(instruction:"))
+        XCTAssertTrue(adjustmentSource.contains("studyDialogueAdjustmentPreview"))
+        XCTAssertTrue(adjustmentSource.contains("studyDialogueAdjustmentResult"))
+        XCTAssertTrue(adjustmentSource.contains("redStateImpact"))
+        XCTAssertFalse(source.contains("case .adjustPlan:\n            ChatView(vm: vm)"))
+        XCTAssertFalse(adjustmentSource.contains("sendMessage(message:"))
+        XCTAssertFalse(adjustmentSource.contains("confirmProposal"))
+    }
+
+    func testAssistantPanelAdjustPlanApplyRequiresPreviewForCurrentInput() throws {
+        let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
+        guard let start = source.range(of: "private struct StudyPlanAdjustmentView"),
+              let end = source[start.upperBound...].range(of: "#if DEBUG") else {
+            XCTFail("StudyPlanAdjustmentView source section not found")
+            return
+        }
+        let adjustmentSource = String(source[start.lowerBound..<end.lowerBound])
+
+        XCTAssertTrue(adjustmentSource.contains("@State private var previewedInstruction"))
+        XCTAssertTrue(adjustmentSource.contains("@State private var previewedProjectId"))
+        XCTAssertTrue(adjustmentSource.contains("private var hasCurrentPreview"))
+        XCTAssertTrue(adjustmentSource.contains("previewedInstruction == trimmedInstruction"))
+        XCTAssertTrue(adjustmentSource.contains("previewedProjectId == projectId"))
+        XCTAssertTrue(adjustmentSource.contains(".disabled(!hasCurrentPreview || vm.isAdjustingStudyPlan)"))
+        XCTAssertTrue(adjustmentSource.contains("previewedInstruction = nil"))
+        XCTAssertTrue(adjustmentSource.contains("previewedProjectId = nil"))
+        XCTAssertTrue(adjustmentSource.contains("vm.studyPlanAdjustmentError == nil"))
+        XCTAssertTrue(adjustmentSource.contains("previewedInstruction = trimmedInstruction"))
+        XCTAssertTrue(adjustmentSource.contains("previewedProjectId = projectId"))
+    }
+
+    func testAssistantPanelAdjustPlanShowsContextualDialogueErrorOnlyAfterDialogueOperation() throws {
+        let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
+        guard let start = source.range(of: "private struct StudyPlanAdjustmentView"),
+              let end = source[start.upperBound...].range(of: "#if DEBUG") else {
+            XCTFail("StudyPlanAdjustmentView source section not found")
+            return
+        }
+        let adjustmentSource = String(source[start.lowerBound..<end.lowerBound])
+
+        XCTAssertTrue(adjustmentSource.contains("hasTouchedDialogueAdjustment"))
+        XCTAssertTrue(adjustmentSource.contains("dialogueAdjustmentErrorMessage"))
+        XCTAssertTrue(adjustmentSource.contains("计划调整失败"))
+        XCTAssertFalse(adjustmentSource.contains("Label(error, systemImage: \"exclamationmark.triangle\")"))
     }
 
     func testStudyPlanIntakeReviewUIWiresDraftFlowControls() throws {

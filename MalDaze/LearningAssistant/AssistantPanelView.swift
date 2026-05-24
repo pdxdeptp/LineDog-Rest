@@ -3,6 +3,7 @@ import SwiftUI
 /// 学习助手中间栏：后端就绪后默认显示首页 dashboard，底部固定导航进入工具页。
 struct AssistantPanelView: View {
     @StateObject private var vm: LearningAssistantViewModel
+    @State private var todayMoveDateDrafts: [Int: String] = [:]
 
     @MainActor
     init(viewModel: LearningAssistantViewModel = LearningAssistantViewModel()) {
@@ -120,9 +121,9 @@ struct AssistantPanelView: View {
         case .resourceProgress:
             resourcesPanel
         case .adjustPlan:
-            ChatView(vm: vm)
+            StudyPlanAdjustmentView(vm: vm)
         case .settings:
-            LearningPreferencesView(api: vm.api)
+            StudySettingsView(vm: vm)
         }
     }
 
@@ -273,17 +274,23 @@ struct AssistantPanelView: View {
     private var todayTasksSection: some View {
         Section {
             ForEach(vm.visibleTodayTasks) { task in
-                TaskRowView(
-                    task: task,
-                    isExpanded: vm.isTaskExpanded(task),
-                    learningLink: vm.learningLink(for: task),
-                    onToggleExpansion: {
-                        vm.toggleTaskExpansion(task)
-                    },
-                    onComplete: {
-                        await vm.completeTask(task)
+                VStack(alignment: .leading, spacing: 6) {
+                    TaskRowView(
+                        task: task,
+                        isExpanded: vm.isTaskExpanded(task),
+                        learningLink: vm.learningLink(for: task),
+                        onToggleExpansion: {
+                            vm.toggleTaskExpansion(task)
+                        },
+                        onComplete: {
+                            await vm.completeTask(task)
+                        }
+                    )
+
+                    if let studyTask = todayStudyTask(for: task.id) {
+                        todayAdjustmentControls(for: studyTask)
                     }
-                )
+                }
             }
             .onMove { source, destination in
                 vm.moveVisibleTasks(fromOffsets: source, toOffset: destination)
@@ -293,6 +300,59 @@ struct AssistantPanelView: View {
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
         }
+    }
+
+    private func todayStudyTask(for id: Int) -> StudyViewTask? {
+        vm.studyTodayView?.tasks.first { $0.id == id }
+    }
+
+    private func todayAdjustmentControls(for task: StudyViewTask) -> some View {
+        HStack(spacing: 8) {
+            if task.showRolledBadge {
+                Label("已滚动 \(task.rolledDayCount) 天", systemImage: "arrow.triangle.2.circlepath")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.orange)
+                    .help("该任务由之前日期滚动而来")
+            } else if task.rolledDayCount > 0 {
+                Text("滚动 \(task.rolledDayCount) 天")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 8)
+
+            TextField("yyyy-MM-dd", text: todayMoveDateBinding(for: task))
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 104)
+
+            Button {
+                Task { await vm.moveStudyTask(id: task.id, scheduledDate: todayMoveDate(for: task)) }
+            } label: {
+                Label("移动", systemImage: "calendar.badge.clock")
+            }
+            .labelStyle(.iconOnly)
+            .buttonStyle(.borderless)
+            .disabled(!todayMoveDateChanged(for: task) || todayMoveDate(for: task).isEmpty || vm.isAdjustingStudyPlan)
+            .help("移动任务日期")
+        }
+        .padding(.leading, 28)
+    }
+
+    private func todayMoveDateBinding(for task: StudyViewTask) -> Binding<String> {
+        Binding(
+            get: { todayMoveDateDrafts[task.id] ?? vm.studyTodayView?.date ?? "" },
+            set: { todayMoveDateDrafts[task.id] = $0 }
+        )
+    }
+
+    private func todayMoveDate(for task: StudyViewTask) -> String {
+        (todayMoveDateDrafts[task.id] ?? vm.studyTodayView?.date ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func todayMoveDateChanged(for task: StudyViewTask) -> Bool {
+        guard let draft = todayMoveDateDrafts[task.id] else { return false }
+        return draft.trimmingCharacters(in: .whitespacesAndNewlines) != (vm.studyTodayView?.date ?? "")
     }
 
     // MARK: - Resources
@@ -388,18 +448,27 @@ struct AssistantPanelView: View {
 
 private struct StudyCalendarLoadView: View {
     @ObservedObject var vm: LearningAssistantViewModel
+    @State private var addProjectIdText = ""
+    @State private var addTaskTitle = ""
+    @State private var addTargetMinutes = 30
+    @State private var addScheduledDate = ""
+    @State private var deleteTaskIdText = ""
+    @State private var moveTaskIdText = ""
+    @State private var moveScheduledDate = ""
 
     var body: some View {
         List {
             VStack(alignment: .leading, spacing: 8) {
-                Text("只读日历")
+                Text("日历负荷")
                     .font(.headline)
-                Text("每日负荷只展示已排定任务，不提供拖拽或变更控件。")
+                Text("显示休息日、可用容量和超载事实；下方提供紧凑的任务增删移动控件。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .padding(.vertical, 8)
+
+            calendarAdjustmentControls
 
             if vm.isFetchingStudyCalendarLoad {
                 HStack(spacing: 8) {
@@ -432,7 +501,12 @@ private struct StudyCalendarLoadView: View {
                                 if day.overCapacity {
                                     Text("超出容量")
                                         .font(.caption.weight(.semibold))
-                                        .foregroundStyle(.orange)
+                                        .foregroundStyle(.red)
+                                }
+                                if day.restDay {
+                                    Label("休息日", systemImage: "moon.zzz")
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(.secondary)
                                 }
                             }
 
@@ -440,6 +514,7 @@ private struct StudyCalendarLoadView: View {
                                 calendarLoadFact(value: "\(day.scheduledTaskCount)", label: "任务")
                                 calendarLoadFact(value: "\(day.totalTargetMinutes)", label: "分钟")
                                 calendarLoadFact(value: "\(day.completedTaskCount)", label: "已完成")
+                                calendarLoadFact(value: "\(day.availableCapacityMinutes)", label: "可用容量")
                             }
                         }
                         .padding(.vertical, 6)
@@ -459,6 +534,100 @@ private struct StudyCalendarLoadView: View {
         }
         .listStyle(.plain)
         .task { await fetchDefaultWindowIfNeeded() }
+    }
+
+    private var calendarAdjustmentControls: some View {
+        Section {
+            VStack(alignment: .leading, spacing: 8) {
+                calendarAddTaskControls
+                calendarDeleteTaskControls
+                calendarMoveTaskControls
+            }
+            .padding(.vertical, 6)
+        }
+    }
+
+    private var calendarAddTaskControls: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("添加任务")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            TextField("项目 ID", text: $addProjectIdText)
+                .textFieldStyle(.roundedBorder)
+
+            TextField("任务标题", text: $addTaskTitle)
+                .textFieldStyle(.roundedBorder)
+
+            HStack(spacing: 8) {
+                Stepper(value: $addTargetMinutes, in: 5...600, step: 5) {
+                    Text("\(addTargetMinutes) 分钟")
+                        .font(.caption.monospacedDigit())
+                }
+
+                TextField("yyyy-MM-dd", text: $addScheduledDate)
+                    .textFieldStyle(.roundedBorder)
+
+                Button {
+                    addTask()
+                } label: {
+                    Label("添加任务", systemImage: "plus.circle")
+                }
+                .labelStyle(.iconOnly)
+                .buttonStyle(.borderless)
+                .disabled(!canAddTask || vm.isAdjustingStudyPlan)
+                .help("添加任务")
+            }
+        }
+    }
+
+    private var calendarDeleteTaskControls: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("删除任务")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            HStack(spacing: 8) {
+                TextField("任务 ID", text: $deleteTaskIdText)
+                    .textFieldStyle(.roundedBorder)
+
+                Button {
+                    deleteTask()
+                } label: {
+                    Label("删除任务", systemImage: "trash")
+                }
+                .labelStyle(.iconOnly)
+                .buttonStyle(.borderless)
+                .disabled(deleteTaskId == nil || vm.isAdjustingStudyPlan)
+                .help("删除任务")
+            }
+        }
+    }
+
+    private var calendarMoveTaskControls: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("移动任务")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            HStack(spacing: 8) {
+                TextField("任务 ID", text: $moveTaskIdText)
+                    .textFieldStyle(.roundedBorder)
+
+                TextField("yyyy-MM-dd", text: $moveScheduledDate)
+                    .textFieldStyle(.roundedBorder)
+
+                Button {
+                    moveTask()
+                } label: {
+                    Label("移动任务", systemImage: "calendar.badge.clock")
+                }
+                .labelStyle(.iconOnly)
+                .buttonStyle(.borderless)
+                .disabled(moveTaskId == nil || trimmedMoveScheduledDate.isEmpty || vm.isAdjustingStudyPlan)
+                .help("移动任务")
+            }
+        }
     }
 
     private func fetchDefaultWindowIfNeeded() async {
@@ -491,16 +660,64 @@ private struct StudyCalendarLoadView: View {
     }()
 
     private static let defaultCalendarWindowDayOffset = 27
+
+    private var canAddTask: Bool {
+        addProjectId != nil &&
+            !addTaskTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            !addScheduledDate.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var addProjectId: Int? {
+        Int(addProjectIdText.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    private var deleteTaskId: Int? {
+        Int(deleteTaskIdText.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    private var moveTaskId: Int? {
+        Int(moveTaskIdText.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    private var trimmedMoveScheduledDate: String {
+        moveScheduledDate.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func addTask() {
+        guard let projectId = addProjectId else { return }
+        let title = addTaskTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        let scheduledDate = addScheduledDate.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !title.isEmpty, !scheduledDate.isEmpty else { return }
+        Task {
+            await vm.insertStudyProjectTask(
+                projectId: projectId,
+                title: title,
+                targetMinutes: addTargetMinutes,
+                scheduledDate: scheduledDate
+            )
+        }
+    }
+
+    private func deleteTask() {
+        guard let taskId = deleteTaskId else { return }
+        Task { await vm.deleteStudyTask(id: taskId) }
+    }
+
+    private func moveTask() {
+        guard let taskId = moveTaskId, !trimmedMoveScheduledDate.isEmpty else { return }
+        Task { await vm.moveStudyTask(id: taskId, scheduledDate: trimmedMoveScheduledDate) }
+    }
 }
 
 private struct ProjectOverviewView: View {
     @ObservedObject var vm: LearningAssistantViewModel
+    @State private var deadlineDrafts: [Int: String] = [:]
 
     var body: some View {
         List {
             if let overview = vm.studyProjectOverview {
-                projectSection(title: "进行中项目", projects: overview.activeProjects)
-                projectSection(title: "完成历史", projects: overview.completedProjects)
+                projectSection(title: "进行中项目", projects: overview.activeProjects, isCompletedHistory: false)
+                projectSection(title: "完成历史", projects: overview.completedProjects, isCompletedHistory: true)
             } else {
                 Text("暂无项目总览")
                     .font(.subheadline)
@@ -513,7 +730,7 @@ private struct ProjectOverviewView: View {
         .refreshable { await vm.fetchDashboard() }
     }
 
-    private func projectSection(title: String, projects: [StudyProjectSummary]) -> some View {
+    private func projectSection(title: String, projects: [StudyProjectSummary], isCompletedHistory: Bool) -> some View {
         Section {
             if projects.isEmpty {
                 Text("暂无记录")
@@ -522,7 +739,7 @@ private struct ProjectOverviewView: View {
                     .padding(.vertical, 4)
             } else {
                 ForEach(projects) { project in
-                    projectRow(project)
+                    projectRow(project, isCompletedHistory: isCompletedHistory)
                 }
             }
         } header: {
@@ -532,7 +749,7 @@ private struct ProjectOverviewView: View {
         }
     }
 
-    private func projectRow(_ project: StudyProjectSummary) -> some View {
+    private func projectRow(_ project: StudyProjectSummary, isCompletedHistory: Bool) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline) {
                 Text(project.title)
@@ -554,6 +771,30 @@ private struct ProjectOverviewView: View {
                 projectFact(value: "\(project.targetMinutes)", label: "目标分钟")
                 projectFact(value: "\(project.actualMinutes)", label: "实际分钟")
                 projectFact(value: projectDeadlineLabel(for: project.deadline), label: "截止")
+            }
+
+            if project.expectedLate {
+                Label("预计晚于截止日期", systemImage: "exclamationmark.triangle")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.red)
+                    .help("事实状态：当前计划预计晚于项目截止日期")
+            }
+
+            if !isCompletedHistory {
+                HStack(spacing: 8) {
+                    TextField("yyyy-MM-dd", text: deadlineBinding(for: project))
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 116)
+                    Button {
+                        Task { await vm.updateStudyProjectDeadline(projectId: project.id, deadline: deadlineDraft(for: project)) }
+                    } label: {
+                        Label("更新截止日期", systemImage: "calendar")
+                    }
+                    .labelStyle(.iconOnly)
+                    .buttonStyle(.borderless)
+                    .disabled(deadlineDraft(for: project).isEmpty || vm.isAdjustingStudyPlan)
+                    .help("更新截止日期")
+                }
             }
         }
         .padding(.vertical, 8)
@@ -588,6 +829,18 @@ private struct ProjectOverviewView: View {
                 .foregroundStyle(.tertiary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func deadlineBinding(for project: StudyProjectSummary) -> Binding<String> {
+        Binding(
+            get: { deadlineDrafts[project.id] ?? project.deadline ?? "" },
+            set: { deadlineDrafts[project.id] = $0 }
+        )
+    }
+
+    private func deadlineDraft(for project: StudyProjectSummary) -> String {
+        (deadlineDrafts[project.id] ?? project.deadline ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
 
@@ -970,6 +1223,371 @@ private struct StudyPlanIntakeView: View {
             get: { durationDrafts[task.orderIndex] ?? task.estimatedMinutes },
             set: { durationDrafts[task.orderIndex] = $0 }
         )
+    }
+}
+
+private struct StudySettingsView: View {
+    @ObservedObject var vm: LearningAssistantViewModel
+
+    @State private var weeklyWeekdays: Set<Int> = []
+    @State private var oneOffDatesText = ""
+    @State private var hasTouchedRestDaySettings = false
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                LearningPreferencesView(api: vm.api)
+
+                Divider()
+
+                VStack(alignment: .leading, spacing: 10) {
+                    Label("休息日设置", systemImage: "moon.zzz")
+                        .font(.headline)
+
+                    if let settings = vm.studyRestDaySettings {
+                        Text("每周：\(weekdaySummary(settings.weeklyWeekdays)) · 单次：\(settings.oneOffDates.isEmpty ? "无" : settings.oneOffDates.joined(separator: ", "))")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    } else {
+                        Text("尚未加载休息日设置")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
+
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 76), spacing: 8)], alignment: .leading, spacing: 8) {
+                        ForEach(Self.weekdays, id: \.self) { weekday in
+                            Toggle(weekdayLabel(weekday), isOn: weekdayBinding(weekday))
+                                .toggleStyle(.checkbox)
+                                .font(.caption)
+                        }
+                    }
+
+                    TextField("单次休息日，逗号分隔 yyyy-MM-dd", text: $oneOffDatesText)
+                        .textFieldStyle(.roundedBorder)
+
+                    HStack(spacing: 8) {
+                        Button {
+                            Task {
+                                hasTouchedRestDaySettings = false
+                                await vm.fetchStudyRestDaySettings()
+                                hasTouchedRestDaySettings = true
+                                seedDrafts(from: vm.studyRestDaySettings)
+                            }
+                        } label: {
+                            Label("重新加载", systemImage: "arrow.clockwise")
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(vm.isAdjustingStudyPlan)
+                        .help("加载休息日设置")
+
+                        Button {
+                            Task {
+                                hasTouchedRestDaySettings = false
+                                await vm.updateStudyRestDaySettings(
+                                    StudyRestDaySettings(
+                                        weeklyWeekdays: weeklyWeekdays.sorted(),
+                                        oneOffDates: parsedOneOffDates
+                                    )
+                                )
+                                hasTouchedRestDaySettings = true
+                                seedDrafts(from: vm.studyRestDaySettings)
+                            }
+                        } label: {
+                            Label("保存休息日", systemImage: "checkmark.circle")
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(vm.isAdjustingStudyPlan)
+                        .help("更新休息日设置")
+                    }
+
+                    if let message = restDayErrorMessage {
+                        Label(message, systemImage: "exclamationmark.triangle")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .task {
+            hasTouchedRestDaySettings = false
+            await vm.fetchStudyRestDaySettings()
+            hasTouchedRestDaySettings = true
+            seedDrafts(from: vm.studyRestDaySettings)
+        }
+    }
+
+    private var restDayErrorMessage: String? {
+        guard hasTouchedRestDaySettings,
+              let error = vm.studyPlanAdjustmentError else { return nil }
+        return "休息日设置失败：\(error)"
+    }
+
+    private var parsedOneOffDates: [String] {
+        oneOffDatesText
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+
+    private func seedDrafts(from settings: StudyRestDaySettings?) {
+        guard let settings else { return }
+        weeklyWeekdays = Set(settings.weeklyWeekdays)
+        oneOffDatesText = settings.oneOffDates.joined(separator: ", ")
+    }
+
+    private func weekdayBinding(_ weekday: Int) -> Binding<Bool> {
+        Binding(
+            get: { weeklyWeekdays.contains(weekday) },
+            set: { isOn in
+                if isOn {
+                    weeklyWeekdays.insert(weekday)
+                } else {
+                    weeklyWeekdays.remove(weekday)
+                }
+            }
+        )
+    }
+
+    private func weekdaySummary(_ weekdays: [Int]) -> String {
+        weekdays.isEmpty ? "无" : weekdays.sorted().map(weekdayLabel).joined(separator: "、")
+    }
+
+    private func weekdayLabel(_ weekday: Int) -> String {
+        switch weekday {
+        case 1: return "周一"
+        case 2: return "周二"
+        case 3: return "周三"
+        case 4: return "周四"
+        case 5: return "周五"
+        case 6: return "周六"
+        case 7: return "周日"
+        default: return "周\(weekday)"
+        }
+    }
+
+    private static let weekdays = Array(1...7)
+}
+
+private struct StudyPlanAdjustmentView: View {
+    @ObservedObject var vm: LearningAssistantViewModel
+
+    @State private var instruction = ""
+    @State private var projectIdText = ""
+    @State private var previewedInstruction: String?
+    @State private var previewedProjectId: Int?
+    @State private var hasTouchedDialogueAdjustment = false
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: 10) {
+                    Label("调整计划", systemImage: "slider.horizontal.3")
+                        .font(.headline)
+
+                    TextEditor(text: $instruction)
+                        .font(.body)
+                        .frame(minHeight: 90)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(Color.secondary.opacity(0.25))
+                        )
+
+                    HStack(spacing: 8) {
+                        TextField("项目 ID（可选）", text: $projectIdText)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 116)
+
+                        Button {
+                            Task {
+                                hasTouchedDialogueAdjustment = false
+                                previewedInstruction = nil
+                                previewedProjectId = nil
+                                let requestedInstruction = trimmedInstruction
+                                let requestedProjectId = projectId
+                                await vm.previewStudyDialogueAdjustment(instruction: trimmedInstruction, projectId: projectId)
+                                hasTouchedDialogueAdjustment = true
+                                if vm.studyPlanAdjustmentError == nil,
+                                   vm.studyDialogueAdjustmentPreview != nil,
+                                   requestedInstruction == trimmedInstruction,
+                                   requestedProjectId == projectId {
+                                    previewedInstruction = trimmedInstruction
+                                    previewedProjectId = projectId
+                                }
+                            }
+                        } label: {
+                            Label("预览", systemImage: "eye")
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(trimmedInstruction.isEmpty || vm.isAdjustingStudyPlan)
+                        .help("预览计划调整")
+
+                        Button {
+                            Task {
+                                hasTouchedDialogueAdjustment = false
+                                await vm.applyStudyDialogueAdjustment(instruction: trimmedInstruction, projectId: projectId)
+                                hasTouchedDialogueAdjustment = true
+                            }
+                        } label: {
+                            Label("应用", systemImage: "checkmark.circle")
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(!hasCurrentPreview || vm.isAdjustingStudyPlan)
+                        .help("应用已预览的计划调整")
+                    }
+                }
+
+                if vm.isAdjustingStudyPlan {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("正在处理调整")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                if let message = dialogueAdjustmentErrorMessage {
+                    Label(message, systemImage: "exclamationmark.triangle")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+
+                previewSection
+                resultSection
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .task {
+            if instruction.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+               let draft = vm.consumeAdjustPlanDraftText() {
+                instruction = draft
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var previewSection: some View {
+        if let preview = vm.studyDialogueAdjustmentPreview {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("预览")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Text(preview.message ?? preview.status)
+                    .font(.callout)
+                    .fixedSize(horizontal: false, vertical: true)
+                adjustmentFacts(
+                    command: preview.command,
+                    projectId: preview.projectId,
+                    deltaDays: preview.deltaDays,
+                    affectedTaskIds: preview.affectedTaskIds,
+                    changes: preview.changes,
+                    redStateImpact: preview.redStateImpact
+                )
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    @ViewBuilder
+    private var resultSection: some View {
+        if let result = vm.studyDialogueAdjustmentResult {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("结果")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Text(result.message ?? result.status)
+                    .font(.callout)
+                    .fixedSize(horizontal: false, vertical: true)
+                adjustmentFacts(
+                    command: result.command,
+                    projectId: result.projectId,
+                    deltaDays: result.deltaDays,
+                    affectedTaskIds: result.affectedTaskIds,
+                    changes: result.changes,
+                    redStateImpact: nil
+                )
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private func adjustmentFacts(
+        command: String?,
+        projectId: Int?,
+        deltaDays: Int?,
+        affectedTaskIds: [Int]?,
+        changes: [StudyAdjustmentChange]?,
+        redStateImpact: StudyRedStateImpact?
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if let command {
+                Label(command, systemImage: "terminal")
+            }
+            if let projectId {
+                Label("项目 ID \(projectId)", systemImage: "folder")
+            }
+            if let deltaDays {
+                Label("移动 \(deltaDays) 天", systemImage: "arrow.left.arrow.right")
+            }
+            if let affectedTaskIds, !affectedTaskIds.isEmpty {
+                Label("影响任务：\(affectedTaskIds.map(String.init).joined(separator: ", "))", systemImage: "checklist")
+            }
+            if let changes, !changes.isEmpty {
+                ForEach(Array(changes.enumerated()), id: \.offset) { _, change in
+                    Text("任务 \(change.taskId)：\(change.oldDate) -> \(change.newDate)")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+            }
+            redStateImpactView(redStateImpact)
+        }
+        .font(.caption)
+    }
+
+    @ViewBuilder
+    private func redStateImpactView(_ redStateImpact: StudyRedStateImpact?) -> some View {
+        if let expectedLate = redStateImpact?.expectedLate {
+            Label(
+                "预计晚于截止日期：\(expectedLate.before ? "是" : "否") -> \(expectedLate.after ? "是" : "否")",
+                systemImage: "exclamationmark.triangle"
+            )
+            .foregroundStyle(expectedLate.after ? .red : .secondary)
+        }
+
+        if let overCapacity = redStateImpact?.overCapacity {
+            if !overCapacity.newOverCapacityDates.isEmpty {
+                Label("新增超载：\(overCapacity.newOverCapacityDates.joined(separator: ", "))", systemImage: "gauge")
+                    .foregroundStyle(.red)
+            } else if !overCapacity.afterDates.isEmpty {
+                Label("超载日期：\(overCapacity.afterDates.joined(separator: ", "))", systemImage: "gauge")
+                    .foregroundStyle(.orange)
+            }
+        }
+    }
+
+    private var trimmedInstruction: String {
+        instruction.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var projectId: Int? {
+        Int(projectIdText.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    private var hasCurrentPreview: Bool {
+        vm.studyDialogueAdjustmentPreview != nil &&
+            previewedInstruction == trimmedInstruction &&
+            previewedProjectId == projectId
+    }
+
+    private var dialogueAdjustmentErrorMessage: String? {
+        guard hasTouchedDialogueAdjustment,
+              let error = vm.studyPlanAdjustmentError else { return nil }
+        return "计划调整失败：\(error)"
     }
 }
 

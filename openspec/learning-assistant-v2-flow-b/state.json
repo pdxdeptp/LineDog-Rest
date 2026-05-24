@@ -1,16 +1,16 @@
 {
   "phase": "flow-b",
-  "round": 23,
+  "round": 25,
   "current_item": "study-plan-adjustment",
   "current_change": "introduce-study-plan-adjustment",
   "current_spec": "study-plan-adjustment",
   "items_initialized": true,
   "in_progress_step": null,
-  "last_completed_step": "item-003-viewmodel-adjustments",
+  "last_completed_step": "item-003-swift-ui-adjustment-controls",
   "last_feature_commit": "81f39e0",
   "last_completed_item": "study-views",
   "last_completed_change": "introduce-study-views",
-  "next_step": "continue-opsx-apply-task-9.1-swift-ui-adjustment-controls",
+  "next_step": "continue-opsx-apply-task-9.3-default-mode-silence-verification",
   "blocker_reason": null,
-  "updated_at": "2026-05-24T07:12:36Z"
+  "updated_at": "2026-05-24T07:30:36Z"
 }
