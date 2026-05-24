@@ -6,15 +6,15 @@
 
 ## 2. Backend Schema And Fact Helpers
 
-- [ ] 2.1 Write failing backend tests for schema/init support of task auto-roll metadata and rest-day settings.
-- [ ] 2.2 Implement minimal schema/init support for auto-roll metadata and rest-day settings.
-- [ ] 2.3 Write failing backend tests for expected-late project status and over-capacity facts after adjustment mutations.
-- [ ] 2.4 Implement red-state helper queries without mutating task dates.
+- [x] 2.1 Write failing backend tests for schema/init support of task auto-roll metadata and rest-day settings.
+- [x] 2.2 Implement minimal schema/init support for auto-roll metadata and rest-day settings.
+- [x] 2.3 Write failing backend tests for expected-late project status and over-capacity facts after adjustment mutations.
+- [x] 2.4 Implement red-state helper queries without mutating task dates.
 
 ## 3. Rollover
 
-- [ ] 3.1 Write failing backend tests for idempotent unfinished-task rollover into the current local day without same-project cascade.
-- [ ] 3.2 Implement rollover service and route, including auto-roll counters and event persistence.
+- [x] 3.1 Write failing backend tests for idempotent unfinished-task rollover into the current local day without same-project cascade.
+- [x] 3.2 Implement rollover service and route, including auto-roll counters and event persistence.
 - [ ] 3.3 Write failing backend tests that Today exposes rolled-day count and threshold badge facts.
 - [ ] 3.4 Implement rolled-day payloads for Today view and completion reset behavior.
 

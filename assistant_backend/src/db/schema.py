@@ -38,6 +38,9 @@ CREATE TABLE IF NOT EXISTS tasks (
     scheduled_date            DATE    NOT NULL,
     originally_scheduled_date DATE,
     reschedule_count          INTEGER DEFAULT 0,
+    auto_roll_days            INTEGER DEFAULT 0,
+    last_auto_rolled_at       DATE,
+    user_adjusted_at          TIMESTAMP,
     priority                  INTEGER DEFAULT 0,
     completed_at              TIMESTAMP,
     actual_minutes            INTEGER,
@@ -100,4 +103,6 @@ DEFAULT_SYSTEM_STATE = {
     "daily_capacity_min": "60",
     "reduced_capacity_min": "60",
     "user_speed_factor": "1.0",
+    "study_rest_weekdays": "[5]",
+    "study_rest_dates": "[]",
 }

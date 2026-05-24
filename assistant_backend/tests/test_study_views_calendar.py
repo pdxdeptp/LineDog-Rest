@@ -154,6 +154,70 @@ async def test_calendar_load_returns_empty_day_buckets_and_falls_back_to_default
 
 
 @pytest.mark.asyncio
+async def test_calendar_load_recalculates_over_capacity_after_persisted_task_fact_changes_without_moving_tasks(client):
+    async with aiosqlite.connect(os.environ["DB_PATH"]) as db:
+        await db.execute("INSERT OR REPLACE INTO system_state (key, value) VALUES (?, ?)", ("daily_capacity_min", "60"))
+        await db.execute(
+            """
+            INSERT INTO resources
+                (id, title, type, tracking_mode, url, status, total_units)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                2801,
+                "Adjustment Calendar Project",
+                "study_project",
+                "sequential",
+                "https://example.com/adjustment-calendar",
+                "active",
+                2,
+            ),
+        )
+        await db.executemany(
+            """
+            INSERT INTO tasks
+                (id, resource_id, title, task_kind, target_minutes, scheduled_date, priority)
+            VALUES (?, ?, ?, 'time', ?, ?, ?)
+            """,
+            [
+                (2901, 2801, "Already on day", 40, "2026-08-01", 9),
+                (2902, 2801, "Moved by adjustment", 25, "2026-08-02", 8),
+            ],
+        )
+        await db.execute("UPDATE tasks SET scheduled_date = ? WHERE id = ?", ("2026-08-01", 2902))
+        await db.commit()
+
+        db.row_factory = aiosqlite.Row
+        before_tasks = await _fetchall(db, "SELECT id, scheduled_date FROM tasks ORDER BY id")
+
+    response = await client.get("/api/study-views/calendar?start=2026-08-01&end=2026-08-02")
+
+    assert response.status_code == 200, response.text
+    assert response.json()["days"] == [
+        {
+            "date": "2026-08-01",
+            "scheduled_task_count": 2,
+            "total_target_minutes": 65,
+            "completed_task_count": 0,
+            "over_capacity": True,
+        },
+        {
+            "date": "2026-08-02",
+            "scheduled_task_count": 0,
+            "total_target_minutes": 0,
+            "completed_task_count": 0,
+            "over_capacity": False,
+        },
+    ]
+
+    async with aiosqlite.connect(os.environ["DB_PATH"]) as db:
+        db.row_factory = aiosqlite.Row
+        after_tasks = await _fetchall(db, "SELECT id, scheduled_date FROM tasks ORDER BY id")
+
+    assert after_tasks == before_tasks
+
+
+@pytest.mark.asyncio
 async def test_calendar_load_requires_valid_date_window(client):
     missing_response = await client.get("/api/study-views/calendar?start=2026-06-01")
     invalid_response = await client.get("/api/study-views/calendar?start=not-a-date&end=2026-06-03")

@@ -108,6 +108,19 @@ async def get_study_project_overview(db: aiosqlite.Connection) -> dict[str, list
                 ) AS task_actual_minutes
             FROM tasks
             GROUP BY resource_id
+        ),
+        expected_late_projects AS (
+            SELECT
+                r.id AS resource_id,
+                1 AS expected_late
+            FROM resources r
+            JOIN tasks t ON t.resource_id = r.id
+            WHERE r.type = 'study_project'
+              AND r.status = 'active'
+              AND r.deadline IS NOT NULL
+              AND t.completed_at IS NULL
+              AND date(t.scheduled_date) > date(r.deadline)
+            GROUP BY r.id
         )
         SELECT
             r.id,
@@ -117,9 +130,11 @@ async def get_study_project_overview(db: aiosqlite.Connection) -> dict[str, list
             COALESCE(tp.task_target_minutes, 0) AS target_minutes,
             COALESCE(tp.task_actual_minutes, 0) AS actual_minutes,
             r.deadline,
+            COALESCE(el.expected_late, 0) AS expected_late,
             r.status
         FROM resources r
         LEFT JOIN task_progress tp ON tp.resource_id = r.id
+        LEFT JOIN expected_late_projects el ON el.resource_id = r.id
         WHERE r.type = 'study_project'
           AND r.status IN ('active', 'completed')
         ORDER BY r.id ASC
@@ -134,6 +149,7 @@ async def get_study_project_overview(db: aiosqlite.Connection) -> dict[str, list
         completed_units = project["completed_units"] or 0
         total_units = project["total_units"] or 0
         project["progress_ratio"] = round(completed_units / total_units, 2) if total_units else 0.0
+        project["expected_late"] = bool(project["expected_late"])
         projects.append(project)
 
     return {
@@ -194,6 +210,103 @@ async def get_study_calendar_load(db: aiosqlite.Connection, start: date, end: da
         "end_date": end.isoformat(),
         "daily_capacity_minutes": daily_capacity_minutes,
         "days": days,
+    }
+
+
+async def rollover_unfinished_study_tasks(db: aiosqlite.Connection, today: date) -> dict:
+    today_iso = today.isoformat()
+    rolled_tasks: list[dict[str, Any]] = []
+
+    await db.execute("BEGIN IMMEDIATE")
+    try:
+        async with db.execute(
+            """
+            SELECT
+                t.id,
+                t.resource_id,
+                t.scheduled_date,
+                COALESCE(t.auto_roll_days, 0) AS auto_roll_days
+            FROM tasks t
+            JOIN resources r ON r.id = t.resource_id
+            WHERE r.type = 'study_project'
+              AND r.status = 'active'
+              AND t.completed_at IS NULL
+              AND date(t.scheduled_date) < date(?)
+              AND (
+                  t.last_auto_rolled_at IS NULL
+                  OR date(t.last_auto_rolled_at) < date(?)
+              )
+            ORDER BY t.scheduled_date ASC, t.id ASC
+            """,
+            (today_iso, today_iso),
+        ) as cursor:
+            candidates = await cursor.fetchall()
+
+        for task in candidates:
+            original_date = date.fromisoformat(task["scheduled_date"][:10])
+            rolled_days = (today - original_date).days
+            if rolled_days <= 0:
+                continue
+
+            auto_roll_days = int(task["auto_roll_days"] or 0) + rolled_days
+            update_cursor = await db.execute(
+                """
+                UPDATE tasks
+                SET scheduled_date = ?,
+                    auto_roll_days = ?,
+                    last_auto_rolled_at = ?
+                WHERE id = ?
+                  AND completed_at IS NULL
+                  AND date(scheduled_date) = date(?)
+                  AND (
+                      last_auto_rolled_at IS NULL
+                      OR date(last_auto_rolled_at) < date(?)
+                  )
+                """,
+                (
+                    today_iso,
+                    auto_roll_days,
+                    today_iso,
+                    task["id"],
+                    task["scheduled_date"],
+                    today_iso,
+                ),
+            )
+            if update_cursor.rowcount != 1:
+                continue
+
+            payload = {
+                "task_id": task["id"],
+                "resource_id": task["resource_id"],
+                "original_date": task["scheduled_date"],
+                "new_date": today_iso,
+                "rolled_days": rolled_days,
+                "source": "auto_rollover",
+            }
+            await db.execute(
+                "INSERT INTO events (event_type, payload) VALUES (?, ?)",
+                ("study_task_rolled_over", json.dumps(payload)),
+            )
+            rolled_tasks.append(
+                {
+                    "task_id": task["id"],
+                    "project_id": task["resource_id"],
+                    "old_date": task["scheduled_date"],
+                    "new_date": today_iso,
+                    "rolled_days": rolled_days,
+                    "auto_roll_days": auto_roll_days,
+                }
+            )
+
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise
+
+    return {
+        "date": today_iso,
+        "rolled_count": len(rolled_tasks),
+        "rolled_tasks": rolled_tasks,
     }
 
 

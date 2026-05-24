@@ -1,15 +1,15 @@
 {
   "phase": "flow-b",
-  "round": 4,
+  "round": 6,
   "current_item": "study-plan-adjustment",
   "last_doc_hash": "d83fb77602961d4f3a9c3e17c307c6b499eb987b",
   "flow_a_readiness": "PASS",
   "flow_b_readiness": "PASS",
   "git_strategy": "current-checkout-only",
-  "last_checkpoint_commit": "92cb29d",
+  "last_checkpoint_commit": "c9da6ff",
   "in_progress_step": null,
-  "last_completed_step": "flow-b-round-16-item-003-openspec-proposal-ready",
-  "next_step": "checkpoint-before-opsx-apply-introduce-study-plan-adjustment",
+  "last_completed_step": "flow-b-round-18-item-003-rollover-service-and-route",
+  "next_step": "continue-opsx-apply-task-3.3-rolled-badge-payload",
   "blocker_reason": null,
-  "updated_at": "2026-05-24T03:00:05Z"
+  "updated_at": "2026-05-24T03:24:05Z"
 }

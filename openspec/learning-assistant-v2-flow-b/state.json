@@ -1,15 +1,15 @@
 {
   "phase": "flow-b",
-  "round": 3,
+  "round": 5,
   "current_item": "study-plan-adjustment",
   "current_change": "introduce-study-plan-adjustment",
   "current_spec": "study-plan-adjustment",
   "items_initialized": true,
   "in_progress_step": null,
-  "last_completed_step": "item-003-openspec-proposal-ready",
+  "last_completed_step": "item-003-rollover-service-and-route",
   "last_completed_item": "study-views",
   "last_completed_change": "introduce-study-views",
-  "next_step": "checkpoint-before-opsx-apply-introduce-study-plan-adjustment",
+  "next_step": "continue-opsx-apply-task-3.3-rolled-badge-payload",
   "blocker_reason": null,
-  "updated_at": "2026-05-24T03:00:05Z"
+  "updated_at": "2026-05-24T03:24:05Z"
 }

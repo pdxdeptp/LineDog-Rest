@@ -773,3 +773,91 @@ Before implementation, create a checkpoint commit in the current checkout, then 
 - D26/D27 rest-day handling is included because automation scoped this item to D20-D28.
 - Smart-mode proposal generation remains deferred to ITEM-004.
 - Recommended next step: create a checkpoint commit in the current checkout, then enter `opsx:apply` for `introduce-study-plan-adjustment`.
+
+## Round 17 · 2026-05-24T03:13:05Z
+
+### ITEM-003 2.1-2.4 Backend Schema / Red-State Facts
+
+- Restored controller state: `phase=flow-b`, `current_item=study-plan-adjustment`.
+- Current checkout only; no worktree was created or used.
+- Existing checkpoint before apply: `c9da6ff chore: checkpoint study views and adjustment proposal`.
+- Subagent TDD implementation completed OpenSpec tasks 2.1-2.4:
+  - task auto-roll metadata columns and existing DB migration support;
+  - default rest-day system state keys;
+  - Project Overview `expected_late` facts for active study projects;
+  - Calendar over-capacity regression coverage confirming view reads do not move task dates.
+
+### Review Gates
+
+- Spec Compliance Review: PASS.
+- Code Quality Review: PASS.
+- P3 follow-up from review: `assistant_backend/tests/test_study_plan_adjustment_schema.py` is new/untracked and must be included in the eventual implementation commit.
+- No blocking or critical issues found for the 2.1-2.4 slice.
+
+### Verification
+
+- `assistant_backend/.venv/bin/pytest assistant_backend/tests/test_study_plan_adjustment_schema.py assistant_backend/tests/test_study_views_project_overview.py assistant_backend/tests/test_study_views_calendar.py -q`: `13 passed, 2 warnings`.
+- `openspec validate introduce-study-plan-adjustment --strict`: PASS.
+- `git diff --check`: PASS.
+- `openspec instructions apply --change introduce-study-plan-adjustment --json`: 37 tasks total, 7 complete, 30 remaining.
+
+### Files Added / Changed
+
+- Updated `assistant_backend/src/db/schema.py`.
+- Updated `assistant_backend/src/db/init.py`.
+- Updated `assistant_backend/src/db/queries.py`.
+- Updated `assistant_backend/tests/test_study_views_project_overview.py`.
+- Updated `assistant_backend/tests/test_study_views_calendar.py`.
+- Added `assistant_backend/tests/test_study_plan_adjustment_schema.py`.
+- Updated `openspec/changes/introduce-study-plan-adjustment/tasks.md` to mark 2.1-2.4 complete.
+- Added `openspec/learning-assistant-v2-flow-b/evidence/item-003/tdd-backend-schema-red-states-report.md`.
+
+### Next Task
+
+- Continue `opsx:apply` for ITEM-003 with tasks 3.1 and 3.2: idempotent unfinished-task rollover into the current local day, route/service implementation, auto-roll counters, and event persistence.
+
+## Round 18 · 2026-05-24T03:24:05Z
+
+### ITEM-003 3.1-3.2 Rollover Service / Route
+
+- Restored controller state: `phase=flow-b`, `current_item=study-plan-adjustment`.
+- Current checkout only; no worktree was created or used.
+- Continued from checkpoint `c9da6ff` and existing ITEM-003 implementation state.
+- Subagent TDD implementation completed OpenSpec tasks 3.1-3.2:
+  - `POST /api/study-plan-adjustment/rollover`;
+  - active study-project unfinished tasks scheduled before today roll into today;
+  - same-project later tasks are not cascaded;
+  - completed tasks, completed projects, and non-study resources are excluded;
+  - `auto_roll_days` and `last_auto_rolled_at` are persisted;
+  - `study_task_rolled_over` events are recorded only for actual rollovers;
+  - repeated same-day calls are idempotent.
+
+### Review Gates
+
+- Spec Compliance Review: PASS.
+- Code Quality Review: PASS.
+- No P0/P1/P2 issues found for the 3.1-3.2 slice.
+- P3 residual risks:
+  - rollover tests and route each call `date.today()`, so a test crossing local midnight could become flaky;
+  - `rollover_unfinished_study_tasks` expects a connection with `aiosqlite.Row` row factory, which is true for the route path but not enforced for direct helper callers;
+  - idempotency coverage is sequential, not a true concurrent POST stress test.
+
+### Verification
+
+- `assistant_backend/.venv/bin/pytest assistant_backend/tests/test_study_plan_adjustment_rollover.py assistant_backend/tests/test_study_plan_adjustment_schema.py assistant_backend/tests/test_study_views_project_overview.py assistant_backend/tests/test_study_views_calendar.py -q`: `15 passed, 2 warnings`.
+- `openspec validate introduce-study-plan-adjustment --strict`: PASS.
+- `git diff --check`: PASS.
+- `openspec instructions apply --change introduce-study-plan-adjustment --json`: 37 tasks total, 9 complete, 28 remaining.
+
+### Files Added / Changed
+
+- Updated `assistant_backend/src/db/queries.py`.
+- Added `assistant_backend/src/routers/study_plan_adjustment.py`.
+- Updated `assistant_backend/src/main.py`.
+- Added `assistant_backend/tests/test_study_plan_adjustment_rollover.py`.
+- Updated `openspec/changes/introduce-study-plan-adjustment/tasks.md` to mark 3.1 and 3.2 complete.
+- Added `openspec/learning-assistant-v2-flow-b/evidence/item-003/tdd-rollover-report.md`.
+
+### Next Task
+
+- Continue `opsx:apply` for ITEM-003 with tasks 3.3 and 3.4: Today rolled-day count payload, threshold badge facts, and completion clearing active rolled badge state.

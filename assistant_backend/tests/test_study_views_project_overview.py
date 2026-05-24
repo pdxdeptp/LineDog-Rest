@@ -172,6 +172,7 @@ async def test_project_overview_returns_active_study_projects_and_completed_hist
                 "target_minutes": 90,
                 "actual_minutes": 40,
                 "deadline": "2026-06-10",
+                "expected_late": False,
                 "status": "active",
             }
         ],
@@ -185,6 +186,7 @@ async def test_project_overview_returns_active_study_projects_and_completed_hist
                 "target_minutes": 45,
                 "actual_minutes": 45,
                 "deadline": "2026-05-30",
+                "expected_late": False,
                 "status": "completed",
             }
         ],
@@ -369,3 +371,80 @@ async def test_project_overview_uses_target_fallback_for_auto_completed_task_wit
             task = await cursor.fetchone()
 
     assert task[0] == 35
+
+
+@pytest.mark.asyncio
+async def test_project_overview_marks_active_project_expected_late_from_unfinished_task_facts(client):
+    async with aiosqlite.connect(os.environ["DB_PATH"]) as db:
+        await db.executemany(
+            """
+            INSERT INTO resources
+                (id, title, type, tracking_mode, url, status, total_units, deadline)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                (
+                    2601,
+                    "Late Active Study Project",
+                    "study_project",
+                    "sequential",
+                    "https://example.com/late",
+                    "active",
+                    2,
+                    "2026-06-10",
+                ),
+                (
+                    2602,
+                    "Completed Late History Project",
+                    "study_project",
+                    "sequential",
+                    "https://example.com/completed-late",
+                    "completed",
+                    1,
+                    "2026-06-10",
+                ),
+                (
+                    2603,
+                    "Non Study Late Resource",
+                    "web",
+                    "sequential",
+                    "https://example.com/non-study-late",
+                    "active",
+                    1,
+                    "2026-06-10",
+                ),
+            ],
+        )
+        await db.executemany(
+            """
+            INSERT INTO tasks
+                (id, resource_id, title, task_kind, target_minutes, scheduled_date, priority, completed_at)
+            VALUES (?, ?, ?, 'time', ?, ?, ?, ?)
+            """,
+            [
+                (2701, 2601, "Finished after deadline", 30, "2026-06-12", 9, "2026-06-12T10:00:00+00:00"),
+                (2702, 2601, "Unfinished after deadline", 30, "2026-06-13", 8, None),
+                (2703, 2602, "Completed project late task", 30, "2026-06-13", 7, None),
+                (2704, 2603, "Non study late task", 30, "2026-06-13", 6, None),
+            ],
+        )
+        await db.commit()
+
+        async with db.execute("SELECT id, scheduled_date FROM tasks ORDER BY id") as cursor:
+            before_tasks = await cursor.fetchall()
+
+    response = await client.get("/api/study-views/projects")
+
+    assert response.status_code == 200, response.text
+    active_project = response.json()["active_projects"][0]
+    completed_project = response.json()["completed_projects"][0]
+    assert active_project["id"] == 2601
+    assert active_project["expected_late"] is True
+    assert completed_project["id"] == 2602
+    assert completed_project["expected_late"] is False
+
+    async with aiosqlite.connect(os.environ["DB_PATH"]) as db:
+        async with db.execute("SELECT id, scheduled_date FROM tasks ORDER BY id") as cursor:
+            after_tasks = await cursor.fetchall()
+
+    assert after_tasks == before_tasks
