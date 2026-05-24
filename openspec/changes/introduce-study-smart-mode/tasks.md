@@ -32,8 +32,8 @@
 
 ## 6. Swift API And ViewModel
 
-- [ ] 6.1 Write failing Swift model/client tests for smart-mode setting, briefing, proposal generation, and proposal apply endpoints.
-- [ ] 6.2 Implement Swift API models, protocol methods, mock support, and concrete client calls.
+- [x] 6.1 Write failing Swift model/client tests for smart-mode setting, briefing, proposal generation, and proposal apply endpoints.
+- [x] 6.2 Implement Swift API models, protocol methods, mock support, and concrete client calls.
 - [ ] 6.3 Write failing ViewModel tests for default-mode silence, enabled smart briefing fetch, proposal ignore/apply state, and after-adjustment red-state trigger gating.
 - [ ] 6.4 Implement ViewModel smart-mode state, refresh sequencing, stale proposal handling, and apply refresh behavior.
 

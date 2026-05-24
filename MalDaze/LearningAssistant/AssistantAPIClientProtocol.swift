@@ -22,6 +22,11 @@ protocol AssistantAPIClientProtocol {
     func deleteStudyTask(id: Int) async throws -> StudyTaskDeleteResult
     func fetchStudyRestDaySettings() async throws -> StudyRestDaySettings
     func updateStudyRestDaySettings(_ settings: StudyRestDaySettings) async throws -> StudyRestDaySettingsUpdateResult
+    func fetchStudySmartModeSettings() async throws -> StudySmartModeSettings
+    func updateStudySmartModeSettings(_ settings: StudySmartModeSettings) async throws -> StudySmartModeSettings
+    func fetchStudySmartMorningBriefing() async throws -> StudySmartMorningBriefing
+    func generateStudySmartProposals(_ request: StudySmartProposalGenerationRequest) async throws -> StudySmartProposalGenerationResponse
+    func applyStudySmartProposal(_ request: StudySmartProposalApplyRequest) async throws -> StudySmartProposalApplyResult
     func previewStudyDialogueAdjustment(
         instruction: String,
         projectId: Int?
@@ -96,6 +101,26 @@ extension AssistantAPIClientProtocol {
     }
 
     func updateStudyRestDaySettings(_ settings: StudyRestDaySettings) async throws -> StudyRestDaySettingsUpdateResult {
+        throw AssistantOfflineError()
+    }
+
+    func fetchStudySmartModeSettings() async throws -> StudySmartModeSettings {
+        throw AssistantOfflineError()
+    }
+
+    func updateStudySmartModeSettings(_ settings: StudySmartModeSettings) async throws -> StudySmartModeSettings {
+        throw AssistantOfflineError()
+    }
+
+    func fetchStudySmartMorningBriefing() async throws -> StudySmartMorningBriefing {
+        throw AssistantOfflineError()
+    }
+
+    func generateStudySmartProposals(_ request: StudySmartProposalGenerationRequest) async throws -> StudySmartProposalGenerationResponse {
+        throw AssistantOfflineError()
+    }
+
+    func applyStudySmartProposal(_ request: StudySmartProposalApplyRequest) async throws -> StudySmartProposalApplyResult {
         throw AssistantOfflineError()
     }
 

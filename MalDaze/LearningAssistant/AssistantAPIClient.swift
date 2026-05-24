@@ -620,6 +620,168 @@ struct StudyRefreshContract: Codable {
     }
 }
 
+struct StudySmartModeSettings: Codable {
+    let enabled: Bool
+}
+
+enum StudySmartProposalTrigger: String, Codable {
+    case morning
+    case afterAdjustment = "after_adjustment"
+}
+
+struct StudySmartBriefingIssue: Codable {
+    let type: String
+    let projectId: Int?
+    let taskId: Int?
+    let rolledDayCount: Int?
+    let date: String?
+
+    enum CodingKeys: String, CodingKey {
+        case type, date
+        case projectId = "project_id"
+        case taskId = "task_id"
+        case rolledDayCount = "rolled_day_count"
+    }
+}
+
+struct StudySmartPreviewedChange: Codable {
+    let taskId: Int?
+    let projectId: Int?
+    let field: String?
+    let oldDate: String?
+    let newDate: String?
+    let oldDeadline: String?
+    let newDeadline: String?
+
+    enum CodingKeys: String, CodingKey {
+        case taskId = "task_id"
+        case projectId = "project_id"
+        case field
+        case oldDate = "old_date"
+        case newDate = "new_date"
+        case oldDeadline = "old_deadline"
+        case newDeadline = "new_deadline"
+    }
+}
+
+struct StudySmartProposalOption: Codable {
+    let id: String
+    let trigger: StudySmartProposalTrigger
+    let reason: [String: AnyCodable]
+    let affectedProjectIds: [Int]
+    let affectedTaskIds: [Int]
+    let preview: [String: AnyCodable]
+    let previewedChanges: [StudySmartPreviewedChange]
+    let redStateImpact: StudyRedStateImpact?
+    let summary: String?
+    let tradeoff: String?
+    let signatureVersion: Int
+    let signature: String
+    let signaturePayload: [String: AnyCodable]
+    var mutates: Bool {
+        preview["mutates"]?.value as? Bool ?? false
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, trigger, reason, preview, signature, summary, tradeoff
+        case affectedProjectIds = "affected_project_ids"
+        case affectedTaskIds = "affected_task_ids"
+        case previewedChanges = "previewed_changes"
+        case redStateImpact = "red_state_impact"
+        case signatureVersion = "signature_version"
+        case signaturePayload = "signature_payload"
+    }
+}
+
+struct StudySmartMorningBriefing: Codable {
+    let enabled: Bool
+    let date: String
+    let summary: String
+    let snapshot: [String: AnyCodable]
+    let issues: [StudySmartBriefingIssue]
+    let options: [StudySmartProposalOption]
+    let triggerEligible: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case enabled, date, summary, snapshot, issues, options
+        case triggerEligible = "trigger_eligible"
+    }
+}
+
+struct StudySmartProposalGenerationRequest: Codable {
+    let trigger: StudySmartProposalTrigger
+    let previousExpectedLateProjectIds: [Int]?
+    let previousOverCapacityDates: [String]?
+
+    init(
+        trigger: StudySmartProposalTrigger,
+        previousExpectedLateProjectIds: [Int]? = nil,
+        previousOverCapacityDates: [String]? = nil
+    ) {
+        self.trigger = trigger
+        self.previousExpectedLateProjectIds = previousExpectedLateProjectIds
+        self.previousOverCapacityDates = previousOverCapacityDates
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case trigger
+        case previousExpectedLateProjectIds = "previous_expected_late_project_ids"
+        case previousOverCapacityDates = "previous_over_capacity_dates"
+    }
+}
+
+struct StudySmartProposalGenerationResponse: Codable {
+    let enabled: Bool
+    let trigger: StudySmartProposalTrigger?
+    let options: [StudySmartProposalOption]
+    let message: String?
+}
+
+struct StudySmartProposalApplyRequest: Codable {
+    let proposal: StudySmartProposalOption
+    let previousExpectedLateProjectIds: [Int]?
+    let previousOverCapacityDates: [String]?
+
+    init(
+        proposal: StudySmartProposalOption,
+        previousExpectedLateProjectIds: [Int]? = nil,
+        previousOverCapacityDates: [String]? = nil
+    ) {
+        self.proposal = proposal
+        self.previousExpectedLateProjectIds = previousExpectedLateProjectIds
+        self.previousOverCapacityDates = previousOverCapacityDates
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case proposal
+        case previousExpectedLateProjectIds = "previous_expected_late_project_ids"
+        case previousOverCapacityDates = "previous_over_capacity_dates"
+    }
+}
+
+struct StudySmartProposalApplyResult: Codable {
+    let status: String
+    let source: String?
+    let proposalId: String?
+    let signature: String?
+    let trigger: StudySmartProposalTrigger?
+    let command: String?
+    let affectedProjectIds: [Int]?
+    let affectedTaskIds: [Int]?
+    let appliedChanges: [StudySmartPreviewedChange]?
+    let mutates: Bool
+    let refresh: StudyRefreshContract?
+    let message: String?
+
+    enum CodingKeys: String, CodingKey {
+        case status, source, signature, trigger, command, mutates, refresh, message
+        case proposalId = "proposal_id"
+        case affectedProjectIds = "affected_project_ids"
+        case affectedTaskIds = "affected_task_ids"
+        case appliedChanges = "applied_changes"
+    }
+}
+
 struct StudyDialogueAdjustmentPreview: Codable {
     let status: String
     let source: String?
@@ -1045,6 +1207,12 @@ struct AnyCodable: Codable {
         else if let v = try? container.decode(Int.self)    { value = v }
         else if let v = try? container.decode(Double.self) { value = v }
         else if let v = try? container.decode(String.self) { value = v }
+        else if let v = try? container.decode([String].self) { value = v }
+        else if let v = try? container.decode([Int].self) { value = v }
+        else if let v = try? container.decode([Double].self) { value = v }
+        else if let v = try? container.decode([Bool].self) { value = v }
+        else if let v = try? container.decode([String: AnyCodable].self) { value = v }
+        else if let v = try? container.decode([AnyCodable].self) { value = v.map(\.value) }
         else { value = NSNull() }
     }
 
@@ -1055,6 +1223,14 @@ struct AnyCodable: Codable {
         case let v as Int:    try container.encode(v)
         case let v as Double: try container.encode(v)
         case let v as String: try container.encode(v)
+        case let v as [String]: try container.encode(v)
+        case let v as [Int]: try container.encode(v)
+        case let v as [Double]: try container.encode(v)
+        case let v as [Bool]: try container.encode(v)
+        case let v as [Any]: try container.encode(v.map { AnyCodable($0) })
+        case let v as [String: AnyCodable]: try container.encode(v)
+        case let v as [String: Any]:
+            try container.encode(v.mapValues { AnyCodable($0) })
         default:              try container.encodeNil()
         }
     }
@@ -1248,6 +1424,39 @@ final class AssistantAPIClient {
         try await put(
             "/api/study-plan-adjustment/rest-days",
             body: settings
+        )
+    }
+
+    func fetchStudySmartModeSettings() async throws -> StudySmartModeSettings {
+        try await get("/api/study-smart-mode/settings")
+    }
+
+    func updateStudySmartModeSettings(_ settings: StudySmartModeSettings) async throws -> StudySmartModeSettings {
+        try await put(
+            "/api/study-smart-mode/settings",
+            body: settings
+        )
+    }
+
+    func fetchStudySmartMorningBriefing() async throws -> StudySmartMorningBriefing {
+        try await get("/api/study-smart-mode/morning-briefing")
+    }
+
+    func generateStudySmartProposals(
+        _ request: StudySmartProposalGenerationRequest
+    ) async throws -> StudySmartProposalGenerationResponse {
+        try await post(
+            "/api/study-smart-mode/proposals",
+            body: request
+        )
+    }
+
+    func applyStudySmartProposal(
+        _ request: StudySmartProposalApplyRequest
+    ) async throws -> StudySmartProposalApplyResult {
+        try await post(
+            "/api/study-smart-mode/proposals/apply",
+            body: request
         )
     }
 

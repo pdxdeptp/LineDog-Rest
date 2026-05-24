@@ -766,6 +766,251 @@ final class AssistantModelDecodingTests: XCTestCase {
         XCTAssertEqual(overCapacity["new_over_capacity_dates"] as? [String], ["2026-06-08"])
     }
 
+    func testSmartModeSettingDecodesAndUpdateEncodesEnabledFlag() throws {
+        let setting = try decode(StudySmartModeSettings.self, from: """
+        {"enabled": false}
+        """)
+        let update = StudySmartModeSettings(enabled: true)
+
+        let payload = try jsonDictionary(from: update)
+
+        XCTAssertEqual(setting.enabled, false)
+        XCTAssertEqual(payload["enabled"] as? Bool, true)
+        XCTAssertNil(payload["is_enabled"])
+    }
+
+    func testSmartMorningBriefingDecodesSnakeCaseFactsAndOptions() throws {
+        let briefing = try decode(StudySmartMorningBriefing.self, from: """
+        {
+            "enabled": true,
+            "date": "2026-06-01",
+            "summary": "Two study-plan issues need attention.",
+            "snapshot": {
+                "today": {"tasks": []},
+                "projects": {"active_projects": [], "completed_projects": []},
+                "calendar": {"days": []},
+                "rollover": {"date": "2026-06-01", "rolled_count": 0, "rolled_tasks": []}
+            },
+            "issues": [
+                {
+                    "type": "rolled_task_lag",
+                    "task_id": 42,
+                    "project_id": 7,
+                    "rolled_day_count": 3
+                }
+            ],
+            "options": [
+                {
+                    "id": "smart-morning-expected-late-project-7",
+                    "trigger": "morning",
+                    "reason": {
+                        "type": "expected_late_project",
+                        "project_id": 7,
+                        "deadline": "2026-06-10",
+                        "latest_task_date": "2026-06-14",
+                        "summary": "Project 7 has unfinished work after its deadline."
+                    },
+                    "affected_project_ids": [7],
+                    "affected_task_ids": [42, 43],
+                    "preview": {
+                        "status": "preview",
+                        "source": "smart_mode_preview",
+                        "command": "extend_project_deadline",
+                        "trigger": "morning",
+                        "project_id": 7,
+                        "old_deadline": "2026-06-10",
+                        "new_deadline": "2026-06-14",
+                        "changes": [{"project_id": 7, "field": "deadline", "old_deadline": "2026-06-10", "new_deadline": "2026-06-14"}],
+                        "mutates": false
+                    },
+                    "previewed_changes": [
+                        {"project_id": 7, "field": "deadline", "old_deadline": "2026-06-10", "new_deadline": "2026-06-14"}
+                    ],
+                    "red_state_impact": {
+                        "expected_late": {"before": true, "after": false},
+                        "over_capacity": {
+                            "before_dates": ["2026-06-11"],
+                            "after_dates": [],
+                            "new_over_capacity_dates": [],
+                            "resolved_over_capacity_dates": ["2026-06-11"]
+                        }
+                    },
+                    "summary": "Extend project 7's deadline to 2026-06-14.",
+                    "tradeoff": "Keeps task dates unchanged but moves the project commitment later.",
+                    "signature_version": 1,
+                    "signature": "abc123",
+                    "signature_payload": {
+                        "id": "smart-morning-expected-late-project-7",
+                        "trigger": "morning",
+                        "reason": {"type": "expected_late_project", "project_id": 7, "deadline": "2026-06-10", "latest_task_date": "2026-06-14"},
+                        "affected_project_ids": [7],
+                        "affected_task_ids": [42, 43],
+                        "preview": {"status": "preview", "source": "smart_mode_preview", "command": "extend_project_deadline", "trigger": "morning", "project_id": 7, "old_deadline": "2026-06-10", "new_deadline": "2026-06-14", "changes": [{"project_id": 7, "field": "deadline", "old_deadline": "2026-06-10", "new_deadline": "2026-06-14"}], "mutates": false},
+                        "previewed_changes": [{"project_id": 7, "field": "deadline", "old_deadline": "2026-06-10", "new_deadline": "2026-06-14"}],
+                        "red_state_impact": {"expected_late": {"before": true, "after": false}, "over_capacity": {"before_dates": ["2026-06-11"], "after_dates": [], "new_over_capacity_dates": [], "resolved_over_capacity_dates": ["2026-06-11"]}}
+                    }
+                }
+            ],
+            "trigger_eligible": true
+        }
+        """)
+
+        XCTAssertTrue(briefing.enabled)
+        XCTAssertEqual(briefing.date, "2026-06-01")
+        XCTAssertEqual(briefing.summary, "Two study-plan issues need attention.")
+        XCTAssertEqual(briefing.issues.first?.type, "rolled_task_lag")
+        XCTAssertEqual(briefing.issues.first?.projectId, 7)
+        XCTAssertEqual(briefing.issues.first?.rolledDayCount, 3)
+        XCTAssertEqual(briefing.options.first?.trigger, .morning)
+        XCTAssertEqual(briefing.options.first?.affectedProjectIds, [7])
+        XCTAssertEqual(briefing.options.first?.reason["type"]?.value as? String, "expected_late_project")
+        XCTAssertEqual(briefing.options.first?.preview["command"]?.value as? String, "extend_project_deadline")
+        XCTAssertEqual(briefing.options.first?.preview["mutates"]?.value as? Bool, false)
+        XCTAssertEqual(briefing.options.first?.redStateImpact?.expectedLate?.after, false)
+        XCTAssertEqual(briefing.options.first?.signatureVersion, 1)
+        XCTAssertEqual(briefing.options.first?.mutates, false)
+        XCTAssertTrue(briefing.triggerEligible)
+    }
+
+    func testSmartProposalOptionDecodesStructuredPreviewAndSignaturePayload() throws {
+        let option = try decode(StudySmartProposalOption.self, from: """
+        {
+            "id": "after-adjustment-spread-42",
+            "trigger": "after_adjustment",
+            "reason": {
+                "type": "over_capacity_day",
+                "date": "2026-06-10",
+                "summary": "2026-06-10 is over capacity."
+            },
+            "affected_project_ids": [7],
+            "affected_task_ids": [42],
+            "preview": {
+                "status": "preview",
+                "source": "smart_mode_preview",
+                "command": "move_task_from_over_capacity_day",
+                "trigger": "after_adjustment",
+                "date": "2026-06-10",
+                "task_id": 42,
+                "new_date": "2026-06-12",
+                "selection_policy": {"selected_task_id": 42},
+                "changes": [{"task_id": 42, "project_id": 7, "old_date": "2026-06-10", "new_date": "2026-06-12"}],
+                "mutates": false
+            },
+            "previewed_changes": [
+                {"task_id": 42, "project_id": 7, "old_date": "2026-06-10", "new_date": "2026-06-12"}
+            ],
+            "red_state_impact": {
+                "expected_late": {"before": false, "after": false},
+                "over_capacity": {
+                    "before_dates": ["2026-06-10"],
+                    "after_dates": [],
+                    "new_over_capacity_dates": [],
+                    "resolved_over_capacity_dates": ["2026-06-10"]
+                }
+            },
+            "summary": "Move task 42 off 2026-06-10.",
+            "tradeoff": "Reduces the overloaded day by pushing task 42 later.",
+            "signature_version": 1,
+            "signature": "sig-42",
+            "signature_payload": {"current_facts": {"over_capacity_dates": ["2026-06-10"]}},
+            "mutates": false
+        }
+        """)
+
+        let selectionPolicy = try XCTUnwrap(option.preview["selection_policy"]?.value as? [String: AnyCodable])
+        let signatureFacts = try XCTUnwrap(option.signaturePayload["current_facts"]?.value as? [String: AnyCodable])
+
+        XCTAssertEqual(option.id, "after-adjustment-spread-42")
+        XCTAssertEqual(option.trigger, .afterAdjustment)
+        XCTAssertEqual(option.reason["type"]?.value as? String, "over_capacity_day")
+        XCTAssertEqual(option.reason["date"]?.value as? String, "2026-06-10")
+        XCTAssertEqual(option.affectedTaskIds, [42])
+        XCTAssertEqual(option.preview["command"]?.value as? String, "move_task_from_over_capacity_day")
+        XCTAssertEqual(selectionPolicy["selected_task_id"]?.value as? Int, 42)
+        XCTAssertEqual(option.previewedChanges.first?.taskId, 42)
+        XCTAssertEqual(signatureFacts["over_capacity_dates"]?.value as? [String], ["2026-06-10"])
+        XCTAssertEqual(option.signatureVersion, 1)
+        XCTAssertEqual(option.signature, "sig-42")
+        XCTAssertFalse(option.mutates)
+    }
+
+    func testSmartProposalGenerationRequestEncodesBackendPreviousRedStateFields() throws {
+        let request = StudySmartProposalGenerationRequest(
+            trigger: .afterAdjustment,
+            previousExpectedLateProjectIds: [8702],
+            previousOverCapacityDates: ["2026-06-12"]
+        )
+
+        let payload = try jsonDictionary(from: request)
+
+        XCTAssertEqual(payload["trigger"] as? String, "after_adjustment")
+        XCTAssertEqual(payload["previous_expected_late_project_ids"] as? [Int], [8702])
+        XCTAssertEqual(payload["previous_over_capacity_dates"] as? [String], ["2026-06-12"])
+        XCTAssertNil(payload["previous_facts"])
+        XCTAssertNil(payload["current_facts"])
+        XCTAssertNil(payload["context"])
+    }
+
+    func testSmartProposalApplyRequestAndResultsUseSelectedProposalPreview() throws {
+        let proposal = sampleStudySmartProposalOption()
+        let request = StudySmartProposalApplyRequest(proposal: proposal)
+
+        let payload = try jsonDictionary(from: request)
+        let encodedProposal = try XCTUnwrap(payload["proposal"] as? [String: Any])
+        XCTAssertEqual(encodedProposal["id"] as? String, "morning-extend-deadline-7")
+        XCTAssertNil(encodedProposal["mutates"])
+        let encodedPreview = try XCTUnwrap(encodedProposal["preview"] as? [String: Any])
+        XCTAssertEqual(encodedPreview["mutates"] as? Bool, false)
+
+        let afterAdjustmentRequest = StudySmartProposalApplyRequest(
+            proposal: sampleStudySmartProposalOption(),
+            previousExpectedLateProjectIds: [8702],
+            previousOverCapacityDates: ["2026-06-12"]
+        )
+        let afterAdjustmentPayload = try jsonDictionary(from: afterAdjustmentRequest)
+        XCTAssertNotNil(afterAdjustmentPayload["proposal"] as? [String: Any])
+        XCTAssertEqual(afterAdjustmentPayload["previous_expected_late_project_ids"] as? [Int], [8702])
+        XCTAssertEqual(afterAdjustmentPayload["previous_over_capacity_dates"] as? [String], ["2026-06-12"])
+        XCTAssertNil(afterAdjustmentPayload["previous_facts"])
+        XCTAssertNil(afterAdjustmentPayload["current_facts"])
+        XCTAssertNil(afterAdjustmentPayload["context"])
+
+        let applied = try decode(StudySmartProposalApplyResult.self, from: """
+        {
+            "status": "applied",
+            "source": "smart_mode_apply",
+            "proposal_id": "morning-extend-deadline-7",
+            "signature": "abc123",
+            "trigger": "morning",
+            "command": "extend_project_deadline",
+            "affected_project_ids": [7],
+            "affected_task_ids": [42],
+            "applied_changes": [{"project_id": 7, "field": "deadline", "old_deadline": "2026-06-10", "new_deadline": "2026-06-14"}],
+            "mutates": true,
+            "refresh": {"today": true, "project_overview": true, "calendar": true}
+        }
+        """)
+        let stale = try decode(StudySmartProposalApplyResult.self, from: """
+        {"status": "stale_proposal", "mutates": false, "message": "submitted proposal does not match the current active plan"}
+        """)
+        let disabled = try decode(StudySmartProposalApplyResult.self, from: """
+        {"status": "disabled", "mutates": false, "message": "smart mode is disabled"}
+        """)
+        let unsupported = try decode(StudySmartProposalApplyResult.self, from: """
+        {"status": "unsupported", "mutates": false, "message": "submitted proposal is unsupported"}
+        """)
+
+        XCTAssertEqual(applied.status, "applied")
+        XCTAssertEqual(applied.source, "smart_mode_apply")
+        XCTAssertEqual(applied.proposalId, "morning-extend-deadline-7")
+        XCTAssertEqual(applied.appliedChanges?.first?.field, "deadline")
+        XCTAssertEqual(applied.refresh?.calendar, true)
+        XCTAssertEqual(stale.status, "stale_proposal")
+        XCTAssertEqual(disabled.message, "smart mode is disabled")
+        XCTAssertEqual(unsupported.mutates, false)
+        XCTAssertNil(stale.refresh)
+    }
+
     func testStudyPlanAdjustmentClientRequestsUseExpectedMethodsPathsAndBodies() async throws {
         let rolloverClient = makeRecordingClient(responseBody: """
         {"date":"2026-06-01","rolled_count":0,"rolled_tasks":[]}
@@ -821,6 +1066,102 @@ final class AssistantModelDecodingTests: XCTestCase {
         request = try XCTUnwrap(URLProtocolBackedAPIClientTests.lastRequest)
         XCTAssertEqual(request.httpMethod, "DELETE")
         XCTAssertEqual(request.url?.path, "/api/study-plan-adjustment/tasks/99")
+    }
+
+    func testStudySmartModeClientRequestsUseNewEndpointsAndNeverLegacyRoutes() async throws {
+        let settingsFetchClient = makeRecordingClient(responseBody: """
+        {"enabled": false}
+        """)
+        _ = try await settingsFetchClient.fetchStudySmartModeSettings()
+        var request = try XCTUnwrap(URLProtocolBackedAPIClientTests.lastRequest)
+        XCTAssertEqual(request.httpMethod, "GET")
+        XCTAssertEqual(request.url?.path, "/api/study-smart-mode/settings")
+
+        let settingsUpdateClient = makeRecordingClient(responseBody: """
+        {"enabled": true}
+        """)
+        _ = try await settingsUpdateClient.updateStudySmartModeSettings(StudySmartModeSettings(enabled: true))
+        request = try XCTUnwrap(URLProtocolBackedAPIClientTests.lastRequest)
+        var body = try XCTUnwrap(request.httpBodyStreamData)
+        var payload = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+        XCTAssertEqual(request.httpMethod, "PUT")
+        XCTAssertEqual(request.url?.path, "/api/study-smart-mode/settings")
+        XCTAssertEqual(payload["enabled"] as? Bool, true)
+
+        let briefingClient = makeRecordingClient(responseBody: """
+        {
+            "enabled": true,
+            "date": "2026-06-01",
+            "summary": "Quiet day.",
+            "snapshot": {
+                "today": {"tasks": []},
+                "projects": {"active_projects": [], "completed_projects": []},
+                "calendar": {"days": []},
+                "rollover": {"date": "2026-06-01", "rolled_count": 0, "rolled_tasks": []}
+            },
+            "issues": [],
+            "options": [],
+            "trigger_eligible": false
+        }
+        """)
+        _ = try await briefingClient.fetchStudySmartMorningBriefing()
+        request = try XCTUnwrap(URLProtocolBackedAPIClientTests.lastRequest)
+        XCTAssertEqual(request.httpMethod, "GET")
+        XCTAssertEqual(request.url?.path, "/api/study-smart-mode/morning-briefing")
+
+        let proposalsClient = makeRecordingClient(responseBody: """
+        {"enabled": true, "trigger": "after_adjustment", "options": []}
+        """)
+        _ = try await proposalsClient.generateStudySmartProposals(
+            StudySmartProposalGenerationRequest(
+                trigger: .afterAdjustment,
+                previousExpectedLateProjectIds: [8702],
+                previousOverCapacityDates: ["2026-06-12"]
+            )
+        )
+        request = try XCTUnwrap(URLProtocolBackedAPIClientTests.lastRequest)
+        body = try XCTUnwrap(request.httpBodyStreamData)
+        payload = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertEqual(request.url?.path, "/api/study-smart-mode/proposals")
+        XCTAssertEqual(payload["trigger"] as? String, "after_adjustment")
+        XCTAssertEqual(payload["previous_expected_late_project_ids"] as? [Int], [8702])
+        XCTAssertEqual(payload["previous_over_capacity_dates"] as? [String], ["2026-06-12"])
+        XCTAssertNil(payload["previous_facts"])
+
+        let applyClient = makeRecordingClient(responseBody: """
+        {"status": "applied", "mutates": true, "refresh": {"today": true, "project_overview": true, "calendar": true}}
+        """)
+        _ = try await applyClient.applyStudySmartProposal(
+            StudySmartProposalApplyRequest(
+                proposal: sampleStudySmartProposalOption(),
+                previousExpectedLateProjectIds: [8702],
+                previousOverCapacityDates: ["2026-06-12"]
+            )
+        )
+        request = try XCTUnwrap(URLProtocolBackedAPIClientTests.lastRequest)
+        body = try XCTUnwrap(request.httpBodyStreamData)
+        payload = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertEqual(request.url?.path, "/api/study-smart-mode/proposals/apply")
+        XCTAssertNotNil(payload["proposal"] as? [String: Any])
+        XCTAssertEqual(payload["previous_expected_late_project_ids"] as? [Int], [8702])
+        XCTAssertEqual(payload["previous_over_capacity_dates"] as? [String], ["2026-06-12"])
+        XCTAssertNil(payload["previous_facts"])
+
+        let clientSource = try sourceFile("MalDaze/LearningAssistant/AssistantAPIClient.swift")
+        for methodName in [
+            "fetchStudySmartModeSettings",
+            "updateStudySmartModeSettings",
+            "fetchStudySmartMorningBriefing",
+            "generateStudySmartProposals",
+            "applyStudySmartProposal"
+        ] {
+            let source = try methodSource(named: methodName, in: clientSource)
+            XCTAssertFalse(source.contains("/api/today-briefing"))
+            XCTAssertFalse(source.contains("/api/chat"))
+            XCTAssertFalse(source.contains("/api/chat/confirm"))
+        }
     }
 
     func testStudyPlanAdjustmentRestDayAndDialogueClientRequestsUseExpectedMethodsPathsAndBodies() async throws {
@@ -1219,6 +1560,13 @@ final class AssistantModelDecodingTests: XCTestCase {
         let projectRoot = testFile.deletingLastPathComponent().deletingLastPathComponent()
         let url = projectRoot.appendingPathComponent(relativePath)
         return try String(contentsOf: url, encoding: .utf8)
+    }
+
+    private func methodSource(named name: String, in source: String) throws -> String {
+        let start = try XCTUnwrap(source.range(of: "func \(name)"))
+        let remaining = source[start.lowerBound...]
+        let end = remaining.range(of: "\n    func ", options: [], range: remaining.index(after: remaining.startIndex)..<remaining.endIndex)?.lowerBound ?? remaining.endIndex
+        return String(remaining[..<end])
     }
 
     private func makeRecordingClient(responseBody: String, statusCode: Int = 200) -> AssistantAPIClient {
@@ -3479,6 +3827,10 @@ private final class MockAssistantAPIClient: AssistantAPIClientProtocol, @uncheck
     var studyTaskDeleteResult = sampleStudyTaskDeleteResult()
     var studyRestDaySettingsResult = StudyRestDaySettings(weeklyWeekdays: [], oneOffDates: [])
     var studyRestDaySettingsUpdateResult = sampleStudyRestDaySettingsUpdateResult()
+    var studySmartModeSettingsResult = StudySmartModeSettings(enabled: false)
+    var studySmartMorningBriefingResult = sampleStudySmartMorningBriefing()
+    var studySmartProposalGenerationResult = sampleStudySmartProposalGenerationResponse()
+    var studySmartProposalApplyResult = sampleStudySmartProposalApplyResult()
     var studyDialogueAdjustmentPreviewResult = sampleStudyDialogueAdjustmentPreview()
     var studyDialogueAdjustmentApplyResult = sampleStudyDialogueAdjustmentApplyResult()
     var adjustmentError: Error?
@@ -3515,6 +3867,14 @@ private final class MockAssistantAPIClient: AssistantAPIClientProtocol, @uncheck
     private(set) var fetchStudyRestDaySettingsCallCount = 0
     private(set) var updateStudyRestDaySettingsCallCount = 0
     private(set) var lastUpdatedStudyRestDaySettings: StudyRestDaySettings?
+    private(set) var fetchStudySmartModeSettingsCallCount = 0
+    private(set) var updateStudySmartModeSettingsCallCount = 0
+    private(set) var lastUpdatedStudySmartModeSettings: StudySmartModeSettings?
+    private(set) var fetchStudySmartMorningBriefingCallCount = 0
+    private(set) var generateStudySmartProposalsCallCount = 0
+    private(set) var lastStudySmartProposalGenerationRequest: StudySmartProposalGenerationRequest?
+    private(set) var applyStudySmartProposalCallCount = 0
+    private(set) var lastStudySmartProposalApplyRequest: StudySmartProposalApplyRequest?
     private(set) var previewStudyDialogueAdjustmentCallCount = 0
     private(set) var lastStudyDialoguePreviewInstruction: String?
     private(set) var lastStudyDialoguePreviewProjectId: Int?
@@ -3720,6 +4080,49 @@ private final class MockAssistantAPIClient: AssistantAPIClientProtocol, @uncheck
         if let adjustmentError { throw adjustmentError }
         if shouldThrowOffline { throw AssistantOfflineError() }
         return studyRestDaySettingsUpdateResult
+    }
+
+    func fetchStudySmartModeSettings() async throws -> StudySmartModeSettings {
+        fetchStudySmartModeSettingsCallCount += 1
+        if let adjustmentError { throw adjustmentError }
+        if shouldThrowOffline { throw AssistantOfflineError() }
+        return studySmartModeSettingsResult
+    }
+
+    func updateStudySmartModeSettings(_ settings: StudySmartModeSettings) async throws -> StudySmartModeSettings {
+        updateStudySmartModeSettingsCallCount += 1
+        lastUpdatedStudySmartModeSettings = settings
+        if let adjustmentError { throw adjustmentError }
+        if shouldThrowOffline { throw AssistantOfflineError() }
+        studySmartModeSettingsResult = settings
+        return studySmartModeSettingsResult
+    }
+
+    func fetchStudySmartMorningBriefing() async throws -> StudySmartMorningBriefing {
+        fetchStudySmartMorningBriefingCallCount += 1
+        if let adjustmentError { throw adjustmentError }
+        if shouldThrowOffline { throw AssistantOfflineError() }
+        return studySmartMorningBriefingResult
+    }
+
+    func generateStudySmartProposals(
+        _ request: StudySmartProposalGenerationRequest
+    ) async throws -> StudySmartProposalGenerationResponse {
+        generateStudySmartProposalsCallCount += 1
+        lastStudySmartProposalGenerationRequest = request
+        if let adjustmentError { throw adjustmentError }
+        if shouldThrowOffline { throw AssistantOfflineError() }
+        return studySmartProposalGenerationResult
+    }
+
+    func applyStudySmartProposal(
+        _ request: StudySmartProposalApplyRequest
+    ) async throws -> StudySmartProposalApplyResult {
+        applyStudySmartProposalCallCount += 1
+        lastStudySmartProposalApplyRequest = request
+        if let adjustmentError { throw adjustmentError }
+        if shouldThrowOffline { throw AssistantOfflineError() }
+        return studySmartProposalApplyResult
     }
 
     func previewStudyDialogueAdjustment(
@@ -4239,6 +4642,112 @@ private func sampleStudyRestDaySettingsUpdateResult(
         addedOneOffDates: oneOffDates,
         removedOneOffDates: [],
         source: "manual_rest_day_settings"
+    )
+}
+
+private func sampleStudySmartMorningBriefing() -> StudySmartMorningBriefing {
+    StudySmartMorningBriefing(
+        enabled: true,
+        date: "2026-06-01",
+        summary: "One study-plan issue needs attention.",
+        snapshot: [
+            "today": AnyCodable(["tasks": []]),
+            "projects": AnyCodable(["active_projects": [], "completed_projects": []]),
+            "calendar": AnyCodable(["days": []])
+        ],
+        issues: [
+            StudySmartBriefingIssue(
+                type: "expected_late_project",
+                projectId: 7,
+                taskId: nil,
+                rolledDayCount: nil,
+                date: nil
+            )
+        ],
+        options: [sampleStudySmartProposalOption()],
+        triggerEligible: true
+    )
+}
+
+private func sampleStudySmartProposalOption() -> StudySmartProposalOption {
+    StudySmartProposalOption(
+        id: "morning-extend-deadline-7",
+        trigger: .morning,
+        reason: [
+            "type": AnyCodable("expected_late_project"),
+            "project_id": AnyCodable(7),
+            "deadline": AnyCodable("2026-06-10"),
+            "latest_task_date": AnyCodable("2026-06-14")
+        ],
+        affectedProjectIds: [7],
+        affectedTaskIds: [42],
+        preview: [
+            "status": AnyCodable("preview"),
+            "source": AnyCodable("smart_mode_preview"),
+            "command": AnyCodable("extend_project_deadline"),
+            "trigger": AnyCodable("morning"),
+            "project_id": AnyCodable(7),
+            "mutates": AnyCodable(false)
+        ],
+        previewedChanges: [
+            StudySmartPreviewedChange(
+                taskId: nil,
+                projectId: 7,
+                field: "deadline",
+                oldDate: nil,
+                newDate: nil,
+                oldDeadline: "2026-06-10",
+                newDeadline: "2026-06-14"
+            )
+        ],
+        redStateImpact: StudyRedStateImpact(
+            expectedLate: StudyExpectedLateImpact(before: true, after: false),
+            overCapacity: nil
+        ),
+        summary: "Extend project 7's deadline to 2026-06-14.",
+        tradeoff: "Keeps task dates unchanged but moves the project commitment later.",
+        signatureVersion: 1,
+        signature: "abc123",
+        signaturePayload: [
+            "trigger": AnyCodable("morning"),
+            "project_id": AnyCodable(7)
+        ]
+    )
+}
+
+private func sampleStudySmartProposalGenerationResponse() -> StudySmartProposalGenerationResponse {
+    StudySmartProposalGenerationResponse(
+        enabled: true,
+        trigger: .morning,
+        options: [sampleStudySmartProposalOption()],
+        message: nil
+    )
+}
+
+private func sampleStudySmartProposalApplyResult() -> StudySmartProposalApplyResult {
+    StudySmartProposalApplyResult(
+        status: "applied",
+        source: "smart_mode_apply",
+        proposalId: "morning-extend-deadline-7",
+        signature: "abc123",
+        trigger: .morning,
+        command: "extend_project_deadline",
+        affectedProjectIds: [7],
+        affectedTaskIds: [42],
+        appliedChanges: [
+            StudySmartPreviewedChange(
+                taskId: nil,
+                projectId: 7,
+                field: "deadline",
+                oldDate: nil,
+                newDate: nil,
+                oldDeadline: "2026-06-10",
+                newDeadline: "2026-06-14"
+            )
+        ],
+        mutates: true,
+        refresh: StudyRefreshContract(today: true, projectOverview: true, calendar: true),
+        message: nil
     )
 }
 
