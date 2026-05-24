@@ -7,7 +7,7 @@
   "items_initialized": true,
   "in_progress_step": null,
   "last_completed_step": "item-003-viewmodel-adjustments",
-  "last_feature_commit": "f539b6c",
+  "last_feature_commit": "81f39e0",
   "last_completed_item": "study-views",
   "last_completed_change": "introduce-study-views",
   "next_step": "continue-opsx-apply-task-9.1-swift-ui-adjustment-controls",

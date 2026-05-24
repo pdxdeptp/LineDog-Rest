@@ -1430,7 +1430,7 @@ Before implementation, create a checkpoint commit in the current checkout, then 
 
 ### Auto Commit
 
-- Commit: pending.
+- Commit: `81f39e0`.
 - Scope: verified ITEM-003 ViewModel adjustment state and refresh sequencing through OpenSpec tasks 8.3-8.4.
 - Pre-commit checks: focused `LearningAssistantViewModelTests`, `MalDazeTests/LearningAssistantTests`, `openspec validate introduce-study-plan-adjustment --strict`, `git diff --check`, Spec Compliance Review, and Code Quality Review all passed.
 
