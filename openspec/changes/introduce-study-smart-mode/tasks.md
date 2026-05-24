@@ -41,8 +41,8 @@
 
 - [x] 7.1 Write failing presentation/source tests for Settings smart-mode toggle, smart morning briefing surface, side-by-side proposal cards, per-option Apply, and Ignore.
 - [x] 7.2 Implement minimal smart-mode UI surfaces in Settings, Today/dashboard, and adjustment context.
-- [ ] 7.3 Write failing source/ViewModel tests proving default-mode red states remain fact-only and smart mode does not use legacy chat state.
-- [ ] 7.4 Implement UI guards so default mode does not show smart proposals and smart-mode UI does not set `chatMessages` or `currentProposal`.
+- [x] 7.3 Write failing source/ViewModel tests proving default-mode red states remain fact-only and smart mode does not use legacy chat state.
+- [x] 7.4 Implement UI guards so default mode does not show smart proposals and smart-mode UI does not set `chatMessages` or `currentProposal`.
 
 ## 8. Review And Verification
 

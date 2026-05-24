@@ -94,6 +94,8 @@ final class LearningAssistantViewModel: ObservableObject {
     @Published var studySmartMorningBriefing: StudySmartMorningBriefing? = nil
     @Published var studySmartProposalOptions: [StudySmartProposalOption] = []
     @Published var studySmartProposalMessage: String? = nil
+    @Published var studySmartProposalMessageTrigger: StudySmartProposalTrigger? = nil
+    @Published var studySmartSettingsMessage: String? = nil
     @Published var studyDialogueAdjustmentPreview: StudyDialogueAdjustmentPreview? = nil
     @Published var studyDialogueAdjustmentResult: StudyDialogueAdjustmentApplyResult? = nil
     @Published var studyPlanAdjustmentError: String? = nil
@@ -333,7 +335,7 @@ final class LearningAssistantViewModel: ObservableObject {
             studySmartMorningBriefing = briefing
             studySmartProposalOptions = briefing.options
             studySmartProposalContexts = [:]
-            studySmartProposalMessage = nil
+            setStudySmartProposalMessage(nil)
         } catch {
             clearStudySmartModeState()
         }
@@ -360,7 +362,8 @@ final class LearningAssistantViewModel: ObservableObject {
             let settings = try await api.updateStudySmartModeSettings(StudySmartModeSettings(enabled: enabled))
             guard requestID == studySmartModeSettingRequestID else { return }
             isStudySmartModeEnabled = settings.enabled
-            studySmartProposalMessage = nil
+            studySmartSettingsMessage = nil
+            setStudySmartProposalMessage(nil)
             if settings.enabled {
                 do {
                     let briefing = try await api.fetchStudySmartMorningBriefing()
@@ -370,7 +373,7 @@ final class LearningAssistantViewModel: ObservableObject {
                         studySmartMorningBriefing = briefing
                         studySmartProposalOptions = briefing.options
                         studySmartProposalContexts = [:]
-                        studySmartProposalMessage = nil
+                        setStudySmartProposalMessage(nil)
                     } else {
                         clearStudySmartModeState()
                     }
@@ -379,7 +382,10 @@ final class LearningAssistantViewModel: ObservableObject {
                     guard requestID == studySmartModeSettingRequestID else { return }
                     isStudySmartModeEnabled = settings.enabled
                     clearStudySmartModeState()
-                    studySmartProposalMessage = "智能模式已开启，但晨间简报暂时无法加载。请稍后刷新。"
+                    setStudySmartProposalMessage(
+                        "智能模式已开启，但晨间简报暂时无法加载。请稍后刷新。",
+                        trigger: .morning
+                    )
                     isOffline = true
                 }
             } else {
@@ -388,7 +394,8 @@ final class LearningAssistantViewModel: ObservableObject {
             }
         } catch {
             guard requestID == studySmartModeSettingRequestID else { return }
-            studySmartProposalMessage = "智能模式设置更新失败，请稍后重试。"
+            setStudySmartProposalMessage(nil)
+            studySmartSettingsMessage = "智能模式设置更新失败，请稍后重试。"
             isOffline = true
         }
     }
@@ -396,24 +403,33 @@ final class LearningAssistantViewModel: ObservableObject {
     func ignoreStudySmartProposals() {
         studySmartProposalOptions = []
         studySmartProposalContexts = [:]
-        studySmartProposalMessage = nil
+        setStudySmartProposalMessage(nil)
     }
 
     func applyStudySmartProposal(_ option: StudySmartProposalOption) async {
         guard !isApplyingStudySmartProposal else { return }
-        guard studySmartProposalOptions.contains(where: { $0.id == option.id }) else {
-            studySmartProposalMessage = "智能建议已过期，请刷新后重试。"
+        guard isStudySmartModeEnabled else {
+            clearStudySmartModeState()
+            return
+        }
+        guard let currentOption = studySmartProposalOptions.first(where: { $0.id == option.id }) else {
+            setStudySmartProposalMessage("智能建议已过期，请刷新后重试。", trigger: option.trigger)
+            return
+        }
+        guard currentOption.trigger == option.trigger,
+              currentOption.signature == option.signature else {
+            setStudySmartProposalMessage("智能建议已过期，请刷新后重试。", trigger: currentOption.trigger)
             return
         }
         isApplyingStudySmartProposal = true
-        studySmartProposalMessage = nil
+        setStudySmartProposalMessage(nil)
         defer { isApplyingStudySmartProposal = false }
 
         do {
-            let context = studySmartProposalContexts[option.id]
+            let context = studySmartProposalContexts[currentOption.id]
             let result = try await api.applyStudySmartProposal(
                 StudySmartProposalApplyRequest(
-                    proposal: option,
+                    proposal: currentOption,
                     previousExpectedLateProjectIds: context?.expectedLateProjectIds,
                     previousOverCapacityDates: context?.overCapacityDates
                 )
@@ -425,14 +441,20 @@ final class LearningAssistantViewModel: ObservableObject {
                 if result.status == "disabled" {
                     isStudySmartModeEnabled = false
                 }
-                studySmartProposalMessage = result.message ?? studySmartProposalStatusMessage(for: result.status)
+                setStudySmartProposalMessage(
+                    result.message ?? studySmartProposalStatusMessage(for: result.status),
+                    trigger: result.status == "disabled" ? nil : (result.trigger ?? currentOption.trigger)
+                )
                 return
             }
 
             studySmartProposalOptions = []
             studySmartProposalContexts = [:]
             studySmartMorningBriefing = nil
-            studySmartProposalMessage = result.message ?? "智能建议已应用。"
+            setStudySmartProposalMessage(
+                result.message ?? "智能建议已应用。",
+                trigger: result.trigger ?? currentOption.trigger
+            )
             if result.refresh?.today == true || result.refresh?.projectOverview == true {
                 guard await refreshDashboardFactsOnly() else { return }
             }
@@ -442,7 +464,7 @@ final class LearningAssistantViewModel: ObservableObject {
             studySmartProposalOptions = []
             studySmartProposalContexts = [:]
         } catch {
-            studySmartProposalMessage = "智能建议应用失败，请稍后重试。"
+            setStudySmartProposalMessage("智能建议应用失败，请稍后重试。", trigger: currentOption.trigger)
             isOffline = true
         }
     }
@@ -1079,6 +1101,15 @@ final class LearningAssistantViewModel: ObservableObject {
         studySmartProposalOptions = []
         studySmartProposalContexts = [:]
         studySmartProposalMessage = nil
+        studySmartProposalMessageTrigger = nil
+    }
+
+    private func setStudySmartProposalMessage(
+        _ message: String?,
+        trigger: StudySmartProposalTrigger? = nil
+    ) {
+        studySmartProposalMessage = message
+        studySmartProposalMessageTrigger = message == nil ? nil : trigger
     }
 
     private func studySmartProposalStatusMessage(for status: String) -> String {
@@ -1143,10 +1174,10 @@ final class LearningAssistantViewModel: ObservableObject {
             studySmartProposalContexts = Dictionary(
                 uniqueKeysWithValues: response.options.map { ($0.id, previousRedState) }
             )
-            studySmartProposalMessage = response.message
+            setStudySmartProposalMessage(response.message, trigger: response.trigger)
             isOffline = false
         } catch {
-            studySmartProposalMessage = "智能建议生成失败，请稍后重试。"
+            setStudySmartProposalMessage("智能建议生成失败，请稍后重试。", trigger: .afterAdjustment)
             isOffline = true
         }
     }
@@ -1184,7 +1215,7 @@ final class LearningAssistantViewModel: ObservableObject {
         smartModeEnabled: Bool
     ) async {
         studySmartProposalOptions = []
-        studySmartProposalMessage = nil
+        setStudySmartProposalMessage(nil)
         studySmartMorningBriefing = nil
         studySmartProposalContexts = [:]
         guard await refreshDashboardFactsOnly() else { return }

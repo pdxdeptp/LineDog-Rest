@@ -1948,11 +1948,14 @@ final class LearningAssistantUISourceTests: XCTestCase {
         XCTAssertTrue(settingsSource.contains("默认关闭"))
         XCTAssertTrue(settingsSource.contains("vm.isStudySmartModeEnabled"))
         XCTAssertTrue(settingsSource.contains("Task { await vm.updateStudySmartModeSetting(isOn) }"))
+        XCTAssertTrue(settingsSource.contains("vm.studySmartSettingsMessage"))
         XCTAssertTrue(viewModelSource.contains("func updateStudySmartModeSetting(_ enabled: Bool) async"))
         XCTAssertTrue(viewModelSource.contains("api.updateStudySmartModeSettings(StudySmartModeSettings(enabled: enabled))"))
         XCTAssertFalse(settingsSource.contains("fetchTodayBriefing()"))
         XCTAssertFalse(settingsSource.contains("sendMessage"))
         XCTAssertFalse(settingsSource.contains("confirmProposal"))
+        XCTAssertFalse(settingsSource.contains("chatMessages"))
+        XCTAssertFalse(settingsSource.contains("currentProposal"))
     }
 
     func testLearningAssistantAPIInjectionUsesSendableProtocolWithoutUnsafeBypass() throws {
@@ -1994,8 +1997,19 @@ final class LearningAssistantUISourceTests: XCTestCase {
         let dashboardSmartSource = String(source[start.lowerBound..<end.lowerBound])
 
         XCTAssertTrue(dashboardSmartSource.contains("dashboardVisibleStudySmartOptions"))
+        XCTAssertTrue(dashboardSmartSource.contains("dashboardVisibleStudySmartMessage != nil"))
         XCTAssertFalse(dashboardSmartSource.contains("!vm.studySmartProposalOptions.isEmpty"))
         XCTAssertFalse(dashboardSmartSource.contains("|| vm.studySmartProposalMessage != nil"))
+        XCTAssertTrue(source.contains("private var dashboardVisibleStudySmartMessage: String?"))
+        guard let messageStart = source.range(of: "private var dashboardVisibleStudySmartMessage: String?"),
+              let messageEnd = source[messageStart.upperBound...].range(of: "private var dashboardSummarySection") else {
+            XCTFail("dashboardVisibleStudySmartMessage source section not found")
+            return
+        }
+        let messageSource = String(source[messageStart.lowerBound..<messageEnd.lowerBound])
+        XCTAssertTrue(messageSource.contains("StudySmartOptionsFilter.visibleMessage"))
+        XCTAssertTrue(messageSource.contains("messageTrigger: vm.studySmartProposalMessageTrigger"))
+        XCTAssertTrue(messageSource.contains("placement: .dashboard"))
     }
 
     func testAssistantPanelSmartProposalCardsAreParallelPreviewOnlyWithPerOptionApplyAndIgnore() throws {
@@ -2009,7 +2023,8 @@ final class LearningAssistantUISourceTests: XCTestCase {
 
         XCTAssertTrue(smartSource.contains("ScrollView(.horizontal"))
         XCTAssertTrue(smartSource.contains("LazyHStack"))
-        XCTAssertTrue(smartSource.contains("ForEach(vm.studySmartProposalOptions, id: \\.id)"))
+        XCTAssertTrue(smartSource.contains("ForEach(visibleOptions, id: \\.id)"))
+        XCTAssertFalse(smartSource.contains("ForEach(vm.studySmartProposalOptions"))
         XCTAssertTrue(smartSource.contains("Task { await vm.applyStudySmartProposal(option) }"))
         XCTAssertTrue(smartSource.contains("vm.ignoreStudySmartProposals()"))
         XCTAssertTrue(smartSource.contains("previewedChanges"))
@@ -2022,6 +2037,33 @@ final class LearningAssistantUISourceTests: XCTestCase {
         XCTAssertFalse(smartSource.contains("currentProposal"))
     }
 
+    func testAssistantPanelSmartProposalStripUsesVisibleOptionsAndAvoidsLegacyChatState() throws {
+        let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
+        guard let start = source.range(of: "private struct StudySmartOptionsStrip"),
+              let end = source[start.upperBound...].range(of: "private struct StudySettingsView") else {
+            XCTFail("StudySmartOptionsStrip source section not found")
+            return
+        }
+        let smartSource = String(source[start.lowerBound..<end.lowerBound])
+        let forbiddenTokens = [
+            "ForEach(vm.studySmartProposalOptions",
+            "ChatView",
+            "chatMessages",
+            "currentProposal",
+            "sendMessage",
+            "confirmProposal",
+            "fetchTodayBriefing"
+        ]
+
+        XCTAssertTrue(smartSource.contains("ForEach(visibleOptions, id: \\.id)"))
+        XCTAssertTrue(smartSource.contains("vm.isStudySmartModeEnabled"))
+        XCTAssertTrue(smartSource.contains("StudySmartOptionsFilter.visibleOptions"))
+        XCTAssertTrue(smartSource.contains("messageTrigger: vm.studySmartProposalMessageTrigger"))
+        for token in forbiddenTokens {
+            XCTAssertFalse(smartSource.contains(token), "StudySmartOptionsStrip must not reference \(token)")
+        }
+    }
+
     func testAssistantPanelSmartProposalPlacementsFilterTriggers() throws {
         let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
         guard let start = source.range(of: "enum StudySmartOptionsFilter"),
@@ -2031,8 +2073,8 @@ final class LearningAssistantUISourceTests: XCTestCase {
         }
         let smartSource = String(source[start.lowerBound..<end.lowerBound])
 
-        XCTAssertTrue(smartSource.contains("case .dashboard:\n            return option.trigger == .morning"))
-        XCTAssertTrue(smartSource.contains("case .adjustment:\n            return option.trigger == .afterAdjustment"))
+        XCTAssertTrue(smartSource.contains("case .dashboard:\n            return trigger == .morning"))
+        XCTAssertTrue(smartSource.contains("case .adjustment:\n            return trigger == .afterAdjustment"))
     }
 
     func testStudySmartOptionsPlacementHelperFiltersByTrigger() {
@@ -2083,6 +2125,90 @@ final class LearningAssistantUISourceTests: XCTestCase {
                 placement: .adjustment
             ),
             "after-adjustment message"
+        )
+    }
+
+    func testStudySmartOptionsMessagesRequireMatchingPlacementContext() {
+        let morning = sampleStudySmartProposalOption(trigger: .morning)
+        let afterAdjustment = sampleStudySmartProposalOption(trigger: .afterAdjustment)
+
+        XCTAssertEqual(
+            StudySmartOptionsFilter.visibleMessage(
+                "morning scoped empty message",
+                messageTrigger: .morning,
+                options: [],
+                placement: .dashboard
+            ),
+            "morning scoped empty message"
+        )
+        XCTAssertNil(
+            StudySmartOptionsFilter.visibleMessage(
+                "morning scoped empty message",
+                messageTrigger: .morning,
+                options: [],
+                placement: .adjustment
+            )
+        )
+        XCTAssertEqual(
+            StudySmartOptionsFilter.visibleMessage(
+                "adjustment scoped empty message",
+                messageTrigger: .afterAdjustment,
+                options: [],
+                placement: .adjustment
+            ),
+            "adjustment scoped empty message"
+        )
+        XCTAssertNil(
+            StudySmartOptionsFilter.visibleMessage(
+                "adjustment scoped empty message",
+                messageTrigger: .afterAdjustment,
+                options: [],
+                placement: .dashboard
+            )
+        )
+        XCTAssertEqual(
+            StudySmartOptionsFilter.visibleMessage(
+                "morning message",
+                options: [morning],
+                placement: .dashboard
+            ),
+            "morning message"
+        )
+        XCTAssertNil(
+            StudySmartOptionsFilter.visibleMessage(
+                "morning message",
+                options: [morning],
+                placement: .adjustment
+            )
+        )
+        XCTAssertEqual(
+            StudySmartOptionsFilter.visibleMessage(
+                "after-adjustment message",
+                options: [afterAdjustment],
+                placement: .adjustment
+            ),
+            "after-adjustment message"
+        )
+        XCTAssertNil(
+            StudySmartOptionsFilter.visibleMessage(
+                "after-adjustment message",
+                options: [afterAdjustment],
+                placement: .dashboard
+            )
+        )
+        XCTAssertNil(
+            StudySmartOptionsFilter.visibleMessage(
+                "智能建议已过期，请刷新后重试。",
+                options: [],
+                placement: .adjustment
+            )
+        )
+        XCTAssertNil(
+            StudySmartOptionsFilter.visibleMessage(
+                "智能建议已应用。",
+                options: [],
+                placement: .adjustment
+            )
         )
     }
 
@@ -3850,6 +3976,92 @@ final class LearningAssistantViewModelTests: XCTestCase {
         XCTAssertEqual(vm.currentProposal, "legacy proposal")
     }
 
+    func testDashboardDefaultSmartModeKeepsRedStateFactsFactOnlyAndClearsStraySmartState() async {
+        let mock = MockAssistantAPIClient()
+        mock.studySmartModeSettingsResult = StudySmartModeSettings(enabled: false)
+        mock.studyTodayViewResult = sampleStudyTodayView(tasks: [
+            sampleStudyViewTaskJSON(
+                id: 42,
+                title: "Rolled task",
+                targetMinutes: 30,
+                projectTitle: "Lag Project",
+                rolledDayCount: 4
+            )
+        ])
+        mock.studyProjectOverviewResult = sampleStudyProjectOverview(activeProjects: [
+            sampleStudyProjectSummaryJSON(
+                id: 7,
+                title: "Expected late",
+                completedUnits: 1,
+                totalUnits: 4,
+                progressRatio: 0.25,
+                status: "active",
+                expectedLate: true
+            )
+        ])
+        mock.studyCalendarLoadResult = sampleStudyCalendarLoad(
+            start: "2026-06-01",
+            end: "2026-06-07",
+            dayJSON: """
+            {
+                "date": "2026-06-03",
+                "scheduled_task_count": 3,
+                "total_target_minutes": 180,
+                "completed_task_count": 0,
+                "available_capacity_minutes": 75,
+                "over_capacity": true,
+                "rest_day": false
+            }
+            """
+        )
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        await vm.fetchStudyCalendarLoad(start: "2026-06-01", end: "2026-06-07")
+        vm.studySmartProposalOptions = [sampleStudySmartProposalOption()]
+        vm.studySmartProposalMessage = "stale smart proposal"
+
+        await vm.fetchDashboard()
+
+        XCTAssertEqual(vm.studyTodayView?.tasks.first?.rolledDayCount, 4)
+        XCTAssertEqual(vm.studyProjectOverview?.activeProjects.first?.expectedLate, true)
+        XCTAssertEqual(vm.studyCalendarLoad?.days.first?.overCapacity, true)
+        XCTAssertEqual(mock.fetchStudySmartModeSettingsCallCount, 1)
+        XCTAssertEqual(mock.fetchStudySmartMorningBriefingCallCount, 0)
+        XCTAssertEqual(mock.generateStudySmartProposalsCallCount, 0)
+        XCTAssertEqual(mock.fetchBriefingCallCount, 0)
+        XCTAssertEqual(mock.sendMessageCallCount, 0)
+        XCTAssertEqual(mock.confirmChatCallCount, 0)
+        XCTAssertNil(vm.studySmartMorningBriefing)
+        XCTAssertTrue(vm.studySmartProposalOptions.isEmpty)
+        XCTAssertNil(vm.studySmartProposalMessage)
+        XCTAssertTrue(vm.chatMessages.isEmpty)
+        XCTAssertNil(vm.currentProposal)
+    }
+
+    func testDisabledStudySmartModeRejectsStrayProposalApplyWithoutSmartOrLegacyCalls() async {
+        let mock = MockAssistantAPIClient()
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        let option = sampleStudySmartProposalOption()
+        vm.isStudySmartModeEnabled = false
+        vm.studySmartProposalOptions = [option]
+        vm.studySmartProposalMessage = "stale smart proposal"
+        vm.chatMessages = [ChatMessage(role: .assistant, text: "legacy")]
+        vm.currentProposal = "legacy proposal"
+
+        await vm.applyStudySmartProposal(option)
+
+        XCTAssertEqual(mock.applyStudySmartProposalCallCount, 0)
+        XCTAssertEqual(mock.fetchStudyTodayViewCallCount, 0)
+        XCTAssertEqual(mock.fetchStudyProjectOverviewCallCount, 0)
+        XCTAssertEqual(mock.fetchResourcesCallCount, 0)
+        XCTAssertEqual(mock.fetchStudyCalendarLoadCallCount, 0)
+        XCTAssertEqual(mock.sendMessageCallCount, 0)
+        XCTAssertEqual(mock.confirmChatCallCount, 0)
+        XCTAssertTrue(vm.studySmartProposalOptions.isEmpty)
+        XCTAssertNil(vm.studySmartProposalMessage)
+        XCTAssertEqual(vm.chatMessages.map(\.text), ["legacy"])
+        XCTAssertEqual(vm.currentProposal, "legacy proposal")
+    }
+
     func testDashboardEnabledSmartModeFetchesMorningBriefingAndStoresProposalOptions() async {
         let mock = MockAssistantAPIClient()
         mock.studySmartModeSettingsResult = StudySmartModeSettings(enabled: true)
@@ -3888,6 +4100,47 @@ final class LearningAssistantViewModelTests: XCTestCase {
         XCTAssertNil(vm.studySmartMorningBriefing)
         XCTAssertTrue(vm.studySmartProposalOptions.isEmpty)
         XCTAssertEqual(vm.studySmartProposalMessage, "智能模式已开启，但晨间简报暂时无法加载。请稍后刷新。")
+        XCTAssertEqual(vm.studySmartProposalMessageTrigger, .morning)
+        XCTAssertNil(vm.studySmartSettingsMessage)
+        XCTAssertEqual(
+            StudySmartOptionsFilter.visibleMessage(
+                vm.studySmartProposalMessage,
+                messageTrigger: vm.studySmartProposalMessageTrigger,
+                options: vm.studySmartProposalOptions,
+                placement: .dashboard
+            ),
+            "智能模式已开启，但晨间简报暂时无法加载。请稍后刷新。"
+        )
+        XCTAssertNil(
+            StudySmartOptionsFilter.visibleMessage(
+                vm.studySmartProposalMessage,
+                messageTrigger: vm.studySmartProposalMessageTrigger,
+                options: vm.studySmartProposalOptions,
+                placement: .adjustment
+            )
+        )
+        XCTAssertEqual(mock.sendMessageCallCount, 0)
+        XCTAssertEqual(mock.confirmChatCallCount, 0)
+        XCTAssertTrue(vm.chatMessages.isEmpty)
+        XCTAssertNil(vm.currentProposal)
+    }
+
+    func testStudySmartModeSettingFailureUsesSettingsMessageWithoutLegacyChatOrProposalMessage() async {
+        let mock = MockAssistantAPIClient()
+        mock.shouldThrowOffline = true
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+
+        await vm.updateStudySmartModeSetting(true)
+
+        XCTAssertEqual(mock.updateStudySmartModeSettingsCallCount, 1)
+        XCTAssertEqual(mock.fetchStudySmartMorningBriefingCallCount, 0)
+        XCTAssertNil(vm.studySmartProposalMessage)
+        XCTAssertNil(vm.studySmartProposalMessageTrigger)
+        XCTAssertEqual(vm.studySmartSettingsMessage, "智能模式设置更新失败，请稍后重试。")
+        XCTAssertEqual(mock.sendMessageCallCount, 0)
+        XCTAssertEqual(mock.confirmChatCallCount, 0)
+        XCTAssertTrue(vm.chatMessages.isEmpty)
+        XCTAssertNil(vm.currentProposal)
     }
 
     func testStudySmartModeSettingUpdateUsesLatestUserIntentWhenRequestsCompleteOutOfOrder() async {
@@ -4002,6 +4255,7 @@ final class LearningAssistantViewModelTests: XCTestCase {
         )
         let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
         let option = sampleStudySmartProposalOption()
+        vm.isStudySmartModeEnabled = true
         vm.studySmartProposalOptions = [option]
 
         await vm.applyStudySmartProposal(option)
@@ -4015,6 +4269,46 @@ final class LearningAssistantViewModelTests: XCTestCase {
         XCTAssertEqual(vm.studySmartProposalMessage, "智能建议已过期，请刷新后重试。")
         XCTAssertTrue(vm.chatMessages.isEmpty)
         XCTAssertNil(vm.currentProposal)
+    }
+
+    func testApplyRejectsCapturedStudySmartProposalWhenSameIdSignatureChanged() async {
+        let mock = MockAssistantAPIClient()
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        let currentOption = sampleStudySmartProposalOption(signature: "new-signature")
+        let capturedStaleOption = sampleStudySmartProposalOption(signature: "old-signature")
+        vm.isStudySmartModeEnabled = true
+        vm.studySmartProposalOptions = [currentOption]
+        vm.chatMessages = [ChatMessage(role: .assistant, text: "legacy")]
+        vm.currentProposal = "legacy proposal"
+
+        await vm.applyStudySmartProposal(capturedStaleOption)
+
+        XCTAssertEqual(mock.applyStudySmartProposalCallCount, 0)
+        XCTAssertEqual(mock.fetchStudyTodayViewCallCount, 0)
+        XCTAssertEqual(mock.fetchStudyProjectOverviewCallCount, 0)
+        XCTAssertEqual(mock.fetchResourcesCallCount, 0)
+        XCTAssertEqual(mock.fetchStudyCalendarLoadCallCount, 0)
+        XCTAssertEqual(vm.studySmartProposalOptions.map(\.signature), ["new-signature"])
+        XCTAssertEqual(vm.studySmartProposalMessage, "智能建议已过期，请刷新后重试。")
+        XCTAssertEqual(
+            StudySmartOptionsFilter.visibleMessage(
+                vm.studySmartProposalMessage,
+                options: vm.studySmartProposalOptions,
+                placement: .dashboard
+            ),
+            "智能建议已过期，请刷新后重试。"
+        )
+        XCTAssertNil(
+            StudySmartOptionsFilter.visibleMessage(
+                vm.studySmartProposalMessage,
+                options: vm.studySmartProposalOptions,
+                placement: .adjustment
+            )
+        )
+        XCTAssertEqual(mock.sendMessageCallCount, 0)
+        XCTAssertEqual(mock.confirmChatCallCount, 0)
+        XCTAssertEqual(vm.chatMessages.map(\.text), ["legacy"])
+        XCTAssertEqual(vm.currentProposal, "legacy proposal")
     }
 
     func testManualAdjustmentCreatesExpectedLateOrOverCapacityRedStateGeneratesAfterAdjustmentProposals() async {
@@ -5454,7 +5748,8 @@ private func sampleStudySmartMorningBriefing() -> StudySmartMorningBriefing {
 }
 
 private func sampleStudySmartProposalOption(
-    trigger: StudySmartProposalTrigger = .morning
+    trigger: StudySmartProposalTrigger = .morning,
+    signature: String = "abc123"
 ) -> StudySmartProposalOption {
     StudySmartProposalOption(
         id: trigger == .morning ? "morning-extend-deadline-7" : "after-adjustment-extend-deadline-7",
@@ -5493,7 +5788,7 @@ private func sampleStudySmartProposalOption(
         summary: "Extend project 7's deadline to 2026-06-14.",
         tradeoff: "Keeps task dates unchanged but moves the project commitment later.",
         signatureVersion: 1,
-        signature: "abc123",
+        signature: signature,
         signaturePayload: [
             "trigger": AnyCodable(trigger.rawValue),
             "project_id": AnyCodable(7)

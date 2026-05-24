@@ -177,7 +177,9 @@ struct AssistantPanelView: View {
     @ViewBuilder
     private var studySmartDashboardSection: some View {
         if vm.isStudySmartModeEnabled,
-           vm.studySmartMorningBriefing != nil || !dashboardVisibleStudySmartOptions.isEmpty {
+           vm.studySmartMorningBriefing != nil ||
+            !dashboardVisibleStudySmartOptions.isEmpty ||
+            dashboardVisibleStudySmartMessage != nil {
             VStack(alignment: .leading, spacing: 10) {
                 if let briefing = vm.studySmartMorningBriefing {
                     Label("智能晨间简报", systemImage: "sparkles")
@@ -207,6 +209,15 @@ struct AssistantPanelView: View {
 
     private var dashboardVisibleStudySmartOptions: [StudySmartProposalOption] {
         StudySmartOptionsFilter.visibleOptions(vm.studySmartProposalOptions, placement: .dashboard)
+    }
+
+    private var dashboardVisibleStudySmartMessage: String? {
+        StudySmartOptionsFilter.visibleMessage(
+            vm.studySmartProposalMessage,
+            messageTrigger: vm.studySmartProposalMessageTrigger,
+            options: vm.studySmartProposalOptions,
+            placement: .dashboard
+        )
     }
 
     private var dashboardSummarySection: some View {
@@ -1308,24 +1319,38 @@ enum StudySmartOptionsFilter {
         options: [StudySmartProposalOption],
         placement: StudySmartOptionsPlacement
     ) -> String? {
+        visibleMessage(message, messageTrigger: nil, options: options, placement: placement)
+    }
+
+    static func visibleMessage(
+        _ message: String?,
+        messageTrigger: StudySmartProposalTrigger?,
+        options: [StudySmartProposalOption],
+        placement: StudySmartOptionsPlacement
+    ) -> String? {
         guard let message else { return nil }
-        switch placement {
-        case .dashboard:
-            return visibleOptions(options, placement: placement).isEmpty ? nil : message
-        case .adjustment:
-            return message
+        if let messageTrigger {
+            return shouldShow(messageTrigger, placement: placement) ? message : nil
         }
+        return visibleOptions(options, placement: placement).isEmpty ? nil : message
     }
 
     private static func shouldShow(
         _ option: StudySmartProposalOption,
         placement: StudySmartOptionsPlacement
     ) -> Bool {
+        shouldShow(option.trigger, placement: placement)
+    }
+
+    private static func shouldShow(
+        _ trigger: StudySmartProposalTrigger,
+        placement: StudySmartOptionsPlacement
+    ) -> Bool {
         switch placement {
         case .dashboard:
-            return option.trigger == .morning
+            return trigger == .morning
         case .adjustment:
-            return option.trigger == .afterAdjustment
+            return trigger == .afterAdjustment
         }
     }
 }
@@ -1353,16 +1378,14 @@ private struct StudySmartOptionsStrip: View {
 
                     ScrollView(.horizontal, showsIndicators: false) {
                         LazyHStack(alignment: .top, spacing: 10) {
-                            ForEach(vm.studySmartProposalOptions, id: \.id) { option in
-                                if shouldShow(option) {
-                                    StudySmartProposalOptionCard(
-                                        option: option,
-                                        isApplying: vm.isApplyingStudySmartProposal,
-                                        onApply: {
-                                            Task { await vm.applyStudySmartProposal(option) }
-                                        }
-                                    )
-                                }
+                            ForEach(visibleOptions, id: \.id) { option in
+                                StudySmartProposalOptionCard(
+                                    option: option,
+                                    isApplying: vm.isApplyingStudySmartProposal,
+                                    onApply: {
+                                        Task { await vm.applyStudySmartProposal(option) }
+                                    }
+                                )
                             }
                         }
                         .padding(.vertical, 2)
@@ -1399,13 +1422,10 @@ private struct StudySmartOptionsStrip: View {
     private var visibleProposalMessage: String? {
         StudySmartOptionsFilter.visibleMessage(
             vm.studySmartProposalMessage,
+            messageTrigger: vm.studySmartProposalMessageTrigger,
             options: vm.studySmartProposalOptions,
             placement: placement
         )
-    }
-
-    private func shouldShow(_ option: StudySmartProposalOption) -> Bool {
-        StudySmartOptionsFilter.visibleOptions([option], placement: placement).contains { $0.id == option.id }
     }
 }
 
@@ -1657,6 +1677,12 @@ private struct StudySettingsView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+
+            if let message = vm.studySmartSettingsMessage {
+                Label(message, systemImage: "exclamationmark.triangle")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
