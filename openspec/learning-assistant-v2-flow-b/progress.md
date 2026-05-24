@@ -3,9 +3,9 @@
 ## Current Status
 
 - Phase: Flow B implementation
-- Current item: ITEM-001 `study-plan-foundation`
-- Current change: `introduce-study-plan-foundation`
-- Current spec: `study-plan`
+- Current item: ITEM-003 `study-plan-adjustment`
+- Current change: pending OpenSpec proposal
+- Current spec: pending `study-plan-adjustment`
 - Checkout strategy: current checkout only; worktrees are forbidden by automation instruction.
 
 ## Round 01 · 2026-05-23T14:50:55Z
@@ -376,3 +376,400 @@ Before implementation, create a checkpoint commit in the current checkout, then 
 
 - Before entering `opsx:apply`, create a checkpoint commit in the current checkout if no unrelated user changes are present.
 - Then begin backend TDD for tasks 2.1 and 2.2.
+
+## Round 11 · 2026-05-23T18:25:26Z
+
+### Checkpoint
+
+- Created checkpoint commit before `opsx:apply`: `92cb29d chore: checkpoint study plan foundation and views spec`.
+- Excluded runtime SQLite files `assistant_backend/learning.db-wal` and `assistant_backend/learning.db-shm` from the checkpoint.
+
+### 2.1 / 2.2 Result
+
+- Worker completed backend Today Study View TDD.
+- RED observed: `/api/study-views/today` returned `404 Not Found`.
+- GREEN observed:
+  - deterministic `GET /api/study-views/today`,
+  - SQLite-backed query over `tasks`, `resources`, and `units`,
+  - filters for today's active `study_project` tasks,
+  - excludes completed/archived projects, non-study resources, and non-today tasks,
+  - does not invoke the morning agent or LLM.
+- Spec compliance review: APPROVED.
+- Code quality review: APPROVED.
+- Non-blocking review notes:
+  - future tests can guard direct import of `src.agents.morning_agent.run_morning_agent`,
+  - unit join can be hardened with `u.resource_id = t.resource_id` if dirty data becomes a concern.
+
+### Verification
+
+- `cd assistant_backend && .venv/bin/python -m pytest tests/test_study_views_today.py -q`: `1 passed, 2 warnings`.
+- `cd assistant_backend && .venv/bin/python -m pytest tests/test_study_plan_router.py tests/test_study_plan_lifecycle.py tests/test_resource_management.py -q`: `27 passed, 2 warnings`.
+- `git diff --check`: PASS.
+
+### Files Added / Changed
+
+- Added `assistant_backend/tests/test_study_views_today.py`.
+- Added `assistant_backend/src/routers/study_views.py`.
+- Updated `assistant_backend/src/db/queries.py`.
+- Updated `assistant_backend/src/main.py`.
+- Updated `openspec/changes/introduce-study-views/tasks.md` to mark 2.1 and 2.2 complete.
+- Added `openspec/learning-assistant-v2-flow-b/evidence/item-002/tdd-backend-today-view-report.md`.
+
+### Next Task
+
+- 2.3 / 2.4: task completion idempotency, progress update, unit completion, and v2 view refresh facts.
+
+### 2.3 / 2.4 Result
+
+- Worker completed backend task completion TDD.
+- RED observed:
+  - duplicate completion produced a new `completed_at` instead of preserving the persisted completion fact,
+  - missing task IDs had no deterministic 404/no-event guarantee,
+  - same-unit multiple task completion could double-count unit progress,
+  - the v2 Today view refresh path after completion needed direct coverage.
+- Initial spec review requested changes because the first implementation attempted to auto-complete/archive the project in this slice, which belongs to 2.9 / 2.10.
+- GREEN observed:
+  - completion runs in one SQLite transaction,
+  - duplicate completion is idempotent,
+  - unknown task completion returns 404 and writes no fake event,
+  - linked units complete once without double-counting `completed_units`,
+  - resource `actual_minutes_total` accumulates non-duplicate task minutes,
+  - Today view reflects the persisted `completed_at` after completion,
+  - project/resource auto-completion remains deferred to 2.9 / 2.10.
+- Second-pass spec compliance review: APPROVED.
+- Second-pass code quality review: APPROVED.
+
+### Verification
+
+- `cd assistant_backend && .venv/bin/python -m pytest tests/test_study_views_completion.py -q`: `3 passed, 2 warnings`.
+- `cd assistant_backend && .venv/bin/python -m pytest tests/test_study_views_today.py tests/test_resource_management.py tests/test_study_plan_lifecycle.py -q`: `19 passed, 2 warnings`.
+- `git diff --check`: PASS.
+
+### Files Added / Changed
+
+- Added `assistant_backend/tests/test_study_views_completion.py`.
+- Updated `assistant_backend/src/db/queries.py`.
+- Updated `assistant_backend/src/routers/tasks.py`.
+- Updated `openspec/changes/introduce-study-views/tasks.md` to mark 2.3 and 2.4 complete.
+- Added `openspec/learning-assistant-v2-flow-b/evidence/item-002/tdd-backend-completion-report.md`.
+
+### Next Task
+
+- 2.5 / 2.6: Project Overview active summaries and completed history.
+
+### 2.5 / 2.6 Result
+
+- Worker completed backend Project Overview TDD.
+- Initial RED observed: `/api/study-views/projects` returned `404 Not Found`.
+- GREEN observed:
+  - deterministic `GET /api/study-views/projects`,
+  - `active_projects` and `completed_projects` sections,
+  - active study project summaries with title, completed count, total count, ratio, target minutes, actual minutes, deadline, and status,
+  - completed study project history remains visible,
+  - archived projects and non-study resources are excluded,
+  - task completion refreshes overview from persisted facts.
+- Review-driven repairs:
+  - progress now uses task completed/total facts rather than unit status or stale resource cache,
+  - same-unit multiple-task projects no longer appear 100% complete after only one task,
+  - no-actual completion persists target fallback to `tasks.actual_minutes`,
+  - zero-task projects report task-derived `0/0` instead of stale `resources.total_units`,
+  - tests no longer freeze final-task no-auto-archive behavior that belongs to 2.9 / 2.10.
+- Spec compliance review: APPROVED.
+- Code quality review: requested fixes twice; both rounds were resolved before task completion.
+
+### Verification
+
+- `cd assistant_backend && .venv/bin/python -m pytest tests/test_study_views_project_overview.py tests/test_study_views_completion.py -q`: `9 passed, 2 warnings`.
+- `cd assistant_backend && .venv/bin/python -m pytest tests/test_study_views_today.py tests/test_resource_management.py -q`: `14 passed, 2 warnings`.
+- `git diff --check`: PASS.
+
+### Files Added / Changed
+
+- Added `assistant_backend/tests/test_study_views_project_overview.py`.
+- Updated `assistant_backend/src/db/queries.py`.
+- Updated `assistant_backend/src/routers/study_views.py`.
+- Updated `assistant_backend/tests/test_study_views_completion.py`.
+- Updated `openspec/changes/introduce-study-views/tasks.md` to mark 2.5 and 2.6 complete.
+- Added `openspec/learning-assistant-v2-flow-b/evidence/item-002/tdd-backend-project-overview-report.md`.
+
+### Next Task
+
+- 2.7 / 2.8: Calendar load aggregation and read-only load route.
+
+### 2.7 / 2.8 Result
+
+- Worker completed backend Calendar Load TDD.
+- RED observed: `/api/study-views/calendar?start=...&end=...` returned `404 Not Found`.
+- GREEN observed:
+  - deterministic `GET /api/study-views/calendar`,
+  - inclusive date-window buckets,
+  - one bucket per day, including empty days,
+  - active `study_project` tasks only,
+  - scheduled task count, total target minutes, completed task count, and over-capacity flag,
+  - configured daily capacity from `system_state.daily_capacity_min`, fallback `60`,
+  - read-only behavior with no events or task date mutations.
+- Spec compliance review: APPROVED.
+- Code quality review: APPROVED.
+- Non-blocking review notes were recorded in evidence; no blocker remains for 2.7 / 2.8.
+
+### Verification
+
+- `cd assistant_backend && .venv/bin/python -m pytest tests/test_study_views_calendar.py -q`: `3 passed, 2 warnings`.
+- `cd assistant_backend && .venv/bin/python -m pytest tests/test_study_views_today.py tests/test_study_views_completion.py tests/test_study_views_project_overview.py tests/test_resource_management.py -q`: `23 passed, 2 warnings`.
+- `git diff --check`: PASS.
+
+### Files Added / Changed
+
+- Added `assistant_backend/tests/test_study_views_calendar.py`.
+- Updated `assistant_backend/src/db/queries.py`.
+- Updated `assistant_backend/src/routers/study_views.py`.
+- Updated `openspec/changes/introduce-study-views/tasks.md` to mark 2.7 and 2.8 complete.
+- Added `openspec/learning-assistant-v2-flow-b/evidence/item-002/tdd-backend-calendar-report.md`.
+
+### Next Task
+
+- 2.9 / 2.10: automatic completed project archive/history when the last unfinished task completes.
+
+### 2.9 / 2.10 Result
+
+- Worker completed backend automatic completed-project archive TDD.
+- RED observed: completing the final active `study_project` task left the project resource `active`.
+- GREEN observed:
+  - final active `study_project` task completion transitions the resource to `completed`,
+  - completed project disappears from active Today and active Project Overview,
+  - completed project appears in Project Overview completed history,
+  - `resource_completed` event is inserted once with `source: task_completion`,
+  - duplicate completion does not duplicate `task_completed` or `resource_completed`,
+  - non-study resources do not auto-complete through this path,
+  - resource, unit, task, and event rows remain persisted.
+- Spec compliance review: APPROVED.
+- Code quality review: APPROVED.
+
+### Verification
+
+- `cd assistant_backend && .venv/bin/python -m pytest tests/test_study_views_completion.py tests/test_study_views_project_overview.py tests/test_study_views_today.py -q`: `12 passed, 2 warnings`.
+- `cd assistant_backend && .venv/bin/python -m pytest tests/test_study_views_calendar.py tests/test_resource_management.py -q`: `16 passed, 2 warnings`.
+- `git diff --check`: PASS.
+
+### Files Added / Changed
+
+- Updated `assistant_backend/src/db/queries.py`.
+- Updated `assistant_backend/tests/test_study_views_completion.py`.
+- Updated `assistant_backend/tests/test_study_views_project_overview.py`.
+- Updated `openspec/changes/introduce-study-views/tasks.md` to mark 2.9 and 2.10 complete.
+- Added `openspec/learning-assistant-v2-flow-b/evidence/item-002/tdd-backend-auto-archive-report.md`.
+
+### Next Task
+
+- 3.1 / 3.2: Swift API models and client methods for Today, Project Overview, Calendar Load, and task completion refresh payloads.
+
+### 3.1 / 3.2 Result
+
+- Worker completed Swift API model/client TDD.
+- Initial RED observed: Swift tests failed because `StudyTodayView`, `StudyProjectOverview`, and `StudyCalendarLoad` were missing.
+- Review-driven RED observed:
+  - `TaskCompletionResult` was missing,
+  - `completeTask` discarded the backend completion payload,
+  - Calendar query construction lacked real client coverage,
+  - AssistantPanel preview fixture still had the old `completeTask -> Void` signature.
+- GREEN observed:
+  - v2 study view Swift models added,
+  - concrete client and protocol expose v2 fetch methods,
+  - `completeTask` returns decoded `TaskCompletionResult`,
+  - URLProtocol-backed tests cover method, path, query, request body, and decode behavior,
+  - Calendar query is built with `URLQueryItem`,
+  - preview fixture conforms to the new completion result signature.
+- Spec compliance review: APPROVED.
+- Code quality review: requested fixes twice; both rounds were resolved before task completion.
+
+### Verification
+
+- `xcodebuild test -project MalDaze.xcodeproj -scheme MalDaze -destination 'platform=macOS' -only-testing:MalDazeTests/AssistantModelDecodingTests`: `** TEST SUCCEEDED **`.
+- `xcodebuild test -project MalDaze.xcodeproj -scheme MalDaze -destination 'platform=macOS' -only-testing:MalDazeTests/LearningAssistantUISourceTests -only-testing:MalDazeTests/AssistantModelDecodingTests`: `** TEST SUCCEEDED **`.
+- `git diff --check`: PASS.
+
+### Files Added / Changed
+
+- Updated `MalDaze/LearningAssistant/AssistantAPIClient.swift`.
+- Updated `MalDaze/LearningAssistant/AssistantAPIClientProtocol.swift`.
+- Updated `MalDaze/LearningAssistant/AssistantPanelView.swift` preview fixture.
+- Updated `MalDazeTests/LearningAssistantTests.swift`.
+- Updated `openspec/changes/introduce-study-views/tasks.md` to mark 3.1 and 3.2 complete.
+- Added `openspec/learning-assistant-v2-flow-b/evidence/item-002/tdd-swift-api-client-report.md`.
+
+### Next Task
+
+- 3.3 / 3.4: ViewModel state transitions for v2 Today, task completion refresh, Project Overview active/history, and read-only Calendar load.
+
+### 3.3 / 3.4 Result
+
+- Worker completed Swift ViewModel TDD for v2 study views.
+- Initial RED observed: `LearningAssistantViewModel` lacked first-class `studyTodayView`, `studyProjectOverview`, `studyCalendarLoad`, and `fetchStudyCalendarLoad(start:end:)`.
+- GREEN observed:
+  - default dashboard refresh uses dedicated v2 Today and Project Overview APIs,
+  - v2 ViewModel state stores Today, Project Overview active/completed history, and read-only Calendar load,
+  - task completion refreshes persisted Today and Project Overview facts,
+  - `TodayBriefing.highlights` is no longer the v2 dashboard source of truth,
+  - Calendar load remains read-only ViewModel state.
+- Code quality review requested fixes for Calendar stale overwrite, project-title mapping, and v2 fixture coverage.
+- Review-driven RED observed: older Calendar range could overwrite a newer range, and visible task mapping preferred resource title when both project/resource titles existed.
+- Repair added latest-request-wins Calendar sequencing, project-title-first visible task mapping, and v2-only fixtures for the relevant ViewModel dashboard/concurrency/completion tests.
+- Spec compliance review: APPROVED.
+- Code quality re-review: APPROVED.
+
+### Verification
+
+- `xcodebuild test -project MalDaze.xcodeproj -scheme MalDaze -destination 'platform=macOS' -only-testing:MalDazeTests/LearningAssistantViewModelTests -only-testing:MalDazeTests/AssistantModelDecodingTests`: `** TEST SUCCEEDED **`.
+- `openspec validate introduce-study-views --strict`: PASS.
+- `git diff --check`: PASS.
+
+### Files Added / Changed
+
+- Updated `MalDaze/LearningAssistant/LearningAssistantViewModel.swift`.
+- Updated `MalDazeTests/LearningAssistantTests.swift`.
+- Updated `openspec/changes/introduce-study-views/tasks.md` to mark 3.3 and 3.4 complete.
+- Added `openspec/learning-assistant-v2-flow-b/evidence/item-002/tdd-swift-viewmodel-report.md`.
+
+### Next Task
+
+- 4.1 / 4.2: presentation tests and minimal Swift UI for first-class Today, Project Overview, completed history, and read-only Calendar load.
+
+### 4.1 / 4.2 / 4.3 Result
+
+- Worker completed Swift UI TDD for first-class v2 study views.
+- Initial RED observed:
+  - source tests failed because the panel did not expose first-class Project Overview and Calendar tabs,
+  - `ProjectOverviewView` and `StudyCalendarLoadView` were missing,
+  - Today did not surface v2 persisted Today facts,
+  - Calendar read-only behavior was not yet locked by tests.
+- GREEN observed:
+  - Today, Project Overview, and Calendar are available as first-class bottom navigation views,
+  - Today displays v2 persisted facts,
+  - Project Overview displays active projects, completed history, progress, status, deadline, and minute facts,
+  - Calendar displays read-only daily load facts.
+- Code quality review requested fixes for Calendar default range, in-flight fetch dedupe, Project Overview progress clamping, and status/deadline formatting.
+- Repair-driven RED observed all four review blockers before implementation.
+- Repair added a 28-day default Calendar window, loaded/in-flight request guard, shared clamped progress helper, non-finite guard, Chinese status labels, and `无截止日期` fallback.
+- Spec compliance re-review: APPROVED.
+- Code quality re-review: APPROVED.
+
+### Verification
+
+- `xcodebuild test -project MalDaze.xcodeproj -scheme MalDaze -destination 'platform=macOS' -only-testing:MalDazeTests/LearningAssistantUISourceTests`: `** TEST SUCCEEDED **`.
+- `openspec validate introduce-study-views --strict`: PASS.
+- `git diff --check`: PASS.
+
+### Files Added / Changed
+
+- Updated `MalDaze/LearningAssistant/AssistantPanelView.swift`.
+- Updated `MalDaze/LearningAssistant/LearningAssistantViewModel.swift`.
+- Updated `MalDazeTests/LearningAssistantTests.swift`.
+- Updated `openspec/changes/introduce-study-views/tasks.md` to mark 4.1, 4.2, and 4.3 complete.
+- Added `openspec/learning-assistant-v2-flow-b/evidence/item-002/tdd-swift-ui-report.md`.
+
+### Next Task
+
+- 5.1 / 5.2 / 5.3: final backend/Swift test verification, OpenSpec validation, and Computer Use/App Use verification in the current checkout.
+
+### 5.1 / 5.2 Partial Final Verification
+
+- Relevant backend tests passed.
+- Relevant Swift ViewModel, model/client decoding, and UI source tests passed.
+- OpenSpec strict validation passed.
+- `git diff --check` passed.
+- App Use verification was attempted against the current checkout app path, but Computer Use could not attach to a key dashboard content window for the menu-bar/desktop-pet panel.
+- Supplemental AX/CGWindow observation confirmed the current checkout app process was running and exposing visible pet/menu windows.
+- 5.3 remains open pending a reliable current-checkout App Use path.
+
+### Verification
+
+- `cd assistant_backend && .venv/bin/python -m pytest tests/test_study_views_today.py tests/test_study_views_completion.py tests/test_study_views_project_overview.py tests/test_study_views_calendar.py tests/test_resource_management.py -q`: `28 passed, 2 warnings`.
+- `xcodebuild test -project MalDaze.xcodeproj -scheme MalDaze -destination 'platform=macOS' -only-testing:MalDazeTests/LearningAssistantViewModelTests -only-testing:MalDazeTests/AssistantModelDecodingTests -only-testing:MalDazeTests/LearningAssistantUISourceTests`: `** TEST SUCCEEDED **`.
+- `openspec validate introduce-study-views --strict`: PASS.
+- `git diff --check`: PASS.
+
+### Files Added / Changed
+
+- Updated `openspec/changes/introduce-study-views/tasks.md` to mark 5.1 and 5.2 complete.
+- Added `openspec/learning-assistant-v2-flow-b/evidence/item-002/final-tests-and-app-use-attempt.md`.
+
+### Next Task
+
+- 5.3: complete Computer Use/App Use verification for the current checkout dashboard, or mark blocked if older running `MalDaze.app` instances prevent safe isolation without user approval.
+
+### 5.3 Blocked
+
+- Current checkout app was launched from `/Users/cpt/Library/Developer/Xcode/DerivedData/MalDaze-bpwxiacqyfwxjndsvopwqmqitret/Build/Products/Debug/MalDaze.app`.
+- The current checkout process exposed a dashboard-sized CG window after an in-process dashboard notification.
+- Computer Use still returned `cgWindowNotFound` for the current app.
+- System-wide AX hit testing over the dashboard area returned `loginwindow` elements, and screenshot capture was black.
+- Root blocker: the desktop/session is currently locked or hidden behind the login window, so Computer Use/App Use cannot observe app pixels or the app accessibility tree.
+- Task 5.3 remains incomplete until the user unlocks the session or explicitly approves an alternate verification method.
+
+## Round 15 · 2026-05-24T02:57:10Z
+
+### 5.3 App Use Verification Result
+
+- The earlier loginwindow blocker was gone; the current checkout app could render a dashboard-sized CG window.
+- Current checkout app path verified: `/Users/cpt/Library/Developer/Xcode/DerivedData/MalDaze-bpwxiacqyfwxjndsvopwqmqitret/Build/Products/Debug/MalDaze.app`.
+- Computer Use could attach to `MalDaze`, but the app exposed the pet stage as the key accessibility window. The dashboard verification therefore used the current checkout dashboard window plus accessibility actions against the current checkout PID.
+- Real user DB screenshots verified first-class Today, Project Overview, and Calendar tabs without mutating user task state.
+- A temporary database was launched via `DB_PATH=/tmp/maldaze-study-views-appuse.db` to safely click the task completion control without touching user data.
+- Temporary DB verification showed:
+  - Today before completion contained `App Use completion task`.
+  - Pressing the actual completion button moved Today into the all-tasks-completed state.
+  - Project Overview refreshed to `1/2` units, `50%`, and `35` actual minutes.
+  - Calendar refreshed the current day completed count to `1`.
+  - Direct SQLite confirmation showed task `9701` completed, unit status `completed`, resource completed units `1`, and resource actual minutes `35`.
+
+### Evidence
+
+- `openspec/learning-assistant-v2-flow-b/evidence/item-002/app-verification.md`
+- `openspec/learning-assistant-v2-flow-b/evidence/item-002/app-use-screenshots/dashboard-home.png`
+- `openspec/learning-assistant-v2-flow-b/evidence/item-002/app-use-screenshots/dashboard-project-overview.png`
+- `openspec/learning-assistant-v2-flow-b/evidence/item-002/app-use-screenshots/dashboard-calendar.png`
+- `openspec/learning-assistant-v2-flow-b/evidence/item-002/app-use-screenshots/tempdb-home-before.png`
+- `openspec/learning-assistant-v2-flow-b/evidence/item-002/app-use-screenshots/tempdb-home-after-complete.png`
+- `openspec/learning-assistant-v2-flow-b/evidence/item-002/app-use-screenshots/tempdb-project-overview-after-complete.png`
+- `openspec/learning-assistant-v2-flow-b/evidence/item-002/app-use-screenshots/tempdb-calendar-after-complete.png`
+
+### ITEM-002 Completion
+
+- Marked OpenSpec task 5.3 complete.
+- Marked ITEM-002 `study-views` complete in the Flow B item queue.
+- Next item: ITEM-003 `study-plan-adjustment`.
+- Next step: start ITEM-003 with v1 observation, gap analysis, and OpenSpec explore/propose before any implementation.
+
+## Round 16 · 2026-05-24T03:00:05Z
+
+### ITEM-003 Explore / Proposal
+
+- Restored controller state: `phase=flow-b`, `current_item=study-plan-adjustment`.
+- Start status contained automation-owned ITEM-002 files and no detected unrelated user edits.
+- No implementation code was written.
+- Affected spec decision:
+  - new v2 spec id: `study-plan-adjustment`;
+  - existing v1 specs are not modified in this change;
+  - completed-but-unarchived context changes are `introduce-study-plan-foundation` and `introduce-study-views`.
+
+### V1 / Current-State Observation
+
+- Backend has a single-task `reschedule_task` helper but no v2 same-project cascade, no auto-roll counters, no active deadline edit endpoint, no add/delete active task endpoint, no rest-day settings/cascade, and no route-A dialogue preview/apply boundary.
+- Calendar can already compute over-capacity facts, but Project Overview does not expose expected-late project state.
+- Swift has first-class Today, Project Overview, Calendar, and Adjust Plan tabs, but Adjust Plan is still the generic chat surface. App Use observation captured this at `openspec/learning-assistant-v2-flow-b/evidence/item-003/app-use-screenshots/adjust-plan-current.png`.
+
+### OpenSpec
+
+- Created change: `openspec/changes/introduce-study-plan-adjustment`.
+- Created proposal, design, spec delta, and tasks.
+- `openspec validate introduce-study-plan-adjustment --strict`: PASS.
+- `openspec status --change introduce-study-plan-adjustment --json`: complete/apply-ready.
+- `openspec instructions apply --change introduce-study-plan-adjustment --json`: 37 tasks, 3 complete after proposal readiness tasks were marked.
+
+### Readiness
+
+- Readiness review: PASS with caution.
+- Scope is large but coherent around one invariant: user action plus explicit mechanical rules, no hidden repair.
+- D26/D27 rest-day handling is included because automation scoped this item to D20-D28.
+- Smart-mode proposal generation remains deferred to ITEM-004.
+- Recommended next step: create a checkpoint commit in the current checkout, then enter `opsx:apply` for `introduce-study-plan-adjustment`.

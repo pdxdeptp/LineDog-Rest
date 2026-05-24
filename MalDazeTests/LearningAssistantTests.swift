@@ -370,6 +370,299 @@ final class AssistantModelDecodingTests: XCTestCase {
         XCTAssertTrue(source.contains("\"/api/study-plan/drafts/\\(draftId)/confirm\""))
     }
 
+    // MARK: Study Views
+
+    func testStudyTodayViewDecodesTaskProjectResourceAndUnitFieldsWithSafeURLs() throws {
+        let json = """
+        {
+            "date": "2026-05-23",
+            "tasks": [
+                {
+                    "id": 10,
+                    "title": "Read Swift Concurrency chapter",
+                    "target_minutes": 45,
+                    "completed_at": null,
+                    "project_id": 2,
+                    "project_title": "Swift Concurrency",
+                    "resource_id": 7,
+                    "resource_title": "Concurrency Guide",
+                    "resource_url": "https://example.com/resource",
+                    "unit_id": 11,
+                    "unit_title": "Structured concurrency",
+                    "unit_url": "http://example.com/unit"
+                },
+                {
+                    "id": 11,
+                    "title": "Review unsafe links",
+                    "target_minutes": 10,
+                    "completed_at": "2026-05-23T15:30:00",
+                    "project_id": null,
+                    "project_title": null,
+                    "resource_id": null,
+                    "resource_title": null,
+                    "resource_url": "file:///Users/cpt/.ssh/id_rsa",
+                    "unit_id": null,
+                    "unit_title": null,
+                    "unit_url": "maliciousapp://open"
+                }
+            ]
+        }
+        """
+
+        let view = try decode(StudyTodayView.self, from: json)
+
+        XCTAssertEqual(view.date, "2026-05-23")
+        XCTAssertEqual(view.tasks.count, 2)
+        XCTAssertEqual(view.tasks[0].id, 10)
+        XCTAssertEqual(view.tasks[0].targetMinutes, 45)
+        XCTAssertNil(view.tasks[0].completedAt)
+        XCTAssertEqual(view.tasks[0].projectId, 2)
+        XCTAssertEqual(view.tasks[0].projectTitle, "Swift Concurrency")
+        XCTAssertEqual(view.tasks[0].resourceId, 7)
+        XCTAssertEqual(view.tasks[0].resourceTitle, "Concurrency Guide")
+        XCTAssertEqual(view.tasks[0].resourceURL, URL(string: "https://example.com/resource"))
+        XCTAssertEqual(view.tasks[0].unitId, 11)
+        XCTAssertEqual(view.tasks[0].unitTitle, "Structured concurrency")
+        XCTAssertEqual(view.tasks[0].unitURL, URL(string: "http://example.com/unit"))
+        XCTAssertTrue(view.tasks[1].isCompleted)
+        XCTAssertNil(view.tasks[1].resourceURL)
+        XCTAssertNil(view.tasks[1].unitURL)
+    }
+
+    func testStudyProjectOverviewDecodesActiveAndCompletedSections() throws {
+        let json = """
+        {
+            "active_projects": [
+                {
+                    "id": 1,
+                    "title": "Swift Concurrency",
+                    "completed_units": 3,
+                    "total_units": 10,
+                    "progress_ratio": 0.3,
+                    "target_minutes": 450,
+                    "actual_minutes": 120,
+                    "deadline": "2026-06-01",
+                    "status": "active"
+                }
+            ],
+            "completed_projects": [
+                {
+                    "id": 2,
+                    "title": "Algorithms",
+                    "completed_units": 8,
+                    "total_units": 8,
+                    "progress_ratio": 1.0,
+                    "target_minutes": 360,
+                    "actual_minutes": 390,
+                    "deadline": null,
+                    "status": "completed"
+                }
+            ]
+        }
+        """
+
+        let overview = try decode(StudyProjectOverview.self, from: json)
+
+        XCTAssertEqual(overview.activeProjects.count, 1)
+        XCTAssertEqual(overview.completedProjects.count, 1)
+        XCTAssertEqual(overview.activeProjects[0].completedUnits, 3)
+        XCTAssertEqual(overview.activeProjects[0].totalUnits, 10)
+        XCTAssertEqual(overview.activeProjects[0].progressRatio, 0.3, accuracy: 0.001)
+        XCTAssertEqual(overview.activeProjects[0].targetMinutes, 450)
+        XCTAssertEqual(overview.activeProjects[0].actualMinutes, 120)
+        XCTAssertEqual(overview.activeProjects[0].deadline, "2026-06-01")
+        XCTAssertEqual(overview.completedProjects[0].status, "completed")
+    }
+
+    func testStudyCalendarLoadDecodesCapacityAndDays() throws {
+        let json = """
+        {
+            "start_date": "2026-05-23",
+            "end_date": "2026-05-30",
+            "daily_capacity_minutes": 75,
+            "days": [
+                {
+                    "date": "2026-05-23",
+                    "scheduled_task_count": 2,
+                    "total_target_minutes": 80,
+                    "completed_task_count": 1,
+                    "over_capacity": true
+                },
+                {
+                    "date": "2026-05-24",
+                    "scheduled_task_count": 0,
+                    "total_target_minutes": 0,
+                    "completed_task_count": 0,
+                    "over_capacity": false
+                }
+            ]
+        }
+        """
+
+        let load = try decode(StudyCalendarLoad.self, from: json)
+
+        XCTAssertEqual(load.startDate, "2026-05-23")
+        XCTAssertEqual(load.endDate, "2026-05-30")
+        XCTAssertEqual(load.dailyCapacityMinutes, 75)
+        XCTAssertEqual(load.days.count, 2)
+        XCTAssertEqual(load.days[0].scheduledTaskCount, 2)
+        XCTAssertEqual(load.days[0].totalTargetMinutes, 80)
+        XCTAssertEqual(load.days[0].completedTaskCount, 1)
+        XCTAssertTrue(load.days[0].overCapacity)
+        XCTAssertFalse(load.days[1].overCapacity)
+    }
+
+    func testTaskCompletionResultDecodesSnakeCaseFields() throws {
+        let json = """
+        {
+            "task_id": 42,
+            "completed_at": "2026-06-01T12:30:00"
+        }
+        """
+
+        let result = try decode(TaskCompletionResult.self, from: json)
+
+        XCTAssertEqual(result.taskId, 42)
+        XCTAssertEqual(result.completedAt, "2026-06-01T12:30:00")
+    }
+
+    func testFetchStudyTodayViewRequestsGETPathAndDecodesResponse() async throws {
+        let client = makeRecordingClient(
+            responseBody: """
+            {
+                "date": "2026-06-01",
+                "tasks": [
+                    {
+                        "id": 10,
+                        "title": "Read",
+                        "target_minutes": 25,
+                        "completed_at": null,
+                        "project_id": 1,
+                        "project_title": "Swift",
+                        "resource_id": 2,
+                        "resource_title": "Book",
+                        "resource_url": "https://example.com/book",
+                        "unit_id": 3,
+                        "unit_title": "Chapter",
+                        "unit_url": "https://example.com/chapter"
+                    }
+                ]
+            }
+            """
+        )
+
+        let view = try await client.fetchStudyTodayView()
+
+        let request = try XCTUnwrap(URLProtocolBackedAPIClientTests.lastRequest)
+        XCTAssertEqual(request.httpMethod, "GET")
+        XCTAssertEqual(request.url?.path, "/api/study-views/today")
+        XCTAssertEqual(view.date, "2026-06-01")
+        XCTAssertEqual(view.tasks.first?.id, 10)
+    }
+
+    func testFetchStudyProjectOverviewRequestsGETPathAndDecodesResponse() async throws {
+        let client = makeRecordingClient(
+            responseBody: """
+            {
+                "active_projects": [
+                    {
+                        "id": 1,
+                        "title": "Swift",
+                        "completed_units": 1,
+                        "total_units": 4,
+                        "progress_ratio": 0.25,
+                        "target_minutes": 200,
+                        "actual_minutes": 50,
+                        "deadline": "2026-06-30",
+                        "status": "active"
+                    }
+                ],
+                "completed_projects": []
+            }
+            """
+        )
+
+        let overview = try await client.fetchStudyProjectOverview()
+
+        let request = try XCTUnwrap(URLProtocolBackedAPIClientTests.lastRequest)
+        XCTAssertEqual(request.httpMethod, "GET")
+        XCTAssertEqual(request.url?.path, "/api/study-views/projects")
+        XCTAssertEqual(overview.activeProjects.first?.title, "Swift")
+        XCTAssertTrue(overview.completedProjects.isEmpty)
+    }
+
+    func testFetchStudyCalendarLoadRequestsGETPathQueryAndDecodesResponse() async throws {
+        let client = makeRecordingClient(
+            responseBody: """
+            {
+                "start_date": "2026-06-01",
+                "end_date": "2026-06-07",
+                "daily_capacity_minutes": 75,
+                "days": [
+                    {
+                        "date": "2026-06-01",
+                        "scheduled_task_count": 2,
+                        "total_target_minutes": 80,
+                        "completed_task_count": 1,
+                        "over_capacity": true
+                    }
+                ]
+            }
+            """
+        )
+
+        let load = try await client.fetchStudyCalendarLoad(start: "2026-06-01", end: "2026-06-07")
+
+        let request = try XCTUnwrap(URLProtocolBackedAPIClientTests.lastRequest)
+        let components = try XCTUnwrap(URLComponents(url: try XCTUnwrap(request.url), resolvingAgainstBaseURL: false))
+        let queryItems = Dictionary(uniqueKeysWithValues: (components.queryItems ?? []).map { ($0.name, $0.value) })
+        XCTAssertEqual(request.httpMethod, "GET")
+        XCTAssertEqual(components.path, "/api/study-views/calendar")
+        XCTAssertEqual(queryItems["start"], "2026-06-01")
+        XCTAssertEqual(queryItems["end"], "2026-06-07")
+        XCTAssertEqual(load.startDate, "2026-06-01")
+        XCTAssertEqual(load.days.first?.overCapacity, true)
+    }
+
+    func testCompleteTaskPostsSnakeCaseActualMinutesAndDecodesResult() async throws {
+        let client = makeRecordingClient(
+            responseBody: """
+            {
+                "task_id": 42,
+                "completed_at": "2026-06-01T12:30:00"
+            }
+            """
+        )
+
+        let result = try await client.completeTask(id: 42, actualMinutes: 35)
+
+        let request = try XCTUnwrap(URLProtocolBackedAPIClientTests.lastRequest)
+        let body = try XCTUnwrap(request.httpBodyStreamData)
+        let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertEqual(request.url?.path, "/api/tasks/42/complete")
+        XCTAssertEqual(payload["actual_minutes"] as? Int, 35)
+        XCTAssertNil(payload["actualMinutes"])
+        XCTAssertEqual(result.taskId, 42)
+        XCTAssertEqual(result.completedAt, "2026-06-01T12:30:00")
+    }
+
+    func testAssistantAPIClientDefinesStudyViewProtocolMethodsAndEndpoints() throws {
+        let protocolSource = try sourceFile("MalDaze/LearningAssistant/AssistantAPIClientProtocol.swift")
+        let clientSource = try sourceFile("MalDaze/LearningAssistant/AssistantAPIClient.swift")
+
+        XCTAssertTrue(protocolSource.contains("func fetchStudyTodayView() async throws -> StudyTodayView"))
+        XCTAssertTrue(protocolSource.contains("func fetchStudyProjectOverview() async throws -> StudyProjectOverview"))
+        XCTAssertTrue(protocolSource.contains("func fetchStudyCalendarLoad(start: String, end: String) async throws -> StudyCalendarLoad"))
+        XCTAssertTrue(clientSource.contains("func fetchStudyTodayView() async throws -> StudyTodayView"))
+        XCTAssertTrue(clientSource.contains("func fetchStudyProjectOverview() async throws -> StudyProjectOverview"))
+        XCTAssertTrue(clientSource.contains("func fetchStudyCalendarLoad(start: String, end: String) async throws -> StudyCalendarLoad"))
+        XCTAssertTrue(clientSource.contains("\"/api/study-views/today\""))
+        XCTAssertTrue(clientSource.contains("\"/api/study-views/projects\""))
+        XCTAssertTrue(clientSource.contains("URLQueryItem(name: \"start\", value: start)"))
+        XCTAssertTrue(clientSource.contains("URLQueryItem(name: \"end\", value: end)"))
+    }
+
     // MARK: TodayBriefing
 
     func testTodayBriefingDecoding() throws {
@@ -551,6 +844,68 @@ final class AssistantModelDecodingTests: XCTestCase {
         let url = projectRoot.appendingPathComponent(relativePath)
         return try String(contentsOf: url, encoding: .utf8)
     }
+
+    private func makeRecordingClient(responseBody: String, statusCode: Int = 200) -> AssistantAPIClient {
+        URLProtocolBackedAPIClientTests.responseData = Data(responseBody.utf8)
+        URLProtocolBackedAPIClientTests.statusCode = statusCode
+        URLProtocolBackedAPIClientTests.lastRequest = nil
+
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [URLProtocolBackedAPIClientTests.self]
+        return AssistantAPIClient(
+            baseURL: URL(string: "http://example.test")!,
+            session: URLSession(configuration: configuration)
+        )
+    }
+}
+
+private final class URLProtocolBackedAPIClientTests: URLProtocol {
+    nonisolated(unsafe) static var responseData = Data()
+    nonisolated(unsafe) static var statusCode = 200
+    nonisolated(unsafe) static var lastRequest: URLRequest?
+
+    override class func canInit(with request: URLRequest) -> Bool {
+        true
+    }
+
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest {
+        request
+    }
+
+    override func startLoading() {
+        Self.lastRequest = request
+        let response = HTTPURLResponse(
+            url: request.url!,
+            statusCode: Self.statusCode,
+            httpVersion: nil,
+            headerFields: ["Content-Type": "application/json"]
+        )!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: Self.responseData)
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
+}
+
+private extension URLRequest {
+    var httpBodyStreamData: Data? {
+        guard let stream = httpBodyStream else { return httpBody }
+        stream.open()
+        defer { stream.close() }
+
+        var data = Data()
+        let bufferSize = 1024
+        let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
+        defer { buffer.deallocate() }
+
+        while stream.hasBytesAvailable {
+            let read = stream.read(buffer, maxLength: bufferSize)
+            if read <= 0 { break }
+            data.append(buffer, count: read)
+        }
+        return data
+    }
 }
 
 // MARK: - UI Source Tests
@@ -601,6 +956,12 @@ final class LearningAssistantUISourceTests: XCTestCase {
         XCTAssertTrue(source.contains("deadlineRiskViewModel"))
     }
 
+    func testAssistantPanelPreviewFixtureCompletesTasksWithResult() throws {
+        let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
+
+        XCTAssertTrue(source.contains("func completeTask(id: Int, actualMinutes: Int?) async throws -> TaskCompletionResult"))
+    }
+
     func testTaskRowProvidesIndependentHandleExpansionCompletionAndLearningLinkAction() throws {
         let source = try sourceFile("MalDaze/LearningAssistant/TaskRowView.swift")
 
@@ -647,6 +1008,120 @@ final class LearningAssistantUISourceTests: XCTestCase {
         XCTAssertTrue(source.contains("case .addResource:"))
         XCTAssertTrue(source.contains("StudyPlanIntakeView(vm: vm)"))
         XCTAssertFalse(source.contains("case .addResource:\n            IngestionView(vm: vm)"))
+    }
+
+    func testAssistantPanelExposesFirstClassStudyViewsInBottomNavigation() throws {
+        let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
+
+        XCTAssertTrue(source.contains("case .projectOverview:"))
+        XCTAssertTrue(source.contains("case .calendar:"))
+        XCTAssertTrue(source.contains("ProjectOverviewView(vm: vm)"))
+        XCTAssertTrue(source.contains("StudyCalendarLoadView(vm: vm)"))
+        XCTAssertTrue(source.contains("bottomNavigationButton(.projectOverview)"))
+        XCTAssertTrue(source.contains("bottomNavigationButton(.calendar)"))
+        XCTAssertTrue(source.contains("今日"))
+        XCTAssertTrue(source.contains("项目总览"))
+        XCTAssertTrue(source.contains("日历"))
+    }
+
+    func testAssistantPanelTodayViewDisplaysStudyTodayV2Facts() throws {
+        let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
+
+        XCTAssertTrue(source.contains("private var todayView"))
+        XCTAssertTrue(source.contains("vm.studyTodayView"))
+        XCTAssertTrue(source.contains("todayV2Facts"))
+        XCTAssertTrue(source.contains("今日学习"))
+        XCTAssertTrue(source.contains("v2 日期"))
+        XCTAssertTrue(source.contains("项目"))
+        XCTAssertTrue(source.contains("单元"))
+    }
+
+    func testAssistantPanelProjectOverviewDisplaysActiveCompletedAndFacts() throws {
+        let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
+
+        XCTAssertTrue(source.contains("private struct ProjectOverviewView"))
+        XCTAssertTrue(source.contains("vm.studyProjectOverview"))
+        XCTAssertTrue(source.contains("进行中项目"))
+        XCTAssertTrue(source.contains("完成历史"))
+        XCTAssertTrue(source.contains("progressRatio"))
+        XCTAssertTrue(source.contains("deadline"))
+        XCTAssertTrue(source.contains("status"))
+        XCTAssertTrue(source.contains("targetMinutes"))
+        XCTAssertTrue(source.contains("actualMinutes"))
+    }
+
+    func testAssistantPanelCalendarDisplaysReadOnlyDailyLoadAndFetchesDefaultWindow() throws {
+        let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
+
+        XCTAssertTrue(source.contains("private struct StudyCalendarLoadView"))
+        XCTAssertTrue(source.contains("vm.studyCalendarLoad"))
+        XCTAssertTrue(source.contains("fetchDefaultWindowIfNeeded"))
+        XCTAssertTrue(source.contains("vm.fetchStudyCalendarLoad(start: start, end: end)"))
+        XCTAssertTrue(source.contains("只读日历"))
+        XCTAssertTrue(source.contains("scheduledTaskCount"))
+        XCTAssertTrue(source.contains("totalTargetMinutes"))
+        XCTAssertTrue(source.contains("completedTaskCount"))
+        XCTAssertTrue(source.contains("overCapacity"))
+    }
+
+    func testAssistantPanelCalendarDefaultWindowCoversNextSeveralWeeks() throws {
+        let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
+
+        XCTAssertTrue(source.contains("defaultCalendarWindowDayOffset"))
+        XCTAssertTrue(source.contains("value: Self.defaultCalendarWindowDayOffset"))
+        XCTAssertTrue(source.contains("private static let defaultCalendarWindowDayOffset = 27"))
+        XCTAssertFalse(source.contains("date(byAdding: .day, value: 6"))
+    }
+
+    func testAssistantPanelCalendarDefaultFetchSkipsLoadedOrInFlightRequest() throws {
+        let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
+        guard let start = source.range(of: "private func fetchDefaultWindowIfNeeded"),
+              let end = source[start.upperBound...].range(of: "private func calendarLoadFact") else {
+            XCTFail("fetchDefaultWindowIfNeeded source section not found")
+            return
+        }
+        let fetchSource = String(source[start.lowerBound..<end.lowerBound])
+
+        XCTAssertTrue(fetchSource.contains("vm.studyCalendarLoad == nil"))
+        XCTAssertTrue(fetchSource.contains("!vm.isFetchingStudyCalendarLoad"))
+    }
+
+    func testProjectOverviewProgressTextAndBarUseClampedRatioHelper() throws {
+        let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
+
+        XCTAssertTrue(source.contains("private func clampedProgressRatio(for project: StudyProjectSummary) -> Double"))
+        XCTAssertTrue(source.contains("ratio.isFinite"))
+        XCTAssertTrue(source.contains("ProgressView(value: clampedProgressRatio(for: project))"))
+        XCTAssertTrue(source.contains("Int(clampedProgressRatio(for: project) * 100)"))
+    }
+
+    func testProjectOverviewFormatsStatusAndMissingDeadlineForDisplay() throws {
+        let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
+
+        XCTAssertTrue(source.contains("projectStatusLabel(for: project.status)"))
+        XCTAssertTrue(source.contains("case \"active\": return \"进行中\""))
+        XCTAssertTrue(source.contains("case \"completed\": return \"已完成\""))
+        XCTAssertTrue(source.contains("projectDeadlineLabel(for: project.deadline)"))
+        XCTAssertTrue(source.contains("return deadline ?? \"无截止日期\""))
+        XCTAssertFalse(source.contains("Text(project.status)"))
+        XCTAssertFalse(source.contains("project.deadline ?? \"无\""))
+    }
+
+    func testAssistantPanelCalendarSourceHasNoMutationWiring() throws {
+        let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
+        guard let start = source.range(of: "private struct StudyCalendarLoadView"),
+              let end = source[start.upperBound...].range(of: "private struct ProjectOverviewView") else {
+            XCTFail("StudyCalendarLoadView source section not found")
+            return
+        }
+        let calendarSource = String(source[start.lowerBound..<end.lowerBound])
+
+        XCTAssertFalse(calendarSource.contains(".onMove"))
+        XCTAssertFalse(calendarSource.contains(".onDelete"))
+        XCTAssertFalse(calendarSource.localizedCaseInsensitiveContains("reschedule"))
+        XCTAssertFalse(calendarSource.localizedCaseInsensitiveContains("delete"))
+        XCTAssertFalse(calendarSource.localizedCaseInsensitiveContains("add task"))
+        XCTAssertFalse(calendarSource.contains("moveVisibleTasks"))
     }
 
     func testStudyPlanIntakeReviewUIWiresDraftFlowControls() throws {
@@ -739,15 +1214,11 @@ final class LearningAssistantViewModelTests: XCTestCase {
 
     func testFetchDashboardAggregatesBriefingAndResourcesIntoSummaryState() async {
         let mock = MockAssistantAPIClient()
-        mock.briefingResult = TodayBriefing(
+        mock.studyTodayViewResult = sampleStudyTodayView(
             tasks: [
-                AssistantTask(id: 1, title: "A", targetMinutes: 15,
-                              completedAt: nil, resourceTitle: "R", priority: 1),
-                AssistantTask(id: 2, title: "B", targetMinutes: 20,
-                              completedAt: nil, resourceTitle: "R", priority: 2)
-            ],
-            totalMinutes: 35,
-            highlights: "今日负荷正常"
+                sampleStudyViewTaskJSON(id: 1, title: "A", targetMinutes: 15, projectTitle: "R"),
+                sampleStudyViewTaskJSON(id: 2, title: "B", targetMinutes: 20, projectTitle: "R")
+            ]
         )
         mock.resourcesResult = [
             AssistantResource(id: 10, title: "R", trackingMode: "video",
@@ -758,19 +1229,21 @@ final class LearningAssistantViewModelTests: XCTestCase {
 
         await vm.fetchDashboard()
 
-        XCTAssertEqual(mock.fetchBriefingCallCount, 1)
+        XCTAssertEqual(mock.fetchStudyTodayViewCallCount, 1)
+        XCTAssertEqual(mock.fetchStudyProjectOverviewCallCount, 1)
+        XCTAssertEqual(mock.fetchBriefingCallCount, 0)
         XCTAssertEqual(mock.fetchResourcesCallCount, 1)
         XCTAssertFalse(vm.isOffline)
         XCTAssertEqual(vm.dashboardState.kind, .tasksToday)
         XCTAssertEqual(vm.dashboardState.taskCount, 2)
         XCTAssertEqual(vm.dashboardState.totalMinutes, 35)
-        XCTAssertEqual(vm.dashboardState.highlights, "今日负荷正常")
+        XCTAssertEqual(vm.dashboardState.highlights, "今日共 2 项学习任务，总计 35 分钟")
         XCTAssertEqual(vm.visibleTodayTasks.map(\.id), [1, 2])
     }
 
     func testDashboardEmptyDatabaseMarksAddResourceAsPrimaryAction() async {
         let mock = MockAssistantAPIClient()
-        mock.briefingResult = TodayBriefing(tasks: [], totalMinutes: 0, highlights: "")
+        mock.studyTodayViewResult = sampleStudyTodayView(tasks: [])
         mock.resourcesResult = []
         let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
 
@@ -783,7 +1256,7 @@ final class LearningAssistantViewModelTests: XCTestCase {
 
     func testDashboardNoTasksWithResourcesDoesNotSelectNextTask() async {
         let mock = MockAssistantAPIClient()
-        mock.briefingResult = TodayBriefing(tasks: [], totalMinutes: 0, highlights: "")
+        mock.studyTodayViewResult = sampleStudyTodayView(tasks: [])
         mock.resourcesResult = [
             AssistantResource(id: 10, title: "R", trackingMode: "video",
                               completedUnits: 1, totalUnits: 5, actualMinutesTotal: 20,
@@ -800,11 +1273,11 @@ final class LearningAssistantViewModelTests: XCTestCase {
 
     func testFetchDashboardFailureDoesNotKeepPartialSuccessState() async {
         let mock = MockAssistantAPIClient()
-        mock.briefingResult = TodayBriefing(
+        mock.studyTodayViewResult = sampleStudyTodayView(
             tasks: [AssistantTask(id: 1, title: "A", targetMinutes: 15,
-                                  completedAt: nil, resourceTitle: "R", priority: 1)],
-            totalMinutes: 15,
-            highlights: "ok"
+                                  completedAt: nil, resourceTitle: "R", priority: 1)].map {
+                sampleStudyViewTaskJSON(id: $0.id, title: $0.title, targetMinutes: $0.targetMinutes, projectTitle: $0.resourceTitle)
+            }
         )
         mock.resourcesResult = [
             AssistantResource(id: 10, title: "R", trackingMode: "video",
@@ -815,11 +1288,11 @@ final class LearningAssistantViewModelTests: XCTestCase {
         await vm.fetchDashboard()
 
         mock.shouldThrowResources = true
-        mock.briefingResult = TodayBriefing(
+        mock.studyTodayViewResult = sampleStudyTodayView(
             tasks: [AssistantTask(id: 2, title: "B", targetMinutes: 20,
-                                  completedAt: nil, resourceTitle: "R2", priority: 1)],
-            totalMinutes: 20,
-            highlights: "new"
+                                  completedAt: nil, resourceTitle: "R2", priority: 1)].map {
+                sampleStudyViewTaskJSON(id: $0.id, title: $0.title, targetMinutes: $0.targetMinutes, projectTitle: $0.resourceTitle)
+            }
         )
         await vm.fetchDashboard()
 
@@ -832,11 +1305,11 @@ final class LearningAssistantViewModelTests: XCTestCase {
 
     func testConnectingWithCachedDashboardContentKeepsDashboardVisibleForBackgroundRefresh() async {
         let mock = MockAssistantAPIClient()
-        mock.briefingResult = TodayBriefing(
+        mock.studyTodayViewResult = sampleStudyTodayView(
             tasks: [AssistantTask(id: 1, title: "Cached", targetMinutes: 15,
-                                  completedAt: nil, resourceTitle: "R", priority: 1)],
-            totalMinutes: 15,
-            highlights: "缓存可用"
+                                  completedAt: nil, resourceTitle: "R", priority: 1)].map {
+                sampleStudyViewTaskJSON(id: $0.id, title: $0.title, targetMinutes: $0.targetMinutes, projectTitle: $0.resourceTitle)
+            }
         )
         mock.resourcesResult = [
             AssistantResource(id: 10, title: "R", trackingMode: "video",
@@ -874,19 +1347,25 @@ final class LearningAssistantViewModelTests: XCTestCase {
     func testFetchDashboardSerializesConcurrentRefreshesWithoutDroppingLaterRequest() async {
         let mock = MockAssistantAPIClient()
         mock.dashboardFetchDelayNanoseconds = 100_000_000
-        mock.briefingResultsQueue = [
-            TodayBriefing(
-                tasks: [AssistantTask(id: 1, title: "Old", targetMinutes: 15,
-                                      completedAt: nil, resourceTitle: "R", priority: 1)],
-                totalMinutes: 15,
-                highlights: "old"
+        mock.studyTodayViewResultsQueue = [
+            sampleStudyTodayView(
+                tasks: [
+                    sampleStudyViewTaskJSON(id: 1, title: "Old", targetMinutes: 15, projectTitle: "R")
+                ]
             ),
-            TodayBriefing(
-                tasks: [AssistantTask(id: 2, title: "New", targetMinutes: 20,
-                                      completedAt: nil, resourceTitle: "R2", priority: 1)],
-                totalMinutes: 20,
-                highlights: "new"
+            sampleStudyTodayView(
+                tasks: [
+                    sampleStudyViewTaskJSON(id: 2, title: "New", targetMinutes: 20, projectTitle: "R2")
+                ]
             )
+        ]
+        mock.studyProjectOverviewResultsQueue = [
+            sampleStudyProjectOverview(activeProjects: [
+                sampleStudyProjectSummaryJSON(id: 10, title: "R", completedUnits: 1, totalUnits: 5, progressRatio: 0.2, status: "active")
+            ]),
+            sampleStudyProjectOverview(activeProjects: [
+                sampleStudyProjectSummaryJSON(id: 20, title: "R2", completedUnits: 2, totalUnits: 6, progressRatio: 0.33, status: "active")
+            ])
         ]
         mock.resourcesResultsQueue = [
             [AssistantResource(id: 10, title: "R", trackingMode: "video",
@@ -902,31 +1381,43 @@ final class LearningAssistantViewModelTests: XCTestCase {
         async let second: Void = vm.fetchDashboard()
         _ = await (first, second)
 
-        XCTAssertEqual(mock.fetchBriefingCallCount, 2)
+        XCTAssertEqual(mock.fetchStudyTodayViewCallCount, 2)
         XCTAssertEqual(mock.fetchResourcesCallCount, 2)
-        XCTAssertEqual(mock.maxConcurrentBriefingFetches, 1)
+        XCTAssertEqual(mock.maxConcurrentStudyTodayViewFetches, 1)
         XCTAssertEqual(mock.maxConcurrentResourceFetches, 1)
         XCTAssertEqual(vm.tasks.map(\.id), [2])
         XCTAssertEqual(vm.resources.map(\.id), [20])
-        XCTAssertEqual(vm.dashboardState.highlights, "new")
+        XCTAssertEqual(vm.dashboardState.highlights, "今日共 1 项学习任务，总计 20 分钟")
     }
 
     func testCompleteTaskQueuesRequiredRefreshWhenDashboardFetchAlreadyInFlight() async {
         let mock = MockAssistantAPIClient()
         mock.dashboardFetchDelayNanoseconds = 100_000_000
-        mock.briefingResultsQueue = [
-            TodayBriefing(
-                tasks: [AssistantTask(id: 1, title: "Before completion", targetMinutes: 15,
-                                      completedAt: nil, resourceTitle: "R", priority: 1)],
-                totalMinutes: 15,
-                highlights: "old"
+        mock.studyTodayViewResultsQueue = [
+            sampleStudyTodayView(
+                tasks: [
+                    sampleStudyViewTaskJSON(id: 1, title: "Before completion", targetMinutes: 15, projectTitle: "R")
+                ]
             ),
-            TodayBriefing(
-                tasks: [AssistantTask(id: 1, title: "After completion", targetMinutes: 15,
-                                      completedAt: "2026-05-17T12:00:00", resourceTitle: "R", priority: 1)],
-                totalMinutes: 15,
-                highlights: "new"
+            sampleStudyTodayView(
+                tasks: [
+                    sampleStudyViewTaskJSON(
+                        id: 1,
+                        title: "After completion",
+                        targetMinutes: 15,
+                        completedAt: "2026-05-17T12:00:00",
+                        projectTitle: "R"
+                    )
+                ]
             )
+        ]
+        mock.studyProjectOverviewResultsQueue = [
+            sampleStudyProjectOverview(activeProjects: [
+                sampleStudyProjectSummaryJSON(id: 10, title: "R", completedUnits: 1, totalUnits: 5, progressRatio: 0.2, status: "active")
+            ]),
+            sampleStudyProjectOverview(activeProjects: [
+                sampleStudyProjectSummaryJSON(id: 10, title: "R", completedUnits: 2, totalUnits: 5, progressRatio: 0.4, status: "active")
+            ])
         ]
         mock.resourcesResultsQueue = [
             [AssistantResource(id: 10, title: "R", trackingMode: "video",
@@ -952,29 +1443,24 @@ final class LearningAssistantViewModelTests: XCTestCase {
         await openingFetch
 
         XCTAssertEqual(mock.lastCompleteTaskId, 1)
-        XCTAssertEqual(mock.fetchBriefingCallCount, 2)
+        XCTAssertEqual(mock.fetchStudyTodayViewCallCount, 2)
         XCTAssertEqual(mock.fetchResourcesCallCount, 2)
-        XCTAssertEqual(mock.maxConcurrentBriefingFetches, 1)
+        XCTAssertEqual(mock.maxConcurrentStudyTodayViewFetches, 1)
         XCTAssertEqual(mock.maxConcurrentResourceFetches, 1)
         XCTAssertEqual(vm.tasks.first?.completedAt, "2026-05-17T12:00:00")
         XCTAssertEqual(vm.resources.first?.actualMinutesTotal, 35)
-        XCTAssertEqual(vm.dashboardState.highlights, "new")
+        XCTAssertEqual(vm.dashboardState.highlights, "今日共 1 项学习任务，总计 15 分钟")
     }
 
     func testLocalTaskDisplayOrderPersistsAndMergesChangedTaskSet() async {
         let mock = MockAssistantAPIClient()
         let defaults = UserDefaults(suiteName: "LearningAssistantTests.order.\(UUID().uuidString)")!
-        mock.briefingResult = TodayBriefing(
+        mock.studyTodayViewResult = sampleStudyTodayView(
             tasks: [
-                AssistantTask(id: 1, title: "A", targetMinutes: 10,
-                              completedAt: nil, resourceTitle: nil, priority: 1),
-                AssistantTask(id: 2, title: "B", targetMinutes: 10,
-                              completedAt: nil, resourceTitle: nil, priority: 2),
-                AssistantTask(id: 3, title: "C", targetMinutes: 10,
-                              completedAt: nil, resourceTitle: nil, priority: 3)
-            ],
-            totalMinutes: 30,
-            highlights: ""
+                sampleStudyViewTaskJSON(id: 1, title: "A", targetMinutes: 10),
+                sampleStudyViewTaskJSON(id: 2, title: "B", targetMinutes: 10),
+                sampleStudyViewTaskJSON(id: 3, title: "C", targetMinutes: 10)
+            ]
         )
         let vm = LearningAssistantViewModel(
             api: mock,
@@ -987,17 +1473,12 @@ final class LearningAssistantViewModelTests: XCTestCase {
         vm.moveVisibleTasks(fromOffsets: IndexSet(integer: 2), toOffset: 0)
         XCTAssertEqual(vm.visibleTodayTasks.map(\.id), [3, 1, 2])
 
-        mock.briefingResult = TodayBriefing(
+        mock.studyTodayViewResult = sampleStudyTodayView(
             tasks: [
-                AssistantTask(id: 2, title: "B", targetMinutes: 10,
-                              completedAt: nil, resourceTitle: nil, priority: 2),
-                AssistantTask(id: 3, title: "C", targetMinutes: 10,
-                              completedAt: nil, resourceTitle: nil, priority: 3),
-                AssistantTask(id: 4, title: "D", targetMinutes: 10,
-                              completedAt: nil, resourceTitle: nil, priority: 4)
-            ],
-            totalMinutes: 30,
-            highlights: ""
+                sampleStudyViewTaskJSON(id: 2, title: "B", targetMinutes: 10),
+                sampleStudyViewTaskJSON(id: 3, title: "C", targetMinutes: 10),
+                sampleStudyViewTaskJSON(id: 4, title: "D", targetMinutes: 10)
+            ]
         )
         await vm.fetchDashboard()
 
@@ -1013,15 +1494,11 @@ final class LearningAssistantViewModelTests: XCTestCase {
         let mock = MockAssistantAPIClient()
         let defaults = UserDefaults(suiteName: "LearningAssistantTests.order.\(UUID().uuidString)")!
         defaults.set([2, 1], forKey: "LearningAssistant.todayTaskOrder.2026-01-31")
-        mock.briefingResult = TodayBriefing(
+        mock.studyTodayViewResult = sampleStudyTodayView(
             tasks: [
-                AssistantTask(id: 1, title: "A", targetMinutes: 10,
-                              completedAt: nil, resourceTitle: nil, priority: 1),
-                AssistantTask(id: 2, title: "B", targetMinutes: 10,
-                              completedAt: nil, resourceTitle: nil, priority: 2)
-            ],
-            totalMinutes: 20,
-            highlights: ""
+                sampleStudyViewTaskJSON(id: 1, title: "A", targetMinutes: 10),
+                sampleStudyViewTaskJSON(id: 2, title: "B", targetMinutes: 10)
+            ]
         )
         let date = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-02-01T02:00:00Z"))
         let vm = LearningAssistantViewModel(
@@ -1260,11 +1737,10 @@ final class LearningAssistantViewModelTests: XCTestCase {
 
     func testConfirmStudyPlanDraftRequiresExplicitConfirmAndRefreshesDashboardOnce() async {
         let mock = MockAssistantAPIClient()
-        mock.briefingResult = TodayBriefing(
-            tasks: [AssistantTask(id: 7, title: "Activated", targetMinutes: 30,
-                                  completedAt: nil, resourceTitle: "Course", priority: 1)],
-            totalMinutes: 30,
-            highlights: "已刷新"
+        mock.studyTodayViewResult = sampleStudyTodayView(
+            tasks: [
+                sampleStudyViewTaskJSON(id: 7, title: "Activated", targetMinutes: 30, projectTitle: "Course")
+            ]
         )
         mock.resourcesResult = [sampleResource(id: 101, title: "Course")]
         let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
@@ -1278,7 +1754,8 @@ final class LearningAssistantViewModelTests: XCTestCase {
         XCTAssertNil(vm.studyPlanDraftId)
         XCTAssertNil(vm.studyPlanClarification)
         XCTAssertNil(vm.studyPlanDraft)
-        XCTAssertEqual(mock.fetchBriefingCallCount, 1)
+        XCTAssertEqual(mock.fetchStudyTodayViewCallCount, 1)
+        XCTAssertEqual(mock.fetchBriefingCallCount, 0)
         XCTAssertEqual(mock.fetchResourcesCallCount, 1)
         XCTAssertEqual(vm.tasks.map(\.id), [7])
         XCTAssertEqual(vm.resources.map(\.id), [101])
@@ -1301,15 +1778,260 @@ final class LearningAssistantViewModelTests: XCTestCase {
         XCTAssertFalse(vm.isConfirmingStudyPlanDraft)
     }
 
+    func testFetchDashboardLoadsStudyTodayAndProjectOverviewAsDefaultV2State() async {
+        let mock = MockAssistantAPIClient()
+        mock.briefingResult = TodayBriefing(
+            tasks: [AssistantTask(id: 999, title: "Stale briefing task", targetMinutes: 5,
+                                  completedAt: nil, resourceTitle: "Briefing", priority: 1)],
+            totalMinutes: 5,
+            highlights: "stale generated briefing"
+        )
+        mock.studyTodayViewResult = sampleStudyTodayView(
+            tasks: [
+                sampleStudyViewTaskJSON(
+                    id: 10,
+                    title: "Read actors",
+                    targetMinutes: 45,
+                    projectTitle: "Swift Concurrency",
+                    resourceTitle: "Concurrency Guide",
+                    unitTitle: "Actors"
+                ),
+                sampleStudyViewTaskJSON(
+                    id: 11,
+                    title: "Practice cancellation",
+                    targetMinutes: 25,
+                    projectTitle: "Swift Concurrency",
+                    resourceTitle: "Concurrency Guide",
+                    unitTitle: "Cancellation"
+                )
+            ]
+        )
+        mock.studyProjectOverviewResult = sampleStudyProjectOverview(
+            activeProjects: [
+                sampleStudyProjectSummaryJSON(
+                    id: 1,
+                    title: "Swift Concurrency",
+                    completedUnits: 1,
+                    totalUnits: 4,
+                    progressRatio: 0.25,
+                    status: "active"
+                )
+            ],
+            completedProjects: []
+        )
+
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        await vm.fetchDashboard()
+
+        XCTAssertEqual(mock.fetchStudyTodayViewCallCount, 1)
+        XCTAssertEqual(mock.fetchStudyProjectOverviewCallCount, 1)
+        XCTAssertEqual(mock.fetchBriefingCallCount, 0)
+        XCTAssertEqual(vm.studyTodayView?.tasks.map(\.id), [10, 11])
+        XCTAssertEqual(vm.studyProjectOverview?.activeProjects.map(\.title), ["Swift Concurrency"])
+        XCTAssertEqual(vm.visibleTodayTasks.map(\.id), [10, 11])
+        XCTAssertEqual(vm.tasks.map(\.title), ["Read actors", "Practice cancellation"])
+        XCTAssertEqual(vm.todayTotalMinutes, 70)
+        XCTAssertNotEqual(vm.todayHighlights, "stale generated briefing")
+        XCTAssertFalse(vm.isOffline)
+    }
+
+    func testDashboardMapsStudyProjectTitleBeforeResourceTitleForVisibleTasks() async {
+        let mock = MockAssistantAPIClient()
+        mock.studyTodayViewResult = sampleStudyTodayView(
+            tasks: [
+                sampleStudyViewTaskJSON(
+                    id: 12,
+                    title: "Review replication",
+                    targetMinutes: 35,
+                    projectTitle: "Distributed Systems",
+                    resourceTitle: "Course Notes"
+                )
+            ]
+        )
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+
+        await vm.fetchDashboard()
+
+        XCTAssertEqual(vm.visibleTodayTasks.first?.resourceTitle, "Distributed Systems")
+        XCTAssertEqual(vm.tasks.first?.resourceTitle, "Distributed Systems")
+    }
+
+    func testCompleteTaskRefreshesStudyTodayAndProjectOverviewFromPersistedFacts() async {
+        let mock = MockAssistantAPIClient()
+        mock.studyTodayViewResultsQueue = [
+            sampleStudyTodayView(
+                tasks: [
+                    sampleStudyViewTaskJSON(id: 20, title: "Before", targetMinutes: 30,
+                                            completedAt: nil, projectTitle: "Algorithms")
+                ]
+            ),
+            sampleStudyTodayView(
+                tasks: [
+                    sampleStudyViewTaskJSON(id: 20, title: "Before", targetMinutes: 30,
+                                            completedAt: "2026-06-01T12:30:00", projectTitle: "Algorithms")
+                ]
+            )
+        ]
+        mock.studyProjectOverviewResultsQueue = [
+            sampleStudyProjectOverview(
+                activeProjects: [
+                    sampleStudyProjectSummaryJSON(id: 2, title: "Algorithms",
+                                                  completedUnits: 1, totalUnits: 2,
+                                                  progressRatio: 0.5, status: "active")
+                ],
+                completedProjects: []
+            ),
+            sampleStudyProjectOverview(
+                activeProjects: [],
+                completedProjects: [
+                    sampleStudyProjectSummaryJSON(id: 2, title: "Algorithms",
+                                                  completedUnits: 2, totalUnits: 2,
+                                                  progressRatio: 1.0, status: "completed")
+                ]
+            )
+        ]
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        await vm.fetchDashboard()
+
+        let task = AssistantTask(id: 20, title: "Before", targetMinutes: 30,
+                                 completedAt: nil, resourceTitle: "Algorithms", priority: 1)
+        await vm.completeTask(task)
+
+        XCTAssertEqual(mock.lastCompleteTaskId, 20)
+        XCTAssertEqual(mock.fetchStudyTodayViewCallCount, 2)
+        XCTAssertEqual(mock.fetchStudyProjectOverviewCallCount, 2)
+        XCTAssertEqual(mock.fetchBriefingCallCount, 0)
+        XCTAssertEqual(vm.studyTodayView?.tasks.first?.completedAt, "2026-06-01T12:30:00")
+        XCTAssertTrue(vm.visibleTodayTasks.first?.isCompleted ?? false)
+        XCTAssertTrue(vm.studyProjectOverview?.activeProjects.isEmpty ?? false)
+        XCTAssertEqual(vm.studyProjectOverview?.completedProjects.first?.status, "completed")
+        XCTAssertEqual(vm.studyProjectOverview?.completedProjects.first?.progressRatio ?? 0, 1.0, accuracy: 0.001)
+    }
+
+    func testProjectOverviewStoresActiveAndCompletedHistorySections() async {
+        let mock = MockAssistantAPIClient()
+        mock.studyProjectOverviewResult = sampleStudyProjectOverview(
+            activeProjects: [
+                sampleStudyProjectSummaryJSON(id: 30, title: "Systems",
+                                              completedUnits: 2, totalUnits: 5,
+                                              progressRatio: 0.4, status: "active")
+            ],
+            completedProjects: [
+                sampleStudyProjectSummaryJSON(id: 31, title: "Databases",
+                                              completedUnits: 6, totalUnits: 6,
+                                              progressRatio: 1.0, status: "completed")
+            ]
+        )
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+
+        await vm.fetchDashboard()
+
+        XCTAssertEqual(mock.fetchStudyProjectOverviewCallCount, 1)
+        XCTAssertEqual(vm.studyProjectOverview?.activeProjects.map(\.title), ["Systems"])
+        XCTAssertEqual(vm.studyProjectOverview?.completedProjects.map(\.title), ["Databases"])
+    }
+
+    func testFetchStudyCalendarLoadStoresReadOnlyLoadState() async {
+        let mock = MockAssistantAPIClient()
+        mock.studyCalendarLoadResult = sampleStudyCalendarLoad(
+            start: "2026-06-01",
+            end: "2026-06-07",
+            dayJSON: """
+            {
+                "date": "2026-06-01",
+                "scheduled_task_count": 3,
+                "total_target_minutes": 95,
+                "completed_task_count": 1,
+                "over_capacity": true
+            }
+            """
+        )
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+
+        await vm.fetchStudyCalendarLoad(start: "2026-06-01", end: "2026-06-07")
+
+        XCTAssertEqual(mock.fetchStudyCalendarLoadCallCount, 1)
+        XCTAssertEqual(mock.lastStudyCalendarLoadStart, "2026-06-01")
+        XCTAssertEqual(mock.lastStudyCalendarLoadEnd, "2026-06-07")
+        XCTAssertEqual(vm.studyCalendarLoad?.dailyCapacityMinutes, 75)
+        XCTAssertEqual(vm.studyCalendarLoad?.days.first?.scheduledTaskCount, 3)
+        XCTAssertEqual(vm.studyCalendarLoad?.days.first?.totalTargetMinutes, 95)
+        XCTAssertEqual(vm.studyCalendarLoad?.days.first?.completedTaskCount, 1)
+        XCTAssertEqual(vm.studyCalendarLoad?.days.first?.overCapacity, true)
+        XCTAssertNil(mock.lastCompleteTaskId)
+    }
+
+    func testFetchStudyCalendarLoadKeepsLatestRangeWhenOlderRequestFinishesLast() async {
+        let mock = MockAssistantAPIClient()
+        mock.studyCalendarLoadResultsQueue = [
+            DelayedStudyCalendarLoadResult(
+                load: sampleStudyCalendarLoad(start: "2026-06-01", end: "2026-06-07"),
+                delayNanoseconds: 100_000_000
+            ),
+            DelayedStudyCalendarLoadResult(
+                load: sampleStudyCalendarLoad(start: "2026-06-08", end: "2026-06-14"),
+                delayNanoseconds: 0
+            )
+        ]
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+
+        let olderRequest = Task {
+            await vm.fetchStudyCalendarLoad(start: "2026-06-01", end: "2026-06-07")
+        }
+        await mock.waitForStudyCalendarLoadCallCount(1)
+        let newerRequest = Task {
+            await vm.fetchStudyCalendarLoad(start: "2026-06-08", end: "2026-06-14")
+        }
+        await newerRequest.value
+        await olderRequest.value
+
+        XCTAssertEqual(mock.fetchStudyCalendarLoadCallCount, 2)
+        XCTAssertEqual(vm.studyCalendarLoad?.startDate, "2026-06-08")
+        XCTAssertEqual(vm.studyCalendarLoad?.endDate, "2026-06-14")
+        XCTAssertNil(vm.studyCalendarLoadError)
+        XCTAssertFalse(vm.isFetchingStudyCalendarLoad)
+    }
+
+    func testOlderStudyCalendarLoadCompletionDoesNotClearNewerLoadingState() async {
+        let mock = MockAssistantAPIClient()
+        mock.studyCalendarLoadResultsQueue = [
+            DelayedStudyCalendarLoadResult(
+                load: sampleStudyCalendarLoad(start: "2026-06-01", end: "2026-06-07"),
+                delayNanoseconds: 0
+            ),
+            DelayedStudyCalendarLoadResult(
+                load: sampleStudyCalendarLoad(start: "2026-06-08", end: "2026-06-14"),
+                delayNanoseconds: 100_000_000
+            )
+        ]
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+
+        let olderRequest = Task {
+            await vm.fetchStudyCalendarLoad(start: "2026-06-01", end: "2026-06-07")
+        }
+        await mock.waitForStudyCalendarLoadCallCount(1)
+        let newerRequest = Task {
+            await vm.fetchStudyCalendarLoad(start: "2026-06-08", end: "2026-06-14")
+        }
+        await mock.waitForStudyCalendarLoadCallCount(2)
+        await olderRequest.value
+
+        XCTAssertTrue(vm.isFetchingStudyCalendarLoad)
+
+        await newerRequest.value
+
+        XCTAssertEqual(vm.studyCalendarLoad?.startDate, "2026-06-08")
+        XCTAssertFalse(vm.isFetchingStudyCalendarLoad)
+    }
+
     func testConfirmStudyPlanDraftIgnoresDuplicateSubmitWhileInFlight() async {
         let mock = MockAssistantAPIClient()
         mock.studyPlanConfirmDelayNanoseconds = 50_000_000
         mock.dashboardFetchDelayNanoseconds = 10_000_000
-        mock.briefingResult = TodayBriefing(
-            tasks: [AssistantTask(id: 7, title: "Activated", targetMinutes: 30,
-                                  completedAt: nil, resourceTitle: "Course", priority: 1)],
-            totalMinutes: 30,
-            highlights: "已刷新"
+        mock.studyTodayViewResult = sampleStudyTodayView(
+            tasks: [
+                sampleStudyViewTaskJSON(id: 7, title: "Activated", targetMinutes: 30, projectTitle: "Course")
+            ]
         )
         mock.resourcesResult = [sampleResource(id: 101, title: "Course")]
         let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
@@ -1326,7 +2048,8 @@ final class LearningAssistantViewModelTests: XCTestCase {
         await second.value
 
         XCTAssertEqual(mock.confirmStudyPlanDraftCallCount, 1)
-        XCTAssertEqual(mock.fetchBriefingCallCount, 1)
+        XCTAssertEqual(mock.fetchStudyTodayViewCallCount, 1)
+        XCTAssertEqual(mock.fetchBriefingCallCount, 0)
         XCTAssertEqual(mock.fetchResourcesCallCount, 1)
         XCTAssertFalse(vm.isConfirmingStudyPlanDraft)
         XCTAssertNil(vm.studyPlanDraftId)
@@ -1344,11 +2067,10 @@ final class LearningAssistantViewModelTests: XCTestCase {
     func testConfirmStudyPlanDraftBlocksStartAndStillClearsDraftAndRefreshesDashboard() async throws {
         let mock = MockAssistantAPIClient()
         mock.studyPlanConfirmDelayNanoseconds = 50_000_000
-        mock.briefingResult = TodayBriefing(
-            tasks: [AssistantTask(id: 7, title: "Activated", targetMinutes: 30,
-                                  completedAt: nil, resourceTitle: "Course", priority: 1)],
-            totalMinutes: 30,
-            highlights: "已刷新"
+        mock.studyTodayViewResult = sampleStudyTodayView(
+            tasks: [
+                sampleStudyViewTaskJSON(id: 7, title: "Activated", targetMinutes: 30, projectTitle: "Course")
+            ]
         )
         mock.resourcesResult = [sampleResource(id: 101, title: "Course")]
         mock.studyPlanStartResult = StudyPlanStartResponse(
@@ -1376,7 +2098,8 @@ final class LearningAssistantViewModelTests: XCTestCase {
         XCTAssertNil(vm.studyPlanDraftId)
         XCTAssertNil(vm.studyPlanClarification)
         XCTAssertNil(vm.studyPlanDraft)
-        XCTAssertEqual(mock.fetchBriefingCallCount, 1)
+        XCTAssertEqual(mock.fetchStudyTodayViewCallCount, 1)
+        XCTAssertEqual(mock.fetchBriefingCallCount, 0)
         XCTAssertEqual(mock.fetchResourcesCallCount, 1)
         XCTAssertEqual(vm.tasks.map(\.id), [7])
         XCTAssertEqual(vm.resources.map(\.id), [101])
@@ -1387,11 +2110,10 @@ final class LearningAssistantViewModelTests: XCTestCase {
     func testConfirmStudyPlanDraftBlocksCancelAndStillClearsDraftAndRefreshesDashboard() async {
         let mock = MockAssistantAPIClient()
         mock.studyPlanConfirmDelayNanoseconds = 50_000_000
-        mock.briefingResult = TodayBriefing(
-            tasks: [AssistantTask(id: 7, title: "Activated", targetMinutes: 30,
-                                  completedAt: nil, resourceTitle: "Course", priority: 1)],
-            totalMinutes: 30,
-            highlights: "已刷新"
+        mock.studyTodayViewResult = sampleStudyTodayView(
+            tasks: [
+                sampleStudyViewTaskJSON(id: 7, title: "Activated", targetMinutes: 30, projectTitle: "Course")
+            ]
         )
         mock.resourcesResult = [sampleResource(id: 101, title: "Course")]
         let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
@@ -1410,7 +2132,8 @@ final class LearningAssistantViewModelTests: XCTestCase {
         XCTAssertNil(vm.studyPlanDraftId)
         XCTAssertNil(vm.studyPlanClarification)
         XCTAssertNil(vm.studyPlanDraft)
-        XCTAssertEqual(mock.fetchBriefingCallCount, 1)
+        XCTAssertEqual(mock.fetchStudyTodayViewCallCount, 1)
+        XCTAssertEqual(mock.fetchBriefingCallCount, 0)
         XCTAssertEqual(mock.fetchResourcesCallCount, 1)
         XCTAssertFalse(vm.isConfirmingStudyPlanDraft)
     }
@@ -1645,7 +2368,8 @@ final class LearningAssistantViewModelTests: XCTestCase {
         await vm.completeTask(task)
 
         XCTAssertEqual(mock.lastCompleteTaskId, 5)
-        XCTAssertGreaterThanOrEqual(mock.fetchBriefingCallCount, 1)
+        XCTAssertGreaterThanOrEqual(mock.fetchStudyTodayViewCallCount, 1)
+        XCTAssertEqual(mock.fetchBriefingCallCount, 0)
     }
 
     func testResourceManagementProtocolCallsCompleteAndArchiveEndpoints() async throws {
@@ -1662,11 +2386,10 @@ final class LearningAssistantViewModelTests: XCTestCase {
     func testCompleteResourceCallsAPIAndRefreshesDashboard() async {
         let mock = MockAssistantAPIClient()
         mock.resourcesResult = [sampleResource(id: 99, title: "Remaining Resource")]
-        mock.briefingResult = TodayBriefing(
-            tasks: [AssistantTask(id: 7, title: "Next", targetMinutes: 20,
-                                  completedAt: nil, resourceTitle: "Remaining Resource", priority: 1)],
-            totalMinutes: 20,
-            highlights: "refreshed"
+        mock.studyTodayViewResult = sampleStudyTodayView(
+            tasks: [
+                sampleStudyViewTaskJSON(id: 7, title: "Next", targetMinutes: 20, projectTitle: "Remaining Resource")
+            ]
         )
         let resource = sampleResource(id: 42, title: "Swift Concurrency Guide")
         let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
@@ -1675,7 +2398,8 @@ final class LearningAssistantViewModelTests: XCTestCase {
         await vm.completeResource(resource)
 
         XCTAssertEqual(mock.lastCompleteResourceId, 42)
-        XCTAssertEqual(mock.fetchBriefingCallCount, 1)
+        XCTAssertEqual(mock.fetchStudyTodayViewCallCount, 1)
+        XCTAssertEqual(mock.fetchBriefingCallCount, 0)
         XCTAssertEqual(mock.fetchResourcesCallCount, 1)
         XCTAssertNil(vm.resourceManagementError)
         XCTAssertEqual(vm.resources.map(\.id), [99])
@@ -1692,7 +2416,8 @@ final class LearningAssistantViewModelTests: XCTestCase {
         await vm.archiveResource(resource)
 
         XCTAssertEqual(mock.lastArchiveResourceId, 43)
-        XCTAssertEqual(mock.fetchBriefingCallCount, 1)
+        XCTAssertEqual(mock.fetchStudyTodayViewCallCount, 1)
+        XCTAssertEqual(mock.fetchBriefingCallCount, 0)
         XCTAssertEqual(mock.fetchResourcesCallCount, 1)
         XCTAssertNil(vm.resourceManagementError)
         XCTAssertTrue(vm.resources.isEmpty)
@@ -1720,11 +2445,10 @@ final class LearningAssistantViewModelTests: XCTestCase {
     func testResourceManagementRefreshFailurePreservesDashboardAndReportsRefreshError() async {
         let mock = MockAssistantAPIClient()
         mock.shouldThrowResources = true
-        mock.briefingResult = TodayBriefing(
-            tasks: [AssistantTask(id: 200, title: "Server Update", targetMinutes: 15,
-                                  completedAt: nil, resourceTitle: "Server", priority: 1)],
-            totalMinutes: 15,
-            highlights: "new data that should not partially apply"
+        mock.studyTodayViewResult = sampleStudyTodayView(
+            tasks: [
+                sampleStudyViewTaskJSON(id: 200, title: "Server Update", targetMinutes: 15, projectTitle: "Server")
+            ]
         )
         let task = AssistantTask(id: 100, title: "Keep Visible", targetMinutes: 25,
                                  completedAt: nil, resourceTitle: "Local Resource", priority: 2)
@@ -1739,7 +2463,8 @@ final class LearningAssistantViewModelTests: XCTestCase {
         await vm.completeResource(resource)
 
         XCTAssertEqual(mock.lastCompleteResourceId, 45)
-        XCTAssertEqual(mock.fetchBriefingCallCount, 1)
+        XCTAssertEqual(mock.fetchStudyTodayViewCallCount, 1)
+        XCTAssertEqual(mock.fetchBriefingCallCount, 0)
         XCTAssertEqual(mock.fetchResourcesCallCount, 1)
         XCTAssertEqual(vm.tasks.map(\.id), [100])
         XCTAssertEqual(vm.visibleTodayTasks.map(\.id), [100])
@@ -1777,7 +2502,8 @@ final class LearningAssistantViewModelTests: XCTestCase {
         await firstRequest.value
 
         XCTAssertEqual(mock.archiveResourceCallCount, 1)
-        XCTAssertEqual(mock.fetchBriefingCallCount, 1)
+        XCTAssertEqual(mock.fetchStudyTodayViewCallCount, 1)
+        XCTAssertEqual(mock.fetchBriefingCallCount, 0)
         XCTAssertEqual(mock.fetchResourcesCallCount, 1)
         XCTAssertNil(vm.resourceManagementError)
     }
@@ -1800,7 +2526,8 @@ final class LearningAssistantViewModelTests: XCTestCase {
 
         XCTAssertEqual(mock.archiveResourceCallCount, 1)
         XCTAssertEqual(mock.completeResourceCallCount, 0)
-        XCTAssertEqual(mock.fetchBriefingCallCount, 1)
+        XCTAssertEqual(mock.fetchStudyTodayViewCallCount, 1)
+        XCTAssertEqual(mock.fetchBriefingCallCount, 0)
         XCTAssertEqual(mock.fetchResourcesCallCount, 1)
         XCTAssertNil(vm.resourceManagementError)
     }
@@ -1823,6 +2550,11 @@ final class LearningAssistantViewModelTests: XCTestCase {
 }
 
 // MARK: - Mock API Client
+
+private struct DelayedStudyCalendarLoadResult {
+    let load: StudyCalendarLoad
+    let delayNanoseconds: UInt64
+}
 
 private final class MockAssistantAPIClient: AssistantAPIClientProtocol, @unchecked Sendable {
 
@@ -1848,15 +2580,28 @@ private final class MockAssistantAPIClient: AssistantAPIClientProtocol, @uncheck
     var studyPlanStartResult = sampleStudyPlanStartResponse()
     var studyPlanDraftResult = sampleStudyPlanDraft()
     var studyPlanActivationResult = sampleStudyPlanActivationResult()
+    var studyTodayViewResult: StudyTodayView?
+    var studyProjectOverviewResult = sampleStudyProjectOverview()
+    var studyCalendarLoadResult = sampleStudyCalendarLoad()
+    var studyCalendarLoadResultsQueue: [DelayedStudyCalendarLoadResult] = []
 
     // Captured call arguments for assertions
     private(set) var fetchBriefingCallCount = 0
     private(set) var fetchResourcesCallCount = 0
+    private(set) var fetchStudyTodayViewCallCount = 0
+    private(set) var fetchStudyProjectOverviewCallCount = 0
+    private(set) var fetchStudyCalendarLoadCallCount = 0
     private(set) var maxConcurrentBriefingFetches = 0
     private(set) var maxConcurrentResourceFetches = 0
+    private(set) var maxConcurrentStudyTodayViewFetches = 0
     private var activeBriefingFetches = 0
     private var activeResourceFetches = 0
+    private var activeStudyTodayViewFetches = 0
+    var studyTodayViewResultsQueue: [StudyTodayView] = []
+    var studyProjectOverviewResultsQueue: [StudyProjectOverview] = []
     private(set) var lastCompleteTaskId: Int?
+    private(set) var lastStudyCalendarLoadStart: String?
+    private(set) var lastStudyCalendarLoadEnd: String?
     private(set) var lastCompleteResourceId: Int?
     private(set) var lastArchiveResourceId: Int?
     private(set) var completeResourceCallCount = 0
@@ -1882,6 +2627,8 @@ private final class MockAssistantAPIClient: AssistantAPIClientProtocol, @uncheck
     private(set) var confirmStudyPlanDraftCallCount = 0
     private let studyPlanConfirmGateLock = NSLock()
     private var studyPlanConfirmStartedContinuations: [CheckedContinuation<Void, Never>] = []
+    private let studyCalendarLoadGateLock = NSLock()
+    private var studyCalendarLoadCallCountContinuations: [(expected: Int, continuation: CheckedContinuation<Void, Never>)] = []
 
     func waitForStudyPlanConfirmToStart() async {
         await withCheckedContinuation { continuation in
@@ -1902,6 +2649,21 @@ private final class MockAssistantAPIClient: AssistantAPIClientProtocol, @uncheck
         signalStudyPlanConfirmStartedAfterRecordingCall()
     }
 
+    func waitForStudyCalendarLoadCallCount(_ expected: Int) async {
+        await withCheckedContinuation { continuation in
+            let shouldResumeImmediately = withStudyCalendarLoadGateLock {
+                if fetchStudyCalendarLoadCallCount >= expected {
+                    return true
+                }
+                studyCalendarLoadCallCountContinuations.append((expected, continuation))
+                return false
+            }
+            if shouldResumeImmediately {
+                continuation.resume()
+            }
+        }
+    }
+
     func fetchTodayBriefing() async throws -> TodayBriefing {
         fetchBriefingCallCount += 1
         activeBriefingFetches += 1
@@ -1917,9 +2679,59 @@ private final class MockAssistantAPIClient: AssistantAPIClientProtocol, @uncheck
         return briefingResult
     }
 
-    func completeTask(id: Int, actualMinutes: Int?) async throws {
+    func fetchStudyTodayView() async throws -> StudyTodayView {
+        fetchStudyTodayViewCallCount += 1
+        activeStudyTodayViewFetches += 1
+        maxConcurrentStudyTodayViewFetches = max(maxConcurrentStudyTodayViewFetches, activeStudyTodayViewFetches)
+        defer { activeStudyTodayViewFetches -= 1 }
+        if dashboardFetchDelayNanoseconds > 0 {
+            try? await Task.sleep(nanoseconds: dashboardFetchDelayNanoseconds)
+        }
+        if shouldThrowOffline { throw AssistantOfflineError() }
+        if !studyTodayViewResultsQueue.isEmpty {
+            return studyTodayViewResultsQueue.removeFirst()
+        }
+        if let studyTodayViewResult {
+            return studyTodayViewResult
+        }
+        if !briefingResultsQueue.isEmpty {
+            return sampleStudyTodayView(from: briefingResultsQueue.removeFirst())
+        }
+        return sampleStudyTodayView(from: briefingResult)
+    }
+
+    func fetchStudyProjectOverview() async throws -> StudyProjectOverview {
+        fetchStudyProjectOverviewCallCount += 1
+        if dashboardFetchDelayNanoseconds > 0 {
+            try? await Task.sleep(nanoseconds: dashboardFetchDelayNanoseconds)
+        }
+        if shouldThrowOffline { throw AssistantOfflineError() }
+        if !studyProjectOverviewResultsQueue.isEmpty {
+            return studyProjectOverviewResultsQueue.removeFirst()
+        }
+        return studyProjectOverviewResult
+    }
+
+    func fetchStudyCalendarLoad(start: String, end: String) async throws -> StudyCalendarLoad {
+        fetchStudyCalendarLoadCallCount += 1
+        lastStudyCalendarLoadStart = start
+        lastStudyCalendarLoadEnd = end
+        signalStudyCalendarLoadCallCountChanged()
+        if shouldThrowOffline { throw AssistantOfflineError() }
+        if !studyCalendarLoadResultsQueue.isEmpty {
+            let result = studyCalendarLoadResultsQueue.removeFirst()
+            if result.delayNanoseconds > 0 {
+                try? await Task.sleep(nanoseconds: result.delayNanoseconds)
+            }
+            return result.load
+        }
+        return studyCalendarLoadResult
+    }
+
+    func completeTask(id: Int, actualMinutes: Int?) async throws -> TaskCompletionResult {
         if shouldThrowOffline { throw AssistantOfflineError() }
         lastCompleteTaskId = id
+        return TaskCompletionResult(taskId: id, completedAt: "2026-06-01T12:30:00")
     }
 
     func completeResource(id: Int) async throws {
@@ -2042,6 +2854,27 @@ private final class MockAssistantAPIClient: AssistantAPIClientProtocol, @uncheck
     private func withStudyPlanConfirmGateLock<T>(_ body: () -> T) -> T {
         studyPlanConfirmGateLock.lock()
         defer { studyPlanConfirmGateLock.unlock() }
+        return body()
+    }
+
+    private func signalStudyCalendarLoadCallCountChanged() {
+        let continuations = withStudyCalendarLoadGateLock {
+            var ready: [CheckedContinuation<Void, Never>] = []
+            studyCalendarLoadCallCountContinuations.removeAll { waiter in
+                if fetchStudyCalendarLoadCallCount >= waiter.expected {
+                    ready.append(waiter.continuation)
+                    return true
+                }
+                return false
+            }
+            return ready
+        }
+        continuations.forEach { $0.resume() }
+    }
+
+    private func withStudyCalendarLoadGateLock<T>(_ body: () -> T) -> T {
+        studyCalendarLoadGateLock.lock()
+        defer { studyCalendarLoadGateLock.unlock() }
         return body()
     }
 
@@ -2188,6 +3021,133 @@ private func sampleStudyPlanActivationResult() -> StudyPlanActivationResult {
         capacityMinutes: 60,
         clarificationSkipped: true
     )
+}
+
+private func sampleStudyTodayView(
+    date: String = "2026-06-01",
+    tasks: [String] = []
+) -> StudyTodayView {
+    let taskPayload = tasks.isEmpty ? "" : tasks.joined(separator: ",")
+    let json = """
+    {
+        "date": "\(date)",
+        "tasks": [\(taskPayload)]
+    }
+    """
+    return try! JSONDecoder().decode(StudyTodayView.self, from: Data(json.utf8))
+}
+
+private func sampleStudyTodayView(from briefing: TodayBriefing, date: String = "2026-06-01") -> StudyTodayView {
+    func nullable(_ value: Any?) -> Any { value ?? NSNull() }
+    let taskPayloads = briefing.tasks.map { task -> [String: Any] in
+        [
+            "id": task.id,
+            "title": task.title,
+            "target_minutes": task.targetMinutes,
+            "completed_at": nullable(task.completedAt),
+            "project_id": NSNull(),
+            "project_title": NSNull(),
+            "resource_id": NSNull(),
+            "resource_title": nullable(task.resourceTitle),
+            "resource_url": nullable(task.resourceURL?.absoluteString),
+            "unit_id": NSNull(),
+            "unit_title": NSNull(),
+            "unit_url": nullable(task.unitURL?.absoluteString)
+        ]
+    }
+    let payload: [String: Any] = [
+        "date": date,
+        "tasks": taskPayloads
+    ]
+    let data = try! JSONSerialization.data(withJSONObject: payload)
+    return try! JSONDecoder().decode(StudyTodayView.self, from: data)
+}
+
+private func sampleStudyViewTaskJSON(
+    id: Int,
+    title: String,
+    targetMinutes: Int,
+    completedAt: String? = nil,
+    projectTitle: String? = nil,
+    resourceTitle: String? = nil,
+    unitTitle: String? = nil
+) -> String {
+    """
+    {
+        "id": \(id),
+        "title": "\(title)",
+        "target_minutes": \(targetMinutes),
+        "completed_at": \(completedAt.map { "\"\($0)\"" } ?? "null"),
+        "project_id": 1,
+        "project_title": \(projectTitle.map { "\"\($0)\"" } ?? "null"),
+        "resource_id": 2,
+        "resource_title": \(resourceTitle.map { "\"\($0)\"" } ?? "null"),
+        "resource_url": "https://example.com/resource/\(id)",
+        "unit_id": 3,
+        "unit_title": \(unitTitle.map { "\"\($0)\"" } ?? "null"),
+        "unit_url": "https://example.com/unit/\(id)"
+    }
+    """
+}
+
+private func sampleStudyProjectOverview(
+    activeProjects: [String] = [],
+    completedProjects: [String] = []
+) -> StudyProjectOverview {
+    let json = """
+    {
+        "active_projects": [\(activeProjects.joined(separator: ","))],
+        "completed_projects": [\(completedProjects.joined(separator: ","))]
+    }
+    """
+    return try! JSONDecoder().decode(StudyProjectOverview.self, from: Data(json.utf8))
+}
+
+private func sampleStudyProjectSummaryJSON(
+    id: Int,
+    title: String,
+    completedUnits: Int,
+    totalUnits: Int,
+    progressRatio: Double,
+    status: String
+) -> String {
+    """
+    {
+        "id": \(id),
+        "title": "\(title)",
+        "completed_units": \(completedUnits),
+        "total_units": \(totalUnits),
+        "progress_ratio": \(progressRatio),
+        "target_minutes": 240,
+        "actual_minutes": 90,
+        "deadline": "2026-07-01",
+        "status": "\(status)"
+    }
+    """
+}
+
+private func sampleStudyCalendarLoad(
+    start: String = "2026-06-01",
+    end: String = "2026-06-07",
+    dayJSON: String = """
+    {
+        "date": "2026-06-01",
+        "scheduled_task_count": 0,
+        "total_target_minutes": 0,
+        "completed_task_count": 0,
+        "over_capacity": false
+    }
+    """
+) -> StudyCalendarLoad {
+    let json = """
+    {
+        "start_date": "\(start)",
+        "end_date": "\(end)",
+        "daily_capacity_minutes": 75,
+        "days": [\(dayJSON)]
+    }
+    """
+    return try! JSONDecoder().decode(StudyCalendarLoad.self, from: Data(json.utf8))
 }
 
 // MARK: - New ViewModel Ingestion Tests (Tasks 3.1–3.6)

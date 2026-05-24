@@ -1,14 +1,15 @@
 {
   "phase": "flow-b",
-  "round": 3,
-  "current_item": "study-views",
+  "round": 4,
+  "current_item": "study-plan-adjustment",
   "last_doc_hash": "d83fb77602961d4f3a9c3e17c307c6b499eb987b",
   "flow_a_readiness": "PASS",
   "flow_b_readiness": "PASS",
   "git_strategy": "current-checkout-only",
-  "last_checkpoint_commit": "efd022d",
+  "last_checkpoint_commit": "92cb29d",
   "in_progress_step": null,
-  "last_completed_step": "flow-b-round-10-item-002-openspec-ready",
-  "next_step": "checkpoint-and-opsx-apply-introduce-study-views",
-  "updated_at": "2026-05-23T18:18:56.496Z"
+  "last_completed_step": "flow-b-round-16-item-003-openspec-proposal-ready",
+  "next_step": "checkpoint-before-opsx-apply-introduce-study-plan-adjustment",
+  "blocker_reason": null,
+  "updated_at": "2026-05-24T03:00:05Z"
 }

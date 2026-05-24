@@ -8,7 +8,7 @@
   - Spec: `study-plan`
   - Goal: Establish the v2 plan calendar foundation: capacity setting, URL guided clarification, decomposition pipeline, scheduled draft plan, review edits, and confirmation into active daily use.
 
-- [ ] ITEM-002 `study-views`
+- [x] ITEM-002 `study-views`
   - Source: US-6, US-7, US-12, US-13, US-14
   - Depends on: ITEM-001
 

@@ -13,6 +13,10 @@ class ResourceNotActiveError(Exception):
     pass
 
 
+class TaskNotFoundError(Exception):
+    pass
+
+
 async def get_tasks_by_date(db: aiosqlite.Connection, target_date: date) -> list[dict]:
     async with db.execute(
         "SELECT * FROM tasks WHERE scheduled_date = ? ORDER BY priority DESC, id ASC",
@@ -54,6 +58,143 @@ async def get_all_active_resources(db: aiosqlite.Connection) -> list[dict]:
         rows = await cursor.fetchall()
         cols = [d[0] for d in cursor.description]
         return [dict(zip(cols, r)) for r in rows]
+
+
+async def get_today_study_view_tasks(db: aiosqlite.Connection, target_date: date) -> list[dict]:
+    async with db.execute(
+        """
+        SELECT
+            t.id,
+            t.title,
+            t.target_minutes,
+            t.completed_at,
+            r.id AS project_id,
+            r.title AS project_title,
+            r.id AS resource_id,
+            r.title AS resource_title,
+            r.url AS resource_url,
+            u.id AS unit_id,
+            u.title AS unit_title,
+            NULL AS unit_url
+        FROM tasks t
+        JOIN resources r ON r.id = t.resource_id
+        LEFT JOIN units u ON u.id = t.unit_id
+        WHERE t.scheduled_date = ?
+          AND r.status = 'active'
+          AND r.type = 'study_project'
+        ORDER BY t.priority DESC, t.id ASC
+        """,
+        (target_date.isoformat(),),
+    ) as cursor:
+        rows = await cursor.fetchall()
+        cols = [d[0] for d in cursor.description]
+        return [dict(zip(cols, r)) for r in rows]
+
+
+async def get_study_project_overview(db: aiosqlite.Connection) -> dict[str, list[dict]]:
+    async with db.execute(
+        """
+        WITH task_progress AS (
+            SELECT
+                resource_id,
+                COUNT(*) AS task_total,
+                SUM(CASE WHEN completed_at IS NOT NULL THEN 1 ELSE 0 END) AS task_completed,
+                SUM(COALESCE(target_minutes, 0)) AS task_target_minutes,
+                SUM(
+                    CASE
+                        WHEN completed_at IS NOT NULL THEN COALESCE(actual_minutes, target_minutes, 0)
+                        ELSE 0
+                    END
+                ) AS task_actual_minutes
+            FROM tasks
+            GROUP BY resource_id
+        )
+        SELECT
+            r.id,
+            r.title,
+            COALESCE(tp.task_completed, 0) AS completed_units,
+            COALESCE(tp.task_total, 0) AS total_units,
+            COALESCE(tp.task_target_minutes, 0) AS target_minutes,
+            COALESCE(tp.task_actual_minutes, 0) AS actual_minutes,
+            r.deadline,
+            r.status
+        FROM resources r
+        LEFT JOIN task_progress tp ON tp.resource_id = r.id
+        WHERE r.type = 'study_project'
+          AND r.status IN ('active', 'completed')
+        ORDER BY r.id ASC
+        """,
+    ) as cursor:
+        rows = await cursor.fetchall()
+        cols = [d[0] for d in cursor.description]
+
+    projects = []
+    for row in rows:
+        project = dict(zip(cols, row))
+        completed_units = project["completed_units"] or 0
+        total_units = project["total_units"] or 0
+        project["progress_ratio"] = round(completed_units / total_units, 2) if total_units else 0.0
+        projects.append(project)
+
+    return {
+        "active_projects": [project for project in projects if project["status"] == "active"],
+        "completed_projects": [project for project in projects if project["status"] == "completed"],
+    }
+
+
+def _parse_daily_capacity_minutes(raw: str | None) -> int:
+    try:
+        capacity = int(raw) if raw is not None else 60
+    except (TypeError, ValueError):
+        return 60
+    return capacity if capacity > 0 else 60
+
+
+async def get_study_calendar_load(db: aiosqlite.Connection, start: date, end: date) -> dict:
+    daily_capacity_minutes = _parse_daily_capacity_minutes(await get_system_state(db, "daily_capacity_min"))
+    async with db.execute(
+        """
+        SELECT
+            t.scheduled_date AS date,
+            COUNT(*) AS scheduled_task_count,
+            SUM(COALESCE(t.target_minutes, 0)) AS total_target_minutes,
+            SUM(CASE WHEN t.completed_at IS NOT NULL THEN 1 ELSE 0 END) AS completed_task_count
+        FROM tasks t
+        JOIN resources r ON r.id = t.resource_id
+        WHERE t.scheduled_date BETWEEN ? AND ?
+          AND r.status = 'active'
+          AND r.type = 'study_project'
+        GROUP BY t.scheduled_date
+        """,
+        (start.isoformat(), end.isoformat()),
+    ) as cursor:
+        rows = await cursor.fetchall()
+        cols = [d[0] for d in cursor.description]
+
+    aggregates = {row["date"]: row for row in (dict(zip(cols, r)) for r in rows)}
+    days = []
+    current = start
+    while current <= end:
+        day = current.isoformat()
+        aggregate = aggregates.get(day, {})
+        total_target_minutes = aggregate.get("total_target_minutes") or 0
+        days.append(
+            {
+                "date": day,
+                "scheduled_task_count": aggregate.get("scheduled_task_count") or 0,
+                "total_target_minutes": total_target_minutes,
+                "completed_task_count": aggregate.get("completed_task_count") or 0,
+                "over_capacity": total_target_minutes > daily_capacity_minutes,
+            }
+        )
+        current += timedelta(days=1)
+
+    return {
+        "start_date": start.isoformat(),
+        "end_date": end.isoformat(),
+        "daily_capacity_minutes": daily_capacity_minutes,
+        "days": days,
+    }
 
 
 async def mark_active_resource_complete(
@@ -273,37 +414,107 @@ async def reschedule_task(db: aiosqlite.Connection, task_id: int, new_date: date
 
 
 async def complete_task(db: aiosqlite.Connection, task_id: int, actual_minutes: int | None = None) -> dict:
-    now = datetime.utcnow().isoformat()
-    await db.execute(
-        "UPDATE tasks SET completed_at = ?, actual_minutes = ? WHERE id = ?",
-        (now, actual_minutes, task_id),
-    )
-    async with db.execute("SELECT unit_id, resource_id, target_minutes FROM tasks WHERE id = ?", (task_id,)) as cur:
-        task = await cur.fetchone()
-    if task:
-        unit_id, resource_id, target_minutes = task
+    now = datetime.now(UTC).isoformat()
+
+    await db.execute("BEGIN IMMEDIATE")
+    try:
+        async with db.execute(
+            """
+            SELECT unit_id, resource_id, target_minutes, completed_at
+            FROM tasks
+            WHERE id = ?
+            """,
+            (task_id,),
+        ) as cur:
+            task = await cur.fetchone()
+
+        if not task:
+            raise TaskNotFoundError
+
+        unit_id, resource_id, target_minutes, completed_at = task
+        if completed_at is not None:
+            await db.commit()
+            return {"task_id": task_id, "completed_at": completed_at}
+
+        minutes = actual_minutes if actual_minutes is not None else (target_minutes or 0)
+        unit_already_completed = False
+        if unit_id:
+            async with db.execute("SELECT status FROM units WHERE id = ?", (unit_id,)) as cur:
+                unit = await cur.fetchone()
+            unit_already_completed = bool(unit and unit[0] == "completed")
+
+        await db.execute(
+            "UPDATE tasks SET completed_at = ?, actual_minutes = ? WHERE id = ?",
+            (now, minutes, task_id),
+        )
         if unit_id:
             await db.execute(
-                "UPDATE units SET status = 'completed', completed_at = ?, actual_minutes = ? WHERE id = ?",
-                (now, actual_minutes or target_minutes, unit_id),
+                """
+                UPDATE units
+                SET status = 'completed',
+                    completed_at = COALESCE(completed_at, ?),
+                    actual_minutes = COALESCE(actual_minutes, ?)
+                WHERE id = ?
+                """,
+                (now, minutes, unit_id),
             )
         if resource_id:
+            completed_unit_delta = 0 if unit_id and unit_already_completed else 1
             await db.execute(
-                "UPDATE resources SET completed_units = completed_units + 1, "
-                "actual_minutes_total = actual_minutes_total + ? WHERE id = ?",
-                (actual_minutes or target_minutes or 0, resource_id),
+                """
+                UPDATE resources
+                SET completed_units = COALESCE(completed_units, 0) + ?,
+                    actual_minutes_total = COALESCE(actual_minutes_total, 0) + ?
+                WHERE id = ?
+                """,
+                (completed_unit_delta, minutes, resource_id),
             )
+
+        await db.execute(
+            "INSERT INTO events (event_type, payload) VALUES (?, ?)",
+            ("task_completed", json.dumps({"task_id": task_id})),
+        )
+        if resource_id:
             async with db.execute(
-                "SELECT total_units, completed_units FROM resources WHERE id = ?", (resource_id,)
+                """
+                SELECT
+                    r.type,
+                    r.status,
+                    COUNT(t.id) AS task_count,
+                    SUM(CASE WHEN t.completed_at IS NULL THEN 1 ELSE 0 END) AS unfinished_count
+                FROM resources r
+                LEFT JOIN tasks t ON t.resource_id = r.id
+                WHERE r.id = ?
+                GROUP BY r.id
+                """,
+                (resource_id,),
             ) as cur:
-                res = await cur.fetchone()
-            if res and res[0] and res[1] >= res[0]:
-                await db.execute(
-                    "UPDATE resources SET status = 'completed' WHERE id = ?", (resource_id,)
+                resource_progress = await cur.fetchone()
+
+            if (
+                resource_progress
+                and resource_progress[0] == "study_project"
+                and resource_progress[1] == "active"
+                and (resource_progress[2] or 0) > 0
+                and (resource_progress[3] or 0) == 0
+            ):
+                cursor = await db.execute(
+                    "UPDATE resources SET status = 'completed' WHERE id = ? AND status = 'active'",
+                    (resource_id,),
                 )
-                await insert_event(db, "resource_completed", {"resource_id": resource_id})
-    await db.commit()
-    await insert_event(db, "task_completed", {"task_id": task_id})
+                if cursor.rowcount == 1:
+                    await db.execute(
+                        "INSERT INTO events (event_type, payload) VALUES (?, ?)",
+                        (
+                            "resource_completed",
+                            json.dumps({"resource_id": resource_id, "source": "task_completion"}),
+                        ),
+                    )
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise
+
     return {"task_id": task_id, "completed_at": now}
 
 

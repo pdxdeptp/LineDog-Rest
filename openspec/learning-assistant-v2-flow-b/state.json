@@ -1,14 +1,15 @@
 {
-  "phase": "ready_to_apply",
-  "round": 2,
-  "current_item": "study-views",
-  "current_change": "introduce-study-views",
-  "current_spec": "study-views",
+  "phase": "flow-b",
+  "round": 3,
+  "current_item": "study-plan-adjustment",
+  "current_change": "introduce-study-plan-adjustment",
+  "current_spec": "study-plan-adjustment",
   "items_initialized": true,
   "in_progress_step": null,
-  "last_completed_step": "item-002-study-views-openspec-ready",
-  "last_completed_item": "study-plan-foundation",
-  "last_completed_change": "introduce-study-plan-foundation",
-  "next_step": "checkpoint-and-opsx-apply-introduce-study-views",
-  "updated_at": "2026-05-23T18:18:56.496Z"
+  "last_completed_step": "item-003-openspec-proposal-ready",
+  "last_completed_item": "study-views",
+  "last_completed_change": "introduce-study-views",
+  "next_step": "checkpoint-before-opsx-apply-introduce-study-plan-adjustment",
+  "blocker_reason": null,
+  "updated_at": "2026-05-24T03:00:05Z"
 }

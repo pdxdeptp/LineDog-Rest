@@ -110,7 +110,11 @@ struct AssistantPanelView: View {
     private var activePanelContent: some View {
         switch vm.selectedPanelTab {
         case .home:
-            homeDashboard
+            todayView
+        case .projectOverview:
+            ProjectOverviewView(vm: vm)
+        case .calendar:
+            StudyCalendarLoadView(vm: vm)
         case .addResource:
             StudyPlanIntakeView(vm: vm)
         case .resourceProgress:
@@ -124,9 +128,14 @@ struct AssistantPanelView: View {
 
     // MARK: - Dashboard
 
+    private var todayView: some View {
+        homeDashboard
+    }
+
     private var homeDashboard: some View {
         List {
             dashboardSummarySection
+            todayV2Facts
 
             switch vm.dashboardState.kind {
             case .emptyDatabase:
@@ -143,6 +152,24 @@ struct AssistantPanelView: View {
         }
         .listStyle(.plain)
         .refreshable { await vm.fetchDashboard() }
+    }
+
+    @ViewBuilder
+    private var todayV2Facts: some View {
+        if let todayView = vm.studyTodayView {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("今日学习")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+
+                HStack(spacing: 12) {
+                    summaryMetric(value: todayView.date, label: "v2 日期")
+                    summaryMetric(value: "\(studyProjectCount(in: todayView))", label: "项目")
+                    summaryMetric(value: "\(studyUnitCount(in: todayView))", label: "单元")
+                }
+            }
+            .padding(.vertical, 8)
+        }
     }
 
     private var dashboardSummarySection: some View {
@@ -191,6 +218,14 @@ struct AssistantPanelView: View {
                 .foregroundStyle(.tertiary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func studyProjectCount(in todayView: StudyTodayView) -> Int {
+        Set(todayView.tasks.compactMap(\.projectId)).count
+    }
+
+    private func studyUnitCount(in todayView: StudyTodayView) -> Int {
+        Set(todayView.tasks.compactMap(\.unitId)).count
     }
 
     private var emptyDatabaseSection: some View {
@@ -319,6 +354,8 @@ struct AssistantPanelView: View {
     private var bottomNavigationBar: some View {
         HStack(spacing: 0) {
             bottomNavigationButton(.home)
+            bottomNavigationButton(.projectOverview)
+            bottomNavigationButton(.calendar)
             bottomNavigationButton(.addResource)
             bottomNavigationButton(.resourceProgress)
             bottomNavigationButton(.adjustPlan)
@@ -346,6 +383,211 @@ struct AssistantPanelView: View {
         }
         .buttonStyle(.plain)
         .help(tab.shortLabel)
+    }
+}
+
+private struct StudyCalendarLoadView: View {
+    @ObservedObject var vm: LearningAssistantViewModel
+
+    var body: some View {
+        List {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("只读日历")
+                    .font(.headline)
+                Text("每日负荷只展示已排定任务，不提供拖拽或变更控件。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.vertical, 8)
+
+            if vm.isFetchingStudyCalendarLoad {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("正在加载日历负荷")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if let error = vm.studyCalendarLoadError {
+                Label(error, systemImage: "exclamationmark.triangle")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
+
+            if let load = vm.studyCalendarLoad {
+                Section {
+                    Text("\(load.startDate) 到 \(load.endDate) · 每日容量 \(load.dailyCapacityMinutes) 分钟")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    ForEach(load.days, id: \.date) { day in
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack {
+                                Text(day.date)
+                                    .font(.callout.weight(.semibold))
+                                Spacer()
+                                if day.overCapacity {
+                                    Text("超出容量")
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(.orange)
+                                }
+                            }
+
+                            HStack(spacing: 12) {
+                                calendarLoadFact(value: "\(day.scheduledTaskCount)", label: "任务")
+                                calendarLoadFact(value: "\(day.totalTargetMinutes)", label: "分钟")
+                                calendarLoadFact(value: "\(day.completedTaskCount)", label: "已完成")
+                            }
+                        }
+                        .padding(.vertical, 6)
+                    }
+                } header: {
+                    Text("日负荷")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+            } else if !vm.isFetchingStudyCalendarLoad {
+                Text("暂无日历负荷")
+                    .font(.subheadline)
+                    .foregroundStyle(.tertiary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding()
+            }
+        }
+        .listStyle(.plain)
+        .task { await fetchDefaultWindowIfNeeded() }
+    }
+
+    private func fetchDefaultWindowIfNeeded() async {
+        guard vm.studyCalendarLoad == nil, !vm.isFetchingStudyCalendarLoad else { return }
+        let calendar = Calendar.current
+        let startDate = Date()
+        let endDate = calendar.date(byAdding: .day, value: Self.defaultCalendarWindowDayOffset, to: startDate) ?? startDate
+        let start = Self.dateFormatter.string(from: startDate)
+        let end = Self.dateFormatter.string(from: endDate)
+        await vm.fetchStudyCalendarLoad(start: start, end: end)
+    }
+
+    private func calendarLoadFact(value: String, label: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(value)
+                .font(.callout.monospacedDigit().weight(.semibold))
+            Text(label)
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private static let dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
+
+    private static let defaultCalendarWindowDayOffset = 27
+}
+
+private struct ProjectOverviewView: View {
+    @ObservedObject var vm: LearningAssistantViewModel
+
+    var body: some View {
+        List {
+            if let overview = vm.studyProjectOverview {
+                projectSection(title: "进行中项目", projects: overview.activeProjects)
+                projectSection(title: "完成历史", projects: overview.completedProjects)
+            } else {
+                Text("暂无项目总览")
+                    .font(.subheadline)
+                    .foregroundStyle(.tertiary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding()
+            }
+        }
+        .listStyle(.plain)
+        .refreshable { await vm.fetchDashboard() }
+    }
+
+    private func projectSection(title: String, projects: [StudyProjectSummary]) -> some View {
+        Section {
+            if projects.isEmpty {
+                Text("暂无记录")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .padding(.vertical, 4)
+            } else {
+                ForEach(projects) { project in
+                    projectRow(project)
+                }
+            }
+        } header: {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func projectRow(_ project: StudyProjectSummary) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(project.title)
+                    .font(.callout.weight(.semibold))
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 8)
+                Text(projectStatusLabel(for: project.status))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            ProgressView(value: clampedProgressRatio(for: project))
+
+            Text("\(project.completedUnits)/\(project.totalUnits) 单元 · \(Int(clampedProgressRatio(for: project) * 100))%")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            HStack(spacing: 12) {
+                projectFact(value: "\(project.targetMinutes)", label: "目标分钟")
+                projectFact(value: "\(project.actualMinutes)", label: "实际分钟")
+                projectFact(value: projectDeadlineLabel(for: project.deadline), label: "截止")
+            }
+        }
+        .padding(.vertical, 8)
+    }
+
+    private func clampedProgressRatio(for project: StudyProjectSummary) -> Double {
+        let ratio = project.progressRatio
+        guard ratio.isFinite else { return 0 }
+        return min(max(ratio, 0), 1)
+    }
+
+    private func projectStatusLabel(for status: String) -> String {
+        switch status.lowercased() {
+        case "active": return "进行中"
+        case "completed": return "已完成"
+        default: return status.isEmpty ? "未知状态" : status
+        }
+    }
+
+    private func projectDeadlineLabel(for deadline: String?) -> String {
+        return deadline ?? "无截止日期"
+    }
+
+    private func projectFact(value: String, label: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(value)
+                .font(.caption.monospacedDigit().weight(.semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+            Text(label)
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -852,7 +1094,9 @@ private struct AssistantPanelFixtureAPIClient: AssistantAPIClientProtocol {
     let resources: [AssistantResource]
 
     func fetchTodayBriefing() async throws -> TodayBriefing { briefing }
-    func completeTask(id: Int, actualMinutes: Int?) async throws {}
+    func completeTask(id: Int, actualMinutes: Int?) async throws -> TaskCompletionResult {
+        TaskCompletionResult(taskId: id, completedAt: "2026-06-01T12:30:00")
+    }
     func completeResource(id: Int) async throws {}
     func archiveResource(id: Int) async throws {}
     func sendMessage(message: String, threadId: String?) async throws -> ChatResponse {
@@ -988,7 +1232,9 @@ private struct AssistantPanelView_Previews: PreviewProvider {
 private extension AssistantPanelTab {
     var shortLabel: String {
         switch self {
-        case .home: return "首页"
+        case .home: return "今日"
+        case .projectOverview: return "项目总览"
+        case .calendar: return "日历"
         case .addResource: return "添加资料"
         case .resourceProgress: return "资料进度"
         case .adjustPlan: return "调整计划"
@@ -999,6 +1245,8 @@ private extension AssistantPanelTab {
     var iconName: String {
         switch self {
         case .home: return "house"
+        case .projectOverview: return "folder"
+        case .calendar: return "calendar"
         case .addResource: return "plus.circle"
         case .resourceProgress: return "chart.bar"
         case .adjustPlan: return "slider.horizontal.3"

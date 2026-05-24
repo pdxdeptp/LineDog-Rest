@@ -112,7 +112,7 @@ struct AssistantResource: Codable, Identifiable {
         status = try container.decode(String.self, forKey: .status)
 
         let rawURL = try container.decodeIfPresent(String.self, forKey: .url)
-        resourceURL = Self.validResourceURL(from: rawURL)
+        resourceURL = validWebURL(from: rawURL)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -137,20 +137,6 @@ struct AssistantResource: Codable, Identifiable {
         case actualMinutesTotal = "actual_minutes_total"
     }
 
-    private static func validResourceURL(from rawValue: String?) -> URL? {
-        guard let rawValue else { return nil }
-        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty,
-              let url = URL(string: trimmed),
-              let scheme = url.scheme?.lowercased(),
-              !scheme.isEmpty else { return nil }
-        guard ["http", "https"].contains(scheme),
-              let host = url.host,
-              !host.isEmpty else {
-            return nil
-        }
-        return url
-    }
 }
 
 struct ChatResponse: Codable {
@@ -215,6 +201,148 @@ struct IngestionDraftDetail: Codable {
 struct LearningPreferences: Codable {
     let dailyCapacityMin: Int
     enum CodingKeys: String, CodingKey { case dailyCapacityMin = "daily_capacity_min" }
+}
+
+// MARK: - Study Views Models
+
+struct StudyTodayView: Codable {
+    let date: String
+    let tasks: [StudyViewTask]
+}
+
+struct StudyViewTask: Codable, Identifiable {
+    let id: Int
+    let title: String
+    let targetMinutes: Int
+    let completedAt: String?
+    let projectId: Int?
+    let projectTitle: String?
+    let resourceId: Int?
+    let resourceTitle: String?
+    let resourceURL: URL?
+    let unitId: Int?
+    let unitTitle: String?
+    let unitURL: URL?
+
+    var isCompleted: Bool { completedAt != nil }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(Int.self, forKey: .id)
+        title = try container.decode(String.self, forKey: .title)
+        targetMinutes = try container.decode(Int.self, forKey: .targetMinutes)
+        completedAt = try container.decodeIfPresent(String.self, forKey: .completedAt)
+        projectId = try container.decodeIfPresent(Int.self, forKey: .projectId)
+        projectTitle = try container.decodeIfPresent(String.self, forKey: .projectTitle)
+        resourceId = try container.decodeIfPresent(Int.self, forKey: .resourceId)
+        resourceTitle = try container.decodeIfPresent(String.self, forKey: .resourceTitle)
+        resourceURL = validWebURL(from: try container.decodeIfPresent(String.self, forKey: .resourceURL))
+        unitId = try container.decodeIfPresent(Int.self, forKey: .unitId)
+        unitTitle = try container.decodeIfPresent(String.self, forKey: .unitTitle)
+        unitURL = validWebURL(from: try container.decodeIfPresent(String.self, forKey: .unitURL))
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(title, forKey: .title)
+        try container.encode(targetMinutes, forKey: .targetMinutes)
+        try container.encodeIfPresent(completedAt, forKey: .completedAt)
+        try container.encodeIfPresent(projectId, forKey: .projectId)
+        try container.encodeIfPresent(projectTitle, forKey: .projectTitle)
+        try container.encodeIfPresent(resourceId, forKey: .resourceId)
+        try container.encodeIfPresent(resourceTitle, forKey: .resourceTitle)
+        try container.encodeIfPresent(resourceURL?.absoluteString, forKey: .resourceURL)
+        try container.encodeIfPresent(unitId, forKey: .unitId)
+        try container.encodeIfPresent(unitTitle, forKey: .unitTitle)
+        try container.encodeIfPresent(unitURL?.absoluteString, forKey: .unitURL)
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, title
+        case targetMinutes = "target_minutes"
+        case completedAt = "completed_at"
+        case projectId = "project_id"
+        case projectTitle = "project_title"
+        case resourceId = "resource_id"
+        case resourceTitle = "resource_title"
+        case resourceURL = "resource_url"
+        case unitId = "unit_id"
+        case unitTitle = "unit_title"
+        case unitURL = "unit_url"
+    }
+
+}
+
+struct StudyProjectOverview: Codable {
+    let activeProjects: [StudyProjectSummary]
+    let completedProjects: [StudyProjectSummary]
+
+    enum CodingKeys: String, CodingKey {
+        case activeProjects = "active_projects"
+        case completedProjects = "completed_projects"
+    }
+}
+
+struct StudyProjectSummary: Codable, Identifiable {
+    let id: Int
+    let title: String
+    let completedUnits: Int
+    let totalUnits: Int
+    let progressRatio: Double
+    let targetMinutes: Int
+    let actualMinutes: Int
+    let deadline: String?
+    let status: String
+
+    enum CodingKeys: String, CodingKey {
+        case id, title, deadline, status
+        case completedUnits = "completed_units"
+        case totalUnits = "total_units"
+        case progressRatio = "progress_ratio"
+        case targetMinutes = "target_minutes"
+        case actualMinutes = "actual_minutes"
+    }
+}
+
+struct StudyCalendarLoad: Codable {
+    let startDate: String
+    let endDate: String
+    let dailyCapacityMinutes: Int
+    let days: [StudyCalendarDay]
+
+    enum CodingKeys: String, CodingKey {
+        case startDate = "start_date"
+        case endDate = "end_date"
+        case dailyCapacityMinutes = "daily_capacity_minutes"
+        case days
+    }
+}
+
+struct StudyCalendarDay: Codable {
+    let date: String
+    let scheduledTaskCount: Int
+    let totalTargetMinutes: Int
+    let completedTaskCount: Int
+    let overCapacity: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case date
+        case scheduledTaskCount = "scheduled_task_count"
+        case totalTargetMinutes = "total_target_minutes"
+        case completedTaskCount = "completed_task_count"
+        case overCapacity = "over_capacity"
+    }
+}
+
+struct TaskCompletionResult: Codable {
+    let taskId: Int
+    let completedAt: String
+
+    enum CodingKeys: String, CodingKey {
+        case taskId = "task_id"
+        case completedAt = "completed_at"
+    }
 }
 
 // MARK: - Study Plan v2 Models
@@ -552,6 +680,20 @@ struct StudyPlanActivationResult: Codable {
 
 private struct EmptyRequestBody: Encodable {}
 
+private func validWebURL(from rawValue: String?) -> URL? {
+    guard let rawValue else { return nil }
+    let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty,
+          let url = URL(string: trimmed),
+          let scheme = url.scheme?.lowercased(),
+          ["http", "https"].contains(scheme),
+          let host = url.host,
+          !host.isEmpty else {
+        return nil
+    }
+    return url
+}
+
 // Keep IngestionDraft for backward-compatible test decoding tests only
 struct IngestionDraft: Codable {
     let threadId: String
@@ -596,46 +738,61 @@ struct AnyCodable: Codable {
 final class AssistantAPIClient {
     static let shared = AssistantAPIClient()
 
-    private let baseURL = URL(string: "http://localhost:8765")!
+    private let baseURL: URL
     let session: URLSession
 
     private init() {
+        baseURL = URL(string: "http://localhost:8765")!
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest  = 120
         config.timeoutIntervalForResource = 300
         session = URLSession(configuration: config)
     }
 
+    init(baseURL: URL, session: URLSession) {
+        self.baseURL = baseURL
+        self.session = session
+    }
+
     // MARK: - Private helpers
 
-    private func get<T: Decodable>(_ path: String) async throws -> T {
-        let url = baseURL.appendingPathComponent(path)
+    private func requestURL(path: String, queryItems: [URLQueryItem] = []) -> URL {
+        var components = URLComponents(
+            url: baseURL.appendingPathComponent(path),
+            resolvingAgainstBaseURL: false
+        )!
+        components.queryItems = queryItems.isEmpty ? nil : queryItems
+        return components.url!
+    }
+
+    private func get<T: Decodable>(_ path: String, queryItems: [URLQueryItem] = []) async throws -> T {
+        let url = requestURL(path: path, queryItems: queryItems)
         let data = try await fetch(url: url, method: "GET", body: nil)
         return try decode(data)
     }
 
     private func post<B: Encodable, T: Decodable>(_ path: String, body: B) async throws -> T {
-        let url  = baseURL.appendingPathComponent(path)
+        let url  = requestURL(path: path)
         let bodyData = try JSONEncoder().encode(body)
         let data = try await fetch(url: url, method: "POST", body: bodyData)
         return try decode(data)
     }
 
     private func postVoid<B: Encodable>(_ path: String, body: B) async throws {
-        let url  = baseURL.appendingPathComponent(path)
+        let url  = requestURL(path: path)
         let bodyData = try JSONEncoder().encode(body)
         _ = try await fetch(url: url, method: "POST", body: bodyData)
     }
 
     private func put<B: Encodable, T: Decodable>(_ path: String, body: B) async throws -> T {
-        let url = baseURL.appendingPathComponent(path)
+        let url = requestURL(path: path)
         let bodyData = try JSONEncoder().encode(body)
         let data = try await fetch(url: url, method: "PUT", body: bodyData)
         return try decode(data)
     }
 
     private func putVoid<B: Encodable>(_ path: String, body: B) async throws {
-        let url  = baseURL.appendingPathComponent(path)
+        let url  = requestURL(path: path)
         let bodyData = try JSONEncoder().encode(body)
         _ = try await fetch(url: url, method: "PUT", body: bodyData)
     }
@@ -682,12 +839,30 @@ final class AssistantAPIClient {
         try await get("/api/today-briefing")
     }
 
-    func completeTask(id: Int, actualMinutes: Int? = nil) async throws {
+    func fetchStudyTodayView() async throws -> StudyTodayView {
+        try await get("/api/study-views/today")
+    }
+
+    func fetchStudyProjectOverview() async throws -> StudyProjectOverview {
+        try await get("/api/study-views/projects")
+    }
+
+    func fetchStudyCalendarLoad(start: String, end: String) async throws -> StudyCalendarLoad {
+        try await get(
+            "/api/study-views/calendar",
+            queryItems: [
+                URLQueryItem(name: "start", value: start),
+                URLQueryItem(name: "end", value: end)
+            ]
+        )
+    }
+
+    func completeTask(id: Int, actualMinutes: Int? = nil) async throws -> TaskCompletionResult {
         struct Body: Encodable {
             let actualMinutes: Int?
             enum CodingKeys: String, CodingKey { case actualMinutes = "actual_minutes" }
         }
-        try await postVoid("/api/tasks/\(id)/complete", body: Body(actualMinutes: actualMinutes))
+        return try await post("/api/tasks/\(id)/complete", body: Body(actualMinutes: actualMinutes))
     }
 
     func completeResource(id: Int) async throws {

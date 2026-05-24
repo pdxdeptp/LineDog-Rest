@@ -14,6 +14,8 @@ struct ChatMessage: Identifiable {
 
 enum AssistantPanelTab: Equatable {
     case home
+    case projectOverview
+    case calendar
     case addResource
     case resourceProgress
     case adjustPlan
@@ -82,8 +84,14 @@ final class LearningAssistantViewModel: ObservableObject {
     @Published var todayTotalMinutes: Int  = 0
     @Published var todayHighlights: String = ""
     @Published private(set) var hasLoadedDashboardContent = false
+    @Published var studyTodayView: StudyTodayView? = nil
+    @Published var studyProjectOverview: StudyProjectOverview? = nil
+    @Published var studyCalendarLoad: StudyCalendarLoad? = nil
+    @Published var studyViewError: String? = nil
+    @Published var studyCalendarLoadError: String? = nil
 
     @Published var isFetchingBriefing = false
+    @Published var isFetchingStudyCalendarLoad = false
     @Published var isSendingMessage   = false
     @Published var isIngesting        = false
     @Published var isStartingStudyPlan = false
@@ -137,6 +145,7 @@ final class LearningAssistantViewModel: ObservableObject {
     private var rescheduleDebounceTask: Task<Void, Never>?
     private var dashboardRefreshTail: Task<Void, Never>?
     private var dashboardRefreshSequence = 0
+    private var studyCalendarLoadRequestSequence = 0
 
     // MARK: - Init
 
@@ -238,19 +247,30 @@ final class LearningAssistantViewModel: ObservableObject {
         isFetchingBriefing = true
         defer { isFetchingBriefing = false }
         do {
-            async let briefingRequest = api.fetchTodayBriefing()
+            async let todayViewRequest = api.fetchStudyTodayView()
+            async let projectOverviewRequest = api.fetchStudyProjectOverview()
             async let resourcesRequest = api.fetchResources()
-            let (briefing, fetchedResources) = try await (briefingRequest, resourcesRequest)
-            apply(briefing: briefing, resources: fetchedResources)
+            let (todayView, projectOverview, fetchedResources) = try await (
+                todayViewRequest,
+                projectOverviewRequest,
+                resourcesRequest
+            )
+            apply(
+                studyTodayView: todayView,
+                projectOverview: projectOverview,
+                resources: fetchedResources
+            )
             if resourceRefreshFailureMessage != nil {
                 resourceManagementError = nil
             }
+            studyViewError = nil
             isOffline = false
             isConnecting = false
         } catch {
             if let resourceRefreshFailureMessage {
                 resourceManagementError = resourceRefreshFailureMessage
             }
+            studyViewError = "学习视图刷新失败，请稍后重试。"
             isOffline = true
             isConnecting = false
         }
@@ -298,10 +318,32 @@ final class LearningAssistantViewModel: ObservableObject {
 
     func completeTask(_ task: AssistantTask) async {
         do {
-            try await api.completeTask(id: task.id, actualMinutes: nil)
-            // Optimistic update: mark locally while re-fetching
+            _ = try await api.completeTask(id: task.id, actualMinutes: nil)
             await fetchDashboard()
+            await refreshCalendarLoadIfNeeded()
         } catch {
+            isOffline = true
+        }
+    }
+
+    func fetchStudyCalendarLoad(start: String, end: String) async {
+        studyCalendarLoadRequestSequence += 1
+        let requestSequence = studyCalendarLoadRequestSequence
+        isFetchingStudyCalendarLoad = true
+        defer {
+            if studyCalendarLoadRequestSequence == requestSequence {
+                isFetchingStudyCalendarLoad = false
+            }
+        }
+        do {
+            let fetchedLoad = try await api.fetchStudyCalendarLoad(start: start, end: end)
+            guard studyCalendarLoadRequestSequence == requestSequence else { return }
+            studyCalendarLoad = fetchedLoad
+            studyCalendarLoadError = nil
+            isOffline = false
+        } catch {
+            guard studyCalendarLoadRequestSequence == requestSequence else { return }
+            studyCalendarLoadError = "日历负荷加载失败，请稍后重试。"
             isOffline = true
         }
     }
@@ -717,6 +759,34 @@ final class LearningAssistantViewModel: ObservableObject {
         hasLoadedDashboardContent = true
     }
 
+    private func apply(
+        studyTodayView todayView: StudyTodayView,
+        projectOverview: StudyProjectOverview,
+        resources fetchedResources: [AssistantResource]
+    ) {
+        let mappedTasks = todayView.tasks.enumerated().map { index, task in
+            AssistantTask(
+                id: task.id,
+                title: task.title,
+                targetMinutes: task.targetMinutes,
+                completedAt: task.completedAt,
+                resourceTitle: task.projectTitle ?? task.resourceTitle,
+                priority: index + 1,
+                resourceURL: task.resourceURL,
+                unitURL: task.unitURL
+            )
+        }
+        let orderedTasks = applyLocalDisplayOrder(to: mappedTasks)
+        studyTodayView = todayView
+        studyProjectOverview = projectOverview
+        tasks = orderedTasks
+        visibleTodayTasks = orderedTasks
+        todayTotalMinutes = todayView.tasks.reduce(0) { $0 + $1.targetMinutes }
+        todayHighlights = factualTodayHighlights(taskCount: todayView.tasks.count, totalMinutes: todayTotalMinutes)
+        resources = fetchedResources
+        hasLoadedDashboardContent = true
+    }
+
     private func clearDashboardContent() {
         tasks = []
         visibleTodayTasks = []
@@ -724,6 +794,16 @@ final class LearningAssistantViewModel: ObservableObject {
         todayTotalMinutes = 0
         todayHighlights = ""
         expandedTaskIDs = []
+    }
+
+    private func refreshCalendarLoadIfNeeded() async {
+        guard let currentLoad = studyCalendarLoad else { return }
+        await fetchStudyCalendarLoad(start: currentLoad.startDate, end: currentLoad.endDate)
+    }
+
+    private func factualTodayHighlights(taskCount: Int, totalMinutes: Int) -> String {
+        guard taskCount > 0 else { return "今天没有安排学习任务" }
+        return "今日共 \(taskCount) 项学习任务，总计 \(totalMinutes) 分钟"
     }
 
     private func manageResource(
