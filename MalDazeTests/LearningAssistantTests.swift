@@ -1645,6 +1645,45 @@ final class LearningAssistantUISourceTests: XCTestCase {
         XCTAssertFalse(adjustmentSource.contains("Label(error, systemImage: \"exclamationmark.triangle\")"))
     }
 
+    func testDefaultModeRedStateSectionsStayFactOnlyWithoutSmartSuggestionsOrRepairWiring() throws {
+        let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
+        guard let calendarStart = source.range(of: "private struct StudyCalendarLoadView"),
+              let projectStart = source.range(of: "private struct ProjectOverviewView"),
+              let intakeStart = source.range(of: "private struct StudyPlanIntakeView"),
+              let adjustmentStart = source.range(of: "private struct StudyPlanAdjustmentView"),
+              let debugStart = source.range(of: "#if DEBUG") else {
+            XCTFail("Expected study view source sections not found")
+            return
+        }
+
+        let calendarSource = String(source[calendarStart.lowerBound..<projectStart.lowerBound])
+        let projectSource = String(source[projectStart.lowerBound..<intakeStart.lowerBound])
+        let adjustmentSource = String(source[adjustmentStart.lowerBound..<debugStart.lowerBound])
+        let redStateSections = [
+            ("calendar", calendarSource),
+            ("project", projectSource),
+            ("adjustment", adjustmentSource)
+        ]
+        let forbiddenTokens = [
+            "smart suggestion", "suggestion card", "auto repair", "automatic repair",
+            "repair plan", "proposal", "ChatView", "sendMessage", "confirmChat",
+            "currentProposal", "chatMessages", "智能建议", "建议卡", "自动修复", "修复方案"
+        ]
+
+        XCTAssertTrue(source.contains("defaultModeSilentRedStateFact"))
+        for (name, section) in redStateSections {
+            XCTAssertTrue(section.contains("defaultModeSilentRedStateFact"), "\(name) red-state section must use the fact-only silent-mode guard")
+            let lowercasedSection = section.lowercased()
+            for token in forbiddenTokens {
+                XCTAssertFalse(lowercasedSection.contains(token.lowercased()), "\(name) red-state section must not contain \(token)")
+            }
+        }
+        XCTAssertTrue(projectSource.contains("expectedLate"))
+        XCTAssertTrue(calendarSource.contains("overCapacity"))
+        XCTAssertTrue(calendarSource.contains("restDay"))
+        XCTAssertTrue(adjustmentSource.contains("redStateImpact"))
+    }
+
     func testStudyPlanIntakeReviewUIWiresDraftFlowControls() throws {
         let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
 
@@ -3205,6 +3244,73 @@ final class LearningAssistantViewModelTests: XCTestCase {
         XCTAssertNil(vm.studyPlanAdjustmentError)
     }
 
+    func testManualAdjustmentMutationsDoNotInvokeChatProposalOrSmartRepairFlow() async {
+        let mock = MockAssistantAPIClient()
+        mock.studyCalendarLoadResult = sampleStudyCalendarLoad(start: "2026-06-01", end: "2026-06-30")
+        mock.studyProjectOverviewResult = sampleStudyProjectOverview(
+            activeProjects: [
+                sampleStudyProjectSummaryJSON(
+                    id: 7,
+                    title: "Manual Red State",
+                    completedUnits: 1,
+                    totalUnits: 4,
+                    progressRatio: 0.25,
+                    status: "active",
+                    expectedLate: true
+                )
+            ]
+        )
+        mock.studyRestDaySettingsUpdateResult = sampleStudyRestDaySettingsUpdateResult(
+            weeklyWeekdays: [5],
+            oneOffDates: ["2026-06-20"]
+        )
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+        await vm.fetchStudyCalendarLoad(start: "2026-06-01", end: "2026-06-30")
+        mock.studyCalendarLoadResult = sampleStudyCalendarLoad(
+            start: "2026-06-01",
+            end: "2026-06-30",
+            dayJSON: """
+            {
+                "date": "2026-06-21",
+                "scheduled_task_count": 3,
+                "total_target_minutes": 180,
+                "completed_task_count": 0,
+                "available_capacity_minutes": 75,
+                "over_capacity": true,
+                "rest_day": false
+            }
+            """
+        )
+
+        await vm.moveStudyTask(id: 42, scheduledDate: "2026-06-21")
+        await vm.updateStudyProjectDeadline(projectId: 7, deadline: "2026-06-15")
+        await vm.insertStudyProjectTask(
+            projectId: 7,
+            title: "Manual overload",
+            targetMinutes: 180,
+            scheduledDate: "2026-06-21"
+        )
+        await vm.deleteStudyTask(id: 99)
+        await vm.updateStudyRestDaySettings(
+            StudyRestDaySettings(weeklyWeekdays: [5], oneOffDates: ["2026-06-20"])
+        )
+
+        XCTAssertEqual(vm.studyProjectOverview?.activeProjects.first?.expectedLate, true)
+        XCTAssertEqual(vm.studyCalendarLoad?.days.first?.overCapacity, true)
+        XCTAssertEqual(mock.moveStudyTaskCallCount, 1)
+        XCTAssertEqual(mock.updateStudyProjectDeadlineCallCount, 1)
+        XCTAssertEqual(mock.insertStudyProjectTaskCallCount, 1)
+        XCTAssertEqual(mock.deleteStudyTaskCallCount, 1)
+        XCTAssertEqual(mock.updateStudyRestDaySettingsCallCount, 1)
+        XCTAssertEqual(mock.sendMessageCallCount, 0)
+        XCTAssertEqual(mock.confirmChatCallCount, 0)
+        XCTAssertTrue(vm.chatMessages.isEmpty)
+        XCTAssertNil(vm.currentProposal)
+        XCTAssertNil(vm.studyDialogueAdjustmentPreview)
+        XCTAssertNil(vm.studyDialogueAdjustmentResult)
+        XCTAssertNil(vm.studyPlanAdjustmentError)
+    }
+
     func testDialoguePreviewStoresTypedPreviewWithoutRefreshingOrMutatingDashboard() async {
         let mock = MockAssistantAPIClient()
         mock.studyDialogueAdjustmentPreviewResult = sampleStudyDialogueAdjustmentPreview(
@@ -4019,7 +4125,8 @@ private func sampleStudyProjectSummaryJSON(
     completedUnits: Int,
     totalUnits: Int,
     progressRatio: Double,
-    status: String
+    status: String,
+    expectedLate: Bool = false
 ) -> String {
     """
     {
@@ -4031,7 +4138,8 @@ private func sampleStudyProjectSummaryJSON(
         "target_minutes": 240,
         "actual_minutes": 90,
         "deadline": "2026-07-01",
-        "status": "\(status)"
+        "status": "\(status)",
+        "expected_late": \(expectedLate)
     }
     """
 }

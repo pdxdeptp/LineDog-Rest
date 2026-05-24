@@ -446,6 +446,11 @@ struct AssistantPanelView: View {
     }
 }
 
+@ViewBuilder
+private func defaultModeSilentRedStateFact<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+    content()
+}
+
 private struct StudyCalendarLoadView: View {
     @ObservedObject var vm: LearningAssistantViewModel
     @State private var addProjectIdText = ""
@@ -499,14 +504,18 @@ private struct StudyCalendarLoadView: View {
                                     .font(.callout.weight(.semibold))
                                 Spacer()
                                 if day.overCapacity {
-                                    Text("超出容量")
-                                        .font(.caption.weight(.semibold))
-                                        .foregroundStyle(.red)
+                                    defaultModeSilentRedStateFact {
+                                        Text("超出容量")
+                                            .font(.caption.weight(.semibold))
+                                            .foregroundStyle(.red)
+                                    }
                                 }
                                 if day.restDay {
-                                    Label("休息日", systemImage: "moon.zzz")
-                                        .font(.caption.weight(.semibold))
-                                        .foregroundStyle(.secondary)
+                                    defaultModeSilentRedStateFact {
+                                        Label("休息日", systemImage: "moon.zzz")
+                                            .font(.caption.weight(.semibold))
+                                            .foregroundStyle(.secondary)
+                                    }
                                 }
                             }
 
@@ -774,10 +783,12 @@ private struct ProjectOverviewView: View {
             }
 
             if project.expectedLate {
-                Label("预计晚于截止日期", systemImage: "exclamationmark.triangle")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.red)
-                    .help("事实状态：当前计划预计晚于项目截止日期")
+                defaultModeSilentRedStateFact {
+                    Label("预计晚于截止日期", systemImage: "exclamationmark.triangle")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.red)
+                        .help("事实状态：当前计划预计晚于项目截止日期")
+                }
             }
 
             if !isCompletedHistory {
@@ -1552,20 +1563,26 @@ private struct StudyPlanAdjustmentView: View {
     @ViewBuilder
     private func redStateImpactView(_ redStateImpact: StudyRedStateImpact?) -> some View {
         if let expectedLate = redStateImpact?.expectedLate {
-            Label(
-                "预计晚于截止日期：\(expectedLate.before ? "是" : "否") -> \(expectedLate.after ? "是" : "否")",
-                systemImage: "exclamationmark.triangle"
-            )
-            .foregroundStyle(expectedLate.after ? .red : .secondary)
+            defaultModeSilentRedStateFact {
+                Label(
+                    "预计晚于截止日期：\(expectedLate.before ? "是" : "否") -> \(expectedLate.after ? "是" : "否")",
+                    systemImage: "exclamationmark.triangle"
+                )
+                .foregroundStyle(expectedLate.after ? .red : .secondary)
+            }
         }
 
         if let overCapacity = redStateImpact?.overCapacity {
             if !overCapacity.newOverCapacityDates.isEmpty {
-                Label("新增超载：\(overCapacity.newOverCapacityDates.joined(separator: ", "))", systemImage: "gauge")
-                    .foregroundStyle(.red)
+                defaultModeSilentRedStateFact {
+                    Label("新增超载：\(overCapacity.newOverCapacityDates.joined(separator: ", "))", systemImage: "gauge")
+                        .foregroundStyle(.red)
+                }
             } else if !overCapacity.afterDates.isEmpty {
-                Label("超载日期：\(overCapacity.afterDates.joined(separator: ", "))", systemImage: "gauge")
-                    .foregroundStyle(.orange)
+                defaultModeSilentRedStateFact {
+                    Label("超载日期：\(overCapacity.afterDates.joined(separator: ", "))", systemImage: "gauge")
+                        .foregroundStyle(.orange)
+                }
             }
         }
     }

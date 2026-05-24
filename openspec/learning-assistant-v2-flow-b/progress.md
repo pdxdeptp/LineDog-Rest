@@ -1498,3 +1498,53 @@ Before implementation, create a checkpoint commit in the current checkout, then 
 ### Next Task
 
 - Continue `opsx:apply` for ITEM-003 with task 9.3: verify default mode stays silent after red-state-producing manual adjustments.
+
+## Round 31 · 2026-05-24T07:55:36Z
+
+### ITEM-003 9.3 Default Mode Silence Verification
+
+- Restored controller state: `phase=flow-b`, `current_item=study-plan-adjustment`.
+- Current checkout only; no worktree was created or used.
+- Created/used pre-apply checkpoint commit `f7b30a1 chore: checkpoint flow b after adjustment controls`.
+- Subagent TDD implementation completed OpenSpec task 9.3:
+  - added a source-level fact-only guard around default-mode red-state displays;
+  - verified Calendar over-capacity/rest-day, Project expected-late, and Adjust Plan red-state impact remain visible as facts;
+  - added a ViewModel regression test where manual adjustment refreshes produce explicit `expectedLate == true` and `overCapacity == true` facts;
+  - verified those red-state-producing manual mutations do not call legacy chat/proposal paths or set dialogue preview/apply state.
+
+### Review Gates
+
+- Initial Spec Compliance Review: BLOCKED because the first ViewModel test did not construct real red-state facts.
+- Review fix completed:
+  - injected explicit `expected_late: true` project overview fixture;
+  - injected explicit `over_capacity: true` calendar fixture after manual adjustments;
+  - updated evidence to record the fixture gap and corrected RED/GREEN coverage.
+- Spec Compliance Re-review: PASS with no blockers.
+- Code Quality Re-review: PASS with no blockers.
+
+### Verification
+
+- RED 1: `xcodebuild test -project MalDaze.xcodeproj -scheme MalDaze -only-testing:MalDazeTests/LearningAssistantUISourceTests -quiet` failed before adding `defaultModeSilentRedStateFact`.
+- RED 2: `xcodebuild test -project MalDaze.xcodeproj -scheme MalDaze -only-testing:MalDazeTests/LearningAssistantViewModelTests/testManualAdjustmentMutationsDoNotInvokeChatProposalOrSmartRepairFlow -quiet` failed before the red-state fixture update.
+- GREEN/REFACTOR:
+  - `xcodebuild test -project MalDaze.xcodeproj -scheme MalDaze -only-testing:MalDazeTests/LearningAssistantUISourceTests -quiet`: PASS.
+  - `xcodebuild test -project MalDaze.xcodeproj -scheme MalDaze -only-testing:MalDazeTests/LearningAssistantViewModelTests -quiet`: PASS.
+  - `openspec validate introduce-study-plan-adjustment --strict`: PASS.
+  - `git diff --check`: PASS.
+
+### Auto Commit
+
+- Commit: pending.
+- Scope: verified ITEM-003 default-mode silence through OpenSpec task 9.3.
+- Pre-commit checks: focused UI source tests, focused ViewModel tests, `openspec validate introduce-study-plan-adjustment --strict`, `git diff --check`, Spec Compliance Re-review, and Code Quality Re-review all passed.
+
+### Files Added / Changed
+
+- Updated `MalDaze/LearningAssistant/AssistantPanelView.swift`.
+- Updated `MalDazeTests/LearningAssistantTests.swift`.
+- Updated `openspec/changes/introduce-study-plan-adjustment/tasks.md` to mark 9.3 complete.
+- Added `openspec/learning-assistant-v2-flow-b/evidence/item-003/default-mode-silence-verification.md`.
+
+### Next Task
+
+- Continue `opsx:apply` for ITEM-003 with tasks 10.1-10.3: full test/evidence summary, OpenSpec validation, and current-checkout App verification.

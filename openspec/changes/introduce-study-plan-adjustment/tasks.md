@@ -57,7 +57,7 @@
 
 - [x] 9.1 Write failing presentation/source tests for rolled badges, red project/day states, move/date edit controls, task add/delete controls, rest-day settings, and dialogue preview/apply.
 - [x] 9.2 Implement minimal UI controls in Today, Project Overview, Calendar, Settings, and Adjust Plan surfaces.
-- [ ] 9.3 Verify default mode stays silent: no smart suggestion card appears after red-state-producing manual adjustments.
+- [x] 9.3 Verify default mode stays silent: no smart suggestion card appears after red-state-producing manual adjustments.
 
 ## 10. Review And Verification
 
