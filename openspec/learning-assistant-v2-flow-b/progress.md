@@ -251,6 +251,58 @@
 
 - Continue `opsx:apply` for ITEM-004 with tasks 5.1-5.2: backend proposal apply tests and implementation, including refreshed fact recomputation, stable signature comparison, mutation, event evidence, and view refresh contract.
 
+## Round 39 · 2026-05-24T15:43:16Z
+
+### ITEM-004 5.1-5.2 Backend Proposal Apply
+
+- Restored controller and Flow B state: `phase=flow-b`, `current_item=study-smart-mode`, `current_change=introduce-study-smart-mode`.
+- Start status was clean.
+- Current checkout only; no worktree was created or used.
+- `openspec instructions apply --change introduce-study-smart-mode --json` reported 28 tasks, 13 complete, with tasks 5.1-5.2 next.
+
+### Completed
+
+- OpenSpec tasks 5.1 and 5.2 completed:
+  - added failing backend tests for applying exactly the selected current smart proposal;
+  - implemented `POST /api/study-smart-mode/proposals/apply`;
+  - recomputes current v2 facts/options and matches stable `signature` plus `signature_payload` before mutation;
+  - applies only the selected current proposal for supported deadline or task-date changes;
+  - records `study_smart_mode_proposal_applied` event evidence with source, signature, signature payload, reason, red-state impact, selected preview, and applied changes;
+  - returns the required Today, Project Overview, and Calendar refresh contract;
+  - left stale, disabled, unsupported, and tampered proposal rejection coverage for tasks 5.3-5.4.
+
+### Review Gates
+
+- Spec Compliance Review: PASS.
+- Code Quality Review: initially CHANGES_REQUESTED for a recompute/apply time-of-check risk and insufficient event audit evidence.
+- Review fix completed by moving enabled-state check, current fact read, option recompute, signature match, mutation, and event insert into one `BEGIN IMMEDIATE` transaction, and by expanding the event payload.
+- Code Quality Re-review: APPROVED.
+
+### Verification
+
+- RED/GREEN/REFACTOR evidence recorded in `openspec/learning-assistant-v2-flow-b/evidence/item-004/tdd-backend-smart-proposal-apply-report.md`.
+- `cd assistant_backend && .venv/bin/python -m pytest tests/test_study_smart_mode_proposals.py -q`: PASS, 15 passed, 2 existing dependency warnings.
+- `cd assistant_backend && .venv/bin/python -m pytest tests/test_study_smart_mode_settings.py tests/test_study_smart_mode_briefing.py tests/test_study_smart_mode_proposals.py tests/test_study_plan_adjustment_dialogue_preview.py tests/test_study_plan_adjustment_dialogue_apply.py -q`: PASS, 44 passed, 2 existing dependency warnings.
+- `openspec validate introduce-study-smart-mode --strict`: PASS.
+- `git diff --check`: PASS.
+
+### Auto Commit
+
+- Commit: `5805e6a`.
+- Scope: verified ITEM-004 backend proposal apply through OpenSpec tasks 5.1-5.2.
+- Pre-commit checks: focused smart-mode proposal tests, smart-mode setting/briefing tests, related dialogue preview/apply tests, `openspec validate introduce-study-smart-mode --strict`, `git diff --check`, Spec Compliance Review, and Code Quality Re-review all passed.
+
+### Files Added / Changed
+
+- Updated `assistant_backend/src/routers/study_smart_mode.py`.
+- Updated `assistant_backend/tests/test_study_smart_mode_proposals.py`.
+- Updated `openspec/changes/introduce-study-smart-mode/tasks.md` to mark 5.1 and 5.2 complete.
+- Added `openspec/learning-assistant-v2-flow-b/evidence/item-004/tdd-backend-smart-proposal-apply-report.md`.
+
+### Next Task
+
+- Continue `opsx:apply` for ITEM-004 with tasks 5.3-5.4: stale, disabled, unsupported, missing, and tampered apply rejection tests and implementation, ensuring no mutation when the submitted proposal is no longer current or valid.
+
 ## Round 01 · 2026-05-23T14:50:55Z
 
 ### Git / Safety
