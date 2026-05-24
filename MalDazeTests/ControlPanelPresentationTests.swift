@@ -1276,6 +1276,37 @@ final class ControlPanelPresentationTests: XCTestCase {
         )
     }
 
+    func testDeskReminderRowRendersNotesUnderTitleOnlyWhenNonEmpty() throws {
+        let source = try readProjectSource("MalDaze/DashboardRootView.swift")
+        let rowSource = try functionSource(named: "deskReminderRow", in: source)
+
+        XCTAssertTrue(
+            rowSource.contains("VStack(alignment: .leading"),
+            "The reminder title and notes should share a compact leading text stack."
+        )
+        XCTAssertOrdered(
+            [
+                "Text(item.title.isEmpty ? \"（无标题）\" : item.title)",
+                "if !item.notesPlain.isEmpty",
+                "Text(item.notesPlain)"
+            ],
+            in: rowSource,
+            "Non-empty reminder notes should render directly under the title."
+        )
+        XCTAssertOrdered(
+            [
+                "Text(item.notesPlain)",
+                ".font(.caption)",
+                ".foregroundStyle(.tertiary)",
+                ".lineLimit(2)",
+                "Text(timeText)",
+                "Menu {"
+            ],
+            in: rowSource,
+            "Reminder notes should be compact, tertiary, line-limited detail text, while due-time and action controls remain after the text block."
+        )
+    }
+
     func testEventKitDeskSidebarFetchUsesExclusiveEndAfterThreeMonthTargetDate() throws {
         let source = try readProjectSource("MalDaze/Reminders/EventKitRemindersBacking.swift")
         let fetchSource = try functionSource(named: "fetchDeskSidebarReminders", in: source)

@@ -457,11 +457,21 @@ struct DashboardRootView: View {
             .buttonStyle(.plain)
             .help("完成")
 
-            Text(item.title.isEmpty ? "（无标题）" : item.title)
-                .font(.body)
-                .lineLimit(2)
-                .multilineTextAlignment(.leading)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(item.title.isEmpty ? "（无标题）" : item.title)
+                    .font(.body)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+
+                if !item.notesPlain.isEmpty {
+                    Text(item.notesPlain)
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             HStack(spacing: 4) {
                 if item.hasRoutineTag {
