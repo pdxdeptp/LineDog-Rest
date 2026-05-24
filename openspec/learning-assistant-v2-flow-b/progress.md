@@ -1617,3 +1617,13 @@ Before implementation, create a checkpoint commit in the current checkout, then 
 
 - Commit: `daa2f66`.
 - Scope: record ITEM-003 current-checkout App verification and unblock the Flow B state.
+
+### Item Status
+
+- ITEM-003 `study-plan-adjustment`: COMPLETE.
+- Active OpenSpec change `introduce-study-plan-adjustment`: 37/37 tasks complete and `openspec validate introduce-study-plan-adjustment --strict` passed.
+- Next queued item: ITEM-004 `study-smart-mode`.
+
+### Next Task
+
+- Start ITEM-004 with v1/current-state observation and gap analysis before proposing the `study-smart-mode` OpenSpec change.
