@@ -1155,7 +1155,7 @@ Before implementation, create a checkpoint commit in the current checkout, then 
 
 ### Auto Commit
 
-- Commit: pending.
+- Commit: `610d5e3 feat: add study plan rest day settings`.
 - Scope: verified ITEM-003 rest-day settings through OpenSpec tasks 6.1-6.2.
 - Pre-commit checks: related backend tests, `openspec validate introduce-study-plan-adjustment --strict`, `git diff --check`, Spec Compliance Review, and Code Quality Review P1 fix verification passed.
 
