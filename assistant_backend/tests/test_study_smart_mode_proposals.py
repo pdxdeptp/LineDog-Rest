@@ -292,6 +292,179 @@ async def _seed_over_capacity_selection_facts(db_path: str) -> dict[str, str]:
     }
 
 
+async def _seed_after_adjustment_red_state_facts(db_path: str) -> dict[str, str]:
+    today = date.today()
+    tomorrow = today + timedelta(days=1)
+    day_after = today + timedelta(days=2)
+    later_day = today + timedelta(days=3)
+
+    async with aiosqlite.connect(db_path) as db:
+        await db.execute(
+            "INSERT OR REPLACE INTO system_state (key, value) VALUES (?, ?)",
+            ("study_smart_mode_enabled", "true"),
+        )
+        await db.execute(
+            "INSERT OR REPLACE INTO system_state (key, value) VALUES (?, ?)",
+            ("daily_capacity_min", "60"),
+        )
+        await db.execute(
+            "INSERT OR REPLACE INTO system_state (key, value) VALUES (?, ?)",
+            ("study_rest_weekdays", "[]"),
+        )
+        await db.execute(
+            "INSERT OR REPLACE INTO system_state (key, value) VALUES (?, ?)",
+            ("study_rest_dates", "[]"),
+        )
+        await db.executemany(
+            """
+            INSERT INTO resources
+                (id, title, type, tracking_mode, url, status, total_units, deadline)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                (
+                    8701,
+                    "New Late Project",
+                    "study_project",
+                    "sequential",
+                    "https://example.com/new-late",
+                    "active",
+                    1,
+                    tomorrow.isoformat(),
+                ),
+                (
+                    8702,
+                    "Existing Late Project",
+                    "study_project",
+                    "sequential",
+                    "https://example.com/existing-late",
+                    "active",
+                    1,
+                    tomorrow.isoformat(),
+                ),
+                (
+                    8703,
+                    "New Capacity Project",
+                    "study_project",
+                    "sequential",
+                    "https://example.com/new-capacity",
+                    "active",
+                    2,
+                    later_day.isoformat(),
+                ),
+                (
+                    8704,
+                    "Existing Capacity Project",
+                    "study_project",
+                    "sequential",
+                    "https://example.com/existing-capacity",
+                    "active",
+                    2,
+                    later_day.isoformat(),
+                ),
+            ],
+        )
+        await db.executemany(
+            """
+            INSERT INTO tasks
+                (
+                    id,
+                    resource_id,
+                    title,
+                    task_kind,
+                    target_minutes,
+                    scheduled_date,
+                    priority,
+                    completed_at,
+                    auto_roll_days,
+                    last_auto_rolled_at,
+                    user_adjusted_at
+                )
+            VALUES (?, ?, ?, 'time', ?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                (8801, 8701, "New late task", 30, day_after.isoformat(), 8, None, 0, None, None),
+                (8802, 8702, "Existing late task", 30, day_after.isoformat(), 7, None, 0, None, None),
+                (8803, 8703, "New capacity anchor", 40, tomorrow.isoformat(), 6, None, 0, None, None),
+                (8804, 8703, "New capacity overflow", 35, tomorrow.isoformat(), 5, None, 0, None, None),
+                (8805, 8704, "Existing capacity anchor", 40, day_after.isoformat(), 4, None, 0, None, None),
+                (8806, 8704, "Existing capacity overflow", 35, day_after.isoformat(), 3, None, 0, None, None),
+            ],
+        )
+        await db.commit()
+
+    return {
+        "tomorrow": tomorrow.isoformat(),
+        "day_after": day_after.isoformat(),
+    }
+
+
+async def _seed_after_adjustment_lag_only_facts(db_path: str) -> dict[str, str]:
+    today = date.today()
+    tomorrow = today + timedelta(days=1)
+
+    async with aiosqlite.connect(db_path) as db:
+        await db.execute(
+            "INSERT OR REPLACE INTO system_state (key, value) VALUES (?, ?)",
+            ("study_smart_mode_enabled", "true"),
+        )
+        await db.execute(
+            "INSERT OR REPLACE INTO system_state (key, value) VALUES (?, ?)",
+            ("daily_capacity_min", "60"),
+        )
+        await db.execute(
+            "INSERT OR REPLACE INTO system_state (key, value) VALUES (?, ?)",
+            ("study_rest_weekdays", "[]"),
+        )
+        await db.execute(
+            "INSERT OR REPLACE INTO system_state (key, value) VALUES (?, ?)",
+            ("study_rest_dates", "[]"),
+        )
+        await db.execute(
+            """
+            INSERT INTO resources
+                (id, title, type, tracking_mode, url, status, total_units, deadline)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                8901,
+                "Lag Only Project",
+                "study_project",
+                "sequential",
+                "https://example.com/lag-only",
+                "active",
+                2,
+                (today + timedelta(days=30)).isoformat(),
+            ),
+        )
+        await db.executemany(
+            """
+            INSERT INTO tasks
+                (
+                    id,
+                    resource_id,
+                    title,
+                    task_kind,
+                    target_minutes,
+                    scheduled_date,
+                    priority,
+                    completed_at,
+                    auto_roll_days,
+                    last_auto_rolled_at,
+                    user_adjusted_at
+                )
+            VALUES (?, ?, ?, 'time', ?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                (8911, 8901, "Rolled task", 25, today.isoformat(), 10, None, 3, today.isoformat(), None),
+                (8912, 8901, "Follow-up", 10, tomorrow.isoformat(), 9, None, 0, None, None),
+            ],
+        )
+        await db.commit()
+
+    return {"today": today.isoformat()}
+
+
 @pytest.mark.asyncio
 async def test_disabled_smart_mode_suppresses_morning_proposals_even_when_red_facts_exist(client):
     await _seed_morning_proposal_facts(os.environ["DB_PATH"], smart_mode_enabled=False)
@@ -344,6 +517,162 @@ async def test_after_adjustment_trigger_stays_empty_for_this_slice(client):
     assert response.status_code == 200, response.text
     assert response.json() == {
         "enabled": True,
+        "trigger": "after_adjustment",
+        "options": [],
+    }
+
+
+@pytest.mark.asyncio
+async def test_after_adjustment_proposals_include_only_newly_created_red_state_options(client):
+    days = await _seed_after_adjustment_red_state_facts(os.environ["DB_PATH"])
+    before = await _snapshot_mutation_guard(os.environ["DB_PATH"])
+
+    response = await client.post(
+        "/api/study-smart-mode/proposals",
+        json={
+            "trigger": "after_adjustment",
+            "previous_expected_late_project_ids": [8702],
+            "previous_over_capacity_dates": [days["day_after"]],
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["enabled"] is True
+    assert body["trigger"] == "after_adjustment"
+    assert [option["id"] for option in body["options"]] == [
+        "smart-after-adjustment-expected-late-project-8701",
+        f"smart-after-adjustment-over-capacity-day-{days['tomorrow']}",
+    ]
+    assert all(option["trigger"] == "after_adjustment" for option in body["options"])
+    assert all(option["preview"]["trigger"] == "after_adjustment" for option in body["options"])
+    assert all(option["preview"]["mutates"] is False for option in body["options"])
+
+    late_option, capacity_option = body["options"]
+    assert late_option["reason"]["type"] == "expected_late_project"
+    assert late_option["affected_project_ids"] == [8701]
+    assert late_option["previewed_changes"] == [
+        {
+            "project_id": 8701,
+            "field": "deadline",
+            "old_deadline": days["tomorrow"],
+            "new_deadline": days["day_after"],
+        }
+    ]
+    assert capacity_option["reason"]["type"] == "over_capacity_day"
+    assert capacity_option["reason"]["date"] == days["tomorrow"]
+    assert capacity_option["affected_project_ids"] == [8703]
+    assert await _snapshot_mutation_guard(os.environ["DB_PATH"]) == before
+
+
+@pytest.mark.asyncio
+async def test_after_adjustment_proposals_stay_empty_for_existing_red_state(client):
+    days = await _seed_after_adjustment_red_state_facts(os.environ["DB_PATH"])
+
+    existing_red_response = await client.post(
+        "/api/study-smart-mode/proposals",
+        json={
+            "trigger": "after_adjustment",
+            "previous_expected_late_project_ids": [8701, 8702],
+            "previous_over_capacity_dates": [days["tomorrow"], days["day_after"]],
+        },
+    )
+
+    assert existing_red_response.status_code == 200, existing_red_response.text
+    assert existing_red_response.json() == {
+        "enabled": True,
+        "trigger": "after_adjustment",
+        "options": [],
+    }
+
+
+@pytest.mark.asyncio
+async def test_after_adjustment_partial_expected_late_context_does_not_return_capacity_options(client):
+    await _seed_after_adjustment_red_state_facts(os.environ["DB_PATH"])
+
+    response = await client.post(
+        "/api/study-smart-mode/proposals",
+        json={
+            "trigger": "after_adjustment",
+            "previous_expected_late_project_ids": [8702],
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["enabled"] is True
+    assert body["trigger"] == "after_adjustment"
+    assert [option["id"] for option in body["options"]] == [
+        "smart-after-adjustment-expected-late-project-8701",
+    ]
+    assert all(option["reason"]["type"] == "expected_late_project" for option in body["options"])
+
+
+@pytest.mark.asyncio
+async def test_after_adjustment_partial_capacity_context_does_not_return_expected_late_options(client):
+    days = await _seed_after_adjustment_red_state_facts(os.environ["DB_PATH"])
+
+    response = await client.post(
+        "/api/study-smart-mode/proposals",
+        json={
+            "trigger": "after_adjustment",
+            "previous_over_capacity_dates": [days["day_after"]],
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["enabled"] is True
+    assert body["trigger"] == "after_adjustment"
+    assert [option["id"] for option in body["options"]] == [
+        f"smart-after-adjustment-over-capacity-day-{days['tomorrow']}",
+    ]
+    assert all(option["reason"]["type"] == "over_capacity_day" for option in body["options"])
+
+
+@pytest.mark.asyncio
+async def test_after_adjustment_proposals_stay_empty_for_lag_only_even_with_context(client):
+    await _seed_after_adjustment_lag_only_facts(os.environ["DB_PATH"])
+
+    lag_response = await client.post(
+        "/api/study-smart-mode/proposals",
+        json={
+            "trigger": "after_adjustment",
+            "previous_expected_late_project_ids": [],
+            "previous_over_capacity_dates": [],
+        },
+    )
+
+    assert lag_response.status_code == 200, lag_response.text
+    assert lag_response.json() == {
+        "enabled": True,
+        "trigger": "after_adjustment",
+        "options": [],
+    }
+
+
+@pytest.mark.asyncio
+async def test_disabled_smart_mode_suppresses_after_adjustment_proposals(client):
+    days = await _seed_after_adjustment_red_state_facts(os.environ["DB_PATH"])
+    async with aiosqlite.connect(os.environ["DB_PATH"]) as db:
+        await db.execute(
+            "INSERT OR REPLACE INTO system_state (key, value) VALUES (?, ?)",
+            ("study_smart_mode_enabled", "false"),
+        )
+        await db.commit()
+
+    response = await client.post(
+        "/api/study-smart-mode/proposals",
+        json={
+            "trigger": "after_adjustment",
+            "previous_expected_late_project_ids": [8702],
+            "previous_over_capacity_dates": [days["day_after"]],
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json() == {
+        "enabled": False,
         "trigger": "after_adjustment",
         "options": [],
     }

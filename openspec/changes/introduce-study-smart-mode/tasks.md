@@ -20,8 +20,8 @@
 
 - [x] 4.1 Write failing backend tests for morning proposal options from rolled-task lag, expected-late projects, and over-capacity days.
 - [x] 4.2 Implement structured smart proposal option generation with side-by-side candidate previews and red-state impact.
-- [ ] 4.3 Write failing backend tests for after-adjustment proposals triggering only on newly created expected-late or over-capacity red state.
-- [ ] 4.4 Implement after-adjustment proposal generation and ensure lag alone does not trigger this path.
+- [x] 4.3 Write failing backend tests for after-adjustment proposals triggering only on newly created expected-late or over-capacity red state.
+- [x] 4.4 Implement after-adjustment proposal generation and ensure lag alone does not trigger this path.
 
 ## 5. Backend Proposal Apply
 

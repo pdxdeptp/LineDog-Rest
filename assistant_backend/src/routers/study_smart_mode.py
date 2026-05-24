@@ -29,6 +29,8 @@ class SmartModeSettingsUpdate(BaseModel):
 
 class SmartModeProposalRequest(BaseModel):
     trigger: Literal["morning", "after_adjustment"]
+    previous_expected_late_project_ids: list[int] | None = None
+    previous_over_capacity_dates: list[str] | None = None
 
 
 def _empty_snapshot() -> dict:
@@ -343,7 +345,15 @@ async def _over_capacity_impact(db: Any, changes: list[dict[str, Any]]) -> dict[
     )
 
 
-async def _build_rolled_lag_option(db: Any, issue: dict[str, Any]) -> dict[str, Any] | None:
+def _trigger_slug(trigger: str) -> str:
+    return trigger.replace("_", "-")
+
+
+async def _build_rolled_lag_option(
+    db: Any,
+    issue: dict[str, Any],
+    trigger: Literal["morning", "after_adjustment"] = "morning",
+) -> dict[str, Any] | None:
     project_id = int(issue["project_id"])
     lag_task_id = int(issue["task_id"])
     project_tasks = await _get_unfinished_project_tasks(db, project_id)
@@ -365,8 +375,8 @@ async def _build_rolled_lag_option(db: Any, issue: dict[str, Any]) -> dict[str, 
     }
 
     option = {
-        "id": f"smart-morning-rolled-task-lag-{lag_task_id}",
-        "trigger": "morning",
+        "id": f"smart-{_trigger_slug(trigger)}-rolled-task-lag-{lag_task_id}",
+        "trigger": trigger,
         "reason": {
             "type": "rolled_task_lag",
             "task_id": lag_task_id,
@@ -380,7 +390,7 @@ async def _build_rolled_lag_option(db: Any, issue: dict[str, Any]) -> dict[str, 
             "status": "preview",
             "source": "smart_mode_preview",
             "command": "make_room_after_lag",
-            "trigger": "morning",
+            "trigger": trigger,
             "task_id": lag_task_id,
             "project_id": project_id,
             "delta_days": 1,
@@ -398,7 +408,11 @@ async def _build_rolled_lag_option(db: Any, issue: dict[str, Any]) -> dict[str, 
     return _with_signature(option)
 
 
-async def _build_expected_late_option(db: Any, issue: dict[str, Any]) -> dict[str, Any] | None:
+async def _build_expected_late_option(
+    db: Any,
+    issue: dict[str, Any],
+    trigger: Literal["morning", "after_adjustment"] = "morning",
+) -> dict[str, Any] | None:
     project_id = int(issue["project_id"])
     project_tasks = await _get_unfinished_project_tasks(db, project_id)
     if not project_tasks or not project_tasks[0]["deadline"]:
@@ -428,8 +442,8 @@ async def _build_expected_late_option(db: Any, issue: dict[str, Any]) -> dict[st
     }
 
     option = {
-        "id": f"smart-morning-expected-late-project-{project_id}",
-        "trigger": "morning",
+        "id": f"smart-{_trigger_slug(trigger)}-expected-late-project-{project_id}",
+        "trigger": trigger,
         "reason": {
             "type": "expected_late_project",
             "project_id": project_id,
@@ -443,7 +457,7 @@ async def _build_expected_late_option(db: Any, issue: dict[str, Any]) -> dict[st
             "status": "preview",
             "source": "smart_mode_preview",
             "command": "extend_project_deadline",
-            "trigger": "morning",
+            "trigger": trigger,
             "project_id": project_id,
             "old_deadline": old_deadline,
             "new_deadline": latest_task_date,
@@ -458,7 +472,11 @@ async def _build_expected_late_option(db: Any, issue: dict[str, Any]) -> dict[st
     return _with_signature(option)
 
 
-async def _build_over_capacity_option(db: Any, issue: dict[str, Any]) -> dict[str, Any] | None:
+async def _build_over_capacity_option(
+    db: Any,
+    issue: dict[str, Any],
+    trigger: Literal["morning", "after_adjustment"] = "morning",
+) -> dict[str, Any] | None:
     overloaded_day = issue["date"]
     selection = await _select_over_capacity_task(db, overloaded_day)
     if selection is None:
@@ -490,8 +508,8 @@ async def _build_over_capacity_option(db: Any, issue: dict[str, Any]) -> dict[st
     }
 
     option = {
-        "id": f"smart-morning-over-capacity-day-{overloaded_day}",
-        "trigger": "morning",
+        "id": f"smart-{_trigger_slug(trigger)}-over-capacity-day-{overloaded_day}",
+        "trigger": trigger,
         "reason": {
             "type": "over_capacity_day",
             "date": overloaded_day,
@@ -503,7 +521,7 @@ async def _build_over_capacity_option(db: Any, issue: dict[str, Any]) -> dict[st
             "status": "preview",
             "source": "smart_mode_preview",
             "command": "move_task_from_over_capacity_day",
-            "trigger": "morning",
+            "trigger": trigger,
             "date": overloaded_day,
             "task_id": int(selected_task["id"]),
             "delta_days": 1,
@@ -525,20 +543,82 @@ async def _build_over_capacity_option(db: Any, issue: dict[str, Any]) -> dict[st
     return _with_signature(option)
 
 
-async def _build_morning_proposal_options(issues: list[dict]) -> list[dict[str, Any]]:
+async def _build_proposal_options(
+    issues: list[dict],
+    trigger: Literal["morning", "after_adjustment"],
+) -> list[dict[str, Any]]:
     options = []
     async with get_db() as db:
         for issue in issues:
             option = None
-            if issue["type"] == "rolled_task_lag":
-                option = await _build_rolled_lag_option(db, issue)
+            if issue["type"] == "rolled_task_lag" and trigger == "morning":
+                option = await _build_rolled_lag_option(db, issue, trigger)
             elif issue["type"] == "expected_late_project":
-                option = await _build_expected_late_option(db, issue)
+                option = await _build_expected_late_option(db, issue, trigger)
             elif issue["type"] == "over_capacity_day":
-                option = await _build_over_capacity_option(db, issue)
+                option = await _build_over_capacity_option(db, issue, trigger)
             if option is not None:
                 options.append(option)
     return options
+
+
+async def _build_morning_proposal_options(issues: list[dict]) -> list[dict[str, Any]]:
+    return await _build_proposal_options(issues, "morning")
+
+
+def _normalized_date_values(values: list[str]) -> set[str]:
+    normalized = set()
+    for value in values:
+        try:
+            normalized.add(date.fromisoformat(str(value)[:10]).isoformat())
+        except ValueError:
+            normalized.add(str(value))
+    return normalized
+
+
+def _after_adjustment_new_red_issues(
+    issues: list[dict],
+    request: SmartModeProposalRequest,
+) -> list[dict]:
+    if (
+        request.previous_expected_late_project_ids is None
+        and request.previous_over_capacity_dates is None
+    ):
+        return []
+
+    previous_expected_late_project_ids = {
+        int(project_id) for project_id in (request.previous_expected_late_project_ids or [])
+    }
+    previous_over_capacity_dates = _normalized_date_values(request.previous_over_capacity_dates or [])
+    new_red_issues = []
+
+    for issue in issues:
+        if (
+            issue["type"] == "expected_late_project"
+            and request.previous_expected_late_project_ids is not None
+        ):
+            project_id = int(issue["project_id"])
+            if project_id not in previous_expected_late_project_ids:
+                new_red_issues.append(issue)
+        elif (
+            issue["type"] == "over_capacity_day"
+            and request.previous_over_capacity_dates is not None
+        ):
+            current_date = date.fromisoformat(issue["date"][:10]).isoformat()
+            if current_date not in previous_over_capacity_dates:
+                new_red_issues.append(issue)
+
+    return new_red_issues
+
+
+async def _build_after_adjustment_proposal_options(
+    issues: list[dict],
+    request: SmartModeProposalRequest,
+) -> list[dict[str, Any]]:
+    return await _build_proposal_options(
+        _after_adjustment_new_red_issues(issues, request),
+        "after_adjustment",
+    )
 
 
 async def _get_projected_rollover_tasks(db: Any, today: date) -> dict[str, Any]:
@@ -681,6 +761,10 @@ async def generate_study_smart_mode_proposals(request: SmartModeProposalRequest)
         snapshot = await _build_read_only_smart_snapshot(date.today())
         issues = _build_fact_issues(snapshot)
         options = await _build_morning_proposal_options(issues)
+    elif enabled and request.trigger == "after_adjustment":
+        snapshot = await _build_read_only_smart_snapshot(date.today())
+        issues = _build_fact_issues(snapshot)
+        options = await _build_after_adjustment_proposal_options(issues, request)
 
     return {
         "enabled": enabled,
