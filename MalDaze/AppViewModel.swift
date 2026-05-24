@@ -127,7 +127,8 @@ final class AppViewModel: ObservableObject {
         let ae = autoEngine ?? AutoTimerEngine(restDuration: TimeInterval(rMin * 60))
         self.manualEngine = me
         self.autoEngine = ae
-        self.isChronoSessionActive = bootstrapAutoEngine
+        let suspendedModeSnapshot = bootstrapAutoEngine ? Self.validSuspendedTimerModeSnapshot(defaults: ud) : nil
+        self.isChronoSessionActive = bootstrapAutoEngine && suspendedModeSnapshot == nil
         if UserDefaults.standard.object(forKey: Self.restBlocksClicksDefaultsKey) == nil {
             self.restBlocksClicksDuringRest = true
         } else {
@@ -154,7 +155,17 @@ final class AppViewModel: ObservableObject {
             }
         }
 
-        if !bootstrapAutoEngine {
+        if let suspendedModeSnapshot {
+            mode = suspendedModeSnapshot
+            chronoSessionSuspendedByUser = true
+            switch suspendedModeSnapshot {
+            case .manual:
+                statusLine = "已暂停。点击「恢复计时」继续，或再次「开始专注」开新一轮。"
+            case .auto:
+                statusLine = "自动提醒已暂停。点击「恢复计时」重新对齐整点 / 半点。"
+            }
+            cachedStatusLine = statusLine
+        } else if !bootstrapAutoEngine {
             statusLine = "（测试）"
             cachedStatusLine = statusLine
         } else {
@@ -275,6 +286,49 @@ final class AppViewModel: ObservableObject {
 
     private func presentDeskPetMenuFromGlobalShortcut() {
         windowManager.presentDeskMenuFromGlobalShortcut()
+    }
+
+    private static func validSuspendedTimerModeSnapshot(defaults: UserDefaults = .standard) -> Mode? {
+        guard defaults.object(forKey: MalDazeDefaults.suspendedTimerModeSnapshot) != nil else {
+            return nil
+        }
+        guard let rawMode = defaults.string(forKey: MalDazeDefaults.suspendedTimerModeSnapshot) else {
+            defaults.removeObject(forKey: MalDazeDefaults.suspendedTimerModeSnapshot)
+            return nil
+        }
+        guard let mode = mode(forSuspendedTimerModeSnapshotToken: rawMode) else {
+            defaults.removeObject(forKey: MalDazeDefaults.suspendedTimerModeSnapshot)
+            return nil
+        }
+        return mode
+    }
+
+    private func persistSuspendedTimerModeSnapshot() {
+        UserDefaults.standard.set(Self.suspendedTimerModeSnapshotToken(for: mode), forKey: MalDazeDefaults.suspendedTimerModeSnapshot)
+    }
+
+    private func clearSuspendedTimerModeSnapshot() {
+        UserDefaults.standard.removeObject(forKey: MalDazeDefaults.suspendedTimerModeSnapshot)
+    }
+
+    private static func suspendedTimerModeSnapshotToken(for mode: Mode) -> String {
+        switch mode {
+        case .manual:
+            return "manual"
+        case .auto:
+            return "auto"
+        }
+    }
+
+    private static func mode(forSuspendedTimerModeSnapshotToken token: String) -> Mode? {
+        switch token {
+        case "manual":
+            return .manual
+        case "auto":
+            return .auto
+        default:
+            return nil
+        }
     }
 
     /// 桌宠右键：由 `WindowManager` 转屏幕坐标后调用。
@@ -448,6 +502,7 @@ final class AppViewModel: ObservableObject {
         wasResting = false
         testRestActive = false
         chronoSessionSuspendedByUser = false
+        clearSuspendedTimerModeSnapshot()
 
         switch newMode {
         case .manual:
@@ -469,6 +524,7 @@ final class AppViewModel: ObservableObject {
         wasResting = false
         testRestActive = false
         chronoSessionSuspendedByUser = false
+        clearSuspendedTimerModeSnapshot()
         manualEngine.start()
         isChronoSessionActive = true
         refreshChronoChrome()
@@ -485,6 +541,7 @@ final class AppViewModel: ObservableObject {
         testRestActive = false
         isChronoSessionActive = false
         chronoSessionSuspendedByUser = true
+        persistSuspendedTimerModeSnapshot()
         if mode == .manual {
             publishStatus("已暂停。点击「恢复计时」继续，或再次「开始专注」开新一轮。")
         } else {
@@ -498,6 +555,7 @@ final class AppViewModel: ObservableObject {
     func resumeTimers() {
         guard chronoSessionSuspendedByUser else { return }
         chronoSessionSuspendedByUser = false
+        clearSuspendedTimerModeSnapshot()
         windowManager.dismissRestImmediately(bringIdlePetWindowToFront: false)
         wasResting = false
         testRestActive = false

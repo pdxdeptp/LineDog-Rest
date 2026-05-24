@@ -37,6 +37,8 @@ enum MalDazeDefaults {
     static let pomodoroWorkDurationMinutes = "MalDaze.pomodoro.workDurationMinutes"
     /// 手动 / 整点模式：休息段长度（分钟），默认 5，范围 1–60。
     static let pomodoroRestDurationMinutes = "MalDaze.pomodoro.restDurationMinutes"
+    /// 用户主动停止计时时保存的模式快照；存在即表示启动后保持暂停并显示「恢复计时」。
+    static let suspendedTimerModeSnapshot = "MalDaze.timer.suspendedModeSnapshot"
 
     /// 独立倒计时长度（分钟），默认 7。
     static let sevenMinuteReminderDurationMinutes = "MalDaze.sevenMinuteReminder.durationMinutes"

@@ -4,6 +4,19 @@ import XCTest
 /// 覆盖「开始专注 / 停止计时 / 切模式 / 测试休息 / 引擎休息」的组合，防止状态与霸屏回调不同步。
 @MainActor
 final class MalDazeInteractionTests: XCTestCase {
+    private static let suspendedTimerModeSnapshotKey = MalDazeDefaults.suspendedTimerModeSnapshot
+    private static let autoSuspendedTimerModeToken = "auto"
+    private static let manualSuspendedTimerModeToken = "manual"
+
+    override func setUp() {
+        super.setUp()
+        Self.clearSuspendedTimerModeSnapshot()
+    }
+
+    override func tearDown() {
+        Self.clearSuspendedTimerModeSnapshot()
+        super.tearDown()
+    }
 
     /// `ManualTimerEngine` / `AutoTimerEngine` 通过 `Task { @MainActor }` 投递到 ViewModel；单测需让出一次运行循环再断言。
     private func yieldForMainActorEngineDelivery() {
@@ -28,6 +41,10 @@ final class MalDazeInteractionTests: XCTestCase {
         return value as? Timer
     }
 
+    private nonisolated static func clearSuspendedTimerModeSnapshot() {
+        UserDefaults.standard.removeObject(forKey: MalDazeDefaults.suspendedTimerModeSnapshot)
+    }
+
     // MARK: - 模式与计时开关
 
     func testDefaultBootstrapAuto_isChronoActive_blackPet() {
@@ -46,6 +63,178 @@ final class MalDazeInteractionTests: XCTestCase {
         let vm2 = AppViewModel(windowManager: mock, bootstrapAutoEngine: false)
         vm2.setMode(.auto)
         XCTAssertEqual(vm2.petDisplayMode, .runningBlack)
+    }
+
+    func testStoppedAutoSnapshotRestoresPausedBootstrapWithoutStartingTimer() {
+        Self.clearSuspendedTimerModeSnapshot()
+        defer { Self.clearSuspendedTimerModeSnapshot() }
+
+        let runningVM = AppViewModel(windowManager: MockWindowManager(), bootstrapAutoEngine: true)
+        runningVM.stopTimers()
+
+        XCTAssertEqual(
+            UserDefaults.standard.string(forKey: Self.suspendedTimerModeSnapshotKey),
+            Self.autoSuspendedTimerModeToken
+        )
+
+        let restoredAutoEngine = AutoTimerEngine(restDuration: 60)
+        let restoredMock = MockWindowManager()
+        let restoredVM = AppViewModel(
+            windowManager: restoredMock,
+            autoEngine: restoredAutoEngine,
+            bootstrapAutoEngine: true
+        )
+
+        XCTAssertEqual(restoredVM.mode, .auto)
+        XCTAssertFalse(restoredAutoEngine.isTimerRunning)
+        XCTAssertFalse(restoredVM.canStopChronoButton)
+        XCTAssertTrue(restoredVM.showResumeChronoButton)
+        XCTAssertEqual(restoredVM.petDisplayMode, .pausedWhiteOutline)
+        XCTAssertEqual(restoredMock.idleModesApplied.last, .pausedWhiteOutline)
+    }
+
+    func testStopTimersPersistsStableModeTokens() {
+        Self.clearSuspendedTimerModeSnapshot()
+        defer { Self.clearSuspendedTimerModeSnapshot() }
+
+        let autoVM = AppViewModel(windowManager: MockWindowManager(), bootstrapAutoEngine: true)
+        autoVM.stopTimers()
+        XCTAssertEqual(
+            UserDefaults.standard.string(forKey: Self.suspendedTimerModeSnapshotKey),
+            Self.autoSuspendedTimerModeToken
+        )
+
+        Self.clearSuspendedTimerModeSnapshot()
+        let manualVM = AppViewModel(windowManager: MockWindowManager(), bootstrapAutoEngine: false)
+        manualVM.setMode(.manual)
+        manualVM.startManualFocus()
+        manualVM.stopTimers()
+        XCTAssertEqual(
+            UserDefaults.standard.string(forKey: Self.suspendedTimerModeSnapshotKey),
+            Self.manualSuspendedTimerModeToken
+        )
+    }
+
+    func testRestoredAutoSnapshotResumeClearsDefaultsAndRestartsAutoEngine() {
+        Self.clearSuspendedTimerModeSnapshot()
+        defer { Self.clearSuspendedTimerModeSnapshot() }
+        UserDefaults.standard.set(Self.autoSuspendedTimerModeToken, forKey: Self.suspendedTimerModeSnapshotKey)
+
+        let autoEngine = AutoTimerEngine(restDuration: 60)
+        let vm = AppViewModel(
+            windowManager: MockWindowManager(),
+            autoEngine: autoEngine,
+            bootstrapAutoEngine: true
+        )
+        XCTAssertFalse(autoEngine.isTimerRunning)
+        XCTAssertTrue(vm.showResumeChronoButton)
+
+        vm.resumeTimers()
+
+        XCTAssertTrue(autoEngine.isTimerRunning)
+        XCTAssertTrue(vm.canStopChronoButton)
+        XCTAssertFalse(vm.showResumeChronoButton)
+        XCTAssertNil(UserDefaults.standard.object(forKey: Self.suspendedTimerModeSnapshotKey))
+    }
+
+    func testStoppedManualSnapshotRestoresManualBootstrapAndResumeRestartsManualEngine() {
+        Self.clearSuspendedTimerModeSnapshot()
+        defer { Self.clearSuspendedTimerModeSnapshot() }
+
+        let runningVM = AppViewModel(windowManager: MockWindowManager(), bootstrapAutoEngine: false)
+        runningVM.setMode(.manual)
+        runningVM.startManualFocus()
+        runningVM.stopTimers()
+
+        XCTAssertEqual(
+            UserDefaults.standard.string(forKey: Self.suspendedTimerModeSnapshotKey),
+            Self.manualSuspendedTimerModeToken
+        )
+
+        let restoredManualEngine = ManualTimerEngine(workDuration: 600, restDuration: 120)
+        let restoredAutoEngine = AutoTimerEngine(restDuration: 60)
+        let restoredVM = AppViewModel(
+            windowManager: MockWindowManager(),
+            manualEngine: restoredManualEngine,
+            autoEngine: restoredAutoEngine,
+            bootstrapAutoEngine: true
+        )
+
+        XCTAssertEqual(restoredVM.mode, .manual)
+        XCTAssertFalse(restoredManualEngine.isTimerRunning)
+        XCTAssertFalse(restoredAutoEngine.isTimerRunning)
+        XCTAssertFalse(restoredVM.canStopChronoButton)
+        XCTAssertTrue(restoredVM.showResumeChronoButton)
+
+        restoredVM.resumeTimers()
+
+        XCTAssertTrue(restoredManualEngine.isTimerRunning)
+        XCTAssertTrue(restoredVM.canStopChronoButton)
+        XCTAssertFalse(restoredVM.showResumeChronoButton)
+        XCTAssertNil(UserDefaults.standard.object(forKey: Self.suspendedTimerModeSnapshotKey))
+    }
+
+    func testInvalidStoppedSnapshotIsClearedAndDefaultAutoBootstrapRuns() {
+        Self.clearSuspendedTimerModeSnapshot()
+        defer { Self.clearSuspendedTimerModeSnapshot() }
+        UserDefaults.standard.set("bogus", forKey: Self.suspendedTimerModeSnapshotKey)
+
+        let autoEngine = AutoTimerEngine(restDuration: 60)
+        let vm = AppViewModel(
+            windowManager: MockWindowManager(),
+            autoEngine: autoEngine,
+            bootstrapAutoEngine: true
+        )
+
+        XCTAssertEqual(vm.mode, .auto)
+        XCTAssertTrue(autoEngine.isTimerRunning)
+        XCTAssertTrue(vm.canStopChronoButton)
+        XCTAssertFalse(vm.showResumeChronoButton)
+        XCTAssertEqual(vm.petDisplayMode, .runningBlack)
+        XCTAssertNil(UserDefaults.standard.object(forKey: Self.suspendedTimerModeSnapshotKey))
+    }
+
+    func testNonStringStoppedSnapshotIsClearedAndDefaultAutoBootstrapRuns() {
+        Self.clearSuspendedTimerModeSnapshot()
+        defer { Self.clearSuspendedTimerModeSnapshot() }
+        UserDefaults.standard.set(["manual"], forKey: Self.suspendedTimerModeSnapshotKey)
+
+        let autoEngine = AutoTimerEngine(restDuration: 60)
+        let vm = AppViewModel(
+            windowManager: MockWindowManager(),
+            autoEngine: autoEngine,
+            bootstrapAutoEngine: true
+        )
+
+        XCTAssertEqual(vm.mode, .auto)
+        XCTAssertTrue(autoEngine.isTimerRunning)
+        XCTAssertTrue(vm.canStopChronoButton)
+        XCTAssertFalse(vm.showResumeChronoButton)
+        XCTAssertEqual(vm.petDisplayMode, .runningBlack)
+        XCTAssertNil(UserDefaults.standard.object(forKey: Self.suspendedTimerModeSnapshotKey))
+    }
+
+    func testSetModeClearsStoppedSnapshot() {
+        Self.clearSuspendedTimerModeSnapshot()
+        defer { Self.clearSuspendedTimerModeSnapshot() }
+        UserDefaults.standard.set(Self.manualSuspendedTimerModeToken, forKey: Self.suspendedTimerModeSnapshotKey)
+
+        let vm = AppViewModel(windowManager: MockWindowManager(), bootstrapAutoEngine: false)
+        vm.setMode(.auto)
+
+        XCTAssertNil(UserDefaults.standard.object(forKey: Self.suspendedTimerModeSnapshotKey))
+    }
+
+    func testStartManualFocusClearsStoppedSnapshot() {
+        Self.clearSuspendedTimerModeSnapshot()
+        defer { Self.clearSuspendedTimerModeSnapshot() }
+
+        let vm = AppViewModel(windowManager: MockWindowManager(), bootstrapAutoEngine: false)
+        vm.setMode(.manual)
+        UserDefaults.standard.set(Self.manualSuspendedTimerModeToken, forKey: Self.suspendedTimerModeSnapshotKey)
+        vm.startManualFocus()
+
+        XCTAssertNil(UserDefaults.standard.object(forKey: Self.suspendedTimerModeSnapshotKey))
     }
 
     func testSetManual_isPausedWhiteUntilStartFocus() {
@@ -67,8 +256,11 @@ final class MalDazeInteractionTests: XCTestCase {
         XCTAssertTrue(vm.showResumeChronoButton)
         XCTAssertFalse(vm.canStopChronoButton)
 
+        Self.clearSuspendedTimerModeSnapshot()
         let mock2 = MockWindowManager()
         let vm2 = AppViewModel(windowManager: mock2, bootstrapAutoEngine: true)
+        XCTAssertEqual(vm2.mode, .auto)
+        XCTAssertTrue(vm2.canStopChronoButton)
         vm2.stopTimers()
         XCTAssertEqual(vm2.petDisplayMode, .pausedWhiteOutline)
         XCTAssertTrue(vm2.showResumeChronoButton)
