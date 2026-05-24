@@ -25,8 +25,8 @@
 
 ## 5. Backend Proposal Apply
 
-- [ ] 5.1 Write failing backend tests for applying exactly the selected current smart proposal and recording smart-mode event evidence.
-- [ ] 5.2 Implement proposal apply with refreshed fact recomputation, stable signature comparison, mutation, and view refresh contract.
+- [x] 5.1 Write failing backend tests for applying exactly the selected current smart proposal and recording smart-mode event evidence.
+- [x] 5.2 Implement proposal apply with refreshed fact recomputation, stable signature comparison, mutation, and view refresh contract.
 - [ ] 5.3 Write failing backend tests for stale, unsupported, and disabled smart-mode apply requests.
 - [ ] 5.4 Implement stale/disabled proposal rejection without mutation.
 

@@ -843,6 +843,171 @@ async def test_over_capacity_option_selects_latest_overloaded_task_and_names_cas
     assert "higher-priority task may move" in option["tradeoff"]
 
 
+@pytest.mark.asyncio
+async def test_apply_current_expected_late_proposal_extends_deadline_and_records_event(client):
+    days = await _seed_morning_proposal_facts(os.environ["DB_PATH"])
+    proposals_response = await client.post("/api/study-smart-mode/proposals", json={"trigger": "morning"})
+    proposals = proposals_response.json()["options"]
+    selected = next(
+        option
+        for option in proposals
+        if option["preview"]["command"] == "extend_project_deadline"
+    )
+
+    response = await client.post(
+        "/api/study-smart-mode/proposals/apply",
+        json={"proposal": selected},
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json() == {
+        "status": "applied",
+        "source": "smart_mode_apply",
+        "proposal_id": selected["id"],
+        "signature": selected["signature"],
+        "trigger": "morning",
+        "command": "extend_project_deadline",
+        "affected_project_ids": [8102],
+        "affected_task_ids": [8203],
+        "applied_changes": selected["previewed_changes"],
+        "mutates": True,
+        "refresh": {"today": True, "project_overview": True, "calendar": True},
+    }
+
+    async with aiosqlite.connect(os.environ["DB_PATH"]) as db:
+        db.row_factory = aiosqlite.Row
+        resources = await _fetchall(
+            db,
+            "SELECT id, deadline FROM resources WHERE id IN (8101, 8102, 8103) ORDER BY id",
+        )
+        events = await _fetchall(
+            db,
+            """
+            SELECT event_type, payload
+            FROM events
+            WHERE event_type = 'study_smart_mode_proposal_applied'
+            ORDER BY id
+            """,
+        )
+
+    assert resources == [
+        {
+            "id": 8101,
+            "deadline": (date.fromisoformat(days["today"]) + timedelta(days=30)).isoformat(),
+        },
+        {"id": 8102, "deadline": days["late_task_day"]},
+        {
+            "id": 8103,
+            "deadline": (date.fromisoformat(days["today"]) + timedelta(days=30)).isoformat(),
+        },
+    ]
+    assert len(events) == 1
+    assert json.loads(events[0]["payload"]) == {
+        "source": "smart_mode_apply",
+        "proposal_id": selected["id"],
+        "signature": selected["signature"],
+        "signature_payload": selected["signature_payload"],
+        "trigger": "morning",
+        "command": "extend_project_deadline",
+        "reason": selected["reason"],
+        "affected_project_ids": [8102],
+        "affected_task_ids": [8203],
+        "red_state_impact": selected["red_state_impact"],
+        "selected_preview": selected["preview"],
+        "applied_changes": selected["previewed_changes"],
+    }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("command", "changed_task_ids", "unchanged_task_ids"),
+    [
+        ("make_room_after_lag", [8202], [8201, 8203, 8204, 8205]),
+        ("move_task_from_over_capacity_day", [8205], [8201, 8202, 8203, 8204]),
+    ],
+)
+async def test_apply_current_task_date_proposal_writes_exact_previewed_changes_and_event(
+    client,
+    command,
+    changed_task_ids,
+    unchanged_task_ids,
+):
+    await _seed_morning_proposal_facts(os.environ["DB_PATH"])
+    before = await _snapshot_mutation_guard(os.environ["DB_PATH"])
+    proposals_response = await client.post("/api/study-smart-mode/proposals", json={"trigger": "morning"})
+    proposals = proposals_response.json()["options"]
+    selected = next(option for option in proposals if option["preview"]["command"] == command)
+
+    response = await client.post(
+        "/api/study-smart-mode/proposals/apply",
+        json={"proposal": selected},
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json() == {
+        "status": "applied",
+        "source": "smart_mode_apply",
+        "proposal_id": selected["id"],
+        "signature": selected["signature"],
+        "trigger": "morning",
+        "command": command,
+        "affected_project_ids": selected["affected_project_ids"],
+        "affected_task_ids": selected["affected_task_ids"],
+        "applied_changes": selected["previewed_changes"],
+        "mutates": True,
+        "refresh": {"today": True, "project_overview": True, "calendar": True},
+    }
+
+    async with aiosqlite.connect(os.environ["DB_PATH"]) as db:
+        db.row_factory = aiosqlite.Row
+        tasks = await _fetchall(
+            db,
+            """
+            SELECT id, scheduled_date, auto_roll_days, last_auto_rolled_at, user_adjusted_at
+            FROM tasks
+            ORDER BY id
+            """,
+        )
+        events = await _fetchall(
+            db,
+            """
+            SELECT event_type, payload
+            FROM events
+            WHERE event_type = 'study_smart_mode_proposal_applied'
+            ORDER BY id
+            """,
+        )
+
+    task_by_id = {task["id"]: task for task in tasks}
+    before_task_by_id = {task["id"]: task for task in before["tasks"]}
+    expected_new_dates = {
+        change["task_id"]: change["new_date"] for change in selected["previewed_changes"]
+    }
+    for task_id in changed_task_ids:
+        assert task_by_id[task_id]["scheduled_date"] == expected_new_dates[task_id]
+        assert task_by_id[task_id]["auto_roll_days"] == 0
+        assert task_by_id[task_id]["last_auto_rolled_at"] is None
+        assert task_by_id[task_id]["user_adjusted_at"] is not None
+    for task_id in unchanged_task_ids:
+        assert task_by_id[task_id] == before_task_by_id[task_id]
+
+    assert len(events) == 1
+    assert json.loads(events[0]["payload"]) == {
+        "source": "smart_mode_apply",
+        "proposal_id": selected["id"],
+        "signature": selected["signature"],
+        "signature_payload": selected["signature_payload"],
+        "trigger": "morning",
+        "command": command,
+        "reason": selected["reason"],
+        "affected_project_ids": selected["affected_project_ids"],
+        "affected_task_ids": selected["affected_task_ids"],
+        "red_state_impact": selected["red_state_impact"],
+        "selected_preview": selected["preview"],
+        "applied_changes": selected["previewed_changes"],
+    }
+
+
 def test_smart_mode_router_uses_public_capacity_preview_helper():
     from src.routers import study_smart_mode
 

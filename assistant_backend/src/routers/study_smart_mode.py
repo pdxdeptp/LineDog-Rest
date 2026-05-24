@@ -1,6 +1,6 @@
 import hashlib
 import json
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any, Literal
 
 from fastapi import APIRouter
@@ -29,6 +29,13 @@ class SmartModeSettingsUpdate(BaseModel):
 
 class SmartModeProposalRequest(BaseModel):
     trigger: Literal["morning", "after_adjustment"]
+    previous_expected_late_project_ids: list[int] | None = None
+    previous_over_capacity_dates: list[str] | None = None
+
+
+class SmartModeProposalApplyRequest(BaseModel):
+    proposal: dict[str, Any] | None = None
+    selected_proposal: dict[str, Any] | None = None
     previous_expected_late_project_ids: list[int] | None = None
     previous_over_capacity_dates: list[str] | None = None
 
@@ -139,6 +146,15 @@ def _with_signature(option: dict[str, Any]) -> dict[str, Any]:
         "signature_payload": signature_payload,
         "signature": hashlib.sha256(signature_text.encode("utf-8")).hexdigest(),
     }
+
+
+def _signature_for_payload(payload: dict[str, Any]) -> str:
+    signature_text = json.dumps(
+        {"version": SIGNATURE_VERSION, "payload": payload},
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(signature_text.encode("utf-8")).hexdigest()
 
 
 def _over_capacity_impact_with_resolved(base_impact: dict[str, list[str]]) -> dict[str, list[str]]:
@@ -547,18 +563,26 @@ async def _build_proposal_options(
     issues: list[dict],
     trigger: Literal["morning", "after_adjustment"],
 ) -> list[dict[str, Any]]:
-    options = []
     async with get_db() as db:
-        for issue in issues:
-            option = None
-            if issue["type"] == "rolled_task_lag" and trigger == "morning":
-                option = await _build_rolled_lag_option(db, issue, trigger)
-            elif issue["type"] == "expected_late_project":
-                option = await _build_expected_late_option(db, issue, trigger)
-            elif issue["type"] == "over_capacity_day":
-                option = await _build_over_capacity_option(db, issue, trigger)
-            if option is not None:
-                options.append(option)
+        return await _build_proposal_options_with_db(db, issues, trigger)
+
+
+async def _build_proposal_options_with_db(
+    db: Any,
+    issues: list[dict],
+    trigger: Literal["morning", "after_adjustment"],
+) -> list[dict[str, Any]]:
+    options = []
+    for issue in issues:
+        option = None
+        if issue["type"] == "rolled_task_lag" and trigger == "morning":
+            option = await _build_rolled_lag_option(db, issue, trigger)
+        elif issue["type"] == "expected_late_project":
+            option = await _build_expected_late_option(db, issue, trigger)
+        elif issue["type"] == "over_capacity_day":
+            option = await _build_over_capacity_option(db, issue, trigger)
+        if option is not None:
+            options.append(option)
     return options
 
 
@@ -619,6 +643,187 @@ async def _build_after_adjustment_proposal_options(
         _after_adjustment_new_red_issues(issues, request),
         "after_adjustment",
     )
+
+
+def _selected_apply_proposal(request: SmartModeProposalApplyRequest) -> dict[str, Any] | None:
+    return request.proposal or request.selected_proposal
+
+
+def _stale_apply_response() -> dict[str, Any]:
+    return {
+        "status": "stale_proposal",
+        "mutates": False,
+        "message": "submitted proposal does not match the current active plan",
+    }
+
+
+def _unsupported_apply_response(message: str = "submitted proposal is unsupported") -> dict[str, Any]:
+    return {
+        "status": "unsupported",
+        "mutates": False,
+        "message": message,
+    }
+
+
+def _disabled_apply_response() -> dict[str, Any]:
+    return {
+        "status": "disabled",
+        "mutates": False,
+        "message": "smart mode is disabled",
+    }
+
+
+def _validated_submitted_signature_payload(
+    submitted: dict[str, Any],
+) -> tuple[str, dict[str, Any]] | None:
+    try:
+        if int(submitted["signature_version"]) != SIGNATURE_VERSION:
+            return None
+        payload = _option_signature_payload(submitted)
+        signature = str(submitted["signature"])
+    except (KeyError, TypeError, ValueError):
+        return None
+
+    if submitted.get("signature_payload") != payload:
+        return None
+    if _signature_for_payload(payload) != signature:
+        return None
+    return signature, payload
+
+
+async def _current_options_for_apply(
+    db: Any,
+    submitted: dict[str, Any],
+    request: SmartModeProposalApplyRequest,
+) -> list[dict[str, Any]] | None:
+    trigger = submitted.get("trigger")
+    if trigger not in {"morning", "after_adjustment"}:
+        return None
+
+    snapshot = await _build_read_only_smart_snapshot_with_db(db, date.today())
+    issues = _build_fact_issues(snapshot)
+    if trigger == "morning":
+        return await _build_proposal_options_with_db(db, issues, "morning")
+
+    proposal_request = SmartModeProposalRequest(
+        trigger="after_adjustment",
+        previous_expected_late_project_ids=request.previous_expected_late_project_ids,
+        previous_over_capacity_dates=request.previous_over_capacity_dates,
+    )
+    return await _build_proposal_options_with_db(
+        db,
+        _after_adjustment_new_red_issues(issues, proposal_request),
+        "after_adjustment",
+    )
+
+
+def _matching_current_option(
+    submitted: dict[str, Any],
+    current_options: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    validated = _validated_submitted_signature_payload(submitted)
+    if validated is None:
+        return None
+    submitted_signature, submitted_payload = validated
+    for option in current_options:
+        if (
+            option["signature"] == submitted_signature
+            and option["signature_payload"] == submitted_payload
+        ):
+            return option
+    return None
+
+
+def _applied_response(option: dict[str, Any]) -> dict[str, Any]:
+    command = option["preview"]["command"]
+    return {
+        "status": "applied",
+        "source": "smart_mode_apply",
+        "proposal_id": option["id"],
+        "signature": option["signature"],
+        "trigger": option["trigger"],
+        "command": command,
+        "affected_project_ids": option["affected_project_ids"],
+        "affected_task_ids": option["affected_task_ids"],
+        "applied_changes": option["previewed_changes"],
+        "mutates": True,
+        "refresh": {"today": True, "project_overview": True, "calendar": True},
+    }
+
+
+def _event_payload_for_option(option: dict[str, Any]) -> dict[str, Any]:
+    response = _applied_response(option)
+    return {
+        "source": response["source"],
+        "proposal_id": response["proposal_id"],
+        "signature": response["signature"],
+        "signature_payload": option["signature_payload"],
+        "trigger": response["trigger"],
+        "command": response["command"],
+        "reason": option["reason"],
+        "affected_project_ids": response["affected_project_ids"],
+        "affected_task_ids": response["affected_task_ids"],
+        "red_state_impact": option["red_state_impact"],
+        "selected_preview": option["preview"],
+        "applied_changes": response["applied_changes"],
+    }
+
+
+async def _apply_deadline_option(db: Any, option: dict[str, Any]) -> dict[str, Any]:
+    for change in option["previewed_changes"]:
+        if change.get("field") != "deadline":
+            return _unsupported_apply_response()
+        cursor = await db.execute(
+            """
+            UPDATE resources
+            SET deadline = ?
+            WHERE id = ?
+              AND type = 'study_project'
+              AND status = 'active'
+              AND date(deadline) = date(?)
+            """,
+            (change["new_deadline"], change["project_id"], change["old_deadline"]),
+        )
+        if cursor.rowcount != 1:
+            return _stale_apply_response()
+    return _applied_response(option)
+
+
+async def _apply_task_date_option(db: Any, option: dict[str, Any]) -> dict[str, Any]:
+    now = datetime.now(UTC).isoformat()
+    for change in option["previewed_changes"]:
+        cursor = await db.execute(
+            """
+            UPDATE tasks
+            SET scheduled_date = ?,
+                auto_roll_days = 0,
+                last_auto_rolled_at = NULL,
+                user_adjusted_at = ?
+            WHERE id = ?
+              AND resource_id = ?
+              AND completed_at IS NULL
+              AND date(scheduled_date) = date(?)
+            """,
+            (
+                change["new_date"],
+                now,
+                change["task_id"],
+                change["project_id"],
+                change["old_date"],
+            ),
+        )
+        if cursor.rowcount != 1:
+            return _stale_apply_response()
+    return _applied_response(option)
+
+
+async def _apply_current_option(db: Any, option: dict[str, Any]) -> dict[str, Any]:
+    command = option["preview"]["command"]
+    if command == "extend_project_deadline":
+        return await _apply_deadline_option(db, option)
+    if command in {"make_room_after_lag", "move_task_from_over_capacity_day"}:
+        return await _apply_task_date_option(db, option)
+    return _unsupported_apply_response()
 
 
 async def _get_projected_rollover_tasks(db: Any, today: date) -> dict[str, Any]:
@@ -709,11 +914,14 @@ async def _get_projected_rollover_tasks(db: Any, today: date) -> dict[str, Any]:
 
 async def _build_read_only_smart_snapshot(today: date) -> dict:
     async with get_db() as db:
-        projected_rollover = await _get_projected_rollover_tasks(db, today)
-        today_tasks = await get_today_study_view_tasks(db, today)
-        projects = await get_study_project_overview(db)
-        calendar = await get_study_calendar_load(db, today, today + timedelta(days=14))
+        return await _build_read_only_smart_snapshot_with_db(db, today)
 
+
+async def _build_read_only_smart_snapshot_with_db(db: Any, today: date) -> dict:
+    projected_rollover = await _get_projected_rollover_tasks(db, today)
+    today_tasks = await get_today_study_view_tasks(db, today)
+    projects = await get_study_project_overview(db)
+    calendar = await get_study_calendar_load(db, today, today + timedelta(days=14))
     return {
         "today": {"tasks": [*projected_rollover["tasks"], *today_tasks]},
         "projects": projects,
@@ -771,6 +979,50 @@ async def generate_study_smart_mode_proposals(request: SmartModeProposalRequest)
         "trigger": request.trigger,
         "options": options,
     }
+
+
+@router.post("/study-smart-mode/proposals/apply")
+async def apply_study_smart_mode_proposal(request: SmartModeProposalApplyRequest) -> dict:
+    async with get_db() as db:
+        await db.execute("BEGIN IMMEDIATE")
+        try:
+            enabled = await get_system_state(db, SMART_MODE_KEY) == "true"
+            if not enabled:
+                await db.rollback()
+                return _disabled_apply_response()
+
+            submitted = _selected_apply_proposal(request)
+            if submitted is None:
+                await db.rollback()
+                return _unsupported_apply_response("missing selected proposal")
+
+            current_options = await _current_options_for_apply(db, submitted, request)
+            if current_options is None:
+                await db.rollback()
+                return _unsupported_apply_response()
+
+            current_option = _matching_current_option(submitted, current_options)
+            if current_option is None:
+                await db.rollback()
+                return _stale_apply_response()
+
+            response = await _apply_current_option(db, current_option)
+            if response.get("status") != "applied":
+                await db.rollback()
+                return response
+
+            await db.execute(
+                "INSERT INTO events (event_type, payload) VALUES (?, ?)",
+                (
+                    "study_smart_mode_proposal_applied",
+                    json.dumps(_event_payload_for_option(current_option)),
+                ),
+            )
+            await db.commit()
+            return response
+        except Exception:
+            await db.rollback()
+            raise
 
 
 @router.get("/study-smart-mode/morning-briefing")
