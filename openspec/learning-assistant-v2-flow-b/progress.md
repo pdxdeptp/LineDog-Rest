@@ -6,6 +6,9 @@
 - Current item: ITEM-004 `study-smart-mode`
 - Current change: `introduce-study-smart-mode`
 - Current spec: `study-smart-mode`
+- Current step: tasks 6.3-6.4 next
+- OpenSpec apply progress: 19/28 complete
+- Last feature commit: `4c7b342`
 - Checkout strategy: current checkout only; worktrees are forbidden by automation instruction.
 
 ## Round 01 · 2026-05-23T14:50:55Z
@@ -1973,3 +1976,54 @@ Before implementation, create a checkpoint commit in the current checkout, then 
 ### Next Task
 
 - Continue `opsx:apply` for ITEM-004 with tasks 6.1-6.2: Swift model/client tests and implementation for smart-mode setting, briefing, proposal generation, and proposal apply endpoints.
+
+## Round 41 · 2026-05-24T16:20:46Z
+
+### ITEM-004 6.1-6.2 Swift API Client
+
+- Restored controller and Flow B state: `phase=flow-b`, `current_item=study-smart-mode`, `current_change=introduce-study-smart-mode`.
+- Start status was clean except for automation-owned in-progress state markers.
+- Current checkout only; no worktree was created or used.
+- `openspec instructions apply --change introduce-study-smart-mode --json` reported 28 tasks, 17 complete, with tasks 6.1-6.2 next.
+
+### Completed
+
+- OpenSpec tasks 6.1 and 6.2 completed:
+  - added failing Swift model/client tests for smart-mode setting, morning briefing, proposal generation, and proposal apply;
+  - added Swift API models for backend smart-mode settings, issues, proposal options, generation requests/responses, and apply results;
+  - added protocol methods, concrete client calls, and mock support for the new `/api/study-smart-mode/*` endpoints;
+  - aligned request and response shapes with the backend contract, including after-adjustment previous red-state context.
+
+### Review Gates
+
+- Spec Compliance Review: initially BLOCKED for backend JSON contract mismatch.
+- Spec Compliance fix completed by aligning issue, proposal, request, signature, preview, and apply status fields with the backend.
+- Spec Compliance Re-review: PASS.
+- Code Quality Review: initially CHANGES_REQUESTED because apply requests did not preserve after-adjustment previous red-state context.
+- Code Quality fix completed by encoding optional previous expected-late project ids and over-capacity dates in `StudySmartProposalApplyRequest`.
+- Code Quality Re-review: APPROVED.
+
+### Verification
+
+- RED/GREEN/REFACTOR evidence recorded in `openspec/learning-assistant-v2-flow-b/evidence/item-004/tdd-swift-smart-mode-api-client-report.md`.
+- `xcodebuild test -project MalDaze.xcodeproj -scheme MalDaze -only-testing:MalDazeTests/AssistantModelDecodingTests -quiet`: PASS.
+- `openspec validate introduce-study-smart-mode --strict`: PASS.
+- `git diff --check`: PASS.
+
+### Auto Commit
+
+- Commit: `4c7b342`.
+- Scope: verified ITEM-004 Swift smart-mode API client through OpenSpec tasks 6.1-6.2.
+- Pre-commit checks: focused Swift model/client tests, `openspec validate introduce-study-smart-mode --strict`, `git diff --check`, Spec Compliance Re-review, and Code Quality Re-review all passed.
+
+### Files Added / Changed
+
+- Updated `MalDaze/LearningAssistant/AssistantAPIClient.swift`.
+- Updated `MalDaze/LearningAssistant/AssistantAPIClientProtocol.swift`.
+- Updated `MalDazeTests/LearningAssistantTests.swift`.
+- Updated `openspec/changes/introduce-study-smart-mode/tasks.md` to mark 6.1 and 6.2 complete.
+- Added `openspec/learning-assistant-v2-flow-b/evidence/item-004/tdd-swift-smart-mode-api-client-report.md`.
+
+### Next Task
+
+- Continue `opsx:apply` for ITEM-004 with tasks 6.3-6.4: ViewModel smart-mode state, refresh sequencing, ignore/apply state, stale proposal handling, and after-adjustment red-state trigger gating. Do not implement UI surfaces yet; those remain 7.x.
