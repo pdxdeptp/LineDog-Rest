@@ -1,16 +1,16 @@
 {
   "phase": "flow-b",
-  "round": 33,
+  "round": 34,
   "current_item": "study-smart-mode",
-  "current_change": null,
+  "current_change": "introduce-study-smart-mode",
   "current_spec": "study-smart-mode",
   "items_initialized": true,
   "in_progress_step": null,
-  "last_completed_step": "item-003-complete",
+  "last_completed_step": "item-004-openspec-ready",
   "last_feature_commit": "daa2f66",
   "last_completed_item": "study-plan-adjustment",
   "last_completed_change": "introduce-study-plan-adjustment",
-  "next_step": "start-item-004-v1-observation-and-gap-analysis",
+  "next_step": "checkpoint-before-item-004-opsx-apply",
   "blocker_reason": null,
-  "updated_at": "2026-05-24T13:48:45Z"
+  "updated_at": "2026-05-24T14:14:19Z"
 }

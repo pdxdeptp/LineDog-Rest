@@ -3,10 +3,43 @@
 ## Current Status
 
 - Phase: Flow B implementation
-- Current item: ITEM-003 `study-plan-adjustment`
-- Current change: pending OpenSpec proposal
-- Current spec: pending `study-plan-adjustment`
+- Current item: ITEM-004 `study-smart-mode`
+- Current change: `introduce-study-smart-mode`
+- Current spec: `study-smart-mode`
 - Checkout strategy: current checkout only; worktrees are forbidden by automation instruction.
+
+## Round 34 · 2026-05-24T14:05:15Z
+
+### ITEM-004 Observation And OpenSpec Proposal
+
+- Restored controller and Flow B state: `phase=flow-b`, `current_item=study-smart-mode`.
+- Current checkout only; no worktree was created or used.
+- Start status contained only automation-owned state markers from the previous in-progress heartbeat.
+- Recorded current-state evidence:
+  - `openspec/learning-assistant-v2-flow-b/evidence/item-004/v1-observation.md`
+  - `openspec/learning-assistant-v2-flow-b/evidence/item-004/gap-analysis.md`
+
+### Findings
+
+- The v2 dashboard already uses `study-views` and avoids old generated briefing state.
+- The old `/api/today-briefing` route can still invoke the v1 Morning Agent, which may run weekly review, reschedule tasks, calibrate speed factors, call an LLM, and cache a generated briefing.
+- ITEM-003 provides the required v2 substrate for smart mode: rollover facts, expected-late state, over-capacity state, manual adjustment primitives, rest-day settings, and bounded dialogue preview/apply.
+- There is no smart-mode setting, fact-only smart briefing, multi-option proposal model, proposal apply route, or Swift smart-mode surface yet.
+
+### OpenSpec
+
+- Created change: `openspec/changes/introduce-study-smart-mode`.
+- New capability: `study-smart-mode`.
+- Existing v1 specs are not modified in this change.
+- Created `proposal.md`, `design.md`, `tasks.md`, and `specs/study-smart-mode/spec.md`.
+- Ran `openspec validate introduce-study-smart-mode --strict`: PASS.
+- `openspec instructions apply --change introduce-study-smart-mode --json` reports 28 tasks, 3 complete, state `ready`.
+- Readiness review saved: `openspec/learning-assistant-v2-flow-b/evidence/item-004/readiness-review.md`.
+
+### Next Task
+
+- Before implementation, create a checkpoint commit in the current checkout if no unrelated user changes are present.
+- Then enter `opsx:apply` for `introduce-study-smart-mode` and start with tasks 2.1-2.2: backend smart-mode setting tests and minimal storage/routes.
 
 ## Round 01 · 2026-05-23T14:50:55Z
 
