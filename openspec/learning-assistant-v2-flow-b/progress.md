@@ -897,6 +897,12 @@ Before implementation, create a checkpoint commit in the current checkout, then 
 - `git diff --check`: PASS.
 - `openspec instructions apply --change introduce-study-plan-adjustment --json`: 37 tasks total, 11 complete, 26 remaining.
 
+### Auto Commit
+
+- Commit: `511077b feat: expose study plan rollover badges`.
+- Scope: verified ITEM-003 Today rolled-day count/badge payload and completion rollover-marker reset through OpenSpec tasks 3.3-3.4.
+- Pre-commit checks: related backend tests, `openspec validate introduce-study-plan-adjustment --strict`, `git diff --check`, Spec Compliance Review, and Code Quality Review all passed.
+
 ### Files Added / Changed
 
 - Updated `assistant_backend/src/db/queries.py`.
@@ -909,3 +915,45 @@ Before implementation, create a checkpoint commit in the current checkout, then 
 ### Next Task
 
 - Continue `opsx:apply` for ITEM-003 with tasks 4.1 and 4.2: active unfinished task date move with same-project later-task cascade, no cross-project movement, past-date rejection, event persistence, and rollover reset.
+
+## Round 20 · 2026-05-24T04:16:05Z
+
+### ITEM-003 4.1-4.2 Manual Move Cascade
+
+- Restored controller state: `phase=flow-b`, `current_item=study-plan-adjustment`.
+- Current checkout only; no worktree was created or used.
+- Subagent TDD implementation completed OpenSpec tasks 4.1-4.2:
+  - `POST /api/study-plan-adjustment/tasks/{task_id}/move`;
+  - selected active unfinished study task moves to the requested date;
+  - unfinished later same-project tasks cascade by the same date delta;
+  - earlier same-project tasks, completed tasks, and other projects are not moved;
+  - target dates before today are rejected with no mutation;
+  - cascade results that would move any affected task before today are rejected with no mutation;
+  - affected tasks reset rollover markers and receive `user_adjusted_at`;
+  - `study_task_moved` event evidence records selected and affected task date changes with source `manual_move`.
+
+### Review Gates
+
+- Spec Compliance Review: PASS.
+- Initial Code Quality Review: PASS with one P2.
+- P2 fixed with TDD: cascade results before today now reject the whole move and roll back before updates/events.
+- Manual Move Re-review: PASS with no P0/P1/P2/P3 findings.
+
+### Verification
+
+- `assistant_backend/.venv/bin/pytest assistant_backend/tests/test_study_plan_adjustment_move.py assistant_backend/tests/test_study_plan_adjustment_rollover.py assistant_backend/tests/test_study_views_today.py -q`: `8 passed, 2 warnings`.
+- `openspec validate introduce-study-plan-adjustment --strict`: PASS.
+- `git diff --check`: PASS.
+- `openspec instructions apply --change introduce-study-plan-adjustment --json`: 37 tasks total, 13 complete, 24 remaining.
+
+### Files Added / Changed
+
+- Updated `assistant_backend/src/db/queries.py`.
+- Updated `assistant_backend/src/routers/study_plan_adjustment.py`.
+- Added `assistant_backend/tests/test_study_plan_adjustment_move.py`.
+- Updated `openspec/changes/introduce-study-plan-adjustment/tasks.md` to mark 4.1 and 4.2 complete.
+- Added `openspec/learning-assistant-v2-flow-b/evidence/item-003/tdd-manual-move-report.md`.
+
+### Next Task
+
+- Continue `opsx:apply` for ITEM-003 with tasks 4.3 and 4.4: active project deadline edit that recalculates expected-late state without moving tasks.

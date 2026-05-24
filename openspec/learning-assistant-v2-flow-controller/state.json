@@ -1,16 +1,16 @@
 {
   "phase": "flow-b",
-  "round": 7,
+  "round": 8,
   "current_item": "study-plan-adjustment",
   "last_doc_hash": "d83fb77602961d4f3a9c3e17c307c6b499eb987b",
   "flow_a_readiness": "PASS",
   "flow_b_readiness": "PASS",
   "git_strategy": "current-checkout-only",
   "last_checkpoint_commit": "c9da6ff",
-  "last_feature_commit": "adff33a",
+  "last_feature_commit": "511077b",
   "in_progress_step": null,
-  "last_completed_step": "flow-b-round-19-item-003-today-rolled-badge-payload",
-  "next_step": "continue-opsx-apply-task-4.1-manual-move-cascade",
+  "last_completed_step": "flow-b-round-20-item-003-manual-move-cascade",
+  "next_step": "continue-opsx-apply-task-4.3-project-deadline-edit",
   "blocker_reason": null,
-  "updated_at": "2026-05-24T03:39:05Z"
+  "updated_at": "2026-05-24T04:16:05Z"
 }

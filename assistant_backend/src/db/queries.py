@@ -17,6 +17,14 @@ class TaskNotFoundError(Exception):
     pass
 
 
+class TaskMovePastDateError(Exception):
+    pass
+
+
+class TaskMoveNotAllowedError(Exception):
+    pass
+
+
 async def get_tasks_by_date(db: aiosqlite.Connection, target_date: date) -> list[dict]:
     async with db.execute(
         "SELECT * FROM tasks WHERE scheduled_date = ? ORDER BY priority DESC, id ASC",
@@ -314,6 +322,142 @@ async def rollover_unfinished_study_tasks(db: aiosqlite.Connection, today: date)
         "date": today_iso,
         "rolled_count": len(rolled_tasks),
         "rolled_tasks": rolled_tasks,
+    }
+
+
+async def move_active_study_task(db: aiosqlite.Connection, task_id: int, new_date: date, today: date) -> dict:
+    if new_date < today:
+        raise TaskMovePastDateError
+
+    now = datetime.now(UTC).isoformat()
+
+    await db.execute("BEGIN IMMEDIATE")
+    try:
+        async with db.execute(
+            """
+            SELECT
+                t.id,
+                t.resource_id,
+                t.scheduled_date,
+                t.completed_at,
+                r.type AS resource_type,
+                r.status AS resource_status,
+                u.order_index AS unit_order_index
+            FROM tasks t
+            JOIN resources r ON r.id = t.resource_id
+            LEFT JOIN units u ON u.id = t.unit_id
+            WHERE t.id = ?
+            """,
+            (task_id,),
+        ) as cursor:
+            selected = await cursor.fetchone()
+
+        if not selected:
+            await db.rollback()
+            raise TaskNotFoundError
+        if (
+            selected["resource_type"] != "study_project"
+            or selected["resource_status"] != "active"
+            or selected["completed_at"] is not None
+        ):
+            await db.rollback()
+            raise TaskMoveNotAllowedError
+
+        original_date = date.fromisoformat(selected["scheduled_date"][:10])
+        delta = (new_date - original_date).days
+
+        async with db.execute(
+            """
+            SELECT
+                t.id,
+                t.resource_id,
+                t.scheduled_date,
+                u.order_index AS unit_order_index
+            FROM tasks t
+            LEFT JOIN units u ON u.id = t.unit_id
+            WHERE t.resource_id = ?
+              AND t.completed_at IS NULL
+            """,
+            (selected["resource_id"],),
+        ) as cursor:
+            same_project_unfinished = await cursor.fetchall()
+
+        def project_order_key(task: aiosqlite.Row) -> tuple[int, int, str, int]:
+            unit_order = task["unit_order_index"]
+            if unit_order is not None:
+                return (0, int(unit_order), task["scheduled_date"], int(task["id"]))
+            return (1, 0, task["scheduled_date"], int(task["id"]))
+
+        ordered_tasks = sorted(same_project_unfinished, key=project_order_key)
+        selected_index = next(
+            index for index, task in enumerate(ordered_tasks) if int(task["id"]) == task_id
+        )
+        affected_tasks = ordered_tasks[selected_index:]
+
+        changes = []
+        for task in affected_tasks:
+            old_date = date.fromisoformat(task["scheduled_date"][:10])
+            shifted_date = old_date + timedelta(days=delta)
+            changes.append(
+                {
+                    "task_id": int(task["id"]),
+                    "project_id": int(task["resource_id"]),
+                    "old_date": task["scheduled_date"],
+                    "new_date": shifted_date.isoformat(),
+                }
+            )
+
+        if any(date.fromisoformat(change["new_date"]) < today for change in changes):
+            raise TaskMovePastDateError
+
+        for change in changes:
+            await db.execute(
+                """
+                UPDATE tasks
+                SET scheduled_date = ?,
+                    auto_roll_days = 0,
+                    last_auto_rolled_at = NULL,
+                    user_adjusted_at = ?
+                WHERE id = ?
+                  AND completed_at IS NULL
+                """,
+                (change["new_date"], now, change["task_id"]),
+            )
+
+        event_changes = [
+            {
+                "task_id": change["task_id"],
+                "project_id": change["project_id"],
+                "original_date": change["old_date"],
+                "new_date": change["new_date"],
+            }
+            for change in changes
+        ]
+        await db.execute(
+            "INSERT INTO events (event_type, payload) VALUES (?, ?)",
+            (
+                "study_task_moved",
+                json.dumps(
+                    {
+                        "task_id": task_id,
+                        "resource_id": int(selected["resource_id"]),
+                        "affected_task_ids": [change["task_id"] for change in changes],
+                        "changes": event_changes,
+                        "source": "manual_move",
+                    }
+                ),
+            ),
+        )
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise
+
+    return {
+        "task_id": task_id,
+        "source": "manual_move",
+        "affected_count": len(changes),
+        "changes": changes,
     }
 
 
