@@ -1635,6 +1635,49 @@ private extension URLRequest {
 // MARK: - UI Source Tests
 // UI 层目前没有稳定的 SwiftUI inspection 依赖；这些测试锁定 OpenSpec 要求的结构和关键文案。
 
+final class LearningAssistantTests: XCTestCase {
+
+    func testAssistantBottomNavigationUsesFullRectangularHitTargetsAndImmediateSelection() throws {
+        let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
+        let buttonSource = try bottomNavigationButtonSource(in: source)
+
+        XCTAssertTrue(
+            buttonSource.contains("vm.selectedPanelTab = tab"),
+            "Bottom navigation should update selectedPanelTab directly in the button action before destination refresh work can run."
+        )
+        XCTAssertTrue(
+            buttonSource.contains(".contentShape(Rectangle())"),
+            "Bottom navigation labels should expose the full visible rectangle as the hit target, not just glyph bounds."
+        )
+        XCTAssertTrue(
+            buttonSource.contains(".frame(maxWidth: .infinity, maxHeight: .infinity)"),
+            "Bottom navigation items should keep a stable equal-width layout across the bar."
+        )
+        XCTAssertTrue(
+            buttonSource.contains("vm.selectedPanelTab == tab ? Color.accentColor : Color.secondary"),
+            "Bottom navigation selected styling should be derived from selectedPanelTab immediately after the click."
+        )
+    }
+
+    private func sourceFile(_ relativePath: String) throws -> String {
+        let testFile = URL(fileURLWithPath: #filePath)
+        let projectRoot = testFile.deletingLastPathComponent().deletingLastPathComponent()
+        let url = projectRoot.appendingPathComponent(relativePath)
+        return try String(contentsOf: url, encoding: .utf8)
+    }
+
+    private func bottomNavigationButtonSource(in source: String) throws -> String {
+        let signature = "private func bottomNavigationButton(_ tab: AssistantPanelTab) -> some View"
+        let start = try XCTUnwrap(source.range(of: signature), "bottomNavigationButton source section not found")
+        let remaining = source[start.lowerBound...]
+        let end = try XCTUnwrap(
+            remaining.range(of: "\n    }\n}\n\n@ViewBuilder"),
+            "bottomNavigationButton source section end not found"
+        )
+        return String(remaining[..<end.lowerBound])
+    }
+}
+
 final class LearningAssistantUISourceTests: XCTestCase {
 
     func testAssistantPanelUsesDashboardHomeAndBottomNavigationInsteadOfSegmentedTabs() throws {

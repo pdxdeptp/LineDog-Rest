@@ -503,6 +503,7 @@ struct AssistantPanelView: View {
                     .minimumScaleFactor(0.8)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .contentShape(Rectangle())
             .foregroundStyle(vm.selectedPanelTab == tab ? Color.accentColor : Color.secondary)
         }
         .buttonStyle(.plain)

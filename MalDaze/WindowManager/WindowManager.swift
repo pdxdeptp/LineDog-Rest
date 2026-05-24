@@ -196,6 +196,8 @@ final class WindowManager: WindowManaging {
     private var deskMenuPanel: DeskPetDashboardPanel?
     private var deskMenuHostingController: NSHostingController<AnyView>?
     /// Dashboard Panel 外部点击 dismiss monitor。
+    private static let dashboardInternalClickDismissSuppressionDuration: TimeInterval = 0.35
+    private var dashboardInternalClickDismissSuppressionUntil: Date?
     private var transientMonitor: Any?
     private var localMouseDismissMonitor: Any?
     /// 桌宠 Dashboard：Esc 关闭（与 `SmartReminder` 输入框的 Esc 监听同理，用本地监视器吃掉按键避免系统咚声）。
@@ -1221,18 +1223,38 @@ extension WindowManager: PetStageDeskMenuPresenter {
     // MARK: - Dashboard Dismiss 监视器
 
     /// 安装外部点击、Esc、App 失活监视器；Dashboard 隐藏后保留本地 SwiftUI 状态。
+    private func dashboardPanelContainsMouseLocation(_ mouse: NSPoint) -> Bool {
+        guard let panel = deskMenuPanel, panel.isVisible else { return false }
+        return panel.frame.contains(mouse)
+    }
+
+    private func recordDashboardInternalClickForDismissSuppression(now: Date = Date()) {
+        dashboardInternalClickDismissSuppressionUntil = now.addingTimeInterval(Self.dashboardInternalClickDismissSuppressionDuration)
+    }
+
+    private func shouldSuppressDashboardDeactivateDismissal(now: Date = Date()) -> Bool {
+        guard let suppressionUntil = dashboardInternalClickDismissSuppressionUntil else { return false }
+        if now < suppressionUntil {
+            dashboardInternalClickDismissSuppressionUntil = nil
+            return true
+        }
+        dashboardInternalClickDismissSuppressionUntil = nil
+        return false
+    }
+
     private func installDashboardDismissMonitors() {
         tearDownDashboardDismissMonitors()
 
         transientMonitor = NSEvent.addGlobalMonitorForEvents(
             matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]
         ) { [weak self] _ in
-            guard let self, let panel = self.deskMenuPanel, panel.isVisible else {
+            guard let self, self.deskMenuPanel?.isVisible == true else {
                 self?.tearDownDashboardDismissMonitors()
                 return
             }
             let mouse = NSEvent.mouseLocation
-            if panel.frame.contains(mouse) {
+            if self.dashboardPanelContainsMouseLocation(mouse) {
+                self.recordDashboardInternalClickForDismissSuppression()
                 return
             }
             if let win = self.window, win.frame.contains(mouse) {
@@ -1242,12 +1264,13 @@ extension WindowManager: PetStageDeskMenuPresenter {
         }
 
         localMouseDismissMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] event in
-            guard let self, let panel = self.deskMenuPanel, panel.isVisible else {
+            guard let self, self.deskMenuPanel?.isVisible == true else {
                 self?.tearDownDashboardDismissMonitors()
                 return event
             }
             let mouse = NSEvent.mouseLocation
-            if panel.frame.contains(mouse) {
+            if self.dashboardPanelContainsMouseLocation(mouse) {
+                self.recordDashboardInternalClickForDismissSuppression()
                 return event
             }
             if let win = self.window, win.frame.contains(mouse) {
@@ -1272,11 +1295,16 @@ extension WindowManager: PetStageDeskMenuPresenter {
             forName: NSApplication.didResignActiveNotification,
             object: nil, queue: .main
         ) { [weak self] _ in
-            self?.closeDeskMenuPanelWithFade()
+            guard let self else { return }
+            if self.shouldSuppressDashboardDeactivateDismissal() {
+                return
+            }
+            self.closeDeskMenuPanelWithFade()
         })
     }
 
     private func tearDownDashboardDismissMonitors() {
+        dashboardInternalClickDismissSuppressionUntil = nil
         if let m = transientMonitor {
             NSEvent.removeMonitor(m)
             transientMonitor = nil

@@ -251,6 +251,173 @@ final class ControlPanelPresentationTests: XCTestCase {
         XCTAssertTrue(source.contains("NSApplication.didResignActiveNotification"))
     }
 
+    func testDeskPetDashboardDismissalUsesCentralInsidePanelGuard() throws {
+        let source = try readProjectSource("MalDaze/WindowManager/WindowManager.swift")
+        let helperRange = try XCTUnwrap(
+            rangeOfFunction(named: "dashboardPanelContainsMouseLocation", in: source),
+            "WindowManager should centralize Dashboard Panel inside-click detection."
+        )
+        let helperSource = String(source[helperRange])
+
+        XCTAssertTrue(
+            source.contains("private func dashboardPanelContainsMouseLocation(_ mouse: NSPoint) -> Bool"),
+            "The inside-panel guard should be a private helper with an explicit NSPoint input."
+        )
+        XCTAssertTrue(
+            helperSource.contains("guard let panel = deskMenuPanel, panel.isVisible else"),
+            "The guard should only treat a visible Dashboard Panel as an internal click target."
+        )
+        XCTAssertTrue(
+            helperSource.contains("return false"),
+            "When the Dashboard Panel is absent or hidden, the helper should report outside-panel."
+        )
+        XCTAssertTrue(
+            helperSource.contains("return panel.frame.contains(mouse)"),
+            "The helper should own the Dashboard Panel frame containment check."
+        )
+
+        let installSource = try functionSource(named: "installDashboardDismissMonitors", in: source)
+        let monitorSources: [(String, String)] = [
+            (
+                "global mouse monitor",
+                try XCTUnwrap(
+                    closureSource(
+                        assignedTo: "transientMonitor",
+                        containing: "NSEvent.addGlobalMonitorForEvents",
+                        in: installSource
+                    )
+                )
+            ),
+            (
+                "local mouse monitor",
+                try XCTUnwrap(
+                    closureSource(
+                        assignedTo: "localMouseDismissMonitor",
+                        containing: "NSEvent.addLocalMonitorForEvents",
+                        in: installSource
+                    )
+                )
+            )
+        ]
+
+        for (label, monitorSource) in monitorSources {
+            XCTAssertTrue(
+                monitorSource.contains("dashboardPanelContainsMouseLocation(mouse)"),
+                "\(label) should use the centralized Dashboard Panel inside-click guard."
+            )
+            XCTAssertFalse(
+                monitorSource.contains("panel.frame.contains(mouse)"),
+                "\(label) should not duplicate Dashboard Panel frame checks inline."
+            )
+            XCTAssertTrue(
+                monitorSource.contains("win.frame.contains(mouse)"),
+                "\(label) should keep desk-pet window clicks from dismissing the Dashboard Panel."
+            )
+            XCTAssertTrue(
+                monitorSource.contains("closeDeskMenuPanelWithFade()"),
+                "\(label) should retain the existing outside-click dismissal path."
+            )
+        }
+    }
+
+    func testDeskPetDashboardInternalClicksSuppressImmediateDeactivateDismissal() throws {
+        let source = try readProjectSource("MalDaze/WindowManager/WindowManager.swift")
+
+        XCTAssertTrue(
+            source.contains("private var dashboardInternalClickDismissSuppressionUntil: Date?"),
+            "WindowManager should keep short-lived state for internal Dashboard Panel clicks that may trigger app deactivation."
+        )
+        XCTAssertTrue(
+            source.contains("private static let dashboardInternalClickDismissSuppressionDuration: TimeInterval"),
+            "The deactivation suppression window should be named and scoped to WindowManager."
+        )
+
+        let recordSource = try functionSource(
+            named: "recordDashboardInternalClickForDismissSuppression",
+            in: source
+        )
+        XCTAssertTrue(
+            recordSource.contains("dashboardInternalClickDismissSuppressionUntil = now.addingTimeInterval(Self.dashboardInternalClickDismissSuppressionDuration)"),
+            "Recording an internal panel click should arm a short suppression deadline."
+        )
+
+        let suppressionSource = try functionSource(
+            named: "shouldSuppressDashboardDeactivateDismissal",
+            in: source
+        )
+        XCTAssertTrue(
+            suppressionSource.contains("guard let suppressionUntil = dashboardInternalClickDismissSuppressionUntil else { return false }"),
+            "Deactivate dismissal should only be suppressed after a recorded internal Dashboard Panel click."
+        )
+        XCTAssertOrdered(
+            [
+                "if now < suppressionUntil",
+                "dashboardInternalClickDismissSuppressionUntil = nil",
+                "return true"
+            ],
+            in: suppressionSource,
+            "An active suppression window should be consumed before the deactivation observer can close the panel."
+        )
+        XCTAssertTrue(
+            suppressionSource.contains("return false"),
+            "Expired or absent suppression state should allow normal deactivation dismissal."
+        )
+
+        let installSource = try functionSource(named: "installDashboardDismissMonitors", in: source)
+        let monitorSources: [(String, String)] = [
+            (
+                "global mouse monitor",
+                try XCTUnwrap(
+                    closureSource(
+                        assignedTo: "transientMonitor",
+                        containing: "NSEvent.addGlobalMonitorForEvents",
+                        in: installSource
+                    )
+                )
+            ),
+            (
+                "local mouse monitor",
+                try XCTUnwrap(
+                    closureSource(
+                        assignedTo: "localMouseDismissMonitor",
+                        containing: "NSEvent.addLocalMonitorForEvents",
+                        in: installSource
+                    )
+                )
+            )
+        ]
+
+        for (label, monitorSource) in monitorSources {
+            XCTAssertOrdered(
+                [
+                    "if self.dashboardPanelContainsMouseLocation(mouse) {",
+                    "self.recordDashboardInternalClickForDismissSuppression()",
+                    "return"
+                ],
+                in: monitorSource,
+                "\(label) should record internal panel clicks before returning without outside-click dismissal."
+            )
+        }
+
+        let deactivateRange = try XCTUnwrap(
+            installSource.range(of: "NSApplication.didResignActiveNotification"),
+            "Dashboard dismissal should observe app deactivation."
+        )
+        let deactivateSource = String(installSource[deactivateRange.lowerBound...])
+
+        XCTAssertOrdered(
+            [
+                "NSApplication.didResignActiveNotification",
+                "guard let self else { return }",
+                "if self.shouldSuppressDashboardDeactivateDismissal()",
+                "return",
+                "self.closeDeskMenuPanelWithFade()"
+            ],
+            in: deactivateSource,
+            "App deactivation should honor a just-recorded internal Dashboard Panel click before closing."
+        )
+    }
+
     func testWindowManagingCommentsUseDashboardPanelSemantics() throws {
         let source = try readProjectSource("MalDaze/WindowManager/WindowManager.swift")
 
