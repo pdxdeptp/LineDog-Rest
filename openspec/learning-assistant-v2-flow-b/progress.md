@@ -6,9 +6,9 @@
 - Current item: ITEM-004 `study-smart-mode`
 - Current change: `introduce-study-smart-mode`
 - Current spec: `study-smart-mode`
-- Current step: tasks 7.1-7.2 next
-- OpenSpec apply progress: 21/28 complete
-- Last feature commit: `81b78ce`
+- Current step: tasks 7.3-7.4 next
+- OpenSpec apply progress: 23/28 complete
+- Last feature commit: `de6d32b`
 - Checkout strategy: current checkout only; worktrees are forbidden by automation instruction.
 
 ## Round 01 · 2026-05-23T14:50:55Z
@@ -2079,3 +2079,55 @@ Before implementation, create a checkpoint commit in the current checkout, then 
 ### Next Task
 
 - Continue `opsx:apply` for ITEM-004 with tasks 7.1-7.2: Swift presentation/source tests and minimal smart-mode UI surfaces for Settings smart-mode toggle, smart morning briefing surface, side-by-side proposal cards, per-option Apply, and Ignore. Do not implement 7.3-7.4 until the next task group.
+
+## Round 43 · 2026-05-24T18:22:30Z
+
+### ITEM-004 7.1-7.2 Swift Smart-Mode UI Surfaces
+
+- Restored controller and Flow B state: `phase=flow-b`, `current_item=study-smart-mode`, `current_change=introduce-study-smart-mode`.
+- Start status was clean except for automation-owned in-progress state markers after task dispatch.
+- Current checkout only; no worktree was created or used.
+- `openspec instructions apply --change introduce-study-smart-mode --json` reported 28 tasks, 21 complete at the start, with tasks 7.1-7.2 next.
+
+### Completed
+
+- OpenSpec tasks 7.1 and 7.2 completed:
+  - added failing presentation/source tests for Settings smart-mode toggle, smart morning briefing surface, side-by-side proposal cards, per-option Apply, and Ignore;
+  - added minimal Settings, Today/dashboard, and adjustment-context smart-mode UI surfaces;
+  - added placement filtering so morning proposals render on the dashboard while after-adjustment proposals render only in adjustment context;
+  - added latest-request-wins smart-mode setting sequencing and failure handling without clearing persisted enabled state;
+  - kept smart-mode UI on the new ViewModel/API smart-mode path and out of legacy chat/currentProposal state.
+
+### Review Gates
+
+- Spec Compliance Review: PASS.
+- Code Quality Review: initially CHANGES_REQUESTED for swallowed briefing failures, setting-toggle request races, placement leakage, source-heavy tests, and actor-isolation risk.
+- Code Quality fixes completed with behavior-focused placement helpers, visible-message scoping, request sequencing, and `Sendable` API protocol/client support.
+- Final Code Quality Re-review: APPROVED.
+
+### Verification
+
+- RED/GREEN/REFACTOR evidence recorded in `openspec/learning-assistant-v2-flow-b/evidence/item-004/tdd-swift-smart-mode-ui-report.md`.
+- `xcodebuild test -project MalDaze.xcodeproj -scheme MalDaze -parallel-testing-enabled NO -only-testing:MalDazeTests/LearningAssistantViewModelTests -only-testing:MalDazeTests/LearningAssistantUISourceTests -quiet`: PASS.
+- `openspec validate introduce-study-smart-mode --strict`: PASS.
+- `git diff --check`: PASS.
+
+### Auto Commit
+
+- Commit: `de6d32b`.
+- Scope: verified ITEM-004 Swift smart-mode UI surfaces through OpenSpec tasks 7.1-7.2.
+- Pre-commit checks: focused Swift ViewModel/source tests, `openspec validate introduce-study-smart-mode --strict`, `git diff --check`, Spec Compliance Review, and final Code Quality Re-review all passed.
+
+### Files Added / Changed
+
+- Updated `MalDaze/LearningAssistant/AssistantAPIClient.swift`.
+- Updated `MalDaze/LearningAssistant/AssistantAPIClientProtocol.swift`.
+- Updated `MalDaze/LearningAssistant/AssistantPanelView.swift`.
+- Updated `MalDaze/LearningAssistant/LearningAssistantViewModel.swift`.
+- Updated `MalDazeTests/LearningAssistantTests.swift`.
+- Updated `openspec/changes/introduce-study-smart-mode/tasks.md` to mark 7.1 and 7.2 complete.
+- Added `openspec/learning-assistant-v2-flow-b/evidence/item-004/tdd-swift-smart-mode-ui-report.md`.
+
+### Next Task
+
+- Continue `opsx:apply` for ITEM-004 with tasks 7.3-7.4: source/ViewModel guards proving default-mode red states remain fact-only and smart-mode UI does not use legacy chat/currentProposal state. Do not start App UI verification until 8.3.
