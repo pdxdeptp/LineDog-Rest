@@ -6,9 +6,9 @@
 - Current item: ITEM-004 `study-smart-mode`
 - Current change: `introduce-study-smart-mode`
 - Current spec: `study-smart-mode`
-- Current step: tasks 6.3-6.4 next
-- OpenSpec apply progress: 19/28 complete
-- Last feature commit: `4c7b342`
+- Current step: tasks 7.1-7.2 next
+- OpenSpec apply progress: 21/28 complete
+- Last feature commit: `81b78ce`
 - Checkout strategy: current checkout only; worktrees are forbidden by automation instruction.
 
 ## Round 01 · 2026-05-23T14:50:55Z
@@ -2027,3 +2027,55 @@ Before implementation, create a checkpoint commit in the current checkout, then 
 ### Next Task
 
 - Continue `opsx:apply` for ITEM-004 with tasks 6.3-6.4: ViewModel smart-mode state, refresh sequencing, ignore/apply state, stale proposal handling, and after-adjustment red-state trigger gating. Do not implement UI surfaces yet; those remain 7.x.
+
+## Round 42 · 2026-05-24T16:52:16Z
+
+### ITEM-004 6.3-6.4 Swift ViewModel Smart Mode
+
+- Restored controller and Flow B state: `phase=flow-b`, `current_item=study-smart-mode`, `current_change=introduce-study-smart-mode`.
+- Start status was clean except for automation-owned in-progress state markers.
+- Current checkout only; no worktree was created or used.
+- `openspec instructions apply --change introduce-study-smart-mode --json` reported 28 tasks, 19 complete, with tasks 6.3-6.4 next.
+
+### Completed
+
+- OpenSpec tasks 6.3 and 6.4 completed:
+  - added failing ViewModel tests for default-mode silence and enabled smart briefing fetch;
+  - added failing tests for proposal ignore/apply state and selected-option apply behavior;
+  - added stale proposal handling and apply refresh contract coverage;
+  - added after-adjustment trigger gating for newly created expected-late or over-capacity red state;
+  - preserved previous red-state context when applying generated after-adjustment proposals;
+  - blocked lag-only and refresh-failure paths from generating after-adjustment proposals;
+  - kept scope to ViewModel support only; Settings/Today/dashboard UI surfaces remain 7.x.
+
+### Review Gates
+
+- Spec Compliance Review: initially BLOCKED for after-adjustment context and stale status handling.
+- Spec Compliance fixes completed by storing proposal context per option id and aligning stale responses with `stale_proposal`.
+- Spec Compliance Re-review: PASS.
+- Code Quality Review: initially CHANGES_REQUESTED for context clearing, refresh-failure masking, stale message cleanup, and transient setting failure behavior.
+- Code Quality fixes completed and re-reviewed; final Code Quality Review: APPROVED.
+
+### Verification
+
+- RED/GREEN/REFACTOR evidence recorded in `openspec/learning-assistant-v2-flow-b/evidence/item-004/tdd-swift-smart-mode-viewmodel-report.md`.
+- `xcodebuild test -project MalDaze.xcodeproj -scheme MalDaze -only-testing:MalDazeTests/LearningAssistantViewModelTests -quiet`: PASS.
+- `openspec validate introduce-study-smart-mode --strict`: PASS.
+- `git diff --check`: PASS.
+
+### Auto Commit
+
+- Commit: `81b78ce`.
+- Scope: verified ITEM-004 Swift smart-mode ViewModel flow through OpenSpec tasks 6.3-6.4.
+- Pre-commit checks: focused ViewModel tests, `openspec validate introduce-study-smart-mode --strict`, `git diff --check`, Spec Compliance Re-review, and Code Quality final review all passed.
+
+### Files Added / Changed
+
+- Updated `MalDaze/LearningAssistant/LearningAssistantViewModel.swift`.
+- Updated `MalDazeTests/LearningAssistantTests.swift`.
+- Updated `openspec/changes/introduce-study-smart-mode/tasks.md` to mark 6.3 and 6.4 complete.
+- Added `openspec/learning-assistant-v2-flow-b/evidence/item-004/tdd-swift-smart-mode-viewmodel-report.md`.
+
+### Next Task
+
+- Continue `opsx:apply` for ITEM-004 with tasks 7.1-7.2: Swift presentation/source tests and minimal smart-mode UI surfaces for Settings smart-mode toggle, smart morning briefing surface, side-by-side proposal cards, per-option Apply, and Ignore. Do not implement 7.3-7.4 until the next task group.
