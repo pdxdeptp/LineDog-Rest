@@ -1214,7 +1214,7 @@ Before implementation, create a checkpoint commit in the current checkout, then 
 
 ### Auto Commit
 
-- Commit: pending.
+- Commit: `bd85269 feat: add study plan rest day cascade`.
 - Scope: verified ITEM-003 rest-day cascade through OpenSpec tasks 6.3-6.4.
 - Pre-commit checks: related backend tests, full `test_study_plan_adjustment_*.py` suite, `openspec validate introduce-study-plan-adjustment --strict`, `git diff --check`, Spec Compliance Re-review, and Code Quality Re-review all passed.
 
