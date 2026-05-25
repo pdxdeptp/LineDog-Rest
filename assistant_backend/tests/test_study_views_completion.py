@@ -232,6 +232,303 @@ async def _seed_rolled_task_completion_facts(db_path: str) -> int:
 
 
 @pytest.mark.asyncio
+async def test_fallback_completion_records_partial_progress_without_full_completion(client):
+    task_id = await _seed_completion_facts(os.environ["DB_PATH"])
+
+    response = await client.post(
+        f"/api/tasks/{task_id}/fallback-complete",
+        json={"actual_minutes": 12},
+    )
+
+    assert response.status_code == 200, response.text
+    fallback_completed_at = response.json()["fallback_completed_at"]
+
+    async with aiosqlite.connect(os.environ["DB_PATH"]) as db:
+        db.row_factory = aiosqlite.Row
+        task = await _fetchone(
+            db,
+            """
+            SELECT
+                completed_at,
+                actual_minutes,
+                fallback_completed_at,
+                fallback_actual_minutes,
+                needs_followup,
+                auto_roll_days,
+                last_auto_rolled_at
+            FROM tasks
+            WHERE id = ?
+            """,
+            (task_id,),
+        )
+        unit = await _fetchone(
+            db,
+            "SELECT status, completed_at, actual_minutes FROM units WHERE id = 601",
+        )
+        resource = await _fetchone(
+            db,
+            """
+            SELECT status, completed_units, actual_minutes_total
+            FROM resources
+            WHERE id = 501
+            """,
+        )
+        completion_events = await _fetchall(
+            db,
+            """
+            SELECT event_type
+            FROM events
+            WHERE event_type IN ('task_completed', 'resource_completed')
+            ORDER BY id
+            """,
+        )
+
+    assert task == {
+        "completed_at": None,
+        "actual_minutes": None,
+        "fallback_completed_at": fallback_completed_at,
+        "fallback_actual_minutes": 12,
+        "needs_followup": 1,
+        "auto_roll_days": 0,
+        "last_auto_rolled_at": None,
+    }
+    assert unit == {"status": "pending", "completed_at": None, "actual_minutes": None}
+    assert resource == {
+        "status": "active",
+        "completed_units": 0,
+        "actual_minutes_total": 10,
+    }
+    assert completion_events == []
+
+    today_response = await client.get("/api/study-views/today")
+
+    assert today_response.status_code == 200, today_response.text
+    tasks_by_id = {task["id"]: task for task in today_response.json()["tasks"]}
+    assert tasks_by_id[task_id]["completed_at"] is None
+
+
+@pytest.mark.asyncio
+async def test_fallback_then_full_completion_clears_followup_and_completes_normally(client):
+    task_id = await _seed_completion_facts(os.environ["DB_PATH"])
+
+    fallback_response = await client.post(
+        f"/api/tasks/{task_id}/fallback-complete",
+        json={"actual_minutes": 12},
+    )
+    full_response = await client.post(
+        f"/api/tasks/{task_id}/complete",
+        json={"actual_minutes": 42},
+    )
+
+    assert fallback_response.status_code == 200, fallback_response.text
+    assert full_response.status_code == 200, full_response.text
+    completed_at = full_response.json()["completed_at"]
+
+    async with aiosqlite.connect(os.environ["DB_PATH"]) as db:
+        db.row_factory = aiosqlite.Row
+        task = await _fetchone(
+            db,
+            """
+            SELECT completed_at, actual_minutes, fallback_completed_at,
+                   fallback_actual_minutes, needs_followup
+            FROM tasks
+            WHERE id = ?
+            """,
+            (task_id,),
+        )
+        unit = await _fetchone(
+            db,
+            "SELECT status, completed_at, actual_minutes FROM units WHERE id = 601",
+        )
+        resource = await _fetchone(
+            db,
+            """
+            SELECT status, completed_units, actual_minutes_total
+            FROM resources
+            WHERE id = 501
+            """,
+        )
+
+    assert task == {
+        "completed_at": completed_at,
+        "actual_minutes": 42,
+        "fallback_completed_at": fallback_response.json()["fallback_completed_at"],
+        "fallback_actual_minutes": 12,
+        "needs_followup": 0,
+    }
+    assert unit == {
+        "status": "completed",
+        "completed_at": completed_at,
+        "actual_minutes": 42,
+    }
+    assert resource == {
+        "status": "active",
+        "completed_units": 1,
+        "actual_minutes_total": 52,
+    }
+
+
+@pytest.mark.asyncio
+async def test_fallback_after_full_completion_is_noop_and_does_not_add_completion_events(client):
+    task_id = await _seed_completion_facts(os.environ["DB_PATH"])
+    full_response = await client.post(
+        f"/api/tasks/{task_id}/complete",
+        json={"actual_minutes": 42},
+    )
+
+    assert full_response.status_code == 200, full_response.text
+    completed_at = full_response.json()["completed_at"]
+
+    fallback_response = await client.post(
+        f"/api/tasks/{task_id}/fallback-complete",
+        json={"actual_minutes": 12},
+    )
+
+    assert fallback_response.status_code == 200, fallback_response.text
+    assert fallback_response.json()["needs_followup"] is False
+
+    async with aiosqlite.connect(os.environ["DB_PATH"]) as db:
+        db.row_factory = aiosqlite.Row
+        task = await _fetchone(
+            db,
+            """
+            SELECT completed_at, actual_minutes, fallback_completed_at,
+                   fallback_actual_minutes, needs_followup
+            FROM tasks
+            WHERE id = ?
+            """,
+            (task_id,),
+        )
+        events = await _fetchall(
+            db,
+            """
+            SELECT event_type, payload
+            FROM events
+            WHERE event_type = 'task_completed'
+            ORDER BY id
+            """,
+        )
+
+    assert task == {
+        "completed_at": completed_at,
+        "actual_minutes": 42,
+        "fallback_completed_at": None,
+        "fallback_actual_minutes": None,
+        "needs_followup": 0,
+    }
+    assert [json.loads(event["payload"]) for event in events] == [{"task_id": task_id}]
+
+
+@pytest.mark.asyncio
+async def test_repeated_fallback_completion_keeps_first_timestamp_and_minutes(client):
+    task_id = await _seed_completion_facts(os.environ["DB_PATH"])
+
+    first_response = await client.post(
+        f"/api/tasks/{task_id}/fallback-complete",
+        json={"actual_minutes": 12},
+    )
+    second_response = await client.post(
+        f"/api/tasks/{task_id}/fallback-complete",
+        json={"actual_minutes": 99},
+    )
+
+    assert first_response.status_code == 200, first_response.text
+    assert second_response.status_code == 200, second_response.text
+    assert second_response.json()["fallback_completed_at"] == first_response.json()[
+        "fallback_completed_at"
+    ]
+    assert second_response.json()["needs_followup"] is True
+
+    async with aiosqlite.connect(os.environ["DB_PATH"]) as db:
+        db.row_factory = aiosqlite.Row
+        task = await _fetchone(
+            db,
+            """
+            SELECT completed_at, actual_minutes, fallback_completed_at,
+                   fallback_actual_minutes, needs_followup
+            FROM tasks
+            WHERE id = ?
+            """,
+            (task_id,),
+        )
+
+    assert task == {
+        "completed_at": None,
+        "actual_minutes": None,
+        "fallback_completed_at": first_response.json()["fallback_completed_at"],
+        "fallback_actual_minutes": 12,
+        "needs_followup": 1,
+    }
+
+
+@pytest.mark.asyncio
+async def test_init_db_migrates_legacy_tasks_with_fallback_progress_columns(tmp_path):
+    from src.db.init import init_db
+
+    db_path = tmp_path / "legacy-fallback-progress.db"
+    async with aiosqlite.connect(db_path) as db:
+        await db.execute(
+            """
+            CREATE TABLE tasks (
+                id             INTEGER PRIMARY KEY,
+                unit_id        INTEGER,
+                resource_id    INTEGER,
+                title          TEXT    NOT NULL,
+                task_kind      TEXT    NOT NULL DEFAULT 'count',
+                target_minutes INTEGER,
+                scheduled_date DATE    NOT NULL,
+                priority       INTEGER DEFAULT 0,
+                completed_at   TIMESTAMP,
+                actual_minutes INTEGER,
+                created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        await db.execute(
+            """
+            CREATE TABLE system_state (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        await db.execute(
+            """
+            INSERT INTO tasks
+                (id, title, task_kind, target_minutes, scheduled_date, completed_at, actual_minutes)
+            VALUES (1, 'Legacy active task', 'time', 30, '2026-06-01', NULL, NULL)
+            """
+        )
+        await db.commit()
+
+    await init_db(str(db_path))
+    await init_db(str(db_path))
+
+    async with aiosqlite.connect(db_path) as db:
+        db.row_factory = aiosqlite.Row
+        columns = {row["name"] for row in await _fetchall(db, "PRAGMA table_info(tasks)")}
+        legacy_task = await _fetchone(
+            db,
+            """
+            SELECT completed_at, actual_minutes, fallback_completed_at,
+                   fallback_actual_minutes, needs_followup
+            FROM tasks
+            WHERE id = 1
+            """,
+        )
+
+    assert {"fallback_completed_at", "fallback_actual_minutes", "needs_followup"} <= columns
+    assert legacy_task == {
+        "completed_at": None,
+        "actual_minutes": None,
+        "fallback_completed_at": None,
+        "fallback_actual_minutes": None,
+        "needs_followup": 0,
+    }
+
+
+@pytest.mark.asyncio
 async def test_task_completion_updates_v2_facts_and_duplicate_completion_is_idempotent(client):
     task_id = await _seed_completion_facts(os.environ["DB_PATH"])
 

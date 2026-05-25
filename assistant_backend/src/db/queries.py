@@ -1648,7 +1648,8 @@ async def complete_task(db: aiosqlite.Connection, task_id: int, actual_minutes: 
                 """
                 UPDATE tasks
                 SET auto_roll_days = 0,
-                    last_auto_rolled_at = NULL
+                    last_auto_rolled_at = NULL,
+                    needs_followup = 0
                 WHERE id = ?
                 """,
                 (task_id,),
@@ -1668,6 +1669,7 @@ async def complete_task(db: aiosqlite.Connection, task_id: int, actual_minutes: 
             UPDATE tasks
             SET completed_at = ?,
                 actual_minutes = ?,
+                needs_followup = 0,
                 auto_roll_days = 0,
                 last_auto_rolled_at = NULL
             WHERE id = ?
@@ -1743,6 +1745,77 @@ async def complete_task(db: aiosqlite.Connection, task_id: int, actual_minutes: 
         raise
 
     return {"task_id": task_id, "completed_at": now}
+
+
+async def complete_task_fallback(
+    db: aiosqlite.Connection,
+    task_id: int,
+    actual_minutes: int | None = None,
+) -> dict:
+    now = datetime.now(UTC).isoformat()
+
+    await db.execute("BEGIN IMMEDIATE")
+    try:
+        async with db.execute(
+            """
+            SELECT completed_at, actual_minutes, fallback_completed_at, fallback_actual_minutes
+            FROM tasks
+            WHERE id = ?
+            """,
+            (task_id,),
+        ) as cur:
+            task = await cur.fetchone()
+
+        if not task:
+            raise TaskNotFoundError
+
+        completed_at, full_actual_minutes, fallback_completed_at, fallback_actual_minutes = task
+        if completed_at is not None:
+            await db.execute(
+                """
+                UPDATE tasks
+                SET needs_followup = 0,
+                    auto_roll_days = 0,
+                    last_auto_rolled_at = NULL
+                WHERE id = ?
+                """,
+                (task_id,),
+            )
+            await db.commit()
+            return {
+                "task_id": task_id,
+                "completed_at": completed_at,
+                "actual_minutes": full_actual_minutes,
+                "needs_followup": False,
+            }
+
+        completed_at_value = fallback_completed_at or now
+        minutes_value = fallback_actual_minutes
+        if minutes_value is None and actual_minutes is not None:
+            minutes_value = actual_minutes
+
+        await db.execute(
+            """
+            UPDATE tasks
+            SET fallback_completed_at = COALESCE(fallback_completed_at, ?),
+                fallback_actual_minutes = ?,
+                needs_followup = 1,
+                auto_roll_days = 0,
+                last_auto_rolled_at = NULL
+            WHERE id = ?
+            """,
+            (now, minutes_value, task_id),
+        )
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise
+
+    return {
+        "task_id": task_id,
+        "fallback_completed_at": completed_at_value,
+        "needs_followup": True,
+    }
 
 
 async def get_resource_reschedule_stats(db: aiosqlite.Connection, resource_id: int, days: int = 14) -> dict:

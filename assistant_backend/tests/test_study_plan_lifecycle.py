@@ -1210,6 +1210,89 @@ async def test_init_db_migrates_legacy_draft_storage_idempotently_without_touchi
 
 
 @pytest.mark.asyncio
+async def test_init_db_migrates_active_tasks_with_fallback_progress_columns_idempotently(
+    tmp_path,
+):
+    from src.db.init import init_db
+    from src.db.schema import SCHEMA_SQL
+
+    db_path = tmp_path / "legacy-active-task-fallback.db"
+    async with aiosqlite.connect(db_path) as conn:
+        await conn.executescript(SCHEMA_SQL)
+        await conn.executescript(
+            """
+            CREATE TABLE legacy_tasks AS SELECT * FROM tasks;
+            DROP TABLE tasks;
+            CREATE TABLE tasks (
+                id                        INTEGER PRIMARY KEY,
+                unit_id                   INTEGER REFERENCES units(id),
+                resource_id               INTEGER REFERENCES resources(id),
+                title                     TEXT    NOT NULL,
+                task_kind                 TEXT    NOT NULL DEFAULT 'count',
+                target_count              INTEGER,
+                target_minutes            INTEGER,
+                scheduled_date            DATE    NOT NULL,
+                originally_scheduled_date DATE,
+                reschedule_count          INTEGER DEFAULT 0,
+                auto_roll_days            INTEGER DEFAULT 0,
+                last_auto_rolled_at       DATE,
+                user_adjusted_at          TIMESTAMP,
+                priority                  INTEGER DEFAULT 0,
+                completed_at              TIMESTAMP,
+                actual_minutes            INTEGER,
+                created_at                TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            DROP TABLE legacy_tasks;
+            """
+        )
+        resource = await conn.execute(
+            """
+            INSERT INTO resources (title, type, tracking_mode, status, total_units)
+            VALUES ('Active Fallback Project', 'study_project', 'sequential', 'active', 1)
+            """
+        )
+        resource_id = int(resource.lastrowid)
+        await conn.execute(
+            """
+            INSERT INTO tasks
+                (resource_id, title, task_kind, target_minutes, scheduled_date,
+                 completed_at, actual_minutes)
+            VALUES (?, 'Existing Active Task', 'time', 25, '2026-06-01',
+                    '2026-05-25T10:00:00+00:00', 27)
+            """,
+            (resource_id,),
+        )
+        await conn.commit()
+
+    await init_db(str(db_path))
+    await init_db(str(db_path))
+
+    async with aiosqlite.connect(db_path) as conn:
+        conn.row_factory = aiosqlite.Row
+        task_columns = {row["name"] for row in await _fetchall(conn, "PRAGMA table_info(tasks)")}
+        active_task = await _fetchone(
+            conn,
+            """
+            SELECT completed_at, actual_minutes, fallback_completed_at,
+                   fallback_actual_minutes, needs_followup
+            FROM tasks
+            WHERE title = 'Existing Active Task'
+            """,
+        )
+
+    assert {"fallback_completed_at", "fallback_actual_minutes", "needs_followup"}.issubset(
+        task_columns
+    )
+    assert active_task == {
+        "completed_at": "2026-05-25T10:00:00+00:00",
+        "actual_minutes": 27,
+        "fallback_completed_at": None,
+        "fallback_actual_minutes": None,
+        "needs_followup": 0,
+    }
+
+
+@pytest.mark.asyncio
 async def test_cancel_draft_study_project_discards_without_active_project_or_tasks(db):
     lifecycle = _lifecycle_module()
     draft = await lifecycle.create_draft_study_project(

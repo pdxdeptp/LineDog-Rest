@@ -44,6 +44,9 @@ CREATE TABLE IF NOT EXISTS tasks (
     priority                  INTEGER DEFAULT 0,
     completed_at              TIMESTAMP,
     actual_minutes            INTEGER,
+    fallback_completed_at     TIMESTAMP,
+    fallback_actual_minutes   INTEGER,
+    needs_followup            INTEGER DEFAULT 0,
     created_at                TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_tasks_scheduled_date ON tasks(scheduled_date);

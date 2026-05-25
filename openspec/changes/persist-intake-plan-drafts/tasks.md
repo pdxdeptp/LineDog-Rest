@@ -24,9 +24,9 @@
 
 ## 3. Fallback And Defaults
 
-- [ ] 3.1 Persist low-energy fallback completion separately from full task completion.
-- [ ] 3.2 Mark fallback-only completion as `needs_followup`.
-- [ ] 3.3 Ensure fallback-only completion never sets full `completed_at` unless the full task is separately completed.
+- [x] 3.1 Persist low-energy fallback completion separately from full task completion.
+- [x] 3.2 Mark fallback-only completion as `needs_followup`.
+- [x] 3.3 Ensure fallback-only completion never sets full `completed_at` unless the full task is separately completed.
 - [x] 3.4 Normalize initialization defaults to `daily_capacity_min=60` and `reduced_capacity_min=60`.
 
 ## 4. Tests
@@ -39,7 +39,7 @@
 - [x] 4.6 Add activation rejection tests for drafts without activation-ready schedule/task data.
 - [x] 4.7 Add invalid lifecycle transition tests.
 - [x] 4.8 Add legacy draft migration/idempotency tests.
-- [ ] 4.9 Add fallback completion tests proving fallback progress does not mark the full task complete.
+- [x] 4.9 Add fallback completion tests proving fallback progress does not mark the full task complete.
 - [x] 4.10 Add capacity-default regression tests proving no 300-minute fallback is used.
 - [x] 4.11 Add draft-kind/target-plan tests for new-plan versus existing-plan activation targets.
 - [x] 4.12 Add duplicate activation idempotency tests.

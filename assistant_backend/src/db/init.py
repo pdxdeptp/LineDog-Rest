@@ -8,6 +8,12 @@ TASK_ADJUSTMENT_COLUMNS = {
     "user_adjusted_at": "TIMESTAMP",
 }
 
+TASK_FALLBACK_COLUMNS = {
+    "fallback_completed_at": "TIMESTAMP",
+    "fallback_actual_minutes": "INTEGER",
+    "needs_followup": "INTEGER DEFAULT 0",
+}
+
 DRAFT_HEADER_COLUMNS = {
     "intake_item_id": "INTEGER REFERENCES study_intake_items(id)",
     "schema_version": "INTEGER NOT NULL DEFAULT 1",
@@ -50,6 +56,10 @@ async def _ensure_task_adjustment_columns(db: aiosqlite.Connection) -> None:
     await _ensure_columns(db, "tasks", TASK_ADJUSTMENT_COLUMNS)
 
 
+async def _ensure_task_fallback_columns(db: aiosqlite.Connection) -> None:
+    await _ensure_columns(db, "tasks", TASK_FALLBACK_COLUMNS)
+
+
 async def _ensure_draft_storage_columns(db: aiosqlite.Connection) -> None:
     await _ensure_columns(db, "study_project_drafts", DRAFT_HEADER_COLUMNS)
     await _ensure_columns(db, "study_project_draft_tasks", DRAFT_TASK_COLUMNS)
@@ -76,6 +86,7 @@ async def init_db(db_path: str) -> None:
     async with aiosqlite.connect(db_path) as db:
         await db.executescript(SCHEMA_SQL)
         await _ensure_task_adjustment_columns(db)
+        await _ensure_task_fallback_columns(db)
         await _ensure_draft_storage_columns(db)
         for key, value in DEFAULT_SYSTEM_STATE.items():
             await db.execute(
