@@ -1,0 +1,160 @@
+{
+  "schemaVersion": 1,
+  "automationId": "add-initiate-changes",
+  "phase": "active",
+  "currentChangeIndex": 0,
+  "currentChange": "introduce-study-intake-router",
+  "currentStep": "product_deepen_round_3",
+  "currentCheckpoint": "introduce-study-intake-router:product_deepen_round_3",
+  "currentAttempt": 0,
+  "runCounter": 2,
+  "maxRetriesPerCheckpoint": 2,
+  "requiredProductDeepenRounds": 3,
+  "stateFile": "openspec/add-initiate-implementation-control/state.json",
+  "progressFile": "openspec/add-initiate-implementation-control/progress.md",
+  "runbookFile": "openspec/add-initiate-implementation-control/runbook.md",
+  "evidenceRoot": "openspec/add-initiate-implementation-control/evidence",
+  "evidenceManifestFile": "openspec/add-initiate-implementation-control/evidence/manifest.json",
+  "workspaceBaselineFile": "openspec/add-initiate-implementation-control/workspace-baseline.json",
+  "failureLogFile": "openspec/add-initiate-implementation-control/evidence/failures/failure-log.jsonl",
+  "commitPolicy": {
+    "checkpointRequiredBeforeApply": true,
+    "commitEvidenceRoot": "openspec/add-initiate-implementation-control/evidence/commits",
+    "lastCheckpointCommit": null,
+    "pendingCommitReason": "OpenSpec/control artifacts are currently untracked; apply must not begin until a safe checkpoint commit is created or commit deferral is recorded with evidence."
+  },
+  "crossChangeContracts": {
+    "schemaVersion": 1,
+    "evidenceRoot": "openspec/add-initiate-implementation-control/evidence/cross-change-contracts",
+    "lastCheck": null,
+    "requiredBeforeAdvancingChange": true,
+    "changeOrder": [
+      "introduce-study-intake-router",
+      "persist-intake-plan-drafts",
+      "introduce-plan-compiler",
+      "introduce-deadline-scheduler",
+      "redesign-add-initiate-ui"
+    ]
+  },
+  "applyCursor": {
+    "schemaVersion": 1,
+    "activeChange": null,
+    "currentGroupId": null,
+    "currentGroupStartedAt": null,
+    "completedGroupIds": [],
+    "blockedGroupId": null,
+    "taskGroupsFile": null,
+    "lastEvidenceFile": null,
+    "lastCommit": null
+  },
+  "lock": {
+    "path": "openspec/add-initiate-implementation-control/run.lock",
+    "staleAfterMinutes": 90,
+    "autoRemoveStale": false,
+    "autoRecoverStale": true,
+    "recoveredRoot": "openspec/add-initiate-implementation-control/recovered-locks",
+    "recoveryEvidenceRoot": "openspec/add-initiate-implementation-control/evidence/lock-recovery",
+    "lastRecovery": null
+  },
+  "changes": [
+    {
+      "id": "introduce-study-intake-router",
+      "status": "in_progress",
+      "productDeepenRoundsCompleted": 2,
+      "applyReadinessCompleted": false,
+      "applyCompleted": false,
+      "applyTaskGroups": {
+        "status": "not_planned",
+        "taskGroupsFile": null,
+        "completedGroupIds": [],
+        "currentGroupId": null,
+        "lastEvidenceFile": null,
+        "lastCommit": null
+      }
+    },
+    {
+      "id": "persist-intake-plan-drafts",
+      "status": "pending",
+      "productDeepenRoundsCompleted": 0,
+      "applyReadinessCompleted": false,
+      "applyCompleted": false,
+      "applyTaskGroups": {
+        "status": "not_planned",
+        "taskGroupsFile": null,
+        "completedGroupIds": [],
+        "currentGroupId": null,
+        "lastEvidenceFile": null,
+        "lastCommit": null
+      }
+    },
+    {
+      "id": "introduce-plan-compiler",
+      "status": "pending",
+      "productDeepenRoundsCompleted": 0,
+      "applyReadinessCompleted": false,
+      "applyCompleted": false,
+      "applyTaskGroups": {
+        "status": "not_planned",
+        "taskGroupsFile": null,
+        "completedGroupIds": [],
+        "currentGroupId": null,
+        "lastEvidenceFile": null,
+        "lastCommit": null
+      }
+    },
+    {
+      "id": "introduce-deadline-scheduler",
+      "status": "pending",
+      "productDeepenRoundsCompleted": 0,
+      "applyReadinessCompleted": false,
+      "applyCompleted": false,
+      "applyTaskGroups": {
+        "status": "not_planned",
+        "taskGroupsFile": null,
+        "completedGroupIds": [],
+        "currentGroupId": null,
+        "lastEvidenceFile": null,
+        "lastCommit": null
+      }
+    },
+    {
+      "id": "redesign-add-initiate-ui",
+      "status": "pending",
+      "productDeepenRoundsCompleted": 0,
+      "applyReadinessCompleted": false,
+      "applyCompleted": false,
+      "applyTaskGroups": {
+        "status": "not_planned",
+        "taskGroupsFile": null,
+        "completedGroupIds": [],
+        "currentGroupId": null,
+        "lastEvidenceFile": null,
+        "lastCommit": null
+      }
+    }
+  ],
+  "lastRun": {
+    "completedAt": "2026-05-25T03:47:18.301Z",
+    "checkpoint": "introduce-study-intake-router:product_deepen_round_2",
+    "result": "completed"
+  },
+  "lastCompletedCheckpoint": "introduce-study-intake-router:product_deepen_round_2",
+  "lastMigration": {
+    "completedAt": "2026-05-25T03:56:29Z",
+    "id": "require-three-product-deepen-rounds",
+    "fromCheckpoint": "introduce-study-intake-router:apply_readiness",
+    "toCheckpoint": "introduce-study-intake-router:product_deepen_round_3",
+    "reason": "Automation now requires three product-deepen rounds before apply-readiness. Round 1 and 2 evidence remains valid; round 3 is the next required checkpoint."
+  },
+  "lastWorkspaceBaseline": {
+    "capturedAt": "2026-05-25T03:56:29Z",
+    "file": "openspec/add-initiate-implementation-control/workspace-baseline.json",
+    "result": "baseline_manifest_created"
+  },
+  "lastFailure": null,
+  "lastVerification": {
+    "command": "openspec validate introduce-study-intake-router --strict && openspec status --change introduce-study-intake-router",
+    "result": "valid; 4/4 artifacts complete"
+  },
+  "blockedReason": null
+}

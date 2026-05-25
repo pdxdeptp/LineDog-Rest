@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-05-25T04:01:51Z",
+  "entries": [
+    {
+      "id": "introduce-study-intake-router-product-deepen-round-1",
+      "timestamp": "2026-05-25T03:43:28Z",
+      "kind": "checkpoint",
+      "changeId": "introduce-study-intake-router",
+      "checkpoint": "introduce-study-intake-router:product_deepen_round_1",
+      "result": "completed",
+      "commands": [
+        {
+          "command": "openspec validate introduce-study-intake-router --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/changes/introduce-study-intake-router/review-records/product-deepen-round-1.md",
+          "sha256": "b14c7de4d68be5963802f6c85298e542430bc76d3fca15a948dfc1d7651ca259",
+          "description": "Round 1 product deepening evidence."
+        }
+      ],
+      "nextCheckpoint": "introduce-study-intake-router:product_deepen_round_2"
+    },
+    {
+      "id": "introduce-study-intake-router-product-deepen-round-2",
+      "timestamp": "2026-05-25T03:47:18Z",
+      "kind": "checkpoint",
+      "changeId": "introduce-study-intake-router",
+      "checkpoint": "introduce-study-intake-router:product_deepen_round_2",
+      "result": "completed",
+      "commands": [
+        {
+          "command": "openspec validate introduce-study-intake-router --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        },
+        {
+          "command": "openspec status --change introduce-study-intake-router",
+          "exitCode": 0,
+          "summary": "4/4 artifacts complete"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/changes/introduce-study-intake-router/review-records/product-deepen-round-2.md",
+          "sha256": "69c4fd434992ff3b4a02934e120887cb72c48750d25161735aa5f7cdcc87cc9a",
+          "description": "Round 2 product deepening evidence."
+        }
+      ],
+      "nextCheckpoint": "introduce-study-intake-router:apply_readiness"
+    },
+    {
+      "id": "require-three-product-deepen-rounds",
+      "timestamp": "2026-05-25T03:56:29Z",
+      "kind": "migration",
+      "changeId": "introduce-study-intake-router",
+      "checkpoint": "introduce-study-intake-router:product_deepen_round_3",
+      "result": "completed",
+      "commands": [
+        {
+          "command": "jq control-state invariants",
+          "exitCode": 0,
+          "summary": "state migrated to require three product-deepen rounds"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/add-initiate-implementation-control/evidence/migrations/2026-05-25-require-three-product-deepen-rounds.md",
+          "sha256": "e69b8f3416dd795ccf0632f426c2bcb5b3bbc486a87342345d76b7308cac0b77",
+          "description": "Migration evidence from two to three product-deepen rounds."
+        }
+      ],
+      "nextCheckpoint": "introduce-study-intake-router:product_deepen_round_3"
+    }
+  ]
+}

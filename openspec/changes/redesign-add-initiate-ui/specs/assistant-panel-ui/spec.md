@@ -1,0 +1,69 @@
+## MODIFIED Requirements
+
+### Requirement: Tab 导航
+The learning assistant middle panel SHALL use the home dashboard as the default entry after backend readiness and SHALL provide bottom navigation for Home, Add / Initiate, Material Progress, and Adjust Plan.
+
+#### Scenario: 底部固定导航
+- **WHEN** the middle panel shows Home or any learning assistant tool page
+- **THEN** bottom navigation shows Home, Add / Initiate, Material Progress, and Adjust Plan
+- **AND** the bottom navigation remains fixed at the bottom of the learning assistant panel
+
+### Requirement: 添加/立项视图
+The Add / Initiate tab SHALL support submitting learning or project items, route them into plan-generating or non-plan roles, and show a draft review before any active daily tasks are created.
+
+#### Scenario: 提交目标或资料
+- **WHEN** the user enters a goal text, URL, GitHub repo, existing project description, interview prep item, resume material, or note snippet and clicks continue
+- **THEN** the frontend calls intake routing to obtain recommended role, confidence, reason, and next action
+- **AND** the frontend does not directly call the old URL ingest path to create active tasks
+
+#### Scenario: 角色确认
+- **WHEN** intake route returns a recommended role
+- **THEN** the frontend shows low-cost confirmation controls that allow the user to accept or switch to new plan, attach to existing plan, reference material, later resource, or explicit one-off action
+- **AND** when the frontend shows "supporting material", that choice is written as existing-plan attachment plus `material_only`
+- **AND** if the role does not require scheduling, the frontend offers storage or attachment confirmation rather than plan-generation controls
+
+#### Scenario: 生成计划草案
+- **WHEN** the user confirms that the item needs a new plan or existing-plan scheduled phase/work
+- **THEN** the frontend collects or displays deadline, available time, target output, target depth, and assumptions
+- **AND** the frontend allows the user to accept visible assumptions before generating the draft
+
+#### Scenario: 展示处理进度
+- **WHEN** Add / Initiate is analyzing, routing, previewing source, generating phases, generating tasks, validating tasks, scheduling, or preparing review
+- **THEN** the frontend displays the current processing stage
+- **AND** it does not display processing as created Today tasks
+
+#### Scenario: 展示计划草案
+- **WHEN** the backend returns a plan draft
+- **THEN** the frontend defaults to a compact summary of role, assumptions, first-week daily schedule, buffer, low-energy fallback, capacity risk, and deadline risk
+- **AND** full schedule, source structure, and per-task edits are available through explicit expansion controls
+- **AND** the draft still does not enter Today
+
+#### Scenario: 不可行草案显示选择而不是错误
+- **WHEN** the backend returns an infeasible review draft
+- **THEN** the frontend shows capacity gap, overload, expected-late work, or buffer erosion facts
+- **AND** it offers localized choices backed by canonical option ids such as `reduce_scope`, `lower_depth`, `extend_deadline`, `increase_capacity`, `accept_crunch`, `accept_buffer_risk`, `accept_overload`, `accept_late_finish`, or `store_for_later`
+
+#### Scenario: 硬 deadline 不提供接受延期
+- **WHEN** an infeasible draft has deadline type `hard`
+- **THEN** the frontend does not display an `accept_late_finish` option
+- **AND** it only shows options that change scope, depth, deadline, capacity, overload/crunch, or storage
+
+#### Scenario: 确认草案
+- **WHEN** the user clicks confirm/initiate on a reviewed draft
+- **THEN** the frontend calls the activation endpoint for the current draft version
+- **AND** success refreshes Home, Today, project overview, and calendar facts
+
+#### Scenario: 激活失败保留草案
+- **WHEN** activation fails
+- **THEN** the frontend keeps the current draft and error state
+- **AND** the user can retry activation, continue editing, or cancel
+
+#### Scenario: 草案过期时阻止激活
+- **WHEN** the user attempts to activate a stale draft version
+- **THEN** the frontend displays that the draft has changed or expired
+- **AND** it does not write the old version into active plan state
+
+#### Scenario: 非计划条目不制造提醒噪音
+- **WHEN** the user stores an item as supporting material, reference material, or later resource
+- **THEN** the frontend does not create Today badges, deadline risk prompts, or smart-mode proposal entries for that item
+- **AND** the item is visible only from the relevant plan material or resource list

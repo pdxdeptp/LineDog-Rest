@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "capturedAt": "2026-05-25T03:56:29Z",
+  "statusCommand": "git status --porcelain=v1",
+  "purpose": "Known dirty workspace baseline for the add-initiate-changes automation. These entries are expected pre-existing OpenSpec/control artifacts, not automatic permission to overwrite or stage them.",
+  "expectedPreexistingEntries": [
+    {
+      "status": "??",
+      "path": "docs/learning-assistant-planning-context.md",
+      "reason": "Planning context created before long-running automation hardening.",
+      "stagePolicy": "only_when_current_checkpoint_evidence_references_this_file"
+    },
+    {
+      "status": "??",
+      "path": "openspec/add-initiate-implementation-control/",
+      "reason": "Automation control state, runbook, progress, baseline, migration, and evidence files.",
+      "stagePolicy": "only_stage_current_checkpoint_control_files"
+    },
+    {
+      "status": "??",
+      "path": "openspec/changes/harden-add-initiate-automation-control/",
+      "reason": "OpenSpec change artifacts for automation control hardening.",
+      "stagePolicy": "only_when_current_checkpoint_is_control_hardening"
+    },
+    {
+      "status": "??",
+      "path": "openspec/changes/introduce-deadline-scheduler/",
+      "reason": "Queued Add / Initiate child change.",
+      "stagePolicy": "only_when_current_change_matches"
+    },
+    {
+      "status": "??",
+      "path": "openspec/changes/introduce-plan-compiler/",
+      "reason": "Queued Add / Initiate child change.",
+      "stagePolicy": "only_when_current_change_matches"
+    },
+    {
+      "status": "??",
+      "path": "openspec/changes/introduce-study-intake-router/",
+      "reason": "Current Add / Initiate child change.",
+      "stagePolicy": "only_when_current_change_matches"
+    },
+    {
+      "status": "??",
+      "path": "openspec/changes/persist-intake-plan-drafts/",
+      "reason": "Queued Add / Initiate child change.",
+      "stagePolicy": "only_when_current_change_matches"
+    },
+    {
+      "status": "??",
+      "path": "openspec/changes/redesign-add-initiate-ui/",
+      "reason": "Queued Add / Initiate child change.",
+      "stagePolicy": "only_when_current_change_matches"
+    },
+    {
+      "status": "??",
+      "path": "openspec/changes/redesign-study-intake-planning/",
+      "reason": "Existing broader study intake planning change present before child-change automation.",
+      "stagePolicy": "do_not_stage_unless_user_explicitly_requests"
+    }
+  ],
+  "neverStageGlobs": [
+    "*.sqlite",
+    "*.sqlite-shm",
+    "*.sqlite-wal",
+    "DerivedData/**",
+    "**/*.log",
+    "**/run.lock/**",
+    "**/screenshots/**",
+    "**/.DS_Store"
+  ],
+  "blockingRules": [
+    "Block on any dirty path not covered by expectedPreexistingEntries unless it is created by the current checkpoint and recorded in evidence.",
+    "Block before editing a covered path when the current checkpoint is not the owner described by stagePolicy.",
+    "Never stage an entire directory; stage explicit files recorded in evidence."
+  ]
+}
