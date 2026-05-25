@@ -1,13 +1,13 @@
 {
   "schemaVersion": 1,
   "automationId": "add-initiate-changes",
-  "phase": "active",
+  "phase": "done",
   "currentChangeIndex": 4,
   "currentChange": "redesign-add-initiate-ui",
-  "currentStep": "apply",
-  "currentCheckpoint": "redesign-add-initiate-ui:apply:real-context-qa-and-final-verification",
+  "currentStep": "done",
+  "currentCheckpoint": "done",
   "currentAttempt": 0,
-  "runCounter": 41,
+  "runCounter": 42,
   "maxRetriesPerCheckpoint": 2,
   "requiredProductDeepenRounds": 3,
   "requiresScopeDependencyCheck": true,
@@ -40,12 +40,12 @@
     "schemaVersion": 1,
     "evidenceRoot": "openspec/add-initiate-implementation-control/evidence/cross-change-contracts",
     "lastCheck": {
-      "completedAt": "2026-05-25T12:38:42Z",
-      "fromChange": "introduce-deadline-scheduler",
-      "toChange": "redesign-add-initiate-ui",
-      "checkpoint": "introduce-deadline-scheduler:apply:cross-change-contract-to-redesign-add-initiate-ui",
+      "completedAt": "2026-05-25T17:37:16Z",
+      "fromChange": "redesign-add-initiate-ui",
+      "toChange": "final automation completion",
+      "checkpoint": "redesign-add-initiate-ui:apply:final-contract",
       "result": "passed",
-      "evidenceFile": "openspec/add-initiate-implementation-control/evidence/cross-change-contracts/introduce-deadline-scheduler-to-redesign-add-initiate-ui.md"
+      "evidenceFile": "openspec/add-initiate-implementation-control/evidence/cross-change-contracts/redesign-add-initiate-ui-final.md"
     },
     "requiredBeforeAdvancingChange": true,
     "changeOrder": [
@@ -73,18 +73,19 @@
     "schemaVersion": 1,
     "activeChange": "redesign-add-initiate-ui",
     "currentGroupId": null,
-    "currentGroupStartedAt": null,
+    "currentGroupStartedAt": "2026-05-25T17:16:13Z",
     "completedGroupIds": [
       "session-adapter-and-api-contract",
       "entry-role-and-attachment-review",
       "anchor-state-machine-and-recovery",
       "draft-review-options-and-activation",
-      "noise-boundaries-and-active-refresh"
+      "noise-boundaries-and-active-refresh",
+      "real-context-qa-and-final-verification"
     ],
     "blockedGroupId": null,
     "taskGroupsFile": "openspec/add-initiate-implementation-control/evidence/redesign-add-initiate-ui/apply-task-groups.json",
-    "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/redesign-add-initiate-ui/apply-groups/noise-boundaries-and-active-refresh.md",
-    "lastCommit": "e566fd4dc5c6b79ccbff9995e40047364e61b4e7"
+    "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/redesign-add-initiate-ui/apply-groups/real-context-qa-and-final-verification.md",
+    "lastCommit": "50831b1f86bfba57b6f4dcdf7260a74f2e1cc70e"
   },
   "lock": {
     "path": "openspec/add-initiate-implementation-control/run.lock",
@@ -176,32 +177,33 @@
     },
     {
       "id": "redesign-add-initiate-ui",
-      "status": "in_progress",
+      "status": "completed",
       "productDeepenRoundsCompleted": 3,
       "scopeDependencyCheckCompleted": true,
-      "applyCompleted": false,
+      "applyCompleted": true,
       "applyTaskGroups": {
-        "status": "planned",
+        "status": "completed",
         "taskGroupsFile": "openspec/add-initiate-implementation-control/evidence/redesign-add-initiate-ui/apply-task-groups.json",
         "completedGroupIds": [
           "session-adapter-and-api-contract",
           "entry-role-and-attachment-review",
           "anchor-state-machine-and-recovery",
           "draft-review-options-and-activation",
-          "noise-boundaries-and-active-refresh"
+          "noise-boundaries-and-active-refresh",
+          "real-context-qa-and-final-verification"
         ],
-        "currentGroupId": "real-context-qa-and-final-verification",
-        "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/redesign-add-initiate-ui/apply-groups/noise-boundaries-and-active-refresh.md",
-        "lastCommit": "e566fd4dc5c6b79ccbff9995e40047364e61b4e7"
+        "currentGroupId": null,
+        "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/redesign-add-initiate-ui/apply-groups/real-context-qa-and-final-verification.md",
+        "lastCommit": "50831b1f86bfba57b6f4dcdf7260a74f2e1cc70e"
       }
     }
   ],
   "lastRun": {
-    "completedAt": "2026-05-25T17:13:27Z",
-    "checkpoint": "redesign-add-initiate-ui:apply:noise-boundaries-and-active-refresh",
+    "completedAt": "2026-05-25T17:37:16Z",
+    "checkpoint": "redesign-add-initiate-ui:apply:real-context-qa-and-final-verification",
     "result": "completed"
   },
-  "lastCompletedCheckpoint": "redesign-add-initiate-ui:apply:noise-boundaries-and-active-refresh",
+  "lastCompletedCheckpoint": "redesign-add-initiate-ui:apply:real-context-qa-and-final-verification",
   "lastMigration": {
     "completedAt": "2026-05-25T03:56:29Z",
     "id": "require-three-product-deepen-rounds",
@@ -221,8 +223,8 @@
   },
   "lastFailure": null,
   "lastVerification": {
-    "command": "cd assistant_backend && uv run pytest tests/test_study_add_initiate_adapter.py tests/test_study_views_today.py tests/test_study_views_calendar.py tests/test_study_smart_mode_proposals.py -k 'add_initiate or draft or non_plan or material or smart or today or calendar'; xcodebuild test -project MalDaze.xcodeproj -scheme MalDaze -parallel-testing-enabled NO -only-testing:MalDazeTests/LearningAssistantViewModelTests -only-testing:MalDazeTests/LearningAssistantUISourceTests -quiet; openspec validate redesign-add-initiate-ui --strict; git diff --check -- assistant_backend/tests/test_study_add_initiate_adapter.py assistant_backend/tests/test_study_views_today.py assistant_backend/tests/test_study_views_calendar.py assistant_backend/tests/test_study_smart_mode_proposals.py MalDaze/LearningAssistant/LearningAssistantViewModel.swift MalDaze/LearningAssistant/AssistantPanelView.swift MalDazeTests/LearningAssistantTests.swift",
-    "result": "noise-boundaries-and-active-refresh verified; backend tests passed, focused Swift tests passed, OpenSpec valid, diff check clean"
+    "command": "cd assistant_backend && uv run pytest tests/test_study_add_initiate_adapter.py tests/test_study_intake_router.py tests/test_study_plan_lifecycle.py tests/test_study_plan_scheduling.py tests/test_study_views_today.py tests/test_study_views_calendar.py tests/test_study_smart_mode_proposals.py; xcodebuild test -project MalDaze.xcodeproj -scheme MalDaze -parallel-testing-enabled NO -only-testing:MalDazeTests/AssistantModelDecodingTests -only-testing:MalDazeTests/LearningAssistantViewModelTests -only-testing:MalDazeTests/LearningAssistantUISourceTests -quiet; openspec validate redesign-add-initiate-ui --strict; openspec instructions apply --change redesign-add-initiate-ui --json; git diff --check -- assistant_backend/tests/test_study_add_initiate_adapter.py MalDazeTests/LearningAssistantTests.swift openspec/changes/redesign-add-initiate-ui/tasks.md",
+    "result": "real-context final verification passed; backend 189 passed with 2 warnings, focused Swift suite passed, OpenSpec valid, apply instructions all_done, diff check clean"
   },
   "blockedReason": null
 }

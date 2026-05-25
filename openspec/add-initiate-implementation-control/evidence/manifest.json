@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-05-25T17:13:27Z",
+  "updatedAt": "2026-05-25T17:37:16Z",
   "entries": [
     {
       "id": "introduce-study-intake-router-product-deepen-round-1",
@@ -2834,6 +2834,121 @@
       ],
       "commit": "e566fd4dc5c6b79ccbff9995e40047364e61b4e7",
       "nextCheckpoint": "redesign-add-initiate-ui:apply:real-context-qa-and-final-verification"
+    },
+    {
+      "id": "redesign-add-initiate-ui-apply-real-context-qa-and-final-verification",
+      "timestamp": "2026-05-25T17:37:16Z",
+      "kind": "apply_group",
+      "changeId": "redesign-add-initiate-ui",
+      "checkpoint": "redesign-add-initiate-ui:apply:real-context-qa-and-final-verification",
+      "result": "completed",
+      "commands": [
+        {
+          "command": "cd assistant_backend && uv run pytest tests/test_study_add_initiate_adapter.py tests/test_study_intake_router.py tests/test_study_plan_lifecycle.py tests/test_study_plan_scheduling.py tests/test_study_views_today.py tests/test_study_views_calendar.py tests/test_study_smart_mode_proposals.py",
+          "exitCode": 0,
+          "summary": "189 passed, 2 warnings"
+        },
+        {
+          "command": "xcodebuild test -project MalDaze.xcodeproj -scheme MalDaze -parallel-testing-enabled NO -only-testing:MalDazeTests/AssistantModelDecodingTests -only-testing:MalDazeTests/LearningAssistantViewModelTests -only-testing:MalDazeTests/LearningAssistantUISourceTests -quiet",
+          "exitCode": 0,
+          "summary": "focused Swift tests passed"
+        },
+        {
+          "command": "openspec validate redesign-add-initiate-ui --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        },
+        {
+          "command": "openspec instructions apply --change redesign-add-initiate-ui --json",
+          "exitCode": 0,
+          "summary": "31/31 complete, all_done"
+        },
+        {
+          "command": "git diff --check -- assistant_backend/tests/test_study_add_initiate_adapter.py MalDazeTests/LearningAssistantTests.swift openspec/changes/redesign-add-initiate-ui/tasks.md",
+          "exitCode": 0,
+          "summary": "no whitespace errors"
+        },
+        {
+          "command": "git commit -m \"Verify Add Initiate real contexts\"",
+          "exitCode": 0,
+          "summary": "50831b1f86bfba57b6f4dcdf7260a74f2e1cc70e"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/add-initiate-implementation-control/evidence/redesign-add-initiate-ui/apply-groups/real-context-qa-and-final-verification.md",
+          "sha256": "f489c3ba22abe8498ef0ec309d1705f1f4406e7945074dfd49b8f34fa3767cbe",
+          "description": "Apply group evidence for real-context Add / Initiate QA and final verification."
+        },
+        {
+          "path": "assistant_backend/tests/test_study_add_initiate_adapter.py",
+          "sha256": "9651e128e5374ee27a69964bf303b00ceb8dd98e83405ea5cfedf37c07b9cc69",
+          "description": "Backend real-context Add / Initiate session and quiet/noise regression tests."
+        },
+        {
+          "path": "MalDazeTests/LearningAssistantTests.swift",
+          "sha256": "47630f45a71c142c6d8bd7247f1d895963cde7dabd04d1a40afa85f62df908fc",
+          "description": "Swift real-context typed adapter and pre-activation quiet regression tests."
+        },
+        {
+          "path": "openspec/changes/redesign-add-initiate-ui/tasks.md",
+          "sha256": "129582e1337b5ed60d95bc328574541640fe62e1ebb49f04b05fd8ad028a3899",
+          "description": "Completed OpenSpec task checklist for redesign-add-initiate-ui."
+        }
+      ],
+      "commit": "50831b1f86bfba57b6f4dcdf7260a74f2e1cc70e",
+      "nextCheckpoint": "redesign-add-initiate-ui:apply:final-contract"
+    },
+    {
+      "id": "redesign-add-initiate-ui-final-contract",
+      "timestamp": "2026-05-25T17:37:16Z",
+      "kind": "cross_change_contract",
+      "changeId": "redesign-add-initiate-ui",
+      "checkpoint": "redesign-add-initiate-ui:apply:final-contract",
+      "result": "passed",
+      "commands": [
+        {
+          "command": "openspec validate redesign-add-initiate-ui --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        },
+        {
+          "command": "openspec instructions apply --change redesign-add-initiate-ui --json",
+          "exitCode": 0,
+          "summary": "31/31 complete, all_done"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/add-initiate-implementation-control/evidence/cross-change-contracts/redesign-add-initiate-ui-final.md",
+          "sha256": "8c8d9a946077e2316bab9f2d64e24074eb0d3c60356d3d52080207b477a293a9",
+          "description": "Final cross-change contract evidence for redesign-add-initiate-ui."
+        }
+      ],
+      "nextCheckpoint": "done"
+    },
+    {
+      "id": "add-initiate-final-report",
+      "timestamp": "2026-05-25T17:37:16Z",
+      "kind": "final_report",
+      "changeId": "redesign-add-initiate-ui",
+      "checkpoint": "done",
+      "result": "completed",
+      "commands": [
+        {
+          "command": "openspec validate redesign-add-initiate-ui --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/add-initiate-implementation-control/final-report.md",
+          "sha256": "8d671196e9cb653d412488e9e94e481c024edb61f15cdbcb201ce2e6f8629d1b",
+          "description": "Final report for the Add / Initiate implementation automation."
+        }
+      ],
+      "nextCheckpoint": null
     }
   ]
 }

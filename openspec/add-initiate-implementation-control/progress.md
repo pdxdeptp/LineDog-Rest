@@ -2,20 +2,15 @@
 
 ## Current Status
 
-- Phase: active
-- Current change: redesign-add-initiate-ui
-- Current step: apply
-- Current checkpoint: redesign-add-initiate-ui:apply:real-context-qa-and-final-verification
-- Required product-deepen rounds before apply: 3
-- Required checkpoint after product deepening: scope_dependency_check
-- Product-deepen scope guard: every round must read adjacent changes and record scope decisions
+- Phase: done
+- Current step: done
+- Current checkpoint: done
+- Completed at: 2026-05-25T17:37:16Z
 - Lock file: `openspec/add-initiate-implementation-control/run.lock`
 - Runbook: `openspec/add-initiate-implementation-control/runbook.md`
 - Evidence root: `openspec/add-initiate-implementation-control/evidence`
-- Stale lock recovery: automatic quarantine to `recovered-locks/` after 90 minutes
 - Evidence manifest: `openspec/add-initiate-implementation-control/evidence/manifest.json`
-- Failure log: `openspec/add-initiate-implementation-control/evidence/failures/failure-log.jsonl`
-- Apply recovery: `state.json.applyCursor` plus per-change apply task groups
+- Final report: `openspec/add-initiate-implementation-control/final-report.md`
 
 Completed changes:
 
@@ -23,46 +18,7 @@ Completed changes:
 - `persist-intake-plan-drafts`
 - `introduce-plan-compiler`
 - `introduce-deadline-scheduler`
-
-Completed apply groups for `persist-intake-plan-drafts`:
-
-- `draft-schema-migration-and-defaults`
-- `draft-package-versioning-and-entrypoints`
-- `activation-boundary-and-events`
-- `fallback-progress-and-final-verification`
-
-Completed apply groups for `introduce-plan-compiler`:
-
-- `envelope-archetype-and-depth-core`
-- `synopsis-llm-validation-and-repair`
-- `estimates-trace-fixtures-and-final-verification`
-
-Product-deepen rounds completed for `introduce-deadline-scheduler`:
-
-- round 1
-- round 2
-- round 3
-
-Scope dependency check completed for `introduce-deadline-scheduler`: yes
-
-Apply planning completed for `introduce-deadline-scheduler`: yes
-
-Completed apply groups for `introduce-deadline-scheduler`:
-
-- `scheduler-contract-preflight-and-capacity`
-- `placement-buffer-splitting-fallback-and-risk`
-- `infeasibility-options-and-recompute-effects`
-- `scheduler-dry-runs-final-verification`
-
-Product-deepen rounds completed for `redesign-add-initiate-ui`:
-
-- round 1
-- round 2
-- round 3
-
-Scope dependency check completed for `redesign-add-initiate-ui`: yes
-
-Apply planning completed for `redesign-add-initiate-ui`: yes
+- `redesign-add-initiate-ui`
 
 Completed apply groups for `redesign-add-initiate-ui`:
 
@@ -71,14 +27,23 @@ Completed apply groups for `redesign-add-initiate-ui`:
 - `anchor-state-machine-and-recovery`
 - `draft-review-options-and-activation`
 - `noise-boundaries-and-active-refresh`
-
-Remaining apply groups for `redesign-add-initiate-ui`:
-
 - `real-context-qa-and-final-verification`
 
-Next required checkpoint for `redesign-add-initiate-ui`:
+Final commits:
 
-- `apply:real-context-qa-and-final-verification`
+- `50831b1f86bfba57b6f4dcdf7260a74f2e1cc70e` - Verify Add Initiate real contexts
+
+Final verification:
+
+- Backend focused suite: 189 passed, 2 warnings.
+- Swift focused suite: passed.
+- `openspec validate redesign-add-initiate-ui --strict`: valid.
+- `openspec instructions apply --change redesign-add-initiate-ui --json`: 31/31 complete, `all_done`.
+
+Automation status:
+
+- All five Add / Initiate child changes are complete.
+- Automation `add-initiate-changes` is ready to pause.
 
 ## Run Log
 
@@ -1481,3 +1446,36 @@ Next required checkpoint for `redesign-add-initiate-ui`:
 - Manifest:
   - Added `redesign-add-initiate-ui-apply-noise-boundaries-and-active-refresh`.
 - Next checkpoint: redesign-add-initiate-ui:apply:real-context-qa-and-final-verification
+
+## Run 2026-05-25T17:37:16Z
+
+- Automation: add-initiate-changes
+- Checkpoint: redesign-add-initiate-ui:apply:real-context-qa-and-final-verification
+- Result: completed
+- Actions:
+  - Followed the apply chain: openspec-apply-change -> superpowers:subagent-driven-development -> per-task superpowers:test-driven-development.
+  - Added backend real-context Add / Initiate session/noise regression coverage for AgentGuide, easyagent repo rebuild, LeetCode cadence, agent/backend interview prep, resume/project rewrite, MalDaze existing-project material, and MalDaze note material.
+  - Added Swift ViewModel real-context coverage proving typed adapter source values are sent and legacy URL ingestion/start/confirm paths are not used as the primary Add / Initiate path.
+  - Completed spec compliance and code quality review loops; final reviews approved.
+  - Marked all 31 `redesign-add-initiate-ui` OpenSpec tasks complete after strict validation and apply instructions reported `all_done`.
+  - Wrote apply group evidence at `openspec/add-initiate-implementation-control/evidence/redesign-add-initiate-ui/apply-groups/real-context-qa-and-final-verification.md`.
+  - Wrote final contract evidence at `openspec/add-initiate-implementation-control/evidence/cross-change-contracts/redesign-add-initiate-ui-final.md`.
+  - Wrote final report at `openspec/add-initiate-implementation-control/final-report.md`.
+  - Created implementation commit `50831b1f86bfba57b6f4dcdf7260a74f2e1cc70e`.
+- Reviews:
+  - Spec compliance review 1: CHANGES_REQUESTED for backend source-type drift and missing backend Calendar/Smart Mode quiet checks.
+  - Spec compliance review 2: CHANGES_REQUESTED for missing backend `note_snippet` fixture.
+  - Final spec compliance review: APPROVED.
+  - Code quality review 1: CHANGES_REQUESTED for repeated `date.today()` midnight-boundary flake risk.
+  - Final code quality review: APPROVED.
+- Verification:
+  - Backend focused suite: 189 passed, 2 warnings.
+  - Focused Swift suite: passed.
+  - `openspec validate redesign-add-initiate-ui --strict`: valid.
+  - `openspec instructions apply --change redesign-add-initiate-ui --json`: 31/31 complete, `all_done`.
+  - `git diff --check` for final apply target files: clean.
+- Manifest:
+  - Added `redesign-add-initiate-ui-apply-real-context-qa-and-final-verification`.
+  - Added `redesign-add-initiate-ui-final-contract`.
+  - Added `add-initiate-final-report`.
+- Next checkpoint: done
