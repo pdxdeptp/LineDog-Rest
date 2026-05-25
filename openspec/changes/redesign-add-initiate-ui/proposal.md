@@ -15,6 +15,7 @@ This change is the fifth split from `redesign-study-intake-planning`. It owns th
 - Show infeasible review choices using canonical option ids.
 - Keep unconfirmed drafts and non-plan items out of Today and active Calendar views.
 - Preserve draft on activation failure and support retry/edit/cancel.
+- Add the thin Add / Initiate orchestration and progress adapter needed for the UI to call the completed router, draft, compiler, scheduler, and activation helpers without reimplementing their logic.
 
 ## Capabilities
 
@@ -36,4 +37,4 @@ This change is the fifth split from `redesign-study-intake-planning`. It owns th
 ## Impact
 
 - Future frontend/ViewModel: Add / Initiate tab, role/anchor review, progress state rendering, draft review, infeasible options, activation/cancel/retry flows.
-- Future backend integration: UI calls router, compiler/scheduler, activation, and progress stream surfaces created by prior child changes.
+- Future backend integration: a thin Add / Initiate orchestration/progress adapter that wraps completed router, draft, compiler, scheduler, and activation helpers. It must not add new routing heuristics, task generation logic, scheduling math, or activation semantics.

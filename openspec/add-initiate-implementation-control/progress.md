@@ -4,8 +4,8 @@
 
 - Phase: active
 - Current change: redesign-add-initiate-ui
-- Current step: product_deepen_round_1
-- Current checkpoint: redesign-add-initiate-ui:product_deepen_round_1
+- Current step: scope_dependency_check
+- Current checkpoint: redesign-add-initiate-ui:scope_dependency_check
 - Required product-deepen rounds before apply: 3
 - Required checkpoint after product deepening: scope_dependency_check
 - Product-deepen scope guard: every round must read adjacent changes and record scope decisions
@@ -56,7 +56,9 @@ Completed apply groups for `introduce-deadline-scheduler`:
 
 Product-deepen rounds completed for `redesign-add-initiate-ui`:
 
-- none
+- round 1
+- round 2
+- round 3
 
 Scope dependency check completed for `redesign-add-initiate-ui`: no
 
@@ -72,7 +74,7 @@ Remaining apply groups for `redesign-add-initiate-ui`:
 
 Next required checkpoint for `redesign-add-initiate-ui`:
 
-- `product_deepen_round_1`
+- `scope_dependency_check`
 
 ## Run Log
 
@@ -1242,3 +1244,62 @@ Next required checkpoint for `redesign-add-initiate-ui`:
 - Manifest:
   - Added `introduce-deadline-scheduler-to-redesign-add-initiate-ui-cross-change-contract`.
 - Next checkpoint: redesign-add-initiate-ui:product_deepen_round_1
+
+## Run 2026-05-25T12:48:42Z Product Deepen redesign-add-initiate-ui round 1
+
+- Automation: add-initiate-changes
+- Checkpoint: redesign-add-initiate-ui:product_deepen_round_1
+- Result: completed
+- Actions:
+  - Acquired `run.lock`.
+  - Read `state.json`, `runbook.md`, `progress.md`, `evidence/manifest.json`, and `workspace-baseline.json`.
+  - Ran `git status --porcelain=v1` and protected unrelated dirty files.
+  - Triggered `opsx-product-deepen`.
+  - Read `redesign-add-initiate-ui` proposal, design, specs, and tasks.
+  - Read upstream scheduler and cross-change contract evidence, plus earlier router/draft/compiler handoff records.
+  - Found and fixed a P0 orchestration gap: UI now has an explicit thin Add / Initiate orchestration/progress adapter contract instead of implicitly stitching legacy endpoints.
+  - Added session identity, draft id/version, stale-event rejection, adapter ownership, and legacy URL-ingestion compatibility boundaries.
+  - Wrote review record at `openspec/changes/redesign-add-initiate-ui/review-records/product-deepen-round-1.md`.
+- Verification:
+  - `openspec validate redesign-add-initiate-ui --strict`: valid.
+- Manifest:
+  - Added `redesign-add-initiate-ui-product-deepen-round-1`.
+- Next checkpoint: redesign-add-initiate-ui:product_deepen_round_2
+
+## Run 2026-05-25T12:48:42Z Product Deepen redesign-add-initiate-ui round 2
+
+- Automation: add-initiate-changes
+- Checkpoint: redesign-add-initiate-ui:product_deepen_round_2
+- Result: completed
+- Actions:
+  - Triggered `opsx-product-deepen`.
+  - Re-read `redesign-add-initiate-ui` proposal, design, specs, and tasks after round 1 edits.
+  - Re-checked upstream scheduler and draft-persistence boundaries around option effects, stale draft versions, and activation guards.
+  - Added a single Add / Initiate ViewModel state machine instead of scattered UI booleans.
+  - Added recovery rules for `needs_input`, `compile_failed`, option-effect progress, activation failure, cancellation, and stale session/draft responses.
+  - Wrote review record at `openspec/changes/redesign-add-initiate-ui/review-records/product-deepen-round-2.md`.
+- Verification:
+  - `openspec validate redesign-add-initiate-ui --strict`: valid.
+- Manifest:
+  - Added `redesign-add-initiate-ui-product-deepen-round-2`.
+- Next checkpoint: redesign-add-initiate-ui:product_deepen_round_3
+
+## Run 2026-05-25T12:48:42Z Product Deepen redesign-add-initiate-ui round 3
+
+- Automation: add-initiate-changes
+- Checkpoint: redesign-add-initiate-ui:product_deepen_round_3
+- Result: completed
+- Actions:
+  - Triggered `opsx-product-deepen`.
+  - Re-read `redesign-add-initiate-ui` proposal, design, specs, and tasks after round 2 edits.
+  - Re-checked upstream scheduler fallback, buffer, overload, option, and no-active-task boundaries.
+  - Added compact draft-summary rules for first-week rendering, buffer, fallback, capacity risk, deadline risk, and expansion controls.
+  - Added localized option-label semantics while preserving canonical ids.
+  - Added refresh/noise rules proving only activation success refreshes active Home, Today, Calendar, and smart-mode surfaces.
+  - Added real-context QA matrix for AgentGuide, easyagent, LeetCode cadence, interview prep, resume/project rewrite, MalDaze project material, and quiet reference/later storage.
+  - Wrote review record at `openspec/changes/redesign-add-initiate-ui/review-records/product-deepen-round-3.md`.
+- Verification:
+  - `openspec validate redesign-add-initiate-ui --strict`: valid.
+- Manifest:
+  - Added `redesign-add-initiate-ui-product-deepen-round-3`.
+- Next checkpoint: redesign-add-initiate-ui:scope_dependency_check

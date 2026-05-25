@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-05-25T12:38:42Z",
+  "updatedAt": "2026-05-25T12:48:42Z",
   "entries": [
     {
       "id": "introduce-study-intake-router-product-deepen-round-1",
@@ -2323,6 +2323,150 @@
         }
       ],
       "nextCheckpoint": "redesign-add-initiate-ui:product_deepen_round_1"
+    },
+    {
+      "id": "redesign-add-initiate-ui-product-deepen-round-1",
+      "timestamp": "2026-05-25T12:48:42Z",
+      "kind": "checkpoint",
+      "changeId": "redesign-add-initiate-ui",
+      "checkpoint": "redesign-add-initiate-ui:product_deepen_round_1",
+      "result": "completed",
+      "commands": [
+        {
+          "command": "openspec validate redesign-add-initiate-ui --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/changes/redesign-add-initiate-ui/review-records/product-deepen-round-1.md",
+          "sha256": "56dbe9d217b78f658d81b998264e0de809db7aa4155ba3456e3204920d17eac7",
+          "description": "Round 1 product deepening evidence with orchestration/session contract scope decisions."
+        },
+        {
+          "path": "openspec/changes/redesign-add-initiate-ui/proposal.md",
+          "sha256": "c2346fc30d78fb160828bb6344fa03499a9a30058084c623e945b0a40266178e",
+          "description": "Proposal now includes thin Add / Initiate orchestration/progress adapter impact."
+        },
+        {
+          "path": "openspec/changes/redesign-add-initiate-ui/design.md",
+          "sha256": "63c787c26cbfb8ef1936db01bc01d97347e4b01eaca3aaf7d0a4c3080b8b5447",
+          "description": "Design now defines integration contract and session/progress contract."
+        },
+        {
+          "path": "openspec/changes/redesign-add-initiate-ui/specs/assistant-panel-ui/spec.md",
+          "sha256": "132264a03d04b5053c2fe9783006665c3e7850476e515bf8a885382a7fc81d6e",
+          "description": "UI spec now requires Add / Initiate session identity and orchestration adapter usage."
+        },
+        {
+          "path": "openspec/changes/redesign-add-initiate-ui/specs/ingestion-progress-sse/spec.md",
+          "sha256": "dfca76e6905a9ff1ee6012744e6a180064f71089606775f6457195c7d262c753",
+          "description": "Progress spec now defines session identity and adapter-owned Add / Initiate stages."
+        },
+        {
+          "path": "openspec/changes/redesign-add-initiate-ui/specs/study-intake-planning/spec.md",
+          "sha256": "efb5294c105ba51f41bec6e64509f232d34b0c2b991c20996aef0d5418106d38",
+          "description": "Study intake spec now constrains the thin orchestration adapter ownership boundary."
+        },
+        {
+          "path": "openspec/changes/redesign-add-initiate-ui/tasks.md",
+          "sha256": "ed02f8ff34d736fe08a14fd189231418b1a3e891ab6412a2bb237f242eb17eee",
+          "description": "Tasks now include orchestration contract and progress/session tests."
+        }
+      ],
+      "nextCheckpoint": "redesign-add-initiate-ui:product_deepen_round_2"
+    },
+    {
+      "id": "redesign-add-initiate-ui-product-deepen-round-2",
+      "timestamp": "2026-05-25T12:48:42Z",
+      "kind": "checkpoint",
+      "changeId": "redesign-add-initiate-ui",
+      "checkpoint": "redesign-add-initiate-ui:product_deepen_round_2",
+      "result": "completed",
+      "commands": [
+        {
+          "command": "openspec validate redesign-add-initiate-ui --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/changes/redesign-add-initiate-ui/review-records/product-deepen-round-2.md",
+          "sha256": "8e39a456e29757e97770652a8d2ed6a1e887f677ff82ecf52d2320b7bcb8383e",
+          "description": "Round 2 product deepening evidence for Add / Initiate state machine and recovery semantics."
+        },
+        {
+          "path": "openspec/changes/redesign-add-initiate-ui/design.md",
+          "sha256": "6ed1a98491721ee2be3aaa7353e1e8b64745ccef8d5951682062aabd32130a2e",
+          "description": "Design now defines UI state machine and recovery rules."
+        },
+        {
+          "path": "openspec/changes/redesign-add-initiate-ui/specs/assistant-panel-ui/spec.md",
+          "sha256": "77cfaea07bd908c71b068d8cb8f7cd2676a681c29b5c4c0c0bd53c00f06ae252",
+          "description": "UI spec now covers needs-input, compile-failed, option effects, and stale response rejection."
+        },
+        {
+          "path": "openspec/changes/redesign-add-initiate-ui/specs/study-intake-planning/spec.md",
+          "sha256": "04c18e1a2066c02f029afebb443b35793983756f227c3acf848959c8038eeebd",
+          "description": "Study intake spec now covers context preservation, option-effect non-activation, and latest-version activation."
+        },
+        {
+          "path": "openspec/changes/redesign-add-initiate-ui/tasks.md",
+          "sha256": "3755421f84bc6329b40cce367fb5047744c9eac4d0a470e5adb67d100b4fd1ca",
+          "description": "Tasks now require ViewModel state machine, option effects, and stale response tests."
+        }
+      ],
+      "nextCheckpoint": "redesign-add-initiate-ui:product_deepen_round_3"
+    },
+    {
+      "id": "redesign-add-initiate-ui-product-deepen-round-3",
+      "timestamp": "2026-05-25T12:48:42Z",
+      "kind": "checkpoint",
+      "changeId": "redesign-add-initiate-ui",
+      "checkpoint": "redesign-add-initiate-ui:product_deepen_round_3",
+      "result": "completed",
+      "commands": [
+        {
+          "command": "openspec validate redesign-add-initiate-ui --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/changes/redesign-add-initiate-ui/review-records/product-deepen-round-3.md",
+          "sha256": "ec54f834d1342897b7ce12aeb3dffca03ba7a80addb10de345b2ce32ebef8cc3",
+          "description": "Round 3 product deepening evidence for summary-first review and noise boundaries."
+        },
+        {
+          "path": "openspec/changes/redesign-add-initiate-ui/design.md",
+          "sha256": "5a68c5f72dddc99cb0f84c96ae3ee13dc4273a425b97a4ede21f43ff98309953",
+          "description": "Design now defines compact draft summary, option labels, refresh/noise rules, and real-context QA matrix."
+        },
+        {
+          "path": "openspec/changes/redesign-add-initiate-ui/specs/assistant-panel-ui/spec.md",
+          "sha256": "0b0fa236dd30cf58c76f0375727ff7bc498a8b2cfd2e43a3495cbfc461e500e1",
+          "description": "UI spec now covers summary rendering, fallback metadata, and activation-only active surface refresh."
+        },
+        {
+          "path": "openspec/changes/redesign-add-initiate-ui/specs/ingestion-progress-sse/spec.md",
+          "sha256": "eb544c480421d06b0626e9cedf850dbb336e220e7f3222a7e22ac584e1532f64",
+          "description": "Progress spec now uses draft_review for Add / Initiate draft safety."
+        },
+        {
+          "path": "openspec/changes/redesign-add-initiate-ui/specs/study-intake-planning/spec.md",
+          "sha256": "489eabbb4eec8aa0b3ae75569050f8cef5a7598eb462772650a170782063967d",
+          "description": "Study intake spec now covers schedule risk summary and quiet storage/attachment."
+        },
+        {
+          "path": "openspec/changes/redesign-add-initiate-ui/tasks.md",
+          "sha256": "9cb98895ce036715982dc049c6748a564961240bda82ad59f0489750e9f7e90d",
+          "description": "Tasks now require first-week rendering, fallback metadata, active-surface silence, and real-context QA."
+        }
+      ],
+      "nextCheckpoint": "redesign-add-initiate-ui:scope_dependency_check"
     }
   ]
 }

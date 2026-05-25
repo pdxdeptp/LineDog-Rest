@@ -4,10 +4,10 @@
   "phase": "active",
   "currentChangeIndex": 4,
   "currentChange": "redesign-add-initiate-ui",
-  "currentStep": "product_deepen_round_1",
-  "currentCheckpoint": "redesign-add-initiate-ui:product_deepen_round_1",
+  "currentStep": "scope_dependency_check",
+  "currentCheckpoint": "redesign-add-initiate-ui:scope_dependency_check",
   "currentAttempt": 0,
-  "runCounter": 33,
+  "runCounter": 34,
   "maxRetriesPerCheckpoint": 2,
   "requiredProductDeepenRounds": 3,
   "requiresScopeDependencyCheck": true,
@@ -170,7 +170,7 @@
     {
       "id": "redesign-add-initiate-ui",
       "status": "in_progress",
-      "productDeepenRoundsCompleted": 0,
+      "productDeepenRoundsCompleted": 3,
       "scopeDependencyCheckCompleted": false,
       "applyCompleted": false,
       "applyTaskGroups": {
@@ -184,12 +184,12 @@
     }
   ],
   "lastRun": {
-    "startedAt": "2026-05-25T12:38:42Z",
-    "completedAt": "2026-05-25T12:38:42Z",
-    "checkpoint": "introduce-deadline-scheduler:apply:cross-change-contract-to-redesign-add-initiate-ui",
+    "startedAt": "2026-05-25T12:48:42Z",
+    "completedAt": "2026-05-25T12:48:42Z",
+    "checkpoint": "redesign-add-initiate-ui:product_deepen_round_3",
     "result": "completed"
   },
-  "lastCompletedCheckpoint": "introduce-deadline-scheduler:apply:cross-change-contract-to-redesign-add-initiate-ui",
+  "lastCompletedCheckpoint": "redesign-add-initiate-ui:product_deepen_round_3",
   "lastMigration": {
     "completedAt": "2026-05-25T03:56:29Z",
     "id": "require-three-product-deepen-rounds",
@@ -209,8 +209,8 @@
   },
   "lastFailure": null,
   "lastVerification": {
-    "command": "openspec validate introduce-deadline-scheduler --strict; openspec validate redesign-add-initiate-ui --strict; openspec instructions apply --change introduce-deadline-scheduler --json; openspec status --change redesign-add-initiate-ui --json",
-    "result": "scheduler and UI changes valid; scheduler instructions apply reports 36/36 complete and all_done; UI artifacts present"
+    "command": "openspec validate redesign-add-initiate-ui --strict",
+    "result": "valid after round 3 product deepening"
   },
   "blockedReason": null
 }
