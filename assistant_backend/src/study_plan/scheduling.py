@@ -130,6 +130,8 @@ def _needs_input_review(
 def _risk_report(
     *,
     fits: bool,
+    essential_work_minutes: int = 0,
+    available_execution_capacity_minutes: int = 0,
     capacity_gap_minutes: int = 0,
     optional_unscheduled_minutes: int = 0,
     overloaded_dates: list[str] | None = None,
@@ -143,6 +145,8 @@ def _risk_report(
 ) -> dict[str, Any]:
     report = {
         "fits_as_written": fits,
+        "essential_work_minutes": essential_work_minutes,
+        "available_execution_capacity_minutes": available_execution_capacity_minutes,
         "capacity_gap_minutes": capacity_gap_minutes,
         "optional_unscheduled_minutes": optional_unscheduled_minutes,
         "overloaded_dates": list(overloaded_dates or []),
@@ -927,6 +931,8 @@ def schedule_draft_review(
             ),
             "risk_report": _risk_report(
                 fits=False,
+                essential_work_minutes=essential_minutes,
+                available_execution_capacity_minutes=0,
                 capacity_gap_minutes=essential_minutes,
                 optional_unscheduled_minutes=optional_unscheduled_minutes,
                 expected_late_tasks=essential_task_ids,
@@ -1301,6 +1307,8 @@ def schedule_draft_review(
     review["unscheduled_tasks"] = unscheduled_tasks
     risk_report = _risk_report(
         fits=status == "draft_review",
+        essential_work_minutes=essential_minutes,
+        available_execution_capacity_minutes=available_minutes,
         capacity_gap_minutes=essential_gap,
         optional_unscheduled_minutes=optional_unscheduled_minutes,
         overloaded_dates=overloaded_dates,

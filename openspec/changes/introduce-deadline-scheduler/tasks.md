@@ -44,4 +44,4 @@
 - [x] 4.9 Add infeasibility option mapping and option-effect tests proving effects return new review/storage/recompute states rather than activation.
 - [x] 4.10 Add crunch-versus-overload tests proving crunch stays within usable capacity and overload remains visible.
 - [x] 4.11 Add hard-deadline tests excluding `accept_late_finish`.
-- [ ] 4.12 Add end-to-end dry-run tests for feasible resume packaging and infeasible easyagent rebuild.
+- [x] 4.12 Add end-to-end dry-run tests for feasible resume packaging and infeasible easyagent rebuild.

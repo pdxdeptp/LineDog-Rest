@@ -1301,6 +1301,173 @@ def test_scheduler_crunch_versus_overload_option_recompute_semantics():
     assert overload["risk_report"]["overloaded_dates"] == ["2026-06-01"]
 
 
+def test_scheduler_feasible_resume_packaging_dry_run_includes_capacity_math():
+    scheduling = _scheduling_module()
+
+    review = scheduling.schedule_draft_review(
+        _compiler_package(
+            start_date="2026-06-01",
+            deadline="2026-06-04",
+            deadline_type="soft",
+            daily_capacity_min=125,
+            rest_weekdays=[],
+            target_output="resume bullets and portfolio project story",
+            material_refs=[{"id": "resume-project", "kind": "project_note"}],
+            tasks=[
+                {
+                    "id": "resume-map",
+                    "phase_id": "phase-1",
+                    "title": "Map project evidence",
+                    "estimated_minutes": 95,
+                    "classification": "essential",
+                    "completion_criteria": ["evidence map"],
+                    "source_refs": [{"id": "resume-project"}],
+                },
+                {
+                    "id": "resume-bullets",
+                    "phase_id": "phase-1",
+                    "title": "Rewrite resume bullets",
+                    "estimated_minutes": 95,
+                    "classification": "essential",
+                    "completion_criteria": ["three impact bullets"],
+                    "source_refs": [{"id": "resume-project"}],
+                },
+                {
+                    "id": "project-story",
+                    "phase_id": "phase-2",
+                    "title": "Package portfolio story",
+                    "estimated_minutes": 95,
+                    "classification": "essential",
+                    "completion_criteria": ["demo story"],
+                    "source_refs": [{"id": "resume-project"}],
+                },
+            ],
+        )
+    )
+
+    assert review["status"] == "draft_review"
+    assert review["risk_report"]["essential_work_minutes"] == 285
+    assert review["risk_report"]["available_execution_capacity_minutes"] == 300
+    assert review["risk_report"]["capacity_gap_minutes"] == 0
+    assert review["risk_report"]["buffer_days_reserved"] == ["2026-06-04"]
+    assert [
+        (day["date"], day["planned_minutes"], day["reserved_buffer"])
+        for day in review["scheduled_days"]
+    ] == [
+        (date(2026, 6, 1), 95, False),
+        (date(2026, 6, 2), 95, False),
+        (date(2026, 6, 3), 95, False),
+        (date(2026, 6, 4), 0, True),
+    ]
+    assert review["infeasibility_options"] == []
+    assert "active_tasks" not in review
+    assert "today_actions" not in review
+
+
+def test_scheduler_infeasible_easyagent_rebuild_dry_run_includes_option_math():
+    scheduling = _scheduling_module()
+
+    review = scheduling.schedule_draft_review(
+        _compiler_package(
+            start_date="2026-06-01",
+            deadline="2026-06-04",
+            deadline_type="hard",
+            daily_capacity_min=125,
+            rest_weekdays=[],
+            source_url="https://github.com/example/easyagent",
+            source_roles={"github_repo": "clone_rebuild_target"},
+            source_facts={"repo_name": "easyagent", "languages": ["Python"]},
+            target_output="easyagent source-understanding rebuild",
+            tasks=[
+                {
+                    "id": "source-map",
+                    "phase_id": "phase-1",
+                    "title": "Map easyagent call flow",
+                    "estimated_minutes": 75,
+                    "classification": "essential",
+                    "completion_criteria": ["call-flow map"],
+                    "source_refs": [{"id": "easyagent-repo"}],
+                },
+                {
+                    "id": "memory-loop",
+                    "phase_id": "phase-1",
+                    "title": "Trace memory loop",
+                    "estimated_minutes": 75,
+                    "classification": "essential",
+                    "completion_criteria": ["memory notes"],
+                    "source_refs": [{"id": "easyagent-repo"}],
+                },
+                {
+                    "id": "minimal-rebuild",
+                    "phase_id": "phase-2",
+                    "title": "Rebuild minimal loop",
+                    "estimated_minutes": 75,
+                    "classification": "essential",
+                    "completion_criteria": ["runnable loop"],
+                    "source_refs": [{"id": "easyagent-repo"}],
+                },
+                {
+                    "id": "tooling-rebuild",
+                    "phase_id": "phase-2",
+                    "title": "Rebuild one tool path",
+                    "estimated_minutes": 75,
+                    "classification": "essential",
+                    "completion_criteria": ["tool path demo"],
+                    "source_refs": [{"id": "easyagent-repo"}],
+                },
+                {
+                    "id": "behavior-change",
+                    "phase_id": "phase-3",
+                    "title": "Modify one behavior",
+                    "estimated_minutes": 75,
+                    "classification": "essential",
+                    "completion_criteria": ["changed behavior"],
+                    "source_refs": [{"id": "easyagent-repo"}],
+                },
+                {
+                    "id": "source-explanation",
+                    "phase_id": "phase-3",
+                    "title": "Write source-understanding explanation",
+                    "estimated_minutes": 75,
+                    "classification": "essential",
+                    "completion_criteria": ["source explanation"],
+                    "source_refs": [{"id": "easyagent-repo"}],
+                },
+                {
+                    "id": "demo-rehearsal",
+                    "phase_id": "phase-4",
+                    "title": "Rehearse rebuild demo",
+                    "estimated_minutes": 75,
+                    "classification": "essential",
+                    "completion_criteria": ["demo rehearsal"],
+                    "source_refs": [{"id": "easyagent-repo"}],
+                },
+            ],
+        )
+    )
+
+    option_ids = review["risk_report"]["canonical_infeasibility_option_ids"]
+    assert review["status"] == "infeasible_review"
+    assert review["risk_report"]["essential_work_minutes"] == 525
+    assert review["risk_report"]["available_execution_capacity_minutes"] == 300
+    assert review["risk_report"]["capacity_gap_minutes"] == 225
+    assert review["risk_report"]["buffer_days_reserved"] == ["2026-06-04"]
+    assert review["risk_report"]["expected_late_tasks"] == [
+        "behavior-change",
+        "source-explanation",
+        "demo-rehearsal",
+    ]
+    assert "accept_late_finish" not in option_ids
+    assert "reduce_scope" not in option_ids
+    assert option_ids == [
+        "lower_depth",
+        "extend_deadline",
+        "increase_capacity",
+        "accept_crunch",
+        "accept_buffer_risk",
+    ]
+
+
 def test_initial_schedule_is_deterministic_and_skips_default_saturday_rest_day():
     scheduling = _scheduling_module()
     tasks = [
