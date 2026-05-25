@@ -30,8 +30,8 @@
 
 ## 5. Verification
 
-- [ ] 5.1 Run focused settings/source tests covering the shared LLM settings module.
-- [ ] 5.2 Run focused Smart Reminder tests covering provider dispatch and Gemini fallback.
-- [ ] 5.3 Run `openspec validate unify-llm-provider-settings --strict`.
-- [ ] 5.4 Run a broader app test/build check after focused tests pass.
-- [ ] 5.5 Manually verify the settings window: provider switching for both feature cards, key show/hide, saved/empty states, local-only copy wrapping, and Smart Input shortcut accessibility.
+- [x] 5.1 Run focused settings/source tests covering the shared LLM settings module.
+- [x] 5.2 Run focused Smart Reminder tests covering provider dispatch and Gemini fallback.
+- [x] 5.3 Run `openspec validate unify-llm-provider-settings --strict`.
+- [x] 5.4 Run a broader app test/build check after focused tests pass.
+- [x] 5.5 Manually verify the settings window: provider switching for both feature cards, key show/hide, saved/empty states, local-only copy wrapping, and Smart Input shortcut accessibility.
