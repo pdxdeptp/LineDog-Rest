@@ -5,9 +5,9 @@
   "currentChangeIndex": 4,
   "currentChange": "redesign-add-initiate-ui",
   "currentStep": "apply",
-  "currentCheckpoint": "redesign-add-initiate-ui:apply:entry-role-and-attachment-review",
+  "currentCheckpoint": "redesign-add-initiate-ui:apply:anchor-state-machine-and-recovery",
   "currentAttempt": 0,
-  "runCounter": 37,
+  "runCounter": 38,
   "maxRetriesPerCheckpoint": 2,
   "requiredProductDeepenRounds": 3,
   "requiresScopeDependencyCheck": true,
@@ -75,12 +75,13 @@
     "currentGroupId": null,
     "currentGroupStartedAt": null,
     "completedGroupIds": [
-      "session-adapter-and-api-contract"
+      "session-adapter-and-api-contract",
+      "entry-role-and-attachment-review"
     ],
     "blockedGroupId": null,
     "taskGroupsFile": "openspec/add-initiate-implementation-control/evidence/redesign-add-initiate-ui/apply-task-groups.json",
-    "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/redesign-add-initiate-ui/apply-groups/session-adapter-and-api-contract.md",
-    "lastCommit": "ae36e59c7a84f20d7053808e625e76277296ac63"
+    "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/redesign-add-initiate-ui/apply-groups/entry-role-and-attachment-review.md",
+    "lastCommit": "d6e3ec280e5294d2bd8b7d1bd859999490630120"
   },
   "lock": {
     "path": "openspec/add-initiate-implementation-control/run.lock",
@@ -180,20 +181,21 @@
         "status": "planned",
         "taskGroupsFile": "openspec/add-initiate-implementation-control/evidence/redesign-add-initiate-ui/apply-task-groups.json",
         "completedGroupIds": [
-          "session-adapter-and-api-contract"
+          "session-adapter-and-api-contract",
+          "entry-role-and-attachment-review"
         ],
-        "currentGroupId": "entry-role-and-attachment-review",
-        "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/redesign-add-initiate-ui/apply-groups/session-adapter-and-api-contract.md",
-        "lastCommit": "ae36e59c7a84f20d7053808e625e76277296ac63"
+        "currentGroupId": "anchor-state-machine-and-recovery",
+        "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/redesign-add-initiate-ui/apply-groups/entry-role-and-attachment-review.md",
+        "lastCommit": "d6e3ec280e5294d2bd8b7d1bd859999490630120"
       }
     }
   ],
   "lastRun": {
-    "completedAt": "2026-05-25T13:14:55Z",
-    "checkpoint": "redesign-add-initiate-ui:apply:session-adapter-and-api-contract",
+    "completedAt": "2026-05-25T14:36:21Z",
+    "checkpoint": "redesign-add-initiate-ui:apply:entry-role-and-attachment-review",
     "result": "completed"
   },
-  "lastCompletedCheckpoint": "redesign-add-initiate-ui:apply:session-adapter-and-api-contract",
+  "lastCompletedCheckpoint": "redesign-add-initiate-ui:apply:entry-role-and-attachment-review",
   "lastMigration": {
     "completedAt": "2026-05-25T03:56:29Z",
     "id": "require-three-product-deepen-rounds",
@@ -213,8 +215,8 @@
   },
   "lastFailure": null,
   "lastVerification": {
-    "command": "cd assistant_backend && uv run pytest tests/test_study_add_initiate_adapter.py tests/test_study_intake_router.py -k 'add_initiate or session or adapter or progress or legacy'; xcodebuild test -project MalDaze.xcodeproj -scheme MalDaze -only-testing:MalDazeTests/AssistantModelDecodingTests -quiet; openspec validate redesign-add-initiate-ui --strict",
-    "result": "session adapter/API contract group verified; backend 15 passed, Swift AssistantModelDecodingTests passed, OpenSpec valid"
+    "command": "xcodebuild test -project MalDaze.xcodeproj -scheme MalDaze -parallel-testing-enabled NO -only-testing:MalDazeTests/LearningAssistantViewModelTests -only-testing:MalDazeTests/LearningAssistantUISourceTests -quiet; openspec validate redesign-add-initiate-ui --strict; git diff --check -- MalDaze/LearningAssistant/AssistantPanelView.swift MalDaze/LearningAssistant/LearningAssistantViewModel.swift MalDazeTests/LearningAssistantTests.swift",
+    "result": "entry role and attachment review group verified; Swift focused tests passed, OpenSpec valid, diff check clean"
   },
   "blockedReason": null
 }

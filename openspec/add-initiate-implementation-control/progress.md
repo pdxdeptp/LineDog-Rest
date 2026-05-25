@@ -5,7 +5,7 @@
 - Phase: active
 - Current change: redesign-add-initiate-ui
 - Current step: apply
-- Current checkpoint: redesign-add-initiate-ui:apply:entry-role-and-attachment-review
+- Current checkpoint: redesign-add-initiate-ui:apply:anchor-state-machine-and-recovery
 - Required product-deepen rounds before apply: 3
 - Required checkpoint after product deepening: scope_dependency_check
 - Product-deepen scope guard: every round must read adjacent changes and record scope decisions
@@ -67,10 +67,10 @@ Apply planning completed for `redesign-add-initiate-ui`: yes
 Completed apply groups for `redesign-add-initiate-ui`:
 
 - `session-adapter-and-api-contract`
+- `entry-role-and-attachment-review`
 
 Remaining apply groups for `redesign-add-initiate-ui`:
 
-- `entry-role-and-attachment-review`
 - `anchor-state-machine-and-recovery`
 - `draft-review-options-and-activation`
 - `noise-boundaries-and-active-refresh`
@@ -78,7 +78,7 @@ Remaining apply groups for `redesign-add-initiate-ui`:
 
 Next required checkpoint for `redesign-add-initiate-ui`:
 
-- `apply:entry-role-and-attachment-review`
+- `apply:anchor-state-machine-and-recovery`
 
 ## Run Log
 
@@ -1388,3 +1388,23 @@ Next required checkpoint for `redesign-add-initiate-ui`:
 - Manifest:
   - Added `redesign-add-initiate-ui-apply-session-adapter-and-api-contract`.
 - Next checkpoint: redesign-add-initiate-ui:apply:entry-role-and-attachment-review
+
+## Run 2026-05-25T14:36:21Z
+
+- Automation: add-initiate-changes
+- Checkpoint: redesign-add-initiate-ui:apply:entry-role-and-attachment-review
+- Result: completed
+- Actions:
+  - Implemented Add / Initiate entry, first-version input source type picker, role review, existing-plan selector, and attachment mode review.
+  - Added ViewModel methods for adapter-based session start and role confirmation without using legacy URL ingestion or old study-plan start as the primary path.
+  - Added request guards for supporting-material and attach-to-existing-plan paths, canonical one-off role mapping, stale failure protection, and per-session role-review seeding.
+  - Completed spec compliance and code quality review loops; both final re-reviews approved.
+- Verification:
+  - `xcodebuild test -project MalDaze.xcodeproj -scheme MalDaze -parallel-testing-enabled NO -only-testing:MalDazeTests/LearningAssistantViewModelTests -only-testing:MalDazeTests/LearningAssistantUISourceTests -quiet`: passed.
+  - `openspec validate redesign-add-initiate-ui --strict`: valid.
+  - `git diff --check -- MalDaze/LearningAssistant/AssistantPanelView.swift MalDaze/LearningAssistant/LearningAssistantViewModel.swift MalDazeTests/LearningAssistantTests.swift`: no whitespace errors.
+- Commits:
+  - Implementation: d6e3ec280e5294d2bd8b7d1bd859999490630120
+- Manifest:
+  - Added `redesign-add-initiate-ui-apply-entry-role-and-attachment-review`.
+- Next checkpoint: redesign-add-initiate-ui:apply:anchor-state-machine-and-recovery
