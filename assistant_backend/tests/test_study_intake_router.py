@@ -1083,6 +1083,157 @@ async def test_api_route_contract_and_canonical_repo_role_are_separate(client):
 
 
 @pytest.mark.asyncio
+async def test_add_initiate_api_uses_session_adapter_and_not_legacy_url_ingest(client):
+    response = await client.post(
+        "/api/study-intake/add-initiate/sessions",
+        json={
+            "clientRequestId": "req-api-add-initiate",
+            "rawInput": "Plan backend interview prep by 2026-08-01.",
+            "sourceType": "interview_prep",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["sessionId"] == f"add-initiate-{payload['intakeItemId']}"
+    assert payload["clientRequestId"] == "req-api-add-initiate"
+    assert payload["stage"] == "role_review"
+    assert payload["reviewState"] == "role_review"
+    assert payload["createsActiveTasks"] is False
+
+    legacy = await client.post(
+        "/api/ingest/start",
+        json={
+            "url": "https://example.com/course",
+            "deadline": "2026-08-01",
+        },
+    )
+    assert legacy.status_code in {200, 500}
+    assert "thread_id" in legacy.text or "threadId" not in payload
+
+
+@pytest.mark.asyncio
+async def test_add_initiate_api_session_mismatch_and_stale_option_return_409(client):
+    import os
+
+    import aiosqlite
+
+    async with aiosqlite.connect(os.environ["DB_PATH"]) as db:
+        db.row_factory = aiosqlite.Row
+        from src.study_plan.add_initiate import session_id_for_intake
+        from src.study_plan.intake import confirm_intake_route, create_intake_item
+        from src.study_plan.lifecycle import save_draft_compiler_package_shell
+
+        item = await create_intake_item(
+            db,
+            client_request_id="req-api-add-initiate-conflict",
+            raw_input="Learn conflict handling by 2026-08-01.",
+            source_type="text_goal",
+            recommended_role="new_plan",
+            confidence="high",
+            reason_codes=["planning_language"],
+        )
+        role = await confirm_intake_route(
+            db,
+            intake_item_id=item["id"],
+            confirmed_role="new_plan",
+            title="Conflict Handling",
+            metadata={"deadline": "2026-08-01", "capacity_minutes": 45},
+        )
+        await save_draft_compiler_package_shell(
+            db,
+            draft_id=role["draftId"],
+            status="compiling",
+            summary="Conflict plan",
+            assumptions={},
+            tasks=[
+                {
+                    "id": "task-1",
+                    "title": "Read conflict notes",
+                    "estimated_minutes": 45,
+                    "schedule_slices": [{"date": "2026-07-01", "target_minutes": 45}],
+                }
+            ],
+        )
+        await save_draft_compiler_package_shell(
+            db,
+            draft_id=role["draftId"],
+            status="draft_review",
+            summary="Conflict plan",
+            assumptions={},
+            tasks=[
+                {
+                    "id": "task-1",
+                    "title": "Read conflict notes",
+                    "estimated_minutes": 45,
+                    "schedule_slices": [{"date": "2026-07-01", "target_minutes": 45}],
+                }
+            ],
+            activation_eligibility={
+                "activation_ready": True,
+                "schedule_version": "sched-v1",
+            },
+        )
+        canonical_session = session_id_for_intake(item["id"])
+        draft_id = role["draftId"]
+
+    mismatch = await client.post(
+        "/api/study-intake/add-initiate/options",
+        json={
+            "sessionId": "add-initiate-999",
+            "draftId": draft_id,
+            "draftVersion": 1,
+            "optionId": "lower_depth",
+            "parameters": {"requested_depth": "survey"},
+        },
+    )
+    assert mismatch.status_code == 409
+
+    first = await client.post(
+        "/api/study-intake/add-initiate/options",
+        json={
+            "sessionId": canonical_session,
+            "draftId": draft_id,
+            "draftVersion": 1,
+            "optionId": "lower_depth",
+            "parameters": {"requested_depth": "survey"},
+        },
+    )
+    assert first.status_code == 200
+    stale = await client.post(
+        "/api/study-intake/add-initiate/options",
+        json={
+            "sessionId": canonical_session,
+            "draftId": draft_id,
+            "draftVersion": 1,
+            "optionId": "lower_depth",
+            "parameters": {"requested_depth": "survey"},
+        },
+    )
+    assert stale.status_code == 409
+
+    stale_activation = await client.post(
+        "/api/study-intake/add-initiate/activate",
+        json={
+            "sessionId": canonical_session,
+            "draftId": draft_id,
+            "draftVersion": 1,
+        },
+    )
+    assert stale_activation.status_code == 409
+
+    activation_mismatch = await client.post(
+        "/api/study-intake/add-initiate/activate",
+        json={
+            "sessionId": "add-initiate-999",
+            "draftId": draft_id,
+            "draftVersion": 2,
+        },
+    )
+    assert activation_mismatch.status_code == 409
+
+
+@pytest.mark.asyncio
 async def test_api_route_accepts_existing_plan_id_as_selected_target(client):
     import os
 

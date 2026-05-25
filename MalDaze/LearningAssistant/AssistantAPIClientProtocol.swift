@@ -44,6 +44,11 @@ protocol AssistantAPIClientProtocol: Sendable {
     func subscribeIngestionProgress(threadId: String) -> AsyncThrowingStream<IngestionProgressEvent, Error>
     func rescheduleIngestion(threadId: String, deadline: String, speedFactor: Double) async throws -> IngestionDraftDetail
     func confirmIngestion(threadId: String, confirmed: Bool, selectedOption: String?, deadline: String?, speedFactor: Double?) async throws
+    func startAddInitiateSession(_ request: AddInitiateStartSessionRequest) async throws -> AddInitiateSessionResponse
+    func confirmAddInitiateRole(_ request: AddInitiateRoleConfirmationRequest) async throws -> AddInitiateSessionResponse
+    func confirmAddInitiateAnchors(_ request: AddInitiateAnchorConfirmationRequest) async throws -> AddInitiateSessionResponse
+    func applyAddInitiateOptionEffect(_ request: AddInitiateOptionEffectRequest) async throws -> AddInitiateSessionResponse
+    func activateAddInitiateDraft(_ request: AddInitiateActivationRequest) async throws -> AddInitiateSessionResponse
     func startStudyPlan(url: String, deadline: String, capacityMinutes: Int) async throws -> StudyPlanStartResponse
     func submitStudyPlanClarification(draftId: Int, answers: [String: String], skip: Bool) async throws -> StudyPlanDraft
     func updateStudyPlanDraftTaskDuration(draftId: Int, taskOrderIndex: Int, estimatedMinutes: Int) async throws -> StudyPlanDraft
@@ -136,6 +141,26 @@ extension AssistantAPIClientProtocol {
         projectId: Int?,
         preview: StudyDialogueAdjustmentPreview
     ) async throws -> StudyDialogueAdjustmentApplyResult {
+        throw AssistantOfflineError()
+    }
+
+    func startAddInitiateSession(_ request: AddInitiateStartSessionRequest) async throws -> AddInitiateSessionResponse {
+        throw AssistantOfflineError()
+    }
+
+    func confirmAddInitiateRole(_ request: AddInitiateRoleConfirmationRequest) async throws -> AddInitiateSessionResponse {
+        throw AssistantOfflineError()
+    }
+
+    func confirmAddInitiateAnchors(_ request: AddInitiateAnchorConfirmationRequest) async throws -> AddInitiateSessionResponse {
+        throw AssistantOfflineError()
+    }
+
+    func applyAddInitiateOptionEffect(_ request: AddInitiateOptionEffectRequest) async throws -> AddInitiateSessionResponse {
+        throw AssistantOfflineError()
+    }
+
+    func activateAddInitiateDraft(_ request: AddInitiateActivationRequest) async throws -> AddInitiateSessionResponse {
         throw AssistantOfflineError()
     }
 }

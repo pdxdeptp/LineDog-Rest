@@ -678,6 +678,7 @@ async def confirm_intake_route(
             "targetPlanId": target_plan["id"],
             "attachmentMode": attachment_mode,
             "draftId": shell["id"],
+            "draftVersion": shell["draft_version"],
             "draftKind": shell["draft_kind"],
         }
 
@@ -707,6 +708,7 @@ async def confirm_intake_route(
         "outcome": "awaiting_anchor_review",
         "targetPlanId": None,
         "draftId": shell["id"],
+        "draftVersion": shell["draft_version"],
         "draftKind": shell["draft_kind"],
     }
 

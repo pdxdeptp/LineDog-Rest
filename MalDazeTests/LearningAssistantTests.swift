@@ -370,6 +370,290 @@ final class AssistantModelDecodingTests: XCTestCase {
         XCTAssertTrue(source.contains("\"/api/study-plan/drafts/\\(draftId)/confirm\""))
     }
 
+    // MARK: Add / Initiate Session Contract
+
+    func testAddInitiateSessionModelsDecodeSessionReviewAndProgressIdentity() throws {
+        let session = try decode(AddInitiateSessionResponse.self, from: """
+        {
+            "sessionId": "add-initiate-42",
+            "clientRequestId": "req-42",
+            "intakeItemId": 42,
+            "draftId": 101,
+            "draftVersion": 3,
+            "stage": "draft_review",
+            "reviewState": "draft_review",
+            "recommendedRole": "new_plan",
+            "confirmedRole": "new_plan",
+            "confidence": "high",
+            "reasonCodes": ["planning_language"],
+            "nextAction": "review_draft",
+            "createsActiveTasks": false
+        }
+        """)
+        let event = try decode(AddInitiateProgressEvent.self, from: """
+        {
+            "sessionId": "add-initiate-42",
+            "clientRequestId": "req-42",
+            "stage": "preparing_review",
+            "reviewState": "draft_review",
+            "draftId": 101,
+            "draftVersion": 3,
+            "createsActiveTasks": false,
+            "done": false
+        }
+        """)
+        let stored = try decode(AddInitiateSessionResponse.self, from: """
+        {
+            "sessionId": "add-initiate-43",
+            "clientRequestId": "req-43",
+            "intakeItemId": 43,
+            "stage": "stored_non_plan",
+            "reviewState": "stored_non_plan",
+            "recommendedRole": "reference_material",
+            "nextAction": "confirm_non_plan_storage",
+            "createsActiveTasks": false
+        }
+        """)
+        let needsInput = try decode(AddInitiateSessionResponse.self, from: """
+        {
+            "sessionId": "add-initiate-44",
+            "clientRequestId": "req-44",
+            "intakeItemId": 44,
+            "stage": "needs_input",
+            "reviewState": "needs_input",
+            "recommendedRole": "later_resource",
+            "confidence": "low",
+            "nextAction": "answer_routing_question",
+            "createsActiveTasks": false,
+            "clarificationQuestion": {
+                "prompt": "Where should this go?",
+                "recommendedDefault": "later_resource",
+                "options": ["new_plan", "later_resource"]
+            }
+        }
+        """)
+        let role = try decode(AddInitiateSessionResponse.self, from: """
+        {
+            "sessionId": "add-initiate-45",
+            "clientRequestId": "req-45",
+            "intakeItemId": 45,
+            "stage": "role_review",
+            "reviewState": "role_review",
+            "recommendedRole": "attach_to_existing_plan",
+            "confidence": "high",
+            "nextAction": "role_review",
+            "attachmentModeSuggestion": "material_only",
+            "canonicalRepoRole": "project_material",
+            "existingPlanCandidates": [{"id": 7, "title": "Compiler Study"}],
+            "createsActiveTasks": false
+        }
+        """)
+        let review = try decode(AddInitiateSessionResponse.self, from: """
+        {
+            "sessionId": "add-initiate-46",
+            "clientRequestId": "req-46",
+            "intakeItemId": 46,
+            "draftId": 90,
+            "draftVersion": 2,
+            "stage": "draft_review",
+            "reviewState": "draft_review",
+            "createsActiveTasks": false,
+            "reviewPackage": {
+                "draft_version": 2,
+                "summary": "Review package",
+                "option_effect": {"id": "lower_depth"}
+            },
+            "activationResult": {
+                "status": "active",
+                "resource_id": 10
+            }
+        }
+        """)
+
+        XCTAssertEqual(session.sessionId, "add-initiate-42")
+        XCTAssertEqual(session.intakeItemId, 42)
+        XCTAssertEqual(session.draftId, 101)
+        XCTAssertEqual(session.draftVersion, 3)
+        XCTAssertEqual(session.stage, .draftReview)
+        XCTAssertEqual(session.reviewState, .draftReview)
+        XCTAssertFalse(session.createsActiveTasks)
+        XCTAssertEqual(event.stage, .preparingReview)
+        XCTAssertEqual(event.reviewState, .draftReview)
+        XCTAssertEqual(event.draftVersion, 3)
+        XCTAssertEqual(stored.stage, .storedNonPlan)
+        XCTAssertEqual(stored.reviewState, .storedNonPlan)
+        XCTAssertFalse(stored.createsActiveTasks)
+        XCTAssertEqual(needsInput.clarificationQuestion?["prompt"]?.value as? String, "Where should this go?")
+        XCTAssertEqual(role.attachmentModeSuggestion, "material_only")
+        XCTAssertEqual(role.canonicalRepoRole, "project_material")
+        XCTAssertEqual(role.existingPlanCandidates?.first?["title"]?.value as? String, "Compiler Study")
+        XCTAssertEqual(review.reviewPackage?["summary"]?.value as? String, "Review package")
+        XCTAssertEqual(review.activationResult?["status"]?.value as? String, "active")
+    }
+
+    func testAddInitiateRequestBodiesEncodeCamelCaseContractKeys() throws {
+        let start = AddInitiateStartSessionRequest(
+            clientRequestId: "req-start",
+            rawInput: "Learn FastAPI by August",
+            sourceType: "text_goal",
+            userHint: "new plan",
+            existingPlanId: nil
+        )
+        let role = AddInitiateRoleConfirmationRequest(
+            sessionId: "add-initiate-1",
+            intakeItemId: 1,
+            confirmedRole: "attach_to_existing_plan",
+            title: "FastAPI notes",
+            url: "https://example.com/fastapi",
+            existingPlanId: 7,
+            attachmentMode: "material_only",
+            canonicalRepoRole: nil,
+            metadata: ["source": AnyCodable("manual")]
+        )
+        let anchors = AddInitiateAnchorConfirmationRequest(
+            sessionId: "add-initiate-1",
+            draftId: 9,
+            intakeItemId: 1,
+            deadline: "2026-08-01",
+            deadlineType: "hard",
+            capacityMinutes: 45,
+            targetOutput: "working notes",
+            targetDepth: "apply",
+            assumptions: ["deadline": AnyCodable(["accepted": true])],
+            restWeekdays: [6],
+            unavailableDates: ["2026-07-04"],
+            bufferPolicy: "standard",
+            loadShape: "steady"
+        )
+        let option = AddInitiateOptionEffectRequest(
+            sessionId: "add-initiate-1",
+            draftId: 9,
+            draftVersion: 2,
+            optionId: "increase_capacity",
+            parameters: ["new_daily_capacity_min": AnyCodable(60)]
+        )
+        let activation = AddInitiateActivationRequest(
+            sessionId: "add-initiate-1",
+            draftId: 9,
+            draftVersion: 2
+        )
+
+        let startPayload = try jsonDictionary(from: start)
+        XCTAssertEqual(startPayload["clientRequestId"] as? String, "req-start")
+        XCTAssertEqual(startPayload["rawInput"] as? String, "Learn FastAPI by August")
+        XCTAssertEqual(startPayload["sourceType"] as? String, "text_goal")
+        XCTAssertNil(startPayload["client_request_id"])
+
+        let rolePayload = try jsonDictionary(from: role)
+        XCTAssertEqual(rolePayload["sessionId"] as? String, "add-initiate-1")
+        XCTAssertEqual(rolePayload["intakeItemId"] as? Int, 1)
+        XCTAssertEqual(rolePayload["confirmedRole"] as? String, "attach_to_existing_plan")
+        XCTAssertEqual(rolePayload["existingPlanId"] as? Int, 7)
+        XCTAssertEqual(rolePayload["attachmentMode"] as? String, "material_only")
+
+        let anchorPayload = try jsonDictionary(from: anchors)
+        XCTAssertEqual(anchorPayload["deadlineType"] as? String, "hard")
+        XCTAssertEqual(anchorPayload["capacityMinutes"] as? Int, 45)
+        XCTAssertEqual(anchorPayload["targetOutput"] as? String, "working notes")
+        XCTAssertEqual(anchorPayload["targetDepth"] as? String, "apply")
+
+        let optionPayload = try jsonDictionary(from: option)
+        XCTAssertEqual(optionPayload["draftVersion"] as? Int, 2)
+        XCTAssertEqual(optionPayload["optionId"] as? String, "increase_capacity")
+
+        let activationPayload = try jsonDictionary(from: activation)
+        XCTAssertEqual(activationPayload["draftId"] as? Int, 9)
+        XCTAssertEqual(activationPayload["draftVersion"] as? Int, 2)
+    }
+
+    func testAddInitiateAPIClientUsesAdapterEndpointsAndNotLegacyURLIngest() async throws {
+        let client = makeRecordingClient(responseBody: """
+        {
+            "sessionId": "add-initiate-1",
+            "clientRequestId": "req-start",
+            "intakeItemId": 1,
+            "stage": "role_review",
+            "reviewState": "role_review",
+            "recommendedRole": "new_plan",
+            "confidence": "high",
+            "reasonCodes": ["planning_language"],
+            "nextAction": "role_review",
+            "createsActiveTasks": false
+        }
+        """)
+        _ = try await client.startAddInitiateSession(
+            AddInitiateStartSessionRequest(
+                clientRequestId: "req-start",
+                rawInput: "Learn FastAPI",
+                sourceType: "text_goal"
+            )
+        )
+
+        var request = try XCTUnwrap(URLProtocolBackedAPIClientTests.lastRequest)
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertEqual(request.url?.path, "/api/study-intake/add-initiate/sessions")
+        XCTAssertNotEqual(request.url?.path, "/api/ingest/start")
+
+        let roleClient = makeRecordingClient(responseBody: """
+        {"sessionId":"add-initiate-1","clientRequestId":"req-start","intakeItemId":1,"draftId":8,"draftVersion":1,"stage":"anchor_review","reviewState":"anchor_review","confirmedRole":"new_plan","createsActiveTasks":false}
+        """)
+        _ = try await roleClient.confirmAddInitiateRole(
+            AddInitiateRoleConfirmationRequest(
+                sessionId: "add-initiate-1",
+                intakeItemId: 1,
+                confirmedRole: "new_plan",
+                title: "Learn FastAPI"
+            )
+        )
+        request = try XCTUnwrap(URLProtocolBackedAPIClientTests.lastRequest)
+        XCTAssertEqual(request.url?.path, "/api/study-intake/add-initiate/role")
+
+        let anchorsClient = makeRecordingClient(responseBody: """
+        {"sessionId":"add-initiate-1","clientRequestId":"req-start","intakeItemId":1,"draftId":8,"draftVersion":1,"stage":"draft_review","reviewState":"draft_review","createsActiveTasks":false}
+        """)
+        _ = try await anchorsClient.confirmAddInitiateAnchors(
+            AddInitiateAnchorConfirmationRequest(
+                sessionId: "add-initiate-1",
+                draftId: 8,
+                intakeItemId: 1,
+                deadline: "2026-08-01",
+                deadlineType: "hard",
+                capacityMinutes: 45,
+                targetOutput: "notes",
+                targetDepth: "apply"
+            )
+        )
+        request = try XCTUnwrap(URLProtocolBackedAPIClientTests.lastRequest)
+        XCTAssertEqual(request.url?.path, "/api/study-intake/add-initiate/anchors")
+
+        let optionClient = makeRecordingClient(responseBody: """
+        {"sessionId":"add-initiate-1","draftId":8,"draftVersion":2,"stage":"draft_review","reviewState":"draft_review","createsActiveTasks":false}
+        """)
+        _ = try await optionClient.applyAddInitiateOptionEffect(
+            AddInitiateOptionEffectRequest(
+                sessionId: "add-initiate-1",
+                draftId: 8,
+                draftVersion: 1,
+                optionId: "reduce_scope"
+            )
+        )
+        request = try XCTUnwrap(URLProtocolBackedAPIClientTests.lastRequest)
+        XCTAssertEqual(request.url?.path, "/api/study-intake/add-initiate/options")
+
+        let activationClient = makeRecordingClient(responseBody: """
+        {"sessionId":"add-initiate-1","draftId":8,"draftVersion":2,"stage":"activated","reviewState":"activated","createsActiveTasks":true,"resourceId":10}
+        """)
+        _ = try await activationClient.activateAddInitiateDraft(
+            AddInitiateActivationRequest(
+                sessionId: "add-initiate-1",
+                draftId: 8,
+                draftVersion: 2
+            )
+        )
+        request = try XCTUnwrap(URLProtocolBackedAPIClientTests.lastRequest)
+        XCTAssertEqual(request.url?.path, "/api/study-intake/add-initiate/activate")
+    }
+
     // MARK: Study Views
 
     func testStudyTodayViewDecodesTaskProjectResourceAndUnitFieldsWithSafeURLs() throws {

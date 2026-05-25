@@ -660,6 +660,7 @@ async def create_meaningful_draft_edit_version(
     draft_id: int,
     edit_kind: str,
     package_updates: dict[str, Any],
+    expected_latest_version: int | None = None,
 ) -> dict[str, Any]:
     """Create a snapshot version after an edit that affects plan semantics."""
     await _ensure_draft_version_storage(db)
@@ -668,6 +669,11 @@ async def create_meaningful_draft_edit_version(
         draft = await _fetch_draft_header(db, draft_id)
         _ensure_draft_allows_package_write(draft)
         latest_version = int(draft["latest_version"])
+        if (
+            expected_latest_version is not None
+            and latest_version != int(expected_latest_version)
+        ):
+            raise ValueError("stale draft option requested")
         latest_row = await _fetch_version_row(db, draft_id, latest_version)
         if latest_row is None:
             raise ValueError(f"Draft package version not found: {draft_id}@{latest_version}")

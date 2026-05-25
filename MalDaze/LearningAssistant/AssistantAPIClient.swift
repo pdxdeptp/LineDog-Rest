@@ -196,6 +196,212 @@ struct IngestionDraftDetail: Codable {
     }
 }
 
+// MARK: - Add / Initiate Models
+
+enum AddInitiateStage: String, Codable {
+    case analyzingInput = "analyzing_input"
+    case routingItem = "routing_item"
+    case previewingSource = "previewing_source"
+    case roleReview = "role_review"
+    case anchorReview = "anchor_review"
+    case generatingPhases = "generating_phases"
+    case generatingTasks = "generating_tasks"
+    case validatingTasks = "validating_tasks"
+    case scheduling
+    case preparingReview = "preparing_review"
+    case storedNonPlan = "stored_non_plan"
+    case materialAttached = "material_attached"
+    case needsInput = "needs_input"
+    case compileFailed = "compile_failed"
+    case infeasibleReview = "infeasible_review"
+    case draftReview = "draft_review"
+    case activationFailed = "activation_failed"
+    case activated
+    case cancelled
+    case error
+}
+
+enum AddInitiateReviewState: String, Codable {
+    case roleReview = "role_review"
+    case anchorReview = "anchor_review"
+    case storedNonPlan = "stored_non_plan"
+    case materialAttached = "material_attached"
+    case needsInput = "needs_input"
+    case compileFailed = "compile_failed"
+    case infeasibleReview = "infeasible_review"
+    case draftReview = "draft_review"
+    case activationFailed = "activation_failed"
+    case activated
+    case cancelled
+    case error
+}
+
+struct AddInitiateStartSessionRequest: Codable {
+    let clientRequestId: String
+    let rawInput: String
+    let sourceType: String
+    let userHint: String?
+    let existingPlanId: Int?
+
+    init(
+        clientRequestId: String,
+        rawInput: String,
+        sourceType: String,
+        userHint: String? = nil,
+        existingPlanId: Int? = nil
+    ) {
+        self.clientRequestId = clientRequestId
+        self.rawInput = rawInput
+        self.sourceType = sourceType
+        self.userHint = userHint
+        self.existingPlanId = existingPlanId
+    }
+}
+
+struct AddInitiateRoleConfirmationRequest: Codable {
+    let sessionId: String
+    let intakeItemId: Int
+    let confirmedRole: String
+    let title: String
+    let url: String?
+    let existingPlanId: Int?
+    let attachmentMode: String?
+    let canonicalRepoRole: String?
+    let metadata: [String: AnyCodable]?
+
+    init(
+        sessionId: String,
+        intakeItemId: Int,
+        confirmedRole: String,
+        title: String,
+        url: String? = nil,
+        existingPlanId: Int? = nil,
+        attachmentMode: String? = nil,
+        canonicalRepoRole: String? = nil,
+        metadata: [String: AnyCodable]? = nil
+    ) {
+        self.sessionId = sessionId
+        self.intakeItemId = intakeItemId
+        self.confirmedRole = confirmedRole
+        self.title = title
+        self.url = url
+        self.existingPlanId = existingPlanId
+        self.attachmentMode = attachmentMode
+        self.canonicalRepoRole = canonicalRepoRole
+        self.metadata = metadata
+    }
+}
+
+struct AddInitiateAnchorConfirmationRequest: Codable {
+    let sessionId: String
+    let draftId: Int
+    let intakeItemId: Int?
+    let deadline: String
+    let deadlineType: String
+    let capacityMinutes: Int
+    let targetOutput: String
+    let targetDepth: String
+    let assumptions: [String: AnyCodable]?
+    let restWeekdays: [Int]?
+    let unavailableDates: [String]?
+    let bufferPolicy: String?
+    let loadShape: String?
+
+    init(
+        sessionId: String,
+        draftId: Int,
+        intakeItemId: Int? = nil,
+        deadline: String,
+        deadlineType: String,
+        capacityMinutes: Int,
+        targetOutput: String,
+        targetDepth: String,
+        assumptions: [String: AnyCodable]? = nil,
+        restWeekdays: [Int]? = nil,
+        unavailableDates: [String]? = nil,
+        bufferPolicy: String? = nil,
+        loadShape: String? = nil
+    ) {
+        self.sessionId = sessionId
+        self.draftId = draftId
+        self.intakeItemId = intakeItemId
+        self.deadline = deadline
+        self.deadlineType = deadlineType
+        self.capacityMinutes = capacityMinutes
+        self.targetOutput = targetOutput
+        self.targetDepth = targetDepth
+        self.assumptions = assumptions
+        self.restWeekdays = restWeekdays
+        self.unavailableDates = unavailableDates
+        self.bufferPolicy = bufferPolicy
+        self.loadShape = loadShape
+    }
+}
+
+struct AddInitiateOptionEffectRequest: Codable {
+    let sessionId: String
+    let draftId: Int
+    let draftVersion: Int
+    let optionId: String
+    let parameters: [String: AnyCodable]?
+
+    init(
+        sessionId: String,
+        draftId: Int,
+        draftVersion: Int,
+        optionId: String,
+        parameters: [String: AnyCodable]? = nil
+    ) {
+        self.sessionId = sessionId
+        self.draftId = draftId
+        self.draftVersion = draftVersion
+        self.optionId = optionId
+        self.parameters = parameters
+    }
+}
+
+struct AddInitiateActivationRequest: Codable {
+    let sessionId: String
+    let draftId: Int
+    let draftVersion: Int
+}
+
+struct AddInitiateSessionResponse: Codable {
+    let sessionId: String
+    let clientRequestId: String?
+    let intakeItemId: Int?
+    let draftId: Int?
+    let draftVersion: Int?
+    let stage: AddInitiateStage
+    let reviewState: AddInitiateReviewState
+    let recommendedRole: String?
+    let confirmedRole: String?
+    let confidence: String?
+    let reasonCodes: [String]?
+    let nextAction: String?
+    let createsActiveTasks: Bool
+    let resourceId: Int?
+    let error: String?
+    let clarificationQuestion: [String: AnyCodable]?
+    let existingPlanCandidates: [[String: AnyCodable]]?
+    let attachmentModeSuggestion: String?
+    let canonicalRepoRole: String?
+    let reviewPackage: [String: AnyCodable]?
+    let activationResult: [String: AnyCodable]?
+}
+
+struct AddInitiateProgressEvent: Codable {
+    let sessionId: String
+    let clientRequestId: String?
+    let intakeItemId: Int?
+    let draftId: Int?
+    let draftVersion: Int?
+    let stage: AddInitiateStage
+    let reviewState: AddInitiateReviewState?
+    let createsActiveTasks: Bool
+    let done: Bool
+}
+
 // MARK: - Learning Preferences Model
 
 struct LearningPreferences: Codable {
@@ -1607,6 +1813,38 @@ final class AssistantAPIClient: @unchecked Sendable {
         try await postVoid("/api/ingest/confirm",
                            body: Body(threadId: threadId, confirmed: confirmed, selectedOption: selectedOption,
                                      deadline: deadline, speedFactor: speedFactor))
+    }
+
+    // MARK: - Add / Initiate
+
+    func startAddInitiateSession(
+        _ request: AddInitiateStartSessionRequest
+    ) async throws -> AddInitiateSessionResponse {
+        try await post("/api/study-intake/add-initiate/sessions", body: request)
+    }
+
+    func confirmAddInitiateRole(
+        _ request: AddInitiateRoleConfirmationRequest
+    ) async throws -> AddInitiateSessionResponse {
+        try await post("/api/study-intake/add-initiate/role", body: request)
+    }
+
+    func confirmAddInitiateAnchors(
+        _ request: AddInitiateAnchorConfirmationRequest
+    ) async throws -> AddInitiateSessionResponse {
+        try await post("/api/study-intake/add-initiate/anchors", body: request)
+    }
+
+    func applyAddInitiateOptionEffect(
+        _ request: AddInitiateOptionEffectRequest
+    ) async throws -> AddInitiateSessionResponse {
+        try await post("/api/study-intake/add-initiate/options", body: request)
+    }
+
+    func activateAddInitiateDraft(
+        _ request: AddInitiateActivationRequest
+    ) async throws -> AddInitiateSessionResponse {
+        try await post("/api/study-intake/add-initiate/activate", body: request)
     }
 
     // MARK: - Study Plan v2
