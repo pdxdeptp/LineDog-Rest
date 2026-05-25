@@ -5,9 +5,9 @@
   "currentChangeIndex": 2,
   "currentChange": "introduce-plan-compiler",
   "currentStep": "apply",
-  "currentCheckpoint": "introduce-plan-compiler:apply:synopsis-llm-validation-and-repair",
+  "currentCheckpoint": "introduce-plan-compiler:apply:estimates-trace-fixtures-and-final-verification",
   "currentAttempt": 0,
-  "runCounter": 22,
+  "runCounter": 23,
   "maxRetriesPerCheckpoint": 2,
   "requiredProductDeepenRounds": 3,
   "requiresScopeDependencyCheck": true,
@@ -72,15 +72,16 @@
   "applyCursor": {
     "schemaVersion": 1,
     "activeChange": "introduce-plan-compiler",
-    "currentGroupId": "synopsis-llm-validation-and-repair",
+    "currentGroupId": "estimates-trace-fixtures-and-final-verification",
     "currentGroupStartedAt": null,
     "completedGroupIds": [
-      "envelope-archetype-and-depth-core"
+      "envelope-archetype-and-depth-core",
+      "synopsis-llm-validation-and-repair"
     ],
     "blockedGroupId": null,
     "taskGroupsFile": "openspec/add-initiate-implementation-control/evidence/introduce-plan-compiler/apply-task-groups.json",
-    "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/introduce-plan-compiler/apply-groups/envelope-archetype-and-depth-core.md",
-    "lastCommit": "b6f94fc525902a68eee3d9ed97afa805fad6fc66"
+    "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/introduce-plan-compiler/apply-groups/synopsis-llm-validation-and-repair.md",
+    "lastCommit": "c98dc6f023aab50bf5b009981090abc4aee81574"
   },
   "lock": {
     "path": "openspec/add-initiate-implementation-control/run.lock",
@@ -141,11 +142,12 @@
         "status": "in_progress",
         "taskGroupsFile": "openspec/add-initiate-implementation-control/evidence/introduce-plan-compiler/apply-task-groups.json",
         "completedGroupIds": [
-          "envelope-archetype-and-depth-core"
+          "envelope-archetype-and-depth-core",
+          "synopsis-llm-validation-and-repair"
         ],
-        "currentGroupId": "synopsis-llm-validation-and-repair",
-        "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/introduce-plan-compiler/apply-groups/envelope-archetype-and-depth-core.md",
-        "lastCommit": "b6f94fc525902a68eee3d9ed97afa805fad6fc66"
+        "currentGroupId": "estimates-trace-fixtures-and-final-verification",
+        "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/introduce-plan-compiler/apply-groups/synopsis-llm-validation-and-repair.md",
+        "lastCommit": "c98dc6f023aab50bf5b009981090abc4aee81574"
       }
     },
     {
@@ -180,11 +182,11 @@
     }
   ],
   "lastRun": {
-    "completedAt": "2026-05-25T09:44:22Z",
-    "checkpoint": "introduce-plan-compiler:apply:envelope-archetype-and-depth-core",
+    "completedAt": "2026-05-25T10:17:12Z",
+    "checkpoint": "introduce-plan-compiler:apply:synopsis-llm-validation-and-repair",
     "result": "completed"
   },
-  "lastCompletedCheckpoint": "introduce-plan-compiler:apply:envelope-archetype-and-depth-core",
+  "lastCompletedCheckpoint": "introduce-plan-compiler:apply:synopsis-llm-validation-and-repair",
   "lastMigration": {
     "completedAt": "2026-05-25T03:56:29Z",
     "id": "require-three-product-deepen-rounds",
@@ -204,8 +206,8 @@
   },
   "lastFailure": null,
   "lastVerification": {
-    "command": "cd assistant_backend && uv run pytest tests/test_study_plan_compiler.py -k 'envelope or status or archetype or tie_breaker or depth' && cd assistant_backend && uv run pytest tests/test_study_plan_lifecycle.py -k 'needs_input or compile_failed or package' && openspec validate introduce-plan-compiler --strict && openspec instructions apply --change introduce-plan-compiler --json",
-    "result": "23 compiler tests passed; 31 lifecycle tests passed; OpenSpec valid; apply progress 11/31 complete"
+    "command": "cd assistant_backend && uv run pytest tests/test_study_plan_compiler.py -k 'synopsis or thin_source or llm_contract or validation or repair or forbidden_date' && cd assistant_backend && uv run pytest tests/test_study_plan_compiler.py -k 'envelope or status or archetype or tie_breaker or depth' && openspec validate introduce-plan-compiler --strict && openspec instructions apply --change introduce-plan-compiler --json",
+    "result": "22 synopsis/validation/repair compiler tests passed; 25 envelope/archetype/depth regression tests passed; OpenSpec valid; apply progress 23/31 complete"
   },
   "blockedReason": null
 }

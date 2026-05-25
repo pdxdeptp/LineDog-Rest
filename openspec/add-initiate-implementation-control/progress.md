@@ -5,7 +5,7 @@
 - Phase: active
 - Current change: introduce-plan-compiler
 - Current step: apply
-- Current checkpoint: introduce-plan-compiler:apply:synopsis-llm-validation-and-repair
+- Current checkpoint: introduce-plan-compiler:apply:estimates-trace-fixtures-and-final-verification
 - Required product-deepen rounds before apply: 3
 - Required checkpoint after product deepening: scope_dependency_check
 - Product-deepen scope guard: every round must read adjacent changes and record scope decisions
@@ -27,6 +27,7 @@ Completed apply groups for previous change `persist-intake-plan-drafts`:
 Completed apply groups for current change `introduce-plan-compiler`:
 
 - `envelope-archetype-and-depth-core`
+- `synopsis-llm-validation-and-repair`
 
 ## Run Log
 
@@ -865,3 +866,31 @@ Completed apply groups for current change `introduce-plan-compiler`:
 - Manifest:
   - Added `introduce-plan-compiler-apply-group-envelope-archetype-and-depth-core`.
 - Next checkpoint: introduce-plan-compiler:apply:synopsis-llm-validation-and-repair
+
+## Run 2026-05-25T10:17:12Z Apply Group introduce-plan-compiler synopsis-llm-validation-and-repair
+
+- Automation: add-initiate-changes
+- Checkpoint: introduce-plan-compiler:apply:synopsis-llm-validation-and-repair
+- Result: completed
+- Actions:
+  - Acquired `run.lock`.
+  - Read `state.json`, `runbook.md`, `progress.md`, `evidence/manifest.json`, and `workspace-baseline.json`.
+  - Ran `git status --porcelain=v1` and protected unrelated dirty files.
+  - Triggered `openspec-apply-change`, `superpowers:subagent-driven-development`, and `superpowers:test-driven-development`.
+  - Implemented source/goal synopsis, thin-source low calibration, structured phase/task candidate contracts, validation severity gates, no-date/no-calendar filtering, dependency gates, archetype-aware default tasks, and bounded repair with invalid-fragment tokens.
+  - Updated `openspec/changes/introduce-plan-compiler/tasks.md` for tasks 2.1-2.5, 3.1-3.3, 4.5, and 4.7-4.9.
+  - Wrote evidence at `openspec/add-initiate-implementation-control/evidence/introduce-plan-compiler/apply-groups/synopsis-llm-validation-and-repair.md`.
+- Reviews:
+  - Spec compliance required multiple fixes around no-executable-output blocking, full depth obligations, repair fragment boundaries, phase repair, source_roles, scope refs, and nested date/calendar rejection; final re-review passed.
+  - Code quality required fixes around repair error recomputation, archetype-aware defaults, dependency validation, vague tasks, repair token handling, and duplicate-id repair coverage; final re-review passed.
+- Verification:
+  - `cd assistant_backend && uv run pytest tests/test_study_plan_compiler.py -k 'synopsis or thin_source or llm_contract or validation or repair or forbidden_date'`: 22 passed, 23 deselected.
+  - `cd assistant_backend && uv run pytest tests/test_study_plan_compiler.py -k 'envelope or status or archetype or tie_breaker or depth'`: 25 passed, 20 deselected.
+  - `openspec validate introduce-plan-compiler --strict`: valid.
+  - `openspec instructions apply --change introduce-plan-compiler --json`: 23/31 tasks complete, state ready.
+  - `git diff --check -- assistant_backend/src/study_plan/compiler.py assistant_backend/tests/test_study_plan_compiler.py openspec/changes/introduce-plan-compiler/tasks.md`: no whitespace errors.
+- Commit:
+  - Implementation commit: `c98dc6f023aab50bf5b009981090abc4aee81574`.
+- Manifest:
+  - Added `introduce-plan-compiler-apply-group-synopsis-llm-validation-and-repair`.
+- Next checkpoint: introduce-plan-compiler:apply:estimates-trace-fixtures-and-final-verification
