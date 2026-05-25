@@ -4,8 +4,8 @@
 
 - Phase: active
 - Current change: introduce-plan-compiler
-- Current step: product_deepen_round_1
-- Current checkpoint: introduce-plan-compiler:product_deepen_round_1
+- Current step: scope_dependency_check
+- Current checkpoint: introduce-plan-compiler:scope_dependency_check
 - Required product-deepen rounds before apply: 3
 - Required checkpoint after product deepening: scope_dependency_check
 - Product-deepen scope guard: every round must read adjacent changes and record scope decisions
@@ -701,3 +701,73 @@ Completed apply groups for previous change `persist-intake-plan-drafts`:
 - Manifest:
   - Added `persist-intake-plan-drafts-to-introduce-plan-compiler-cross-change-contract`.
 - Next checkpoint: introduce-plan-compiler:product_deepen_round_1
+
+## Run 2026-05-25T08:54:41Z Product Deepen introduce-plan-compiler Round 1
+
+- Automation: add-initiate-changes
+- Checkpoint: introduce-plan-compiler:product_deepen_round_1
+- Result: completed
+- Actions:
+  - Acquired `run.lock`.
+  - Read `state.json`, `runbook.md`, `progress.md`, `evidence/manifest.json`, and `workspace-baseline.json`.
+  - Ran `git status --porcelain=v1` and protected unrelated dirty files.
+  - Read current `introduce-plan-compiler` proposal, design, specs, and tasks.
+  - Read upstream `persist-intake-plan-drafts` and downstream `introduce-deadline-scheduler` artifacts.
+  - Ran `opsx-product-deepen` review for compiler boundary contracts and status semantics.
+  - Added `openspec/changes/introduce-plan-compiler/review-records/product-deepen-round-1.md`.
+  - Updated compiler design/spec/tasks for `PlanningEnvelope` V1, compiler result statuses, scheduler-owned `infeasible_review`, task candidate fields, and low-calibration thresholds.
+- Scope decisions:
+  - In scope: compiler input/output contracts, status-specific packages, scheduler-needed unscheduled task fields, and calibration thresholds.
+  - Out of scope: intake routing, draft table internals, activation, deterministic date placement, schedule risk, and UI.
+  - Deferred upstream dependencies: source summaries may be absent; legacy assumptions may be unknown.
+  - Downstream contracts preserved: scheduler receives ordered validated task candidates with estimates, work type, classification, fallback, split points, and no dates.
+- Verification:
+  - `openspec validate introduce-plan-compiler --strict`: valid.
+- Manifest:
+  - Added `introduce-plan-compiler-product-deepen-round-1`.
+- Next checkpoint: introduce-plan-compiler:product_deepen_round_2
+
+## Run 2026-05-25T08:54:41Z Product Deepen introduce-plan-compiler Round 2
+
+- Automation: add-initiate-changes
+- Checkpoint: introduce-plan-compiler:product_deepen_round_2
+- Result: completed
+- Actions:
+  - Re-read current `introduce-plan-compiler` artifacts and Round 1 review record.
+  - Re-read upstream draft persistence and downstream deadline scheduler boundaries.
+  - Ran `opsx-product-deepen` review for archetype selection, source synopsis, LLM validation, and repair invariants.
+  - Added `openspec/changes/introduce-plan-compiler/review-records/product-deepen-round-2.md`.
+  - Updated design/spec/tasks with archetype matrix, deterministic tie-breakers, source/goal synopsis contract, thin-source behavior, LLM call boundaries, validation severities, and repair-loop constraints.
+- Scope decisions:
+  - In scope: archetype matrix/tie-breakers, scope boundary output, source synopsis, LLM phase/task/repair call boundaries, validation severities, and repair invariants.
+  - Out of scope: deep source parsing, final date placement, UI wording, and active task movement.
+  - Deferred upstream dependencies: richer material parsing may arrive later; compiler must still work from shallow facts.
+  - Downstream contracts preserved: scheduler receives no dates and owns capacity-gap, `reduce_scope`, `lower_depth`, and `infeasible_review`.
+- Verification:
+  - `openspec validate introduce-plan-compiler --strict`: valid.
+- Manifest:
+  - Added `introduce-plan-compiler-product-deepen-round-2`.
+- Next checkpoint: introduce-plan-compiler:product_deepen_round_3
+
+## Run 2026-05-25T08:54:41Z Product Deepen introduce-plan-compiler Round 3
+
+- Automation: add-initiate-changes
+- Checkpoint: introduce-plan-compiler:product_deepen_round_3
+- Result: completed
+- Actions:
+  - Read the user planning context summary and mother-change real-context dry-run records.
+  - Re-read current compiler artifacts plus upstream draft persistence and downstream scheduler boundaries.
+  - Ran `opsx-product-deepen` review for real-context compiler fixtures and sensitive-content boundaries.
+  - Added `openspec/changes/introduce-plan-compiler/review-records/product-deepen-round-3.md`.
+  - Updated design/spec/tasks with AgentGuide, easyagent, LeetCode, interview prep, and resume/project packaging compiler fixtures.
+  - Added sensitive-content boundaries for private notes, resume material, repo descriptions, LLM prompts, trace records, validation errors, and prompt logs.
+- Scope decisions:
+  - In scope: real-context compiler fixture acceptance, unscheduled compiler output, and sensitive-content boundaries.
+  - Out of scope: dated schedule dry runs, capacity math, deep GitHub crawling, broad Obsidian sync, and UI display details.
+  - Deferred upstream dependencies: richer source parsing may improve facts later; V1 must remain honest with shallow facts.
+  - Downstream contracts preserved: scheduler owns dated schedule feasibility, risk, buffer, and `infeasible_review`.
+- Verification:
+  - `openspec validate introduce-plan-compiler --strict`: valid.
+- Manifest:
+  - Added `introduce-plan-compiler-product-deepen-round-3`.
+- Next checkpoint: introduce-plan-compiler:scope_dependency_check

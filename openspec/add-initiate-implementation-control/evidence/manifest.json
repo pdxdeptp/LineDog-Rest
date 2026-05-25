@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-05-25T08:44:41Z",
+  "updatedAt": "2026-05-25T08:54:41Z",
   "entries": [
     {
       "id": "introduce-study-intake-router-product-deepen-round-1",
@@ -1311,6 +1311,123 @@
         }
       ],
       "nextCheckpoint": "introduce-plan-compiler:product_deepen_round_1"
+    },
+    {
+      "id": "introduce-plan-compiler-product-deepen-round-1",
+      "timestamp": "2026-05-25T08:54:41Z",
+      "kind": "product_deepen",
+      "changeId": "introduce-plan-compiler",
+      "checkpoint": "introduce-plan-compiler:product_deepen_round_1",
+      "round": 1,
+      "result": "completed",
+      "commands": [
+        {
+          "command": "openspec validate introduce-plan-compiler --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/changes/introduce-plan-compiler/review-records/product-deepen-round-1.md",
+          "sha256": "b247408652d21218547c2def4416f3d778d3d2dcfb8a91e7986b5ad5d5015251",
+          "description": "Round 1 product-deepen evidence for compiler boundary contracts and status semantics."
+        },
+        {
+          "path": "openspec/changes/introduce-plan-compiler/design.md",
+          "sha256": "14d05e92534261bfe4ca613281eb9e9b0f872c79574cf2598803676fd9277b97",
+          "description": "Boundary contracts, PlanningEnvelope V1, compiler statuses, scheduler handoff, and calibration thresholds."
+        },
+        {
+          "path": "openspec/changes/introduce-plan-compiler/specs/study-intake-planning/spec.md",
+          "sha256": "d15bdd5917dc3a5156a94155fedbafaaeaff3e3a4aac923a5fb13dd2535239b9",
+          "description": "Compiler status, blocked result, task candidate, and calibration acceptance scenarios."
+        },
+        {
+          "path": "openspec/changes/introduce-plan-compiler/tasks.md",
+          "sha256": "31b5b050858f91c9b9c8d1d50a82b3063da145ced78ea67b8cc6db0fc13936a8",
+          "description": "Task list updated for compiler statuses, task candidate fields, and calibration tests."
+        }
+      ],
+      "nextCheckpoint": "introduce-plan-compiler:product_deepen_round_2"
+    },
+    {
+      "id": "introduce-plan-compiler-product-deepen-round-2",
+      "timestamp": "2026-05-25T08:54:41Z",
+      "kind": "product_deepen",
+      "changeId": "introduce-plan-compiler",
+      "checkpoint": "introduce-plan-compiler:product_deepen_round_2",
+      "round": 2,
+      "result": "completed",
+      "commands": [
+        {
+          "command": "openspec validate introduce-plan-compiler --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/changes/introduce-plan-compiler/review-records/product-deepen-round-2.md",
+          "sha256": "1e9969d25c50d66fffecddd4f9e66079dbc0c74d8f6d39b4712f3f21a405dddf",
+          "description": "Round 2 product-deepen evidence for archetype selection, synopsis, LLM validation, and repair."
+        },
+        {
+          "path": "openspec/changes/introduce-plan-compiler/design.md",
+          "sha256": "d53c9d374fb94b53fe59c5c8f5c327b93e3c44e9efbb1959e0aa8c28177fc83a",
+          "description": "Archetype matrix, tie-breakers, source/goal synopsis, LLM call boundaries, validation severities, and repair rules."
+        },
+        {
+          "path": "openspec/changes/introduce-plan-compiler/specs/study-intake-planning/spec.md",
+          "sha256": "61244ec10b5608c6119992fe5bba21bba7a7f675cda091f45c1e6ca5f93f0ee1",
+          "description": "Archetype tie-breaker, source synopsis, repair-invariant, and task quality gate scenarios."
+        },
+        {
+          "path": "openspec/changes/introduce-plan-compiler/tasks.md",
+          "sha256": "322c458e25139bdddcd3771e9fdd348e8505c6913dd574535d05ff1a70a05fab",
+          "description": "Tasks updated for tie-breakers, synopsis, thin-source handling, validation severities, repair, and tests."
+        }
+      ],
+      "nextCheckpoint": "introduce-plan-compiler:product_deepen_round_3"
+    },
+    {
+      "id": "introduce-plan-compiler-product-deepen-round-3",
+      "timestamp": "2026-05-25T08:54:41Z",
+      "kind": "product_deepen",
+      "changeId": "introduce-plan-compiler",
+      "checkpoint": "introduce-plan-compiler:product_deepen_round_3",
+      "round": 3,
+      "result": "completed",
+      "commands": [
+        {
+          "command": "openspec validate introduce-plan-compiler --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/changes/introduce-plan-compiler/review-records/product-deepen-round-3.md",
+          "sha256": "779e5d588e6230ccf69c83fd6793f10947bb1b30b469c6c6837c1dcaad90c5ee",
+          "description": "Round 3 product-deepen evidence for real-context compiler fixtures and sensitive-content boundaries."
+        },
+        {
+          "path": "openspec/changes/introduce-plan-compiler/design.md",
+          "sha256": "d017163265b785a409a0c34b4992e1f88b7b5b533fce94731ab39b4ed3928b60",
+          "description": "Sensitive-content boundary and real-context compiler fixture expectations."
+        },
+        {
+          "path": "openspec/changes/introduce-plan-compiler/specs/study-intake-planning/spec.md",
+          "sha256": "733803216801681efc916f527ccef6014720c65e062f56cde6f6e354a71ff09b",
+          "description": "Sensitive planning input and real-context compiler fixture scenarios."
+        },
+        {
+          "path": "openspec/changes/introduce-plan-compiler/tasks.md",
+          "sha256": "ee8d7017bd41298d54345f2bde82f881630b112ecb23c94914a0bccc96189481",
+          "description": "Tasks updated for sensitive-content tests and unscheduled fixture tests."
+        }
+      ],
+      "nextCheckpoint": "introduce-plan-compiler:scope_dependency_check"
     }
   ]
 }
