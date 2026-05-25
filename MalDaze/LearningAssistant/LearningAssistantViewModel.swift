@@ -1358,6 +1358,7 @@ final class LearningAssistantViewModel: ObservableObject {
         let requestSequence = addInitiateActivationRequestSequence
         addInitiateError = nil
         addInitiateLocalFlowState = .activationProgress
+        let previousRedState = currentStudySmartRedState()
 
         do {
             let response = try await api.activateAddInitiateDraft(
@@ -1376,7 +1377,8 @@ final class LearningAssistantViewModel: ObservableObject {
                 requestSequence: requestSequence
             ) else {
                 if addInitiateFlowGeneration == operationGeneration,
-                   addInitiateSession?.sessionId == session.sessionId {
+                   addInitiateSession?.sessionId == session.sessionId,
+                   addInitiateLocalFlowState == .activationProgress {
                     addInitiateLocalFlowState = nil
                 }
                 return
@@ -1387,8 +1389,17 @@ final class LearningAssistantViewModel: ObservableObject {
             addInitiateError = preservedResponse.error
             addInitiateLocalFlowState = nil
             isOffline = false
+            if preservedResponse.reviewState == .activated && preservedResponse.createsActiveTasks {
+                let smartModeEnabled = await refreshStudySmartModeSetting()
+                await refreshAfterStudyPlanAdjustment(
+                    previousRedState: previousRedState,
+                    smartModeEnabled: smartModeEnabled
+                )
+            }
         } catch {
             guard addInitiateFlowGeneration == operationGeneration,
+                  addInitiateLocalFlowState == .activationProgress,
+                  addInitiateActivationRequestSequence == requestSequence,
                   addInitiateSession?.sessionId == session.sessionId,
                   addInitiateSession?.draftId == draftId,
                   addInitiateSession?.draftVersion == draftVersion else { return }
@@ -2093,18 +2104,9 @@ final class LearningAssistantViewModel: ObservableObject {
         operationGeneration: Int,
         requestSequence: Int
     ) -> Bool {
-        let sequenceMatches: Bool
-        switch addInitiateLocalFlowState {
-        case .optionEffectProgress:
-            sequenceMatches = addInitiateOptionRequestSequence == requestSequence
-        case .activationProgress:
-            sequenceMatches = addInitiateActivationRequestSequence == requestSequence
-        default:
-            sequenceMatches = true
-        }
         guard addInitiateFlowGeneration == operationGeneration,
-              addInitiateLocalFlowState != .cancelled,
-              sequenceMatches,
+              addInitiateLocalFlowState == .activationProgress,
+              addInitiateActivationRequestSequence == requestSequence,
               response.sessionId == requestSessionId,
               response.draftId == requestDraftId,
               let current = addInitiateSession,

@@ -234,6 +234,85 @@ async def _activate_package_draft_for_today(db_path: str) -> int:
         return int(activated["resource_id"])
 
 
+async def _make_add_initiate_draft_for_today(db_path: str) -> dict:
+    from src.study_plan.add_initiate import (
+        confirm_add_initiate_anchors,
+        confirm_add_initiate_role,
+        start_add_initiate_session,
+    )
+
+    today = date.today().isoformat()
+    async with aiosqlite.connect(db_path) as db:
+        db.row_factory = aiosqlite.Row
+        started = await start_add_initiate_session(
+            db,
+            client_request_id="req-today-add-initiate-draft",
+            raw_input="Learn Today Draft Silence by tomorrow.",
+            source_type="text_goal",
+        )
+        role = await confirm_add_initiate_role(
+            db,
+            session_id=started["sessionId"],
+            intake_item_id=started["intakeItemId"],
+            confirmed_role="new_plan",
+            title="Today Add Initiate Draft",
+            metadata={"deadline": today, "capacity_minutes": 45},
+        )
+        review = await confirm_add_initiate_anchors(
+            db,
+            session_id=started["sessionId"],
+            draft_id=role["draftId"],
+            deadline=today,
+            deadline_type="hard",
+            capacity_minutes=45,
+            target_output="quiet draft notes",
+            target_depth="apply",
+            assumptions={"deadline": {"accepted": True}},
+            compiler=lambda anchor_request: {
+                "schema_version": 1,
+                "status": "draft_review",
+                "summary": "Quiet draft",
+                "assumptions": anchor_request["assumptions"],
+                "tasks": [
+                    {
+                        "id": "quiet-today-task",
+                        "title": "Quiet draft task",
+                        "estimated_minutes": 45,
+                        "schedule_slices": [{"date": today, "target_minutes": 45}],
+                    }
+                ],
+            },
+            scheduler=lambda package, **kwargs: {
+                **package,
+                "status": "draft_review",
+                "activation_eligibility": {
+                    "activation_ready": True,
+                    "schedule_version": "quiet-today-v1",
+                },
+            },
+        )
+
+        return {
+            "today": today,
+            "session_id": started["sessionId"],
+            "draft_id": role["draftId"],
+            "draft_version": review["draftVersion"],
+        }
+
+
+async def _activate_add_initiate_draft_for_today(db_path: str, draft: dict) -> dict:
+    from src.study_plan.add_initiate import activate_add_initiate_draft
+
+    async with aiosqlite.connect(db_path) as db:
+        db.row_factory = aiosqlite.Row
+        return await activate_add_initiate_draft(
+            db,
+            session_id=draft["session_id"],
+            draft_id=draft["draft_id"],
+            draft_version=draft["draft_version"],
+        )
+
+
 @pytest.mark.asyncio
 async def test_today_study_view_returns_persisted_active_project_tasks_without_morning_agent(
     client,
@@ -298,6 +377,26 @@ async def test_today_study_view_reads_tasks_created_from_persisted_package_activ
             "show_rolled_badge": False,
         }
     ]
+
+
+@pytest.mark.asyncio
+async def test_today_study_view_excludes_add_initiate_draft_until_activation(client):
+    draft = await _make_add_initiate_draft_for_today(os.environ["DB_PATH"])
+
+    draft_response = await client.get("/api/study-views/today")
+
+    assert draft_response.status_code == 200, draft_response.text
+    assert draft_response.json() == {
+        "date": draft["today"],
+        "tasks": [],
+    }
+
+    activation = await _activate_add_initiate_draft_for_today(os.environ["DB_PATH"], draft)
+    active_response = await client.get("/api/study-views/today")
+
+    assert activation["createsActiveTasks"] is True
+    assert active_response.status_code == 200, active_response.text
+    assert [task["title"] for task in active_response.json()["tasks"]] == ["Quiet draft task"]
 
 
 @pytest.mark.asyncio

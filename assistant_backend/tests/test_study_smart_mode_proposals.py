@@ -38,6 +38,79 @@ async def _snapshot_mutation_guard(db_path: str) -> dict[str, list[dict]]:
         }
 
 
+async def _seed_add_initiate_non_plan_silence_facts(db_path: str) -> None:
+    from src.study_plan.add_initiate import (
+        confirm_add_initiate_role,
+        start_add_initiate_session,
+    )
+
+    async with aiosqlite.connect(db_path) as db:
+        db.row_factory = aiosqlite.Row
+        await db.execute(
+            "INSERT OR REPLACE INTO system_state (key, value) VALUES (?, ?)",
+            ("study_smart_mode_enabled", "true"),
+        )
+        await db.execute(
+            "INSERT OR REPLACE INTO system_state (key, value) VALUES (?, ?)",
+            ("daily_capacity_min", "60"),
+        )
+        await db.execute(
+            """
+            INSERT INTO resources
+                (id, title, type, tracking_mode, url, status, total_units)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                9101,
+                "Material Target Project",
+                "study_project",
+                "sequential",
+                "https://example.com/material-target",
+                "active",
+                0,
+            ),
+        )
+        await db.commit()
+
+        stored = await start_add_initiate_session(
+            db,
+            client_request_id="req-smart-stored-reference",
+            raw_input="Keep this as reference material: https://example.com/reference",
+            source_type="url",
+        )
+        stored_role = await confirm_add_initiate_role(
+            db,
+            session_id=stored["sessionId"],
+            intake_item_id=stored["intakeItemId"],
+            confirmed_role="reference_material",
+            title="Stored Reference",
+            url="https://example.com/reference",
+            metadata={"source": "test"},
+        )
+
+        material = await start_add_initiate_session(
+            db,
+            client_request_id="req-smart-material-only",
+            raw_input="Attach this repo as material only: https://github.com/example/material",
+            source_type="github_repo",
+        )
+        material_role = await confirm_add_initiate_role(
+            db,
+            session_id=material["sessionId"],
+            intake_item_id=material["intakeItemId"],
+            confirmed_role="attach_to_existing_plan",
+            title="Material Only Attachment",
+            url="https://github.com/example/material",
+            existing_plan_id=9101,
+            attachment_mode="material_only",
+            metadata={"source": "test"},
+        )
+
+        assert stored_role["reviewState"] == "stored_non_plan"
+        assert material_role["reviewState"] == "material_attached"
+        assert await _fetchall(db, "SELECT id FROM tasks") == []
+
+
 def _resign_proposal_for_test(proposal: dict) -> dict:
     canonical = {
         "id": proposal["id"],
@@ -503,6 +576,36 @@ async def test_disabled_smart_mode_suppresses_morning_proposals_even_when_red_fa
     assert response.json() == {
         "enabled": False,
         "trigger": "morning",
+        "options": [],
+    }
+    assert await _snapshot_mutation_guard(os.environ["DB_PATH"]) == before
+
+
+@pytest.mark.asyncio
+async def test_stored_non_plan_and_material_only_add_initiate_states_do_not_trigger_smart_proposals(client):
+    await _seed_add_initiate_non_plan_silence_facts(os.environ["DB_PATH"])
+    before = await _snapshot_mutation_guard(os.environ["DB_PATH"])
+
+    morning_response = await client.post("/api/study-smart-mode/proposals", json={"trigger": "morning"})
+    adjustment_response = await client.post(
+        "/api/study-smart-mode/proposals",
+        json={
+            "trigger": "after_adjustment",
+            "previous_expected_late_project_ids": [],
+            "previous_over_capacity_dates": [],
+        },
+    )
+
+    assert morning_response.status_code == 200, morning_response.text
+    assert morning_response.json() == {
+        "enabled": True,
+        "trigger": "morning",
+        "options": [],
+    }
+    assert adjustment_response.status_code == 200, adjustment_response.text
+    assert adjustment_response.json() == {
+        "enabled": True,
+        "trigger": "after_adjustment",
         "options": [],
     }
     assert await _snapshot_mutation_guard(os.environ["DB_PATH"]) == before

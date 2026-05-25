@@ -2875,6 +2875,46 @@ final class LearningAssistantUISourceTests: XCTestCase {
         XCTAssertFalse(addSource.contains("draftReviewCard(isApplyingOption: true)"))
     }
 
+    func testAddInitiateProgressAndTerminalUISourceDoesNotPresentCreatedTaskWording() throws {
+        let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
+        guard let start = source.range(of: "private struct AddInitiateView"),
+              let end = source[start.upperBound...].range(of: "private struct StudyPlanIntakeView") else {
+            XCTFail("AddInitiateView source section not found")
+            return
+        }
+        let addSource = String(source[start.lowerBound..<end.lowerBound])
+        let processingAndTerminalTokens = [
+            "vm.addInitiateFlowState == .planningProgress",
+            "case .optionEffectProgress",
+            "case .activationFailed",
+            "case .cancelled",
+            "session.reviewState == .storedNonPlan || session.reviewState == .materialAttached"
+        ]
+        let forbiddenCreatedTaskWording = [
+            "已创建任务",
+            "创建了任务",
+            "已加入今日",
+            "created task",
+            "created tasks"
+        ]
+
+        for token in processingAndTerminalTokens {
+            guard let tokenRange = addSource.range(of: token) else {
+                XCTFail("Missing Add / Initiate UI token \(token)")
+                continue
+            }
+            let tail = addSource[tokenRange.lowerBound...]
+            let sectionEnd = tail.range(of: "case .", options: [], range: tail.index(after: tokenRange.lowerBound)..<tail.endIndex)?.lowerBound
+                ?? tail.range(of: "@ViewBuilder", options: [], range: tail.index(after: tokenRange.lowerBound)..<tail.endIndex)?.lowerBound
+                ?? tail.endIndex
+            let section = String(tail[..<sectionEnd]).lowercased()
+
+            for wording in forbiddenCreatedTaskWording {
+                XCTAssertFalse(section.contains(wording.lowercased()), "\(token) must not present \(wording)")
+            }
+        }
+    }
+
     func testChatViewConsumesResourceAdjustPlanDraftText() throws {
         let source = try sourceFile("MalDaze/LearningAssistant/ChatView.swift")
 
@@ -3424,6 +3464,69 @@ final class LearningAssistantViewModelTests: XCTestCase {
         XCTAssertEqual(vm.addInitiateFlowState, .roleReview)
     }
 
+    func testActivationResponseAfterEditingDraftDoesNotOverwriteAnchorReviewOrRefreshActiveSurfaces() async {
+        let mock = MockAssistantAPIClient()
+        mock.studySmartModeSettingsResult = StudySmartModeSettings(enabled: true)
+        mock.addInitiateStartResult = sampleAddInitiateRoleReviewSession()
+        mock.addInitiateRoleResult = sampleAddInitiateAnchorReviewSession()
+        mock.addInitiateAnchorResult = sampleAddInitiateDraftReviewSession(draftVersion: 2)
+        mock.addInitiateActivationResult = sampleAddInitiateActivatedSession(draftVersion: 2)
+        mock.addInitiateActivationDelayNanoseconds = 100_000_000
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+
+        await vm.startAddInitiateSession(rawInput: "Edit while activation is in flight", sourceType: .textGoal)
+        await vm.confirmAddInitiateRole(title: "Edit while activation is in flight", confirmedRole: .newPlan)
+        vm.addInitiateDeadline = "2026-10-08"
+        vm.addInitiateTargetOutput = "draft"
+        vm.addInitiateTargetDepth = "apply"
+        await vm.confirmAddInitiateAnchors()
+
+        let activationTask = Task { await vm.activateAddInitiateDraft() }
+        await mock.waitForAddInitiateActivationCallCount(1)
+        vm.editAddInitiateDraft()
+        await activationTask.value
+
+        XCTAssertEqual(mock.activateAddInitiateDraftCallCount, 1)
+        XCTAssertEqual(vm.addInitiateFlowState, .anchorReview)
+        XCTAssertEqual(mock.fetchStudyTodayViewCallCount, 0)
+        XCTAssertEqual(mock.fetchStudyProjectOverviewCallCount, 0)
+        XCTAssertEqual(mock.fetchResourcesCallCount, 0)
+        XCTAssertEqual(mock.fetchStudyCalendarLoadCallCount, 0)
+        XCTAssertEqual(mock.generateStudySmartProposalsCallCount, 0)
+    }
+
+    func testActivationThrownErrorAfterEditingDraftDoesNotOverwriteAnchorReviewOrRefreshActiveSurfaces() async {
+        let mock = MockAssistantAPIClient()
+        mock.addInitiateStartResult = sampleAddInitiateRoleReviewSession()
+        mock.addInitiateRoleResult = sampleAddInitiateAnchorReviewSession()
+        mock.addInitiateAnchorResult = sampleAddInitiateDraftReviewSession(draftVersion: 2)
+        mock.addInitiateActivationError = AssistantOfflineError()
+        mock.addInitiateActivationDelayNanoseconds = 100_000_000
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+
+        await vm.startAddInitiateSession(rawInput: "Edit while activation throws", sourceType: .textGoal)
+        await vm.confirmAddInitiateRole(title: "Edit while activation throws", confirmedRole: .newPlan)
+        vm.addInitiateDeadline = "2026-10-09"
+        vm.addInitiateTargetOutput = "draft"
+        vm.addInitiateTargetDepth = "apply"
+        await vm.confirmAddInitiateAnchors()
+
+        let activationTask = Task { await vm.activateAddInitiateDraft() }
+        await mock.waitForAddInitiateActivationCallCount(1)
+        vm.editAddInitiateDraft()
+        await activationTask.value
+
+        XCTAssertEqual(mock.activateAddInitiateDraftCallCount, 1)
+        XCTAssertEqual(vm.addInitiateFlowState, .anchorReview)
+        XCTAssertNil(vm.addInitiateError)
+        XCTAssertFalse(vm.isOffline)
+        XCTAssertEqual(mock.fetchStudyTodayViewCallCount, 0)
+        XCTAssertEqual(mock.fetchStudyProjectOverviewCallCount, 0)
+        XCTAssertEqual(mock.fetchResourcesCallCount, 0)
+        XCTAssertEqual(mock.fetchStudyCalendarLoadCallCount, 0)
+        XCTAssertEqual(mock.generateStudySmartProposalsCallCount, 0)
+    }
+
     func testActivationFailurePreservesDraftIdentityAndDoesNotRefreshActiveSurfaces() async {
         let mock = MockAssistantAPIClient()
         mock.addInitiateStartResult = sampleAddInitiateRoleReviewSession()
@@ -3449,6 +3552,168 @@ final class LearningAssistantViewModelTests: XCTestCase {
         XCTAssertEqual(mock.fetchStudyTodayViewCallCount, 0)
         XCTAssertEqual(mock.fetchStudyProjectOverviewCallCount, 0)
         XCTAssertEqual(mock.fetchStudyCalendarLoadCallCount, 0)
+    }
+
+    func testAddInitiateDraftOptionTerminalAndFailureStatesDoNotRefreshActiveSurfaces() async {
+        let quietCases: [(String, AddInitiateSessionResponse, String)] = [
+            ("draft_review", sampleAddInitiateDraftReviewSession(), "confirm_anchors"),
+            ("stored_non_plan", sampleAddInitiateStoredLaterSession(), "store_for_later"),
+            ("needs_input", sampleAddInitiateNeedsInputSession(draftVersion: 2), "answer_one_question"),
+            ("activation_failed", sampleAddInitiateActivationFailedSession(draftVersion: 2), "activate")
+        ]
+
+        for (state, response, action) in quietCases {
+            let mock = MockAssistantAPIClient()
+            mock.studySmartModeSettingsResult = StudySmartModeSettings(enabled: true)
+            mock.addInitiateStartResult = sampleAddInitiateRoleReviewSession()
+            mock.addInitiateRoleResult = sampleAddInitiateAnchorReviewSession()
+            if action == "confirm_anchors" {
+                mock.addInitiateAnchorResult = response
+            } else if action == "activate" {
+                mock.addInitiateAnchorResult = sampleAddInitiateDraftReviewSession(
+                    draftVersion: response.draftVersion ?? 2
+                )
+            } else {
+                mock.addInitiateAnchorResult = sampleAddInitiateInfeasibleReviewSession()
+            }
+            mock.addInitiateOptionResult = response
+            mock.addInitiateActivationResult = response
+            let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+
+            await vm.startAddInitiateSession(rawInput: "Quiet \(state)", sourceType: .textGoal)
+            await vm.confirmAddInitiateRole(title: "Quiet \(state)", confirmedRole: .newPlan)
+            vm.addInitiateDeadline = "2026-06-20"
+            vm.addInitiateTargetOutput = "quiet draft"
+            vm.addInitiateTargetDepth = "apply"
+            await vm.confirmAddInitiateAnchors()
+
+            if action == "store_for_later" || action == "answer_one_question" {
+                await vm.applyAddInitiateOptionEffect(optionId: action)
+            } else if action == "activate" {
+                await vm.activateAddInitiateDraft()
+            }
+
+            XCTAssertEqual(mock.fetchStudyTodayViewCallCount, 0, "\(state) must not refresh Today")
+            XCTAssertEqual(mock.fetchStudyProjectOverviewCallCount, 0, "\(state) must not refresh project overview")
+            XCTAssertEqual(mock.fetchResourcesCallCount, 0, "\(state) must not refresh Home resources")
+            XCTAssertEqual(mock.fetchStudyCalendarLoadCallCount, 0, "\(state) must not refresh calendar facts")
+            XCTAssertEqual(mock.generateStudySmartProposalsCallCount, 0, "\(state) must not refresh smart proposal context")
+            XCTAssertEqual(mock.fetchStudySmartMorningBriefingCallCount, 0, "\(state) must not refresh smart briefing")
+            XCTAssertEqual(mock.sendMessageCallCount, 0, "\(state) must not use legacy proposal chat")
+            XCTAssertEqual(mock.confirmChatCallCount, 0, "\(state) must not use legacy proposal chat")
+        }
+    }
+
+    func testAddInitiateCancelAfterDraftReviewDoesNotRefreshActiveSurfaces() async {
+        let mock = MockAssistantAPIClient()
+        mock.studySmartModeSettingsResult = StudySmartModeSettings(enabled: true)
+        mock.addInitiateStartResult = sampleAddInitiateRoleReviewSession()
+        mock.addInitiateRoleResult = sampleAddInitiateAnchorReviewSession()
+        mock.addInitiateAnchorResult = sampleAddInitiateDraftReviewSession()
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+
+        await vm.startAddInitiateSession(rawInput: "Cancel quietly", sourceType: .textGoal)
+        await vm.confirmAddInitiateRole(title: "Cancel quietly", confirmedRole: .newPlan)
+        vm.addInitiateDeadline = "2026-06-20"
+        vm.addInitiateTargetOutput = "quiet draft"
+        vm.addInitiateTargetDepth = "apply"
+        await vm.confirmAddInitiateAnchors()
+
+        vm.cancelAddInitiateFlow()
+
+        XCTAssertEqual(vm.addInitiateFlowState, .cancelled)
+        XCTAssertEqual(mock.fetchStudyTodayViewCallCount, 0)
+        XCTAssertEqual(mock.fetchStudyProjectOverviewCallCount, 0)
+        XCTAssertEqual(mock.fetchResourcesCallCount, 0)
+        XCTAssertEqual(mock.fetchStudyCalendarLoadCallCount, 0)
+        XCTAssertEqual(mock.generateStudySmartProposalsCallCount, 0)
+        XCTAssertEqual(mock.fetchStudySmartMorningBriefingCallCount, 0)
+    }
+
+    func testAddInitiateActivationSuccessRefreshesActiveSurfacesAndSmartProposalContext() async {
+        let mock = MockAssistantAPIClient()
+        mock.studySmartModeSettingsResult = StudySmartModeSettings(enabled: true)
+        mock.studyProjectOverviewResult = sampleStudyProjectOverview(activeProjects: [
+            sampleStudyProjectSummaryJSON(
+                id: 7,
+                title: "Before activation",
+                completedUnits: 1,
+                totalUnits: 4,
+                progressRatio: 0.25,
+                status: "active",
+                expectedLate: false
+            )
+        ])
+        mock.studyCalendarLoadResult = sampleStudyCalendarLoad(start: "2026-06-01", end: "2026-06-07")
+        mock.addInitiateStartResult = sampleAddInitiateRoleReviewSession()
+        mock.addInitiateRoleResult = sampleAddInitiateAnchorReviewSession()
+        mock.addInitiateAnchorResult = sampleAddInitiateDraftReviewSession(draftVersion: 2)
+        mock.addInitiateActivationResult = sampleAddInitiateActivatedSession(draftVersion: 2)
+        mock.studySmartProposalGenerationResult = StudySmartProposalGenerationResponse(
+            enabled: true,
+            trigger: .afterAdjustment,
+            options: [sampleStudySmartProposalOption(trigger: .afterAdjustment)],
+            message: nil
+        )
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+
+        await vm.fetchDashboard()
+        await vm.fetchStudyCalendarLoad(start: "2026-06-01", end: "2026-06-07")
+        let todayCallsBeforeActivation = mock.fetchStudyTodayViewCallCount
+        let overviewCallsBeforeActivation = mock.fetchStudyProjectOverviewCallCount
+        let resourceCallsBeforeActivation = mock.fetchResourcesCallCount
+        let calendarCallsBeforeActivation = mock.fetchStudyCalendarLoadCallCount
+        let settingsCallsBeforeActivation = mock.fetchStudySmartModeSettingsCallCount
+
+        await vm.startAddInitiateSession(rawInput: "Activate active work", sourceType: .textGoal)
+        await vm.confirmAddInitiateRole(title: "Activate active work", confirmedRole: .newPlan)
+        vm.addInitiateDeadline = "2026-06-20"
+        vm.addInitiateTargetOutput = "active plan"
+        vm.addInitiateTargetDepth = "apply"
+        await vm.confirmAddInitiateAnchors()
+
+        mock.studyProjectOverviewResult = sampleStudyProjectOverview(activeProjects: [
+            sampleStudyProjectSummaryJSON(
+                id: 7,
+                title: "After activation",
+                completedUnits: 1,
+                totalUnits: 4,
+                progressRatio: 0.25,
+                status: "active",
+                expectedLate: true
+            )
+        ])
+        mock.studyCalendarLoadResult = sampleStudyCalendarLoad(
+            start: "2026-06-01",
+            end: "2026-06-07",
+            dayJSON: """
+            {
+                "date": "2026-06-03",
+                "scheduled_task_count": 3,
+                "total_target_minutes": 180,
+                "completed_task_count": 0,
+                "available_capacity_minutes": 75,
+                "over_capacity": true,
+                "rest_day": false
+            }
+            """
+        )
+
+        await vm.activateAddInitiateDraft()
+
+        XCTAssertEqual(vm.addInitiateFlowState, .activated)
+        XCTAssertEqual(mock.fetchStudyTodayViewCallCount, todayCallsBeforeActivation + 1)
+        XCTAssertEqual(mock.fetchStudyProjectOverviewCallCount, overviewCallsBeforeActivation + 1)
+        XCTAssertEqual(mock.fetchResourcesCallCount, resourceCallsBeforeActivation + 1)
+        XCTAssertEqual(mock.fetchStudyCalendarLoadCallCount, calendarCallsBeforeActivation + 1)
+        XCTAssertEqual(mock.fetchStudySmartModeSettingsCallCount, settingsCallsBeforeActivation + 1)
+        XCTAssertEqual(mock.generateStudySmartProposalsCallCount, 1)
+        XCTAssertEqual(mock.lastStudySmartProposalGenerationRequest?.trigger, .afterAdjustment)
+        XCTAssertEqual(mock.lastStudySmartProposalGenerationRequest?.previousExpectedLateProjectIds, [])
+        XCTAssertEqual(mock.lastStudySmartProposalGenerationRequest?.previousOverCapacityDates, [])
+        XCTAssertEqual(vm.studySmartProposalOptions.map(\.trigger), [.afterAdjustment])
+        XCTAssertEqual(mock.sendMessageCallCount, 0)
+        XCTAssertEqual(mock.confirmChatCallCount, 0)
     }
 
     func testActivationFailedRetryCallsActivationAPIWithPreservedDraftVersion() async {
@@ -6439,6 +6704,7 @@ private final class MockAssistantAPIClient: AssistantAPIClientProtocol, @uncheck
     var addInitiateOptionDelayNanoseconds: UInt64 = 0
     var addInitiateOptionError: Error?
     var addInitiateActivationResult = sampleAddInitiateActivationFailedSession()
+    var addInitiateActivationDelayNanoseconds: UInt64 = 0
     var addInitiateActivationError: Error?
     var adjustmentError: Error?
 
@@ -6542,6 +6808,8 @@ private final class MockAssistantAPIClient: AssistantAPIClientProtocol, @uncheck
     private var addInitiateAnchorCallCountContinuations: [(expected: Int, continuation: CheckedContinuation<Void, Never>)] = []
     private let addInitiateOptionGateLock = NSLock()
     private var addInitiateOptionCallCountContinuations: [(expected: Int, continuation: CheckedContinuation<Void, Never>)] = []
+    private let addInitiateActivationGateLock = NSLock()
+    private var addInitiateActivationCallCountContinuations: [(expected: Int, continuation: CheckedContinuation<Void, Never>)] = []
 
     func waitForStudyPlanConfirmToStart() async {
         await withCheckedContinuation { continuation in
@@ -6644,6 +6912,21 @@ private final class MockAssistantAPIClient: AssistantAPIClientProtocol, @uncheck
                     return true
                 }
                 addInitiateOptionCallCountContinuations.append((expected, continuation))
+                return false
+            }
+            if shouldResumeImmediately {
+                continuation.resume()
+            }
+        }
+    }
+
+    func waitForAddInitiateActivationCallCount(_ expected: Int) async {
+        await withCheckedContinuation { continuation in
+            let shouldResumeImmediately = withAddInitiateActivationGateLock {
+                if activateAddInitiateDraftCallCount >= expected {
+                    return true
+                }
+                addInitiateActivationCallCountContinuations.append((expected, continuation))
                 return false
             }
             if shouldResumeImmediately {
@@ -7006,6 +7289,10 @@ private final class MockAssistantAPIClient: AssistantAPIClientProtocol, @uncheck
     ) async throws -> AddInitiateSessionResponse {
         activateAddInitiateDraftCallCount += 1
         lastAddInitiateActivationRequest = request
+        signalAddInitiateActivationCallCountChanged()
+        if addInitiateActivationDelayNanoseconds > 0 {
+            try? await Task.sleep(nanoseconds: addInitiateActivationDelayNanoseconds)
+        }
         if let addInitiateActivationError { throw addInitiateActivationError }
         if shouldThrowOffline { throw AssistantOfflineError() }
         return addInitiateActivationResult
@@ -7197,6 +7484,27 @@ private final class MockAssistantAPIClient: AssistantAPIClientProtocol, @uncheck
     private func withAddInitiateOptionGateLock<T>(_ body: () -> T) -> T {
         addInitiateOptionGateLock.lock()
         defer { addInitiateOptionGateLock.unlock() }
+        return body()
+    }
+
+    private func signalAddInitiateActivationCallCountChanged() {
+        let continuations = withAddInitiateActivationGateLock {
+            var ready: [CheckedContinuation<Void, Never>] = []
+            addInitiateActivationCallCountContinuations.removeAll { waiter in
+                if activateAddInitiateDraftCallCount >= waiter.expected {
+                    ready.append(waiter.continuation)
+                    return true
+                }
+                return false
+            }
+            return ready
+        }
+        continuations.forEach { $0.resume() }
+    }
+
+    private func withAddInitiateActivationGateLock<T>(_ body: () -> T) -> T {
+        addInitiateActivationGateLock.lock()
+        defer { addInitiateActivationGateLock.unlock() }
         return body()
     }
 
