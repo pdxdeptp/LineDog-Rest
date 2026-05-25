@@ -2,10 +2,15 @@
 
 import json
 import re
+from datetime import date
 from typing import Any
 from urllib.parse import urlparse
 
 import aiosqlite
+
+from .lifecycle import create_or_load_draft_shell
+
+UNKNOWN_DRAFT_DEADLINE = "9999-12-31"
 
 
 def _row_to_dict(row: Any) -> dict:
@@ -18,6 +23,62 @@ def _json_dumps(value: Any) -> str:
 
 def _metadata_to_db(metadata: dict | None) -> str | None:
     return _json_dumps(metadata) if metadata is not None else None
+
+
+def _metadata_deadline_value(metadata: dict | None) -> str | None:
+    value = (metadata or {}).get("deadline") or (metadata or {}).get("target_deadline")
+    if isinstance(value, date):
+        return value.isoformat()
+    return str(value) if value else None
+
+
+def _metadata_deadline(metadata: dict | None) -> str:
+    return _metadata_deadline_value(metadata) or UNKNOWN_DRAFT_DEADLINE
+
+
+def _metadata_capacity_minutes(metadata: dict | None) -> int:
+    value = (metadata or {}).get("capacity_minutes") or (metadata or {}).get(
+        "daily_capacity_min"
+    )
+    return int(value) if value is not None else 60
+
+
+def _metadata_assumptions(metadata: dict | None) -> dict[str, Any]:
+    assumptions = (metadata or {}).get("assumptions")
+    normalized = dict(assumptions) if isinstance(assumptions, dict) else {}
+    deadline = _metadata_deadline_value(metadata)
+    if "deadline" not in normalized:
+        normalized["deadline"] = (
+            {
+                "value": deadline,
+                "provenance": "user_provided",
+                "accepted": True,
+            }
+            if deadline
+            else {
+                "value": None,
+                "provenance": "unknown",
+                "accepted": False,
+                "needs_input": True,
+            }
+        )
+    if "capacity" not in normalized:
+        capacity_provided = (metadata or {}).get("capacity_minutes") is not None or (
+            metadata or {}
+        ).get("daily_capacity_min") is not None
+        normalized["capacity"] = {
+            "daily_minutes": _metadata_capacity_minutes(metadata),
+            "provenance": "user_provided" if capacity_provided else "system_default",
+            "accepted": True,
+        }
+    return normalized
+
+
+def _draft_kind_for_attachment_mode(attachment_mode: str) -> str:
+    return {
+        "draft_phase": "existing_plan_phase",
+        "scheduled_work": "existing_plan_scheduled_work",
+    }[attachment_mode]
 
 
 ROLES = {
@@ -589,6 +650,18 @@ async def confirm_intake_route(
                 "outcome": "stored_plan_attachment",
                 "attachmentId": attachment["id"],
             }
+        shell = await create_or_load_draft_shell(
+            db,
+            intake_item_id=intake_item_id,
+            title=title,
+            source_url=url or (metadata or {}).get("source_url") or item["raw_input"],
+            deadline=_metadata_deadline(metadata),
+            capacity_minutes=_metadata_capacity_minutes(metadata),
+            draft_kind=_draft_kind_for_attachment_mode(attachment_mode),
+            target_plan_id=target_plan["id"],
+            calibration_level=item["calibration_level"],
+            assumptions=_metadata_assumptions(metadata),
+        )
         await db.execute(
             """
             UPDATE study_intake_items
@@ -602,9 +675,24 @@ async def confirm_intake_route(
             "nextAction": "handoff_to_anchor_review",
             "outcome": "awaiting_anchor_review",
             "existingPlanId": target_plan["id"],
+            "targetPlanId": target_plan["id"],
             "attachmentMode": attachment_mode,
+            "draftId": shell["id"],
+            "draftKind": shell["draft_kind"],
         }
 
+    shell = await create_or_load_draft_shell(
+        db,
+        intake_item_id=intake_item_id,
+        title=title,
+        source_url=url or (metadata or {}).get("source_url") or item["raw_input"],
+        deadline=_metadata_deadline(metadata),
+        capacity_minutes=_metadata_capacity_minutes(metadata),
+        draft_kind="new_plan",
+        target_plan_id=None,
+        calibration_level=item["calibration_level"],
+        assumptions=_metadata_assumptions(metadata),
+    )
     await db.execute(
         """
         UPDATE study_intake_items
@@ -617,6 +705,9 @@ async def confirm_intake_route(
     return base | {
         "nextAction": "handoff_to_anchor_review",
         "outcome": "awaiting_anchor_review",
+        "targetPlanId": None,
+        "draftId": shell["id"],
+        "draftKind": shell["draft_kind"],
     }
 
 

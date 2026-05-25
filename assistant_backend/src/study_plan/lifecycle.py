@@ -1,14 +1,698 @@
 """Minimal draft study project lifecycle persistence."""
 
 import json
+from copy import deepcopy
 from datetime import date
 from typing import Any
 
 import aiosqlite
 
+DRAFT_SCHEMA_VERSION = 1
+DRAFT_KINDS = {"new_plan", "existing_plan_phase", "existing_plan_scheduled_work"}
+OPEN_DRAFT_STATUSES = {
+    "review",
+    "anchor_review",
+    "compiling",
+    "needs_input",
+    "compile_failed",
+    "infeasible_review",
+    "draft_review",
+    "activating",
+}
+DRAFT_PACKAGE_STATUSES = {
+    "review",
+    "anchor_review",
+    "compiling",
+    "needs_input",
+    "compile_failed",
+    "infeasible_review",
+    "draft_review",
+}
+PACKAGE_CORE_FIELDS = {
+    "schema_version",
+    "draft_id",
+    "draft_version",
+    "intake_id",
+    "status",
+    "summary",
+    "assumptions",
+    "phases",
+    "tasks",
+    "review_summary",
+    "activation_eligibility",
+}
+
 
 def _iso(value: date | str) -> str:
     return value.isoformat() if isinstance(value, date) else value
+
+
+def _json_dumps(value: Any) -> str:
+    return json.dumps(value, ensure_ascii=False, sort_keys=True)
+
+
+def _json_loads(raw: str | None, fallback: Any) -> Any:
+    if raw is None:
+        return deepcopy(fallback)
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        return deepcopy(fallback)
+
+
+def _validate_draft_package_status(status: str) -> None:
+    if status not in DRAFT_PACKAGE_STATUSES:
+        raise ValueError(f"unsupported draft package status: {status}")
+
+
+def _ensure_draft_allows_package_write(draft: dict[str, Any]) -> None:
+    if draft["status"] not in OPEN_DRAFT_STATUSES:
+        raise ValueError(f"cannot modify closed draft: {draft['status']}")
+
+
+async def _ensure_draft_version_storage(db: aiosqlite.Connection) -> None:
+    await db.execute(
+        """
+        CREATE TABLE IF NOT EXISTS study_project_draft_versions (
+            id                     INTEGER PRIMARY KEY,
+            draft_id               INTEGER NOT NULL REFERENCES study_project_drafts(id),
+            draft_version          INTEGER NOT NULL,
+            schema_version         INTEGER NOT NULL DEFAULT 1,
+            status                 TEXT    NOT NULL,
+            summary                TEXT,
+            assumptions            TEXT    NOT NULL DEFAULT '{}',
+            package_json           TEXT    NOT NULL DEFAULT '{}',
+            phases                 TEXT    NOT NULL DEFAULT '[]',
+            tasks                  TEXT    NOT NULL DEFAULT '[]',
+            review_summary         TEXT    NOT NULL DEFAULT '{}',
+            activation_eligibility TEXT    NOT NULL DEFAULT '{}',
+            created_at             TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at             TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(draft_id, draft_version)
+        )
+        """
+    )
+    await db.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_study_project_draft_versions_latest
+        ON study_project_draft_versions(draft_id, draft_version)
+        """
+    )
+
+
+async def _fetch_draft_header(db: aiosqlite.Connection, draft_id: int) -> dict[str, Any]:
+    async with db.execute(
+        """
+        SELECT id, intake_item_id, title, source_url, deadline, status,
+               schema_version, draft_version, latest_version, calibration_level,
+               draft_kind, target_plan_id, capacity_minutes, clarification_skipped,
+               metadata, activated_resource_id, created_at, updated_at
+        FROM study_project_drafts
+        WHERE id = ?
+        """,
+        (draft_id,),
+    ) as cursor:
+        row = await cursor.fetchone()
+    if row is None:
+        raise ValueError(f"Study project draft not found: {draft_id}")
+    header = dict(row)
+    header["clarification_skipped"] = bool(header["clarification_skipped"])
+    header["metadata"] = _json_loads(header.get("metadata"), {})
+    return header
+
+
+async def _fetch_draft_shell(db: aiosqlite.Connection, draft_id: int) -> dict[str, Any]:
+    header = await _fetch_draft_header(db, draft_id)
+    display_metadata = header["metadata"].get("display_metadata") or {}
+    return {
+        "id": header["id"],
+        "intake_item_id": header["intake_item_id"],
+        "title": header["title"],
+        "source_url": header["source_url"],
+        "deadline": header["deadline"],
+        "status": header["status"],
+        "schema_version": header["schema_version"],
+        "draft_version": header["draft_version"],
+        "latest_version": header["latest_version"],
+        "calibration_level": header["calibration_level"],
+        "draft_kind": header["draft_kind"],
+        "target_plan_id": header["target_plan_id"],
+        "capacity_minutes": header["capacity_minutes"],
+        "clarification_skipped": header["clarification_skipped"],
+        "metadata": header["metadata"],
+        "display_metadata": display_metadata,
+        "activated_resource_id": header["activated_resource_id"],
+    }
+
+
+async def _validate_draft_target_plan(
+    db: aiosqlite.Connection,
+    *,
+    draft_kind: str,
+    target_plan_id: int | None,
+) -> None:
+    if draft_kind not in DRAFT_KINDS:
+        raise ValueError("unsupported draft kind")
+    if draft_kind == "new_plan":
+        if target_plan_id is not None:
+            raise ValueError("new_plan drafts cannot target an existing plan")
+        return
+    if target_plan_id is None:
+        raise ValueError("target_plan_id must reference an active study plan")
+    async with db.execute(
+        """
+        SELECT id
+        FROM resources
+        WHERE id = ? AND status = 'active' AND type = 'study_project'
+        """,
+        (target_plan_id,),
+    ) as cursor:
+        row = await cursor.fetchone()
+    if row is None:
+        raise ValueError("target_plan_id must reference an active study plan")
+
+
+def _package_payload(
+    *,
+    draft: dict[str, Any],
+    draft_version: int,
+    status: str,
+    summary: str | None,
+    assumptions: dict[str, Any],
+    phases: list[dict[str, Any]],
+    tasks: list[dict[str, Any]],
+    review_summary: dict[str, Any],
+    activation_eligibility: dict[str, Any],
+    extra: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    payload = {
+        "schema_version": DRAFT_SCHEMA_VERSION,
+        "draft_id": draft["id"],
+        "draft_version": draft_version,
+        "intake_id": draft["intake_item_id"],
+        "status": status,
+        "summary": summary,
+        "assumptions": assumptions,
+        "phases": phases,
+        "tasks": tasks,
+        "review_summary": review_summary,
+        "activation_eligibility": activation_eligibility,
+    }
+    if extra:
+        payload.update(extra)
+    return payload
+
+
+async def _upsert_draft_version(
+    db: aiosqlite.Connection,
+    *,
+    draft: dict[str, Any],
+    draft_version: int,
+    status: str,
+    summary: str | None = None,
+    assumptions: dict[str, Any] | None = None,
+    phases: list[dict[str, Any]] | None = None,
+    tasks: list[dict[str, Any]] | None = None,
+    review_summary: dict[str, Any] | None = None,
+    activation_eligibility: dict[str, Any] | None = None,
+    extra_package_fields: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    _validate_draft_package_status(status)
+    assumptions = assumptions or {}
+    phases = phases or []
+    tasks = tasks or []
+    review_summary = review_summary or {}
+    activation_eligibility = activation_eligibility or {}
+    package = _package_payload(
+        draft=draft,
+        draft_version=draft_version,
+        status=status,
+        summary=summary,
+        assumptions=assumptions,
+        phases=phases,
+        tasks=tasks,
+        review_summary=review_summary,
+        activation_eligibility=activation_eligibility,
+        extra=extra_package_fields,
+    )
+    await db.execute(
+        """
+        INSERT INTO study_project_draft_versions (
+            draft_id, draft_version, schema_version, status, summary,
+            assumptions, package_json, phases, tasks, review_summary,
+            activation_eligibility
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(draft_id, draft_version) DO UPDATE SET
+            schema_version = excluded.schema_version,
+            status = excluded.status,
+            summary = excluded.summary,
+            assumptions = excluded.assumptions,
+            package_json = excluded.package_json,
+            phases = excluded.phases,
+            tasks = excluded.tasks,
+            review_summary = excluded.review_summary,
+            activation_eligibility = excluded.activation_eligibility,
+            updated_at = CURRENT_TIMESTAMP
+        """,
+        (
+            draft["id"],
+            draft_version,
+            DRAFT_SCHEMA_VERSION,
+            status,
+            summary,
+            _json_dumps(assumptions),
+            _json_dumps(package),
+            _json_dumps(phases),
+            _json_dumps(tasks),
+            _json_dumps(review_summary),
+            _json_dumps(activation_eligibility),
+        ),
+    )
+    return package
+
+
+def _unknown_legacy_assumptions(draft: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "deadline": {
+            "value": draft.get("deadline"),
+            "provenance": "unknown",
+            "accepted": False,
+        },
+        "capacity": {
+            "daily_minutes": draft.get("capacity_minutes"),
+            "provenance": "unknown",
+            "accepted": False,
+        },
+        "target_output": {
+            "value": None,
+            "provenance": "unknown",
+            "accepted": False,
+        },
+        "target_depth": {
+            "value": None,
+            "provenance": "unknown",
+            "accepted": False,
+        },
+        "buffer_policy": {
+            "value": None,
+            "provenance": "unknown",
+            "accepted": False,
+        },
+        "rest_days": {
+            "weekdays": [],
+            "unavailable_dates": [],
+            "provenance": "unknown",
+            "accepted": False,
+        },
+        "source_roles": {
+            "value": {},
+            "provenance": "unknown",
+            "accepted": False,
+        },
+    }
+
+
+def _legacy_package_from_draft(
+    draft: dict[str, Any],
+    draft_version: int,
+) -> dict[str, Any]:
+    metadata_assumptions = draft["metadata"].get("assumptions")
+    assumptions = (
+        metadata_assumptions
+        if isinstance(metadata_assumptions, dict) and metadata_assumptions
+        else _unknown_legacy_assumptions(draft)
+    )
+    return _package_payload(
+        draft=draft,
+        draft_version=draft_version,
+        status=draft["status"],
+        summary=draft["title"],
+        assumptions=assumptions,
+        phases=[],
+        tasks=[],
+        review_summary={"provenance": "legacy_header"},
+        activation_eligibility={
+            "activation_ready": False,
+            "provenance": "unknown",
+        },
+        extra={
+            "recovered_from": "legacy_draft_header",
+            "provenance": "unknown",
+        },
+    )
+
+
+async def _fetch_version_row(
+    db: aiosqlite.Connection,
+    draft_id: int,
+    draft_version: int,
+) -> dict[str, Any] | None:
+    async with db.execute(
+        """
+        SELECT draft_id, draft_version, schema_version, status, summary,
+               assumptions, package_json, phases, tasks, review_summary,
+               activation_eligibility
+        FROM study_project_draft_versions
+        WHERE draft_id = ? AND draft_version = ?
+        """,
+        (draft_id, draft_version),
+    ) as cursor:
+        row = await cursor.fetchone()
+    return dict(row) if row else None
+
+
+async def _has_draft_version_rows(db: aiosqlite.Connection, draft_id: int) -> bool:
+    async with db.execute(
+        """
+        SELECT 1
+        FROM study_project_draft_versions
+        WHERE draft_id = ?
+        LIMIT 1
+        """,
+        (draft_id,),
+    ) as cursor:
+        return await cursor.fetchone() is not None
+
+
+def _package_from_version_row(row: dict[str, Any]) -> dict[str, Any]:
+    package = _json_loads(row["package_json"], {})
+    package.update(
+        {
+            "draft_id": row["draft_id"],
+            "draft_version": row["draft_version"],
+            "schema_version": row["schema_version"],
+            "status": row["status"],
+            "summary": row["summary"],
+            "assumptions": _json_loads(row["assumptions"], {}),
+            "phases": _json_loads(row["phases"], []),
+            "tasks": _json_loads(row["tasks"], []),
+            "review_summary": _json_loads(row["review_summary"], {}),
+            "activation_eligibility": _json_loads(row["activation_eligibility"], {}),
+        }
+    )
+    return package
+
+
+async def create_or_load_draft_shell(
+    db: aiosqlite.Connection,
+    *,
+    intake_item_id: int,
+    title: str,
+    source_url: str,
+    deadline: date | str,
+    capacity_minutes: int,
+    clarification_skipped: bool = False,
+    draft_kind: str = "new_plan",
+    target_plan_id: int | None = None,
+    calibration_level: str = "standard",
+    assumptions: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Create or return the open draft shell for an intake item and draft kind."""
+    await _ensure_draft_version_storage(db)
+    await _validate_draft_target_plan(
+        db,
+        draft_kind=draft_kind,
+        target_plan_id=target_plan_id,
+    )
+    await db.execute("BEGIN IMMEDIATE")
+    try:
+        async with db.execute(
+            f"""
+            SELECT id
+            FROM study_project_drafts
+            WHERE intake_item_id = ?
+              AND draft_kind = ?
+              AND (
+                  (target_plan_id IS NULL AND ? IS NULL)
+                  OR target_plan_id = ?
+              )
+              AND status IN ({",".join("?" for _ in OPEN_DRAFT_STATUSES)})
+            ORDER BY id ASC
+            LIMIT 1
+            """,
+            (
+                intake_item_id,
+                draft_kind,
+                target_plan_id,
+                target_plan_id,
+                *sorted(OPEN_DRAFT_STATUSES),
+            ),
+        ) as cursor:
+            existing = await cursor.fetchone()
+        if existing is not None:
+            await db.commit()
+            return await _fetch_draft_shell(db, int(existing["id"]))
+
+        metadata = {
+            "assumptions": assumptions or {},
+            "display_metadata": {},
+            "source_url": source_url,
+            "deadline": _iso(deadline),
+            "capacity_minutes": capacity_minutes,
+        }
+        cursor = await db.execute(
+            """
+            INSERT INTO study_project_drafts
+                (intake_item_id, title, source_url, deadline, status,
+                 schema_version, draft_version, latest_version, calibration_level,
+                 draft_kind, target_plan_id, capacity_minutes, clarification_skipped,
+                 metadata)
+            VALUES (?, ?, ?, ?, 'anchor_review', ?, 1, 1, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                intake_item_id,
+                title,
+                source_url,
+                _iso(deadline),
+                DRAFT_SCHEMA_VERSION,
+                calibration_level,
+                draft_kind,
+                target_plan_id,
+                capacity_minutes,
+                int(clarification_skipped),
+                _json_dumps(metadata),
+            ),
+        )
+        draft_id = int(cursor.lastrowid)
+        draft = await _fetch_draft_header(db, draft_id)
+        await _upsert_draft_version(
+            db,
+            draft=draft,
+            draft_version=1,
+            status="anchor_review",
+            summary=None,
+            assumptions=assumptions or {},
+        )
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise
+
+    return await _fetch_draft_shell(db, draft_id)
+
+
+async def save_draft_compiler_package_shell(
+    db: aiosqlite.Connection,
+    *,
+    draft_id: int,
+    status: str,
+    summary: str | None = None,
+    assumptions: dict[str, Any] | None = None,
+    phases: list[dict[str, Any]] | None = None,
+    tasks: list[dict[str, Any]] | None = None,
+    review_summary: dict[str, Any] | None = None,
+    activation_eligibility: dict[str, Any] | None = None,
+    missing_input: dict[str, Any] | None = None,
+    validation_errors: list[dict[str, Any]] | None = None,
+    risk_report: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Persist a compiler package shell for the current draft version."""
+    await _ensure_draft_version_storage(db)
+    _validate_draft_package_status(status)
+    extra = {
+        key: value
+        for key, value in {
+            "missing_input": missing_input,
+            "validation_errors": validation_errors,
+            "risk_report": risk_report,
+        }.items()
+        if value is not None
+    }
+    await db.execute("BEGIN IMMEDIATE")
+    try:
+        draft = await _fetch_draft_header(db, draft_id)
+        _ensure_draft_allows_package_write(draft)
+        draft_version = int(draft["latest_version"])
+        package = await _upsert_draft_version(
+            db,
+            draft=draft,
+            draft_version=draft_version,
+            status=status,
+            summary=summary,
+            assumptions=assumptions,
+            phases=phases,
+            tasks=tasks,
+            review_summary=review_summary,
+            activation_eligibility=activation_eligibility,
+            extra_package_fields=extra,
+        )
+        metadata = dict(draft["metadata"])
+        metadata["assumptions"] = assumptions or {}
+        metadata["latest_package_summary"] = summary
+        await db.execute(
+            """
+            UPDATE study_project_drafts
+            SET status = ?, schema_version = ?, draft_version = ?,
+                latest_version = ?, metadata = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            (
+                status,
+                DRAFT_SCHEMA_VERSION,
+                draft_version,
+                draft_version,
+                _json_dumps(metadata),
+                draft_id,
+            ),
+        )
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise
+    return package
+
+
+async def fetch_draft_package_version(
+    db: aiosqlite.Connection,
+    draft_id: int,
+    draft_version: int,
+) -> dict[str, Any]:
+    await _ensure_draft_version_storage(db)
+    row = await _fetch_version_row(db, draft_id, draft_version)
+    if row is None:
+        draft = await _fetch_draft_header(db, draft_id)
+        if draft_version != int(draft["latest_version"]) or await _has_draft_version_rows(
+            db, draft_id
+        ):
+            raise ValueError(f"Draft package version not found: {draft_id}@{draft_version}")
+        synthetic = _legacy_package_from_draft(draft, draft_version)
+        should_commit = not db.in_transaction
+        try:
+            package = await _upsert_draft_version(
+                db,
+                draft=draft,
+                draft_version=draft_version,
+                status=synthetic["status"],
+                summary=synthetic["summary"],
+                assumptions=synthetic["assumptions"],
+                review_summary=synthetic["review_summary"],
+                activation_eligibility=synthetic["activation_eligibility"],
+                extra_package_fields={
+                    key: value
+                    for key, value in synthetic.items()
+                    if key not in PACKAGE_CORE_FIELDS
+                },
+            )
+        except Exception:
+            if should_commit:
+                await db.rollback()
+            raise
+        if should_commit:
+            await db.commit()
+        return package
+    return _package_from_version_row(row)
+
+
+async def fetch_latest_draft_package(
+    db: aiosqlite.Connection,
+    draft_id: int,
+) -> dict[str, Any]:
+    draft = await _fetch_draft_header(db, draft_id)
+    return await fetch_draft_package_version(db, draft_id, int(draft["latest_version"]))
+
+
+async def create_meaningful_draft_edit_version(
+    db: aiosqlite.Connection,
+    *,
+    draft_id: int,
+    edit_kind: str,
+    package_updates: dict[str, Any],
+) -> dict[str, Any]:
+    """Create a snapshot version after an edit that affects plan semantics."""
+    await _ensure_draft_version_storage(db)
+    await db.execute("BEGIN IMMEDIATE")
+    try:
+        draft = await _fetch_draft_header(db, draft_id)
+        _ensure_draft_allows_package_write(draft)
+        latest_version = int(draft["latest_version"])
+        latest_row = await _fetch_version_row(db, draft_id, latest_version)
+        if latest_row is None:
+            raise ValueError(f"Draft package version not found: {draft_id}@{latest_version}")
+        latest = _package_from_version_row(latest_row)
+        next_version = latest_version + 1
+        updated = deepcopy(latest)
+        updated.update(package_updates)
+        updated["draft_version"] = next_version
+        updated["edit_kind"] = edit_kind
+        status = updated.get("status") or draft["status"]
+        extra_fields = {
+            key: value
+            for key, value in updated.items()
+            if key not in PACKAGE_CORE_FIELDS
+        }
+        package = await _upsert_draft_version(
+            db,
+            draft=draft,
+            draft_version=next_version,
+            status=status,
+            summary=updated.get("summary"),
+            assumptions=updated.get("assumptions") or {},
+            phases=updated.get("phases") or [],
+            tasks=updated.get("tasks") or [],
+            review_summary=updated.get("review_summary") or {},
+            activation_eligibility=updated.get("activation_eligibility") or {},
+            extra_package_fields=extra_fields,
+        )
+        metadata = dict(draft["metadata"])
+        metadata["assumptions"] = package["assumptions"]
+        metadata["latest_package_summary"] = package.get("summary")
+        await db.execute(
+            """
+            UPDATE study_project_drafts
+            SET status = ?, draft_version = ?, latest_version = ?,
+                metadata = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            (status, next_version, next_version, _json_dumps(metadata), draft_id),
+        )
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise
+    return package
+
+
+async def update_draft_display_metadata(
+    db: aiosqlite.Connection,
+    *,
+    draft_id: int,
+    display_metadata: dict[str, Any],
+) -> dict[str, Any]:
+    """Update display-only metadata without creating a new draft version."""
+    draft = await _fetch_draft_header(db, draft_id)
+    metadata = dict(draft["metadata"])
+    metadata["display_metadata"] = display_metadata
+    await db.execute(
+        """
+        UPDATE study_project_drafts
+        SET metadata = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+        """,
+        (_json_dumps(metadata), draft_id),
+    )
+    await db.commit()
+    return await _fetch_draft_shell(db, draft_id)
 
 
 async def _fetch_draft(db: aiosqlite.Connection, draft_id: int) -> dict[str, Any]:
@@ -67,6 +751,10 @@ async def create_draft_study_project(
                 FROM study_project_drafts
                 WHERE intake_item_id = ?
                   AND draft_kind = ?
+                  AND (
+                      (target_plan_id IS NULL AND ? IS NULL)
+                      OR target_plan_id = ?
+                  )
                   AND status IN (
                       'review', 'draft_review', 'anchor_review', 'compiling',
                       'needs_input', 'compile_failed', 'infeasible_review', 'activating'
@@ -74,7 +762,7 @@ async def create_draft_study_project(
                 ORDER BY id ASC
                 LIMIT 1
                 """,
-                (intake_item_id, draft_kind),
+                (intake_item_id, draft_kind, target_plan_id, target_plan_id),
             ) as cursor:
                 existing = await cursor.fetchone()
             if existing is not None:

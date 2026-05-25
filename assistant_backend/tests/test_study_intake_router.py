@@ -1,5 +1,6 @@
 """Study intake data/idempotency tests."""
 
+import json
 from datetime import date
 
 import pytest
@@ -37,6 +38,12 @@ async def _fetchall(db, sql: str, params: tuple = ()) -> list[dict]:
     async with db.execute(sql, params) as cursor:
         rows = await cursor.fetchall()
         return [dict(row) for row in rows]
+
+
+async def _fetchone(db, sql: str, params: tuple = ()) -> dict | None:
+    async with db.execute(sql, params) as cursor:
+        row = await cursor.fetchone()
+        return dict(row) if row else None
 
 
 @pytest.mark.asyncio
@@ -819,6 +826,236 @@ async def test_scheduled_work_confirmation_requires_target_and_attachment_mode(d
     assert ready["nextAction"] == "handoff_to_anchor_review"
     assert ready["outcome"] == "awaiting_anchor_review"
     assert ready["createsActiveTasks"] is False
+
+
+@pytest.mark.asyncio
+async def test_new_plan_handoff_persists_draft_kind_shell_without_active_tasks(db):
+    from src.study_plan.intake import confirm_intake_route, create_intake_item
+
+    item = await create_intake_item(
+        db,
+        client_request_id="req-new-plan-handoff-draft-kind",
+        raw_input="Learn SQLite by August.",
+        source_type="text_goal",
+        recommended_role="new_plan",
+        confidence="high",
+    )
+
+    handoff = await confirm_intake_route(
+        db,
+        intake_item_id=item["id"],
+        confirmed_role="new_plan",
+        title="Learn SQLite",
+        url="https://example.com/sqlite",
+        metadata={
+            "deadline": "2026-08-15",
+            "capacity_minutes": 75,
+            "assumptions": {
+                "deadline": {"value": "2026-08-15", "provenance": "user_provided"},
+                "capacity": {"daily_minutes": 75, "provenance": "user_provided"},
+            },
+        },
+    )
+
+    assert handoff["nextAction"] == "handoff_to_anchor_review"
+    assert handoff["outcome"] == "awaiting_anchor_review"
+    assert handoff["draftId"] > 0
+    assert handoff["draftKind"] == "new_plan"
+    assert handoff["targetPlanId"] is None
+    assert handoff["createsActiveTasks"] is False
+    assert await _fetchone(
+        db,
+        """
+        SELECT intake_item_id, status, draft_kind, target_plan_id, draft_version,
+               latest_version
+        FROM study_project_drafts
+        WHERE id = ?
+        """,
+        (handoff["draftId"],),
+    ) == {
+        "intake_item_id": item["id"],
+        "status": "anchor_review",
+        "draft_kind": "new_plan",
+        "target_plan_id": None,
+        "draft_version": 1,
+        "latest_version": 1,
+    }
+    assert await _fetchall(db, "SELECT id FROM tasks") == []
+
+
+@pytest.mark.asyncio
+async def test_new_plan_handoff_without_deadline_records_unknown_assumption_not_today(db):
+    from src.study_plan.intake import confirm_intake_route, create_intake_item
+
+    item = await create_intake_item(
+        db,
+        client_request_id="req-new-plan-unknown-deadline",
+        raw_input="Learn SQLite when I have time.",
+        source_type="text_goal",
+        recommended_role="new_plan",
+        confidence="high",
+    )
+
+    handoff = await confirm_intake_route(
+        db,
+        intake_item_id=item["id"],
+        confirmed_role="new_plan",
+        title="Learn SQLite",
+        metadata={"capacity_minutes": 75},
+    )
+    stored = await _fetchone(
+        db,
+        "SELECT deadline, metadata FROM study_project_drafts WHERE id = ?",
+        (handoff["draftId"],),
+    )
+    metadata = json.loads(stored["metadata"])
+
+    assert stored["deadline"] == "9999-12-31"
+    assert stored["deadline"] != date.today().isoformat()
+    assert metadata["deadline"] == "9999-12-31"
+    assert metadata["assumptions"]["deadline"] == {
+        "value": None,
+        "provenance": "unknown",
+        "accepted": False,
+        "needs_input": True,
+    }
+    assert metadata["assumptions"]["capacity"] == {
+        "daily_minutes": 75,
+        "provenance": "user_provided",
+        "accepted": True,
+    }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("attachment_mode", "expected_draft_kind"),
+    [
+        ("draft_phase", "existing_plan_phase"),
+        ("scheduled_work", "existing_plan_scheduled_work"),
+    ],
+)
+async def test_existing_plan_handoff_persists_draft_phase_and_scheduled_work_targets(
+    db,
+    attachment_mode,
+    expected_draft_kind,
+):
+    from src.study_plan.intake import confirm_intake_route, create_intake_item
+
+    cursor = await db.execute(
+        """
+        INSERT INTO resources (title, type, tracking_mode, status, total_units)
+        VALUES ('Backend Study Project', 'study_project', 'sequential', 'active', 1)
+        """
+    )
+    plan_id = int(cursor.lastrowid)
+    await db.commit()
+    item = await create_intake_item(
+        db,
+        client_request_id=f"req-{attachment_mode}-target-draft-kind",
+        raw_input="Attach this work to my backend project.",
+        source_type="existing_project_description",
+        recommended_role="attach_to_existing_plan",
+        confidence="high",
+    )
+
+    handoff = await confirm_intake_route(
+        db,
+        intake_item_id=item["id"],
+        confirmed_role="attach_to_existing_plan",
+        existing_plan_id=plan_id,
+        attachment_mode=attachment_mode,
+        title="Retry practice",
+        metadata={"deadline": "2026-08-20", "capacity_minutes": 40},
+    )
+
+    assert handoff["nextAction"] == "handoff_to_anchor_review"
+    assert handoff["outcome"] == "awaiting_anchor_review"
+    assert handoff["draftId"] > 0
+    assert handoff["draftKind"] == expected_draft_kind
+    assert handoff["existingPlanId"] == plan_id
+    assert handoff["targetPlanId"] == plan_id
+    assert handoff["attachmentMode"] == attachment_mode
+    assert await _fetchone(
+        db,
+        """
+        SELECT intake_item_id, status, draft_kind, target_plan_id
+        FROM study_project_drafts
+        WHERE id = ?
+        """,
+        (handoff["draftId"],),
+    ) == {
+        "intake_item_id": item["id"],
+        "status": "anchor_review",
+        "draft_kind": expected_draft_kind,
+        "target_plan_id": plan_id,
+    }
+    assert await _fetchall(db, "SELECT id FROM study_intake_plan_attachments") == []
+    assert await _fetchall(db, "SELECT id FROM tasks") == []
+
+
+@pytest.mark.asyncio
+async def test_existing_plan_handoff_idempotency_respects_target_plan_id(db):
+    from src.study_plan.intake import confirm_intake_route, create_intake_item
+
+    first_cursor = await db.execute(
+        """
+        INSERT INTO resources (title, type, tracking_mode, status, total_units)
+        VALUES ('Compiler Study Project', 'study_project', 'sequential', 'active', 1)
+        """
+    )
+    first_plan_id = int(first_cursor.lastrowid)
+    second_cursor = await db.execute(
+        """
+        INSERT INTO resources (title, type, tracking_mode, status, total_units)
+        VALUES ('Backend Study Project', 'study_project', 'sequential', 'active', 1)
+        """
+    )
+    second_plan_id = int(second_cursor.lastrowid)
+    await db.commit()
+    item = await create_intake_item(
+        db,
+        client_request_id="req-existing-plan-retarget-draft",
+        raw_input="Attach retry practice to the selected project.",
+        source_type="existing_project_description",
+        recommended_role="attach_to_existing_plan",
+        confidence="high",
+    )
+
+    first = await confirm_intake_route(
+        db,
+        intake_item_id=item["id"],
+        confirmed_role="attach_to_existing_plan",
+        existing_plan_id=first_plan_id,
+        attachment_mode="scheduled_work",
+        title="Retry practice",
+        metadata={"deadline": "2026-08-20", "capacity_minutes": 40},
+    )
+    second = await confirm_intake_route(
+        db,
+        intake_item_id=item["id"],
+        confirmed_role="attach_to_existing_plan",
+        existing_plan_id=second_plan_id,
+        attachment_mode="scheduled_work",
+        title="Retry practice",
+        metadata={"deadline": "2026-08-21", "capacity_minutes": 40},
+    )
+
+    assert first["draftId"] != second["draftId"]
+    assert first["targetPlanId"] == first_plan_id
+    assert second["targetPlanId"] == second_plan_id
+    assert await _fetchall(
+        db,
+        """
+        SELECT id, target_plan_id
+        FROM study_project_drafts
+        WHERE intake_item_id = ?
+        ORDER BY id
+        """,
+        (item["id"],),
+    ) == [
+        {"id": first["draftId"], "target_plan_id": first_plan_id},
+        {"id": second["draftId"], "target_plan_id": second_plan_id},
+    ]
 
 
 @pytest.mark.asyncio

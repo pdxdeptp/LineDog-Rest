@@ -183,6 +183,688 @@ async def test_create_draft_study_project_links_intake_item_idempotently_without
     assert await _fetchall(db, "SELECT id FROM tasks") == []
 
 
+def _planning_assumptions(**overrides):
+    assumptions = {
+        "deadline": {
+            "value": "2026-07-15",
+            "type": "fixed",
+            "provenance": "user_provided",
+            "accepted": True,
+        },
+        "capacity": {
+            "daily_minutes": 60,
+            "per_date_overrides": {"2026-07-03": 30},
+            "provenance": "system_default",
+            "accepted": True,
+        },
+        "target_output": {
+            "value": "working demo",
+            "provenance": "parsed",
+            "accepted": True,
+        },
+        "target_depth": {
+            "value": "project",
+            "provenance": "ai_assumed",
+            "accepted": False,
+            "user_edited": True,
+        },
+        "buffer_policy": {
+            "value": "leave_20_percent",
+            "provenance": "system_default",
+            "accepted": True,
+        },
+        "rest_days": {
+            "weekdays": [5],
+            "unavailable_dates": ["2026-07-04"],
+            "provenance": "user_provided",
+            "accepted": True,
+        },
+        "source_roles": {
+            "github_repo": "main_learning_object",
+            "provenance": "parsed",
+            "accepted": True,
+        },
+    }
+    assumptions.update(overrides)
+    return assumptions
+
+
+@pytest.mark.asyncio
+async def test_draft_package_persists_assumptions_provenance_and_latest_fetch(db):
+    lifecycle = _lifecycle_module()
+    cursor = await db.execute(
+        """
+        INSERT INTO study_intake_items
+            (client_request_id, raw_input, source_type, recommended_role, confidence)
+        VALUES ('req-assumptions-package', 'learn sqlite deeply', 'text_goal', 'new_plan', 'high')
+        """
+    )
+    intake_item_id = int(cursor.lastrowid)
+    await db.commit()
+
+    shell = await lifecycle.create_or_load_draft_shell(
+        db,
+        intake_item_id=intake_item_id,
+        title="Learn SQLite Deeply",
+        source_url="https://example.com/sqlite",
+        deadline=date(2026, 7, 15),
+        capacity_minutes=60,
+        calibration_level="standard",
+        assumptions=_planning_assumptions(),
+    )
+    saved = await lifecycle.save_draft_compiler_package_shell(
+        db,
+        draft_id=shell["id"],
+        status="needs_input",
+        summary="Need the learner to pick a target output.",
+        assumptions=_planning_assumptions(),
+        review_summary={"headline": "Missing anchor"},
+        activation_eligibility={"activation_ready": False, "reason": "missing_input"},
+        missing_input={"facts": ["target_output"]},
+    )
+    latest = await lifecycle.fetch_latest_draft_package(db, shell["id"])
+
+    assert saved["draft_version"] == 1
+    assert latest["draft_id"] == shell["id"]
+    assert latest["draft_version"] == 1
+    assert latest["status"] == "needs_input"
+    assert latest["summary"] == "Need the learner to pick a target output."
+    assert latest["assumptions"]["deadline"]["provenance"] == "user_provided"
+    assert latest["assumptions"]["capacity"] == {
+        "daily_minutes": 60,
+        "per_date_overrides": {"2026-07-03": 30},
+        "provenance": "system_default",
+        "accepted": True,
+    }
+    assert latest["assumptions"]["target_output"] == {
+        "value": "working demo",
+        "provenance": "parsed",
+        "accepted": True,
+    }
+    assert latest["assumptions"]["target_depth"]["user_edited"] is True
+    assert latest["assumptions"]["buffer_policy"] == {
+        "value": "leave_20_percent",
+        "provenance": "system_default",
+        "accepted": True,
+    }
+    assert latest["assumptions"]["rest_days"] == {
+        "weekdays": [5],
+        "unavailable_dates": ["2026-07-04"],
+        "provenance": "user_provided",
+        "accepted": True,
+    }
+    assert latest["assumptions"]["source_roles"] == {
+        "github_repo": "main_learning_object",
+        "provenance": "parsed",
+        "accepted": True,
+    }
+    assert latest["activation_eligibility"] == {
+        "activation_ready": False,
+        "reason": "missing_input",
+    }
+
+
+@pytest.mark.asyncio
+async def test_save_package_shell_reloads_latest_version_inside_transaction(db):
+    lifecycle = _lifecycle_module()
+    cursor = await db.execute(
+        """
+        INSERT INTO study_intake_items
+            (client_request_id, raw_input, source_type, recommended_role, confidence)
+        VALUES ('req-package-transaction-latest', 'learn sqlite', 'text_goal', 'new_plan', 'high')
+        """
+    )
+    intake_item_id = int(cursor.lastrowid)
+    await db.commit()
+    shell = await lifecycle.create_or_load_draft_shell(
+        db,
+        intake_item_id=intake_item_id,
+        title="Learn SQLite",
+        source_url="https://example.com/sqlite",
+        deadline="2026-07-20",
+        capacity_minutes=60,
+    )
+    await lifecycle.save_draft_compiler_package_shell(
+        db,
+        draft_id=shell["id"],
+        status="needs_input",
+        summary="Initial missing anchors",
+        assumptions=_planning_assumptions(),
+    )
+
+    async def create_concurrent_latest_version() -> None:
+        assumptions = _planning_assumptions(
+            target_output={
+                "value": "concurrent demo",
+                "provenance": "user_provided",
+                "accepted": True,
+            }
+        )
+        package = {
+            "schema_version": 1,
+            "draft_id": shell["id"],
+            "draft_version": 2,
+            "intake_id": intake_item_id,
+            "status": "draft_review",
+            "summary": "Concurrent user edit",
+            "assumptions": assumptions,
+            "phases": [],
+            "tasks": [],
+            "review_summary": {},
+            "activation_eligibility": {"activation_ready": True},
+        }
+        await db.execute(
+            """
+            INSERT INTO study_project_draft_versions (
+                draft_id, draft_version, schema_version, status, summary,
+                assumptions, package_json, phases, tasks, review_summary,
+                activation_eligibility
+            )
+            VALUES (?, 2, 1, 'draft_review', 'Concurrent user edit',
+                    ?, ?, '[]', '[]', '{}', ?)
+            """,
+            (
+                shell["id"],
+                json.dumps(assumptions, sort_keys=True),
+                json.dumps(package, sort_keys=True),
+                json.dumps({"activation_ready": True}, sort_keys=True),
+            ),
+        )
+        await db.execute(
+            """
+            UPDATE study_project_drafts
+            SET status = 'draft_review', draft_version = 2, latest_version = 2
+            WHERE id = ?
+            """,
+            (shell["id"],),
+        )
+        await db.commit()
+
+    racing_db = _BeforeBeginConnection(db, create_concurrent_latest_version)
+
+    package = await lifecycle.save_draft_compiler_package_shell(
+        racing_db,
+        draft_id=shell["id"],
+        status="compile_failed",
+        summary="Validation failed after concurrent edit",
+        assumptions=_planning_assumptions(),
+        validation_errors=[{"field": "deadline", "message": "too soon"}],
+    )
+
+    assert package["draft_version"] == 2
+    assert package["status"] == "compile_failed"
+    assert await _fetchone(
+        db,
+        "SELECT draft_version, latest_version FROM study_project_drafts WHERE id = ?",
+        (shell["id"],),
+    ) == {"draft_version": 2, "latest_version": 2}
+    assert await _fetchall(
+        db,
+        """
+        SELECT draft_version, status, summary
+        FROM study_project_draft_versions
+        WHERE draft_id = ?
+        ORDER BY draft_version
+        """,
+        (shell["id"],),
+    ) == [
+        {
+            "draft_version": 1,
+            "status": "needs_input",
+            "summary": "Initial missing anchors",
+        },
+        {
+            "draft_version": 2,
+            "status": "compile_failed",
+            "summary": "Validation failed after concurrent edit",
+        },
+    ]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "package_status",
+    ["needs_input", "compile_failed", "infeasible_review", "draft_review"],
+)
+async def test_draft_package_shells_allow_blocked_statuses_without_schedule_tasks(
+    db,
+    package_status,
+):
+    lifecycle = _lifecycle_module()
+    cursor = await db.execute(
+        """
+        INSERT INTO study_intake_items
+            (client_request_id, raw_input, source_type, recommended_role, confidence)
+        VALUES (?, 'learn compiler basics', 'text_goal', 'new_plan', 'high')
+        """,
+        (f"req-package-{package_status}",),
+    )
+    intake_item_id = int(cursor.lastrowid)
+    await db.commit()
+
+    shell = await lifecycle.create_or_load_draft_shell(
+        db,
+        intake_item_id=intake_item_id,
+        title="Compiler Basics",
+        source_url="https://example.com/compiler",
+        deadline="2026-07-20",
+        capacity_minutes=45,
+    )
+
+    package = await lifecycle.save_draft_compiler_package_shell(
+        db,
+        draft_id=shell["id"],
+        status=package_status,
+        summary=f"{package_status} shell",
+        assumptions=_planning_assumptions(),
+        review_summary={"status": package_status},
+        activation_eligibility={"activation_ready": package_status == "draft_review"},
+    )
+
+    assert package["status"] == package_status
+    assert package["phases"] == []
+    assert package["tasks"] == []
+    assert await _fetchall(db, "SELECT id FROM tasks") == []
+
+
+@pytest.mark.asyncio
+async def test_save_package_shell_rejects_unknown_package_status(db):
+    lifecycle = _lifecycle_module()
+    cursor = await db.execute(
+        """
+        INSERT INTO study_intake_items
+            (client_request_id, raw_input, source_type, recommended_role, confidence)
+        VALUES ('req-invalid-package-status', 'learn compiler basics', 'text_goal',
+                'new_plan', 'high')
+        """
+    )
+    intake_item_id = int(cursor.lastrowid)
+    await db.commit()
+    shell = await lifecycle.create_or_load_draft_shell(
+        db,
+        intake_item_id=intake_item_id,
+        title="Compiler Basics",
+        source_url="https://example.com/compiler",
+        deadline="2026-07-20",
+        capacity_minutes=45,
+    )
+
+    with pytest.raises(ValueError, match="status"):
+        await lifecycle.save_draft_compiler_package_shell(
+            db,
+            draft_id=shell["id"],
+            status="teleported",
+            summary="Invalid lifecycle state",
+            assumptions=_planning_assumptions(),
+        )
+
+    assert await _fetchone(
+        db,
+        "SELECT status, draft_version, latest_version FROM study_project_drafts WHERE id = ?",
+        (shell["id"],),
+    ) == {"status": "anchor_review", "draft_version": 1, "latest_version": 1}
+
+
+@pytest.mark.asyncio
+async def test_meaningful_edit_creates_new_draft_version_and_preserves_previous_package(db):
+    lifecycle = _lifecycle_module()
+    cursor = await db.execute(
+        """
+        INSERT INTO study_intake_items
+            (client_request_id, raw_input, source_type, recommended_role, confidence)
+        VALUES ('req-version-edit', 'learn fastapi', 'text_goal', 'new_plan', 'high')
+        """
+    )
+    intake_item_id = int(cursor.lastrowid)
+    await db.commit()
+    shell = await lifecycle.create_or_load_draft_shell(
+        db,
+        intake_item_id=intake_item_id,
+        title="Learn FastAPI",
+        source_url="https://example.com/fastapi",
+        deadline="2026-07-15",
+        capacity_minutes=60,
+    )
+    first = await lifecycle.save_draft_compiler_package_shell(
+        db,
+        draft_id=shell["id"],
+        status="draft_review",
+        summary="Initial draft",
+        assumptions=_planning_assumptions(),
+        phases=[{"id": "phase-1", "title": "Basics"}],
+        tasks=[{"stable_task_id": "task-1", "title": "Read docs", "estimate_minutes": 45}],
+        activation_eligibility={"activation_ready": True},
+    )
+
+    second = await lifecycle.create_meaningful_draft_edit_version(
+        db,
+        draft_id=shell["id"],
+        edit_kind="scope",
+        package_updates={
+            "summary": "Expanded project draft",
+            "assumptions": _planning_assumptions(
+                target_output={
+                    "value": "deployed API",
+                    "provenance": "user_provided",
+                    "accepted": True,
+                    "user_edited": True,
+                }
+            ),
+            "tasks": [
+                {"stable_task_id": "task-1", "title": "Read docs", "estimate_minutes": 45},
+                {"stable_task_id": "task-2", "title": "Build endpoint", "estimate_minutes": 60},
+            ],
+        },
+    )
+    latest = await lifecycle.fetch_latest_draft_package(db, shell["id"])
+    old = await lifecycle.fetch_draft_package_version(db, shell["id"], first["draft_version"])
+
+    assert second["draft_version"] == 2
+    assert latest["draft_version"] == 2
+    assert latest["summary"] == "Expanded project draft"
+    assert [task["title"] for task in latest["tasks"]] == ["Read docs", "Build endpoint"]
+    assert old["draft_version"] == 1
+    assert old["summary"] == "Initial draft"
+    assert [task["title"] for task in old["tasks"]] == ["Read docs"]
+    assert await _fetchone(
+        db,
+        "SELECT draft_version, latest_version FROM study_project_drafts WHERE id = ?",
+        (shell["id"],),
+    ) == {"draft_version": 2, "latest_version": 2}
+
+
+@pytest.mark.asyncio
+async def test_meaningful_edit_rejects_package_update_status_override(db):
+    lifecycle = _lifecycle_module()
+    cursor = await db.execute(
+        """
+        INSERT INTO study_intake_items
+            (client_request_id, raw_input, source_type, recommended_role, confidence)
+        VALUES ('req-invalid-edit-status', 'learn fastapi', 'text_goal', 'new_plan', 'high')
+        """
+    )
+    intake_item_id = int(cursor.lastrowid)
+    await db.commit()
+    shell = await lifecycle.create_or_load_draft_shell(
+        db,
+        intake_item_id=intake_item_id,
+        title="Learn FastAPI",
+        source_url="https://example.com/fastapi",
+        deadline="2026-07-15",
+        capacity_minutes=60,
+    )
+    await lifecycle.save_draft_compiler_package_shell(
+        db,
+        draft_id=shell["id"],
+        status="draft_review",
+        summary="Initial draft",
+        assumptions=_planning_assumptions(),
+        activation_eligibility={"activation_ready": True},
+    )
+
+    with pytest.raises(ValueError, match="status"):
+        await lifecycle.create_meaningful_draft_edit_version(
+            db,
+            draft_id=shell["id"],
+            edit_kind="scope",
+            package_updates={"status": "made_up", "summary": "Invalid status edit"},
+        )
+
+    assert await _fetchone(
+        db,
+        "SELECT status, draft_version, latest_version FROM study_project_drafts WHERE id = ?",
+        (shell["id"],),
+    ) == {"status": "draft_review", "draft_version": 1, "latest_version": 1}
+
+
+@pytest.mark.asyncio
+async def test_display_metadata_update_does_not_create_new_draft_version(db):
+    lifecycle = _lifecycle_module()
+    cursor = await db.execute(
+        """
+        INSERT INTO study_intake_items
+            (client_request_id, raw_input, source_type, recommended_role, confidence)
+        VALUES ('req-metadata-version', 'learn celery', 'text_goal', 'new_plan', 'high')
+        """
+    )
+    intake_item_id = int(cursor.lastrowid)
+    await db.commit()
+    shell = await lifecycle.create_or_load_draft_shell(
+        db,
+        intake_item_id=intake_item_id,
+        title="Learn Celery",
+        source_url="https://example.com/celery",
+        deadline="2026-07-25",
+        capacity_minutes=60,
+    )
+    await lifecycle.save_draft_compiler_package_shell(
+        db,
+        draft_id=shell["id"],
+        status="draft_review",
+        summary="Review draft",
+        assumptions=_planning_assumptions(),
+    )
+
+    updated = await lifecycle.update_draft_display_metadata(
+        db,
+        draft_id=shell["id"],
+        display_metadata={"label": "Pinned", "color": "blue"},
+    )
+    latest = await lifecycle.fetch_latest_draft_package(db, shell["id"])
+    version_rows = await _fetchall(
+        db,
+        "SELECT draft_version FROM study_project_draft_versions WHERE draft_id = ?",
+        (shell["id"],),
+    )
+
+    assert updated["draft_version"] == 1
+    assert updated["latest_version"] == 1
+    assert updated["display_metadata"] == {"label": "Pinned", "color": "blue"}
+    assert latest["draft_version"] == 1
+    assert version_rows == [{"draft_version": 1}]
+
+
+@pytest.mark.asyncio
+async def test_fetch_latest_package_synthesizes_legacy_header_without_version_row(db):
+    lifecycle = _lifecycle_module()
+    cursor = await db.execute(
+        """
+        INSERT INTO study_project_drafts
+            (title, source_url, deadline, status, capacity_minutes,
+             clarification_skipped, metadata)
+        VALUES ('Legacy Header', 'https://example.com/legacy', '2026-09-30',
+                'review', 80, 0, '{}')
+        """
+    )
+    draft_id = int(cursor.lastrowid)
+    await db.commit()
+
+    package = await lifecycle.fetch_latest_draft_package(db, draft_id)
+
+    assert package["draft_id"] == draft_id
+    assert package["draft_version"] == 1
+    assert package["status"] == "review"
+    assert package["summary"] == "Legacy Header"
+    assert package["assumptions"]["deadline"] == {
+        "value": "2026-09-30",
+        "provenance": "unknown",
+        "accepted": False,
+    }
+    assert package["assumptions"]["capacity"] == {
+        "daily_minutes": 80,
+        "provenance": "unknown",
+        "accepted": False,
+    }
+    assert package["assumptions"]["target_output"]["provenance"] == "unknown"
+    assert package["assumptions"]["target_depth"]["provenance"] == "unknown"
+    assert package["assumptions"]["buffer_policy"]["provenance"] == "unknown"
+    assert package["assumptions"]["rest_days"]["provenance"] == "unknown"
+    assert package["assumptions"]["source_roles"]["provenance"] == "unknown"
+    assert db.in_transaction is False
+
+    updated = await lifecycle.save_draft_compiler_package_shell(
+        db,
+        draft_id=draft_id,
+        status="draft_review",
+        summary="Legacy package can be updated after fetch",
+        assumptions=_planning_assumptions(),
+    )
+
+    assert updated["status"] == "draft_review"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("closed_status", ["cancelled", "confirmed", "active_plan", "discarded"])
+@pytest.mark.parametrize("entrypoint", ["save_package", "meaningful_edit"])
+async def test_package_entrypoints_reject_closed_draft_without_reopening(
+    db,
+    closed_status,
+    entrypoint,
+):
+    lifecycle = _lifecycle_module()
+    draft = await lifecycle.create_draft_study_project(
+        db,
+        title=f"Closed {closed_status} Draft",
+        source_url="https://example.com/closed-draft",
+        deadline=date(2026, 8, 15),
+        capacity_minutes=60,
+        clarification_skipped=False,
+        tasks=[
+            {
+                "title": "Draft-only task",
+                "estimated_minutes": 45,
+                "scheduled_date": date(2026, 8, 10),
+                "target_minutes": 45,
+            }
+        ],
+    )
+    await lifecycle.fetch_latest_draft_package(db, draft["id"])
+    if closed_status == "cancelled":
+        await lifecycle.cancel_draft_study_project(db, draft["id"])
+    else:
+        await db.execute(
+            """
+            UPDATE study_project_drafts
+            SET status = ?
+            WHERE id = ?
+            """,
+            (closed_status, draft["id"]),
+        )
+        await db.commit()
+    before = await _fetchone(
+        db,
+        "SELECT status, draft_version, latest_version FROM study_project_drafts WHERE id = ?",
+        (draft["id"],),
+    )
+
+    with pytest.raises(ValueError, match="closed draft"):
+        if entrypoint == "save_package":
+            await lifecycle.save_draft_compiler_package_shell(
+                db,
+                draft_id=draft["id"],
+                status="draft_review",
+                summary="Should not reopen",
+                assumptions=_planning_assumptions(),
+            )
+        else:
+            await lifecycle.create_meaningful_draft_edit_version(
+                db,
+                draft_id=draft["id"],
+                edit_kind="scope",
+                package_updates={"summary": "Should not reopen"},
+            )
+
+    assert await _fetchone(
+        db,
+        "SELECT status, draft_version, latest_version FROM study_project_drafts WHERE id = ?",
+        (draft["id"],),
+    ) == before
+
+
+@pytest.mark.asyncio
+async def test_draft_kind_target_plan_linkage_requires_active_plan_for_existing_plan_shell(db):
+    lifecycle = _lifecycle_module()
+    active_cursor = await db.execute(
+        """
+        INSERT INTO resources (title, type, tracking_mode, status, total_units)
+        VALUES ('Active Study Project', 'study_project', 'sequential', 'active', 1)
+        """
+    )
+    active_plan_id = int(active_cursor.lastrowid)
+    second_active_cursor = await db.execute(
+        """
+        INSERT INTO resources (title, type, tracking_mode, status, total_units)
+        VALUES ('Second Active Study Project', 'study_project', 'sequential', 'active', 1)
+        """
+    )
+    second_active_plan_id = int(second_active_cursor.lastrowid)
+    archived_cursor = await db.execute(
+        """
+        INSERT INTO resources (title, type, tracking_mode, status, total_units)
+        VALUES ('Archived Study Project', 'study_project', 'sequential', 'archived', 1)
+        """
+    )
+    archived_plan_id = int(archived_cursor.lastrowid)
+    intake_cursor = await db.execute(
+        """
+        INSERT INTO study_intake_items
+            (client_request_id, raw_input, source_type, recommended_role, confidence)
+        VALUES ('req-target-plan-shell', 'attach work', 'text_goal',
+                'attach_to_existing_plan', 'high')
+        """
+    )
+    intake_item_id = int(intake_cursor.lastrowid)
+    await db.commit()
+
+    shell = await lifecycle.create_or_load_draft_shell(
+        db,
+        intake_item_id=intake_item_id,
+        title="Add retry practice",
+        source_url="",
+        deadline="2026-08-01",
+        capacity_minutes=30,
+        draft_kind="existing_plan_scheduled_work",
+        target_plan_id=active_plan_id,
+    )
+    retry = await lifecycle.create_or_load_draft_shell(
+        db,
+        intake_item_id=intake_item_id,
+        title="Duplicate should reuse shell",
+        source_url="",
+        deadline="2026-08-02",
+        capacity_minutes=45,
+        draft_kind="existing_plan_scheduled_work",
+        target_plan_id=active_plan_id,
+    )
+    second_target_shell = await lifecycle.create_or_load_draft_shell(
+        db,
+        intake_item_id=intake_item_id,
+        title="Attach to a different active plan",
+        source_url="",
+        deadline="2026-08-03",
+        capacity_minutes=45,
+        draft_kind="existing_plan_scheduled_work",
+        target_plan_id=second_active_plan_id,
+    )
+
+    assert retry["id"] == shell["id"]
+    assert second_target_shell["id"] != shell["id"]
+    assert shell["draft_kind"] == "existing_plan_scheduled_work"
+    assert shell["target_plan_id"] == active_plan_id
+    assert second_target_shell["target_plan_id"] == second_active_plan_id
+    with pytest.raises(ValueError, match="active study plan"):
+        await lifecycle.create_or_load_draft_shell(
+            db,
+            intake_item_id=intake_item_id,
+            title="Invalid target",
+            source_url="",
+            deadline="2026-08-01",
+            capacity_minutes=30,
+            draft_kind="existing_plan_phase",
+            target_plan_id=archived_plan_id,
+        )
+
+
 @pytest.mark.asyncio
 async def test_init_db_migrates_legacy_draft_storage_idempotently_without_touching_active_rows(
     tmp_path,

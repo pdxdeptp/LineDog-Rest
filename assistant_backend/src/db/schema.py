@@ -88,6 +88,26 @@ CREATE TABLE IF NOT EXISTS study_project_draft_tasks (
 CREATE INDEX IF NOT EXISTS idx_study_project_draft_tasks_order
     ON study_project_draft_tasks(draft_id, order_index);
 
+CREATE TABLE IF NOT EXISTS study_project_draft_versions (
+    id                     INTEGER PRIMARY KEY,
+    draft_id               INTEGER NOT NULL REFERENCES study_project_drafts(id),
+    draft_version          INTEGER NOT NULL,
+    schema_version         INTEGER NOT NULL DEFAULT 1,
+    status                 TEXT    NOT NULL,
+    summary                TEXT,
+    assumptions            TEXT    NOT NULL DEFAULT '{}',
+    package_json           TEXT    NOT NULL DEFAULT '{}',
+    phases                 TEXT    NOT NULL DEFAULT '[]',
+    tasks                  TEXT    NOT NULL DEFAULT '[]',
+    review_summary         TEXT    NOT NULL DEFAULT '{}',
+    activation_eligibility TEXT    NOT NULL DEFAULT '{}',
+    created_at             TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at             TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(draft_id, draft_version)
+);
+CREATE INDEX IF NOT EXISTS idx_study_project_draft_versions_latest
+    ON study_project_draft_versions(draft_id, draft_version);
+
 CREATE TABLE IF NOT EXISTS study_intake_items (
     id                  INTEGER PRIMARY KEY,
     client_request_id   TEXT    NOT NULL UNIQUE,
