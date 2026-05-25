@@ -5,7 +5,7 @@
 - Phase: active
 - Current change: persist-intake-plan-drafts
 - Current step: apply
-- Current checkpoint: persist-intake-plan-drafts:apply:draft-package-versioning-and-entrypoints
+- Current checkpoint: persist-intake-plan-drafts:apply:activation-boundary-and-events
 - Required product-deepen rounds before apply: 3
 - Required checkpoint after product deepening: scope_dependency_check
 - Product-deepen scope guard: every round must read adjacent changes and record scope decisions
@@ -20,6 +20,7 @@
 Completed apply groups for current change:
 
 - `draft-schema-migration-and-defaults`
+- `draft-package-versioning-and-entrypoints`
 
 ## Run Log
 
@@ -532,3 +533,45 @@ Completed apply groups for current change:
 - Manifest:
   - Added `persist-intake-plan-drafts-apply-group-draft-schema-migration-and-defaults`.
 - Next checkpoint: persist-intake-plan-drafts:apply:draft-package-versioning-and-entrypoints
+
+## Run 2026-05-25T06:59:40Z Apply Group draft-package-versioning-and-entrypoints
+
+- Automation: add-initiate-changes
+- Checkpoint: persist-intake-plan-drafts:apply:draft-package-versioning-and-entrypoints
+- Result: completed
+- Actions:
+  - Acquired `run.lock`.
+  - Read `state.json`, `runbook.md`, `progress.md`, `evidence/manifest.json`, `workspace-baseline.json`, apply planning, and current task-group source.
+  - Ran `git status --porcelain=v1` and protected unrelated dirty files.
+  - Triggered `openspec-apply-change`, `superpowers:subagent-driven-development`, `superpowers:test-driven-development`, and `superpowers:receiving-code-review`.
+  - Delegated TDD implementation to a worker subagent with a bounded write set.
+  - Added package/versioning storage helpers, draft version snapshot storage, intake handoff draft shell creation, and package status/closed-state guards.
+  - Ran spec compliance and code quality reviews; both initially required changes.
+  - Fixed review findings for task `1.8` scope, legacy package recovery, transaction cleanup, stale latest-version reads, target-plan idempotency, unknown deadline provenance, package status validation, and closed-draft reopening.
+  - Wrote apply group evidence at `openspec/add-initiate-implementation-control/evidence/persist-intake-plan-drafts/apply-groups/draft-package-versioning-and-entrypoints.md`.
+  - Marked OpenSpec tasks `1.3`, `1.4`, `1.5`, `1.6`, `1.8`, `1.9`, `4.2`, `4.3`, and `4.11` complete.
+  - Created implementation commit `dd01c193c6690dd70b47f85df332100fac825425`.
+- Verification:
+  - `cd assistant_backend && uv run pytest tests/test_study_plan_lifecycle.py -k 'version or package or assumptions or target_plan or draft_kind'`: 13 passed.
+  - `cd assistant_backend && uv run pytest tests/test_study_intake_router.py -k 'handoff or scheduled_work or draft_phase'`: 8 passed.
+  - `cd assistant_backend && uv run pytest tests/test_study_plan_lifecycle.py tests/test_study_intake_router.py`: 83 passed, 2 third-party warnings.
+  - `cd assistant_backend && uv run pytest tests/test_study_plan_router.py -k 'start_endpoint or clarification_without_active_resources'`: 1 passed, 2 third-party warnings.
+  - `openspec validate persist-intake-plan-drafts --strict`: valid.
+  - `openspec instructions apply --change persist-intake-plan-drafts --json`: 16/35 tasks complete.
+  - `git diff --check`: passed for the apply-group file set.
+- Review:
+  - Final spec/code review verdict: approved.
+  - P0/P1 findings remaining: none.
+  - P2 note: task `4.11` wording still says activation targets, but current task `1.8` explicitly leaves activation behavior to later 2.* tasks; current group covers storage linkage only.
+- Protected unrelated dirty paths:
+  - `docs/agent-workflow.md`
+  - `openspec/changes/harden-add-initiate-automation-control/design.md`
+  - `openspec/changes/harden-add-initiate-automation-control/proposal.md`
+  - `openspec/changes/harden-add-initiate-automation-control/tasks.md`
+  - `openspec/changes/redesign-study-intake-planning/iteration-records/round-16-split-readiness-review.md`
+  - `openspec/changes/redesign-study-intake-planning/pre-split-readiness-audit.md`
+  - `openspec/changes/redesign-study-intake-planning/split-decision.md`
+  - `openspec/changes/redesign-study-intake-planning/tasks.md`
+- Manifest:
+  - Added `persist-intake-plan-drafts-apply-group-draft-package-versioning-and-entrypoints`.
+- Next checkpoint: persist-intake-plan-drafts:apply:activation-boundary-and-events

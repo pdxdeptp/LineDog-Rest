@@ -5,9 +5,9 @@
   "currentChangeIndex": 1,
   "currentChange": "persist-intake-plan-drafts",
   "currentStep": "apply",
-  "currentCheckpoint": "persist-intake-plan-drafts:apply:draft-package-versioning-and-entrypoints",
+  "currentCheckpoint": "persist-intake-plan-drafts:apply:activation-boundary-and-events",
   "currentAttempt": 0,
-  "runCounter": 14,
+  "runCounter": 15,
   "maxRetriesPerCheckpoint": 2,
   "requiredProductDeepenRounds": 3,
   "requiresScopeDependencyCheck": true,
@@ -75,12 +75,13 @@
     "currentGroupId": null,
     "currentGroupStartedAt": null,
     "completedGroupIds": [
-      "draft-schema-migration-and-defaults"
+      "draft-schema-migration-and-defaults",
+      "draft-package-versioning-and-entrypoints"
     ],
     "blockedGroupId": null,
     "taskGroupsFile": "openspec/add-initiate-implementation-control/evidence/persist-intake-plan-drafts/apply-task-groups.json",
-    "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/persist-intake-plan-drafts/apply-groups/draft-schema-migration-and-defaults.md",
-    "lastCommit": "d521f5440a84274e3ef90dfa4e0e38b708be2e9f"
+    "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/persist-intake-plan-drafts/apply-groups/draft-package-versioning-and-entrypoints.md",
+    "lastCommit": "dd01c193c6690dd70b47f85df332100fac825425"
   },
   "lock": {
     "path": "openspec/add-initiate-implementation-control/run.lock",
@@ -121,11 +122,12 @@
         "status": "planned",
         "taskGroupsFile": "openspec/add-initiate-implementation-control/evidence/persist-intake-plan-drafts/apply-task-groups.json",
         "completedGroupIds": [
-          "draft-schema-migration-and-defaults"
+          "draft-schema-migration-and-defaults",
+          "draft-package-versioning-and-entrypoints"
         ],
         "currentGroupId": null,
-        "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/persist-intake-plan-drafts/apply-groups/draft-schema-migration-and-defaults.md",
-        "lastCommit": "d521f5440a84274e3ef90dfa4e0e38b708be2e9f"
+        "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/persist-intake-plan-drafts/apply-groups/draft-package-versioning-and-entrypoints.md",
+        "lastCommit": "dd01c193c6690dd70b47f85df332100fac825425"
       }
     },
     {
@@ -175,11 +177,11 @@
     }
   ],
   "lastRun": {
-    "completedAt": "2026-05-25T06:56:39Z",
-    "checkpoint": "persist-intake-plan-drafts:apply:draft-schema-migration-and-defaults",
+    "completedAt": "2026-05-25T07:42:50Z",
+    "checkpoint": "persist-intake-plan-drafts:apply:draft-package-versioning-and-entrypoints",
     "result": "completed"
   },
-  "lastCompletedCheckpoint": "persist-intake-plan-drafts:apply:draft-schema-migration-and-defaults",
+  "lastCompletedCheckpoint": "persist-intake-plan-drafts:apply:draft-package-versioning-and-entrypoints",
   "lastMigration": {
     "completedAt": "2026-05-25T03:56:29Z",
     "id": "require-three-product-deepen-rounds",
@@ -200,7 +202,7 @@
   "lastFailure": null,
   "lastVerification": {
     "command": "openspec validate persist-intake-plan-drafts --strict",
-    "result": "valid after draft-schema-migration-and-defaults apply group"
+    "result": "valid after draft-package-versioning-and-entrypoints apply group"
   },
   "blockedReason": null
 }

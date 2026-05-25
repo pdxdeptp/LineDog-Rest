@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-05-25T06:56:39Z",
+  "updatedAt": "2026-05-25T07:42:50Z",
   "entries": [
     {
       "id": "introduce-study-intake-router-product-deepen-round-1",
@@ -975,6 +975,103 @@
         }
       ],
       "nextCheckpoint": "persist-intake-plan-drafts:apply:draft-package-versioning-and-entrypoints"
+    },
+    {
+      "id": "persist-intake-plan-drafts-apply-group-draft-package-versioning-and-entrypoints",
+      "timestamp": "2026-05-25T07:42:50Z",
+      "kind": "apply_group",
+      "changeId": "persist-intake-plan-drafts",
+      "checkpoint": "persist-intake-plan-drafts:apply:draft-package-versioning-and-entrypoints",
+      "groupId": "draft-package-versioning-and-entrypoints",
+      "result": "completed",
+      "commit": "dd01c193c6690dd70b47f85df332100fac825425",
+      "commands": [
+        {
+          "command": "cd assistant_backend && uv run pytest tests/test_study_plan_lifecycle.py -k 'version or package or assumptions or target_plan or draft_kind'",
+          "exitCode": 0,
+          "summary": "13 passed, 6 deselected"
+        },
+        {
+          "command": "cd assistant_backend && uv run pytest tests/test_study_intake_router.py -k 'handoff or scheduled_work or draft_phase'",
+          "exitCode": 0,
+          "summary": "8 passed, 48 deselected"
+        },
+        {
+          "command": "cd assistant_backend && uv run pytest tests/test_study_plan_lifecycle.py tests/test_study_intake_router.py",
+          "exitCode": 0,
+          "summary": "83 passed, 2 third-party warnings"
+        },
+        {
+          "command": "cd assistant_backend && uv run pytest tests/test_study_plan_router.py -k 'start_endpoint or clarification_without_active_resources'",
+          "exitCode": 0,
+          "summary": "1 passed, 8 deselected, 2 third-party warnings"
+        },
+        {
+          "command": "openspec validate persist-intake-plan-drafts --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        },
+        {
+          "command": "openspec instructions apply --change persist-intake-plan-drafts --json",
+          "exitCode": 0,
+          "summary": "16/35 tasks complete"
+        },
+        {
+          "command": "git diff --check -- assistant_backend/src/db/schema.py assistant_backend/src/study_plan/lifecycle.py assistant_backend/src/study_plan/intake.py assistant_backend/tests/test_study_plan_lifecycle.py assistant_backend/tests/test_study_intake_router.py openspec/changes/persist-intake-plan-drafts/tasks.md",
+          "exitCode": 0,
+          "summary": "no whitespace errors"
+        }
+      ],
+      "reviews": [
+        {
+          "type": "spec_compliance",
+          "result": "approved",
+          "summary": "No remaining P0/P1 findings after task 1.8 scope clarification, legacy latest-fetch recovery, and expanded assumption provenance tests."
+        },
+        {
+          "type": "code_quality",
+          "result": "approved",
+          "summary": "No remaining P0/P1 findings after transaction cleanup, closed-draft write guards, status whitelist, target-plan idempotency, and unknown deadline provenance fixes."
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/add-initiate-implementation-control/evidence/persist-intake-plan-drafts/apply-groups/draft-package-versioning-and-entrypoints.md",
+          "sha256": "eecc410150def6632b4a7bd7eb70a4b3b7ad4774ec4e38c102e0a22c2edba2d9",
+          "description": "Apply group evidence, TDD trace, review iterations, verification, and scope summary."
+        },
+        {
+          "path": "assistant_backend/src/db/schema.py",
+          "sha256": "230ba63f46b8bc6a65ab8939bc143873f6a6f5f7ee27467d7a355aefcbb09c8e",
+          "description": "Draft version snapshot table for compiler package shells."
+        },
+        {
+          "path": "assistant_backend/src/study_plan/lifecycle.py",
+          "sha256": "51607b70fa7dd57b0abb41dd4449276754bf4ddf28190195fa4c3f76a69cddf2",
+          "description": "Draft shell, package/versioning helpers, legacy package recovery, status validation, and closed-draft guards."
+        },
+        {
+          "path": "assistant_backend/src/study_plan/intake.py",
+          "sha256": "4fbc19ba71b57a2d530f773ca3dcb140ae0fd3f1846c5887e180b628d9044630",
+          "description": "Plan-generating intake handoff now persists draft shells with draft kind, target plan, assumptions, and unknown deadline provenance."
+        },
+        {
+          "path": "assistant_backend/tests/test_study_plan_lifecycle.py",
+          "sha256": "24cfdf9069a39fb6ad44bfe7142684b7bb631abefe0446524cddbf30745ef6ba",
+          "description": "TDD tests for assumptions, package shells, versioning, metadata updates, target-plan linkage, legacy recovery, transaction cleanup, and closed-draft guards."
+        },
+        {
+          "path": "assistant_backend/tests/test_study_intake_router.py",
+          "sha256": "6fd9146876d599981e42405349fb92037e0cf0cae7a396572036a53eca4e316a",
+          "description": "TDD tests for new-plan and existing-plan draft handoff, target-plan idempotency, and unknown deadline provenance."
+        },
+        {
+          "path": "openspec/changes/persist-intake-plan-drafts/tasks.md",
+          "sha256": "43a788166ebb7c2e0d3c6da70747f3efddcfcbc473441719d23405d4492e9232",
+          "description": "OpenSpec tasks updated for completed package/versioning entrypoints and clarified 1.8 scope."
+        }
+      ],
+      "nextCheckpoint": "persist-intake-plan-drafts:apply:activation-boundary-and-events"
     }
   ]
 }
