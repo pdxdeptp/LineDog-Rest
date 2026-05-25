@@ -76,6 +76,7 @@ async def lifespan(app: FastAPI):
         review,
         study_plan,
         study_plan_adjustment,
+        study_intake,
         study_smart_mode,
         study_views,
         resources as resources_router,
@@ -88,6 +89,7 @@ async def lifespan(app: FastAPI):
     app.include_router(review.router, prefix="/api")
     app.include_router(study_plan.router, prefix="/api")
     app.include_router(study_plan_adjustment.router, prefix="/api")
+    app.include_router(study_intake.router, prefix="/api")
     app.include_router(study_smart_mode.router, prefix="/api")
     app.include_router(study_views.router, prefix="/api")
     app.include_router(resources_router.router, prefix="/api")
