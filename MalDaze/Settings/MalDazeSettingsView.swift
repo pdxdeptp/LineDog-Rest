@@ -207,7 +207,7 @@ struct MalDazeSettingsView: View {
 
             Spacer(minLength: 12)
 
-            Text("API Key 按当前实现即时保存到本机设置；本页只改善入口、说明与可读性。")
+            Text(selectedCategory.helperCopy)
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -225,6 +225,8 @@ struct MalDazeSettingsView: View {
             switch selectedCategory {
             case .modelCredentials:
                 modelCredentialsSettingsPane
+            case .learningAssistant:
+                learningAssistantSettingsPane
             case .shortcuts:
                 shortcutsSettingsPane
             }
@@ -243,21 +245,7 @@ struct MalDazeSettingsView: View {
                 apiKey: selectedBackendAPIKey,
                 isKeyVisible: $isBackendAPIKeyVisible
             ) {
-                SettingsLabeledRow(
-                    title: "懒启动学习助手后端",
-                    subtitle: "更省电，但首次打开学习助手可能需要等待。"
-                ) {
-                    Toggle(isOn: $assistantBackendLazyStartupEnabled) {
-                        Text("开启懒启动")
-                    }
-                    .toggleStyle(.switch)
-                    .help("影响下次 App 启动策略：开启时更省电，启动不会拉起后端，首次打开学习助手可能需要等待；关闭后会在 App 启动完成后预先启动后端。切换此项不会立即启动或停止当前后端。")
-
-                    Text("下次 App 启动时生效，不会立即启动或停止当前后端。")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+                EmptyView()
             }
 
             LLMProviderSettingsCard(
@@ -269,6 +257,46 @@ struct MalDazeSettingsView: View {
                 model: selectedSmartInputModel,
                 apiKey: selectedSmartInputAPIKey,
                 isKeyVisible: $isSmartInputAPIKeyVisible
+            ) {
+                EmptyView()
+            }
+        }
+    }
+
+    private var learningAssistantSettingsPane: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SettingsGroup(
+                title: "后端启动",
+                subtitle: "控制学习助手本地后端何时启动。",
+                systemImage: "bolt.horizontal.circle",
+                trailing: "下次启动生效"
+            ) {
+                SettingsLabeledRow(
+                    title: "启动策略",
+                    subtitle: "在省电启动和首次打开速度之间取舍。"
+                ) {
+                    Toggle(isOn: $assistantBackendLazyStartupEnabled) {
+                        Text("按需启动后端")
+                    }
+                    .toggleStyle(.switch)
+                    .help("开启后 App 启动时不会拉起后端，首次打开学习助手时再启动；关闭后下次 App 启动完成后预先启动后端；切换不会立即启动或停止当前后端。")
+
+                    Text("开启后 App 启动时不会拉起后端，首次打开学习助手时再启动；关闭后下次 App 启动完成后预先启动后端；切换不会立即启动或停止当前后端。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+    }
+
+    private var shortcutsSettingsPane: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SettingsGroup(
+                title: "全局快捷键",
+                subtitle: "录制时须带 ⌘ / ⌥ / ⌃ / ⇧ 之一；按 Esc 取消录制。",
+                systemImage: "keyboard",
+                trailing: "须带修饰键"
             ) {
                 ShortcutSettingRow(
                     title: "添加提醒",
@@ -284,18 +312,7 @@ struct MalDazeSettingsView: View {
                         smartKeyLabel = d.keyLabel
                     }
                 )
-            }
-        }
-    }
 
-    private var shortcutsSettingsPane: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            SettingsGroup(
-                title: "全局快捷键",
-                subtitle: "录制时须带 ⌘ / ⌥ / ⌃ / ⇧ 之一；按 Esc 取消录制。",
-                systemImage: "keyboard",
-                trailing: "须带修饰键"
-            ) {
                 ShortcutSettingRow(
                     title: "桌宠菜单",
                     subtitle: "默认 ⌘⇧.（句号），打开桌宠 Dashboard 面板。",
@@ -404,6 +421,7 @@ private enum SettingsDesignPalette {
 
 private enum SettingsCategory: String, CaseIterable, Identifiable {
     case modelCredentials
+    case learningAssistant
     case shortcuts
 
     var id: Self { self }
@@ -411,6 +429,7 @@ private enum SettingsCategory: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .modelCredentials: return "模型与密钥"
+        case .learningAssistant: return "学习助手"
         case .shortcuts: return "快捷键"
         }
     }
@@ -418,6 +437,7 @@ private enum SettingsCategory: String, CaseIterable, Identifiable {
     var subtitle: String {
         switch self {
         case .modelCredentials: return "LLM 凭据与默认模型"
+        case .learningAssistant: return "启动与运行"
         case .shortcuts: return "全局操作"
         }
     }
@@ -425,7 +445,19 @@ private enum SettingsCategory: String, CaseIterable, Identifiable {
     var systemImage: String {
         switch self {
         case .modelCredentials: return "key.horizontal"
+        case .learningAssistant: return "graduationcap"
         case .shortcuts: return "keyboard"
+        }
+    }
+
+    var helperCopy: String {
+        switch self {
+        case .modelCredentials:
+            return "API Key 按当前实现即时保存到本机设置；本页只改善入口、说明与可读性。"
+        case .learningAssistant:
+            return "学习助手运行设置会在下次相关启动路径中生效。"
+        case .shortcuts:
+            return "快捷键录制仅更新本机设置，恢复默认不会影响其他类别。"
         }
     }
 }
@@ -637,7 +669,8 @@ private struct LLMProviderSettingsCard<ExtraRows: View>: View {
                             Text(option.label).tag(option.id.rawValue)
                         }
                     }
-                    .pickerStyle(.segmented)
+                    .pickerStyle(.menu)
+                    .frame(maxWidth: 280, alignment: .leading)
                     .onChange(of: provider.wrappedValue) { newProvider in
                         model.wrappedValue = LLMProviderCatalog.defaultModel(for: newProvider)
                     }
@@ -648,7 +681,7 @@ private struct LLMProviderSettingsCard<ExtraRows: View>: View {
                         }
                     }
                     .pickerStyle(.menu)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(maxWidth: 280, alignment: .leading)
 
                     Text("仅保存在本机 UserDefaults；切换此处不会改写另一项功能的服务商、模型或 API Key。")
                         .font(.caption)

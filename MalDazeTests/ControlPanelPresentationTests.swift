@@ -884,6 +884,99 @@ final class ControlPanelPresentationTests: XCTestCase {
         XCTAssertTrue(cardSource.contains("SettingsDesignPalette.paleBlueAccent"))
     }
 
+    func testMalDazeSettingsCategoryOrderIncludesLearningAssistantBetweenCredentialsAndShortcuts() throws {
+        let settingsSource = try readProjectSource("MalDaze/Settings/MalDazeSettingsView.swift")
+        let sidebarSource = try propertySource(named: "settingsSidebar", in: settingsSource)
+
+        XCTAssertOrdered(
+            ["case modelCredentials", "case learningAssistant", "case shortcuts"],
+            in: settingsSource,
+            "Settings categories should place Learning Assistant between model credentials and shortcuts."
+        )
+        XCTAssertTrue(settingsSource.contains("case .learningAssistant: return \"学习助手\""))
+        XCTAssertTrue(settingsSource.contains("case .learningAssistant: return \"启动与运行\""))
+        XCTAssertTrue(settingsSource.contains("var helperCopy: String"))
+        XCTAssertTrue(sidebarSource.contains("selectedCategory.helperCopy"))
+        XCTAssertFalse(
+            sidebarSource.contains("API Key 按当前实现即时保存到本机设置；本页只改善入口、说明与可读性。"),
+            "The sidebar footer helper should follow the selected category instead of always showing API-key copy."
+        )
+    }
+
+    func testModelCredentialsCategoryContainsOnlyLLMProviderModelAndAPIKeyRows() throws {
+        let settingsSource = try readProjectSource("MalDaze/Settings/MalDazeSettingsView.swift")
+        let modelPaneSource = try propertySource(named: "modelCredentialsSettingsPane", in: settingsSource)
+
+        XCTAssertEqual(
+            modelPaneSource.ranges(of: "LLMProviderSettingsCard(").count,
+            2,
+            "Model credentials should keep one Learning Assistant card and one Smart Input card."
+        )
+
+        let forbiddenTokens = [
+            "ShortcutSettingRow(",
+            "添加提醒",
+            "懒启动学习助手后端",
+            "按需启动后端",
+            "assistantBackendLazyStartupEnabled"
+        ]
+
+        for token in forbiddenTokens {
+            XCTAssertFalse(
+                modelPaneSource.contains(token),
+                "Model credentials should not include cross-category control: \(token)"
+            )
+        }
+    }
+
+    func testLLMProviderSelectorsUseAlignedCompactMenus() throws {
+        let settingsSource = try readProjectSource("MalDaze/Settings/MalDazeSettingsView.swift")
+        let cardSource = try structSource(named: "LLMProviderSettingsCard", in: settingsSource)
+
+        XCTAssertFalse(
+            cardSource.contains(".pickerStyle(.segmented)"),
+            "Provider selection should use the same compact popup style as model selection."
+        )
+        XCTAssertEqual(
+            cardSource.ranges(of: ".pickerStyle(.menu)").count,
+            2,
+            "Provider and model pickers should both use compact menu picker styling."
+        )
+    }
+
+    func testShortcutsCategoryIncludesSmartInputAddReminderRecorder() throws {
+        let settingsSource = try readProjectSource("MalDaze/Settings/MalDazeSettingsView.swift")
+        let shortcutsSource = try propertySource(named: "shortcutsSettingsPane", in: settingsSource)
+
+        XCTAssertTrue(shortcutsSource.contains("ShortcutSettingRow("))
+        XCTAssertTrue(shortcutsSource.contains("title: \"添加提醒\""))
+        XCTAssertTrue(shortcutsSource.contains("displayString: smartShortcutModel.displayString"))
+        XCTAssertTrue(shortcutsSource.contains("isRecording: isRecordingSmartShortcut"))
+        XCTAssertTrue(shortcutsSource.contains("onRecord: { isRecordingSmartShortcut = true }"))
+        XCTAssertTrue(shortcutsSource.contains("let d = SmartReminderInputShortcut.default"))
+        XCTAssertTrue(shortcutsSource.contains("smartKeyCode = Int(d.keyCode)"))
+        XCTAssertTrue(shortcutsSource.contains("smartModifiersRaw = SmartReminderInputShortcut.defaultModifiersStorageInt"))
+        XCTAssertTrue(shortcutsSource.contains("smartKeyLabel = d.keyLabel"))
+    }
+
+    func testLearningAssistantCategoryContainsBackendStartupOnly() throws {
+        let settingsSource = try readProjectSource("MalDaze/Settings/MalDazeSettingsView.swift")
+        let viewSource = try structSource(named: "MalDazeSettingsView", in: settingsSource)
+        let learningAssistantSource = try propertySource(named: "learningAssistantSettingsPane", in: settingsSource)
+
+        XCTAssertTrue(viewSource.contains("case .learningAssistant:"))
+        XCTAssertTrue(viewSource.contains("learningAssistantSettingsPane"))
+        XCTAssertTrue(learningAssistantSource.contains("后端启动"))
+        XCTAssertTrue(learningAssistantSource.contains("控制学习助手本地后端何时启动。"))
+        XCTAssertTrue(learningAssistantSource.contains("启动策略"))
+        XCTAssertTrue(learningAssistantSource.contains("在省电启动和首次打开速度之间取舍。"))
+        XCTAssertTrue(learningAssistantSource.contains("按需启动后端"))
+        XCTAssertTrue(learningAssistantSource.contains("$assistantBackendLazyStartupEnabled"))
+        XCTAssertTrue(learningAssistantSource.contains("不会立即启动或停止当前后端"))
+        XCTAssertFalse(learningAssistantSource.contains("LLMProviderSettingsCard("))
+        XCTAssertFalse(learningAssistantSource.contains("ShortcutSettingRow("))
+    }
+
     func testMalDazeSettingsSmartInputUsesSharedProvidersAndIndependentStorageHooks() throws {
         let settingsSource = try readProjectSource("MalDaze/Settings/MalDazeSettingsView.swift")
         let defaultsSource = try readProjectSource("MalDaze/MalDazeDefaults.swift")
