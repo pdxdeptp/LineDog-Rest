@@ -75,6 +75,46 @@ CREATE TABLE IF NOT EXISTS study_project_draft_tasks (
 CREATE INDEX IF NOT EXISTS idx_study_project_draft_tasks_order
     ON study_project_draft_tasks(draft_id, order_index);
 
+CREATE TABLE IF NOT EXISTS study_intake_items (
+    id                  INTEGER PRIMARY KEY,
+    client_request_id   TEXT    NOT NULL UNIQUE,
+    raw_input           TEXT    NOT NULL,
+    source_type         TEXT    NOT NULL,
+    recommended_role    TEXT    NOT NULL,
+    confidence          TEXT    NOT NULL,
+    reason_codes        TEXT    NOT NULL DEFAULT '[]',
+    next_action         TEXT    NOT NULL DEFAULT 'role_review',
+    confirmation_state  TEXT    NOT NULL DEFAULT 'pending',
+    calibration_level   TEXT    NOT NULL DEFAULT 'standard',
+    created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_study_intake_items_role_state
+    ON study_intake_items(recommended_role, confirmation_state);
+
+CREATE TABLE IF NOT EXISTS study_intake_non_plan_items (
+    id             INTEGER PRIMARY KEY,
+    intake_item_id INTEGER NOT NULL UNIQUE REFERENCES study_intake_items(id),
+    role           TEXT    NOT NULL,
+    title          TEXT    NOT NULL,
+    url            TEXT,
+    metadata       TEXT,
+    created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_study_intake_non_plan_items_role
+    ON study_intake_non_plan_items(role);
+
+CREATE TABLE IF NOT EXISTS study_intake_plan_attachments (
+    id              INTEGER PRIMARY KEY,
+    intake_item_id  INTEGER NOT NULL UNIQUE REFERENCES study_intake_items(id),
+    target_plan_id  INTEGER NOT NULL REFERENCES resources(id),
+    attachment_mode TEXT    NOT NULL,
+    title           TEXT    NOT NULL,
+    metadata        TEXT,
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_study_intake_plan_attachments_target
+    ON study_intake_plan_attachments(target_plan_id, attachment_mode);
+
 CREATE TABLE IF NOT EXISTS plan_versions (
     id              INTEGER PRIMARY KEY,
     content         TEXT    NOT NULL,
