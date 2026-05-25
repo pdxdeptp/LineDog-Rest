@@ -68,17 +68,17 @@ Completed apply groups for `redesign-add-initiate-ui`:
 
 - `session-adapter-and-api-contract`
 - `entry-role-and-attachment-review`
+- `anchor-state-machine-and-recovery`
 
 Remaining apply groups for `redesign-add-initiate-ui`:
 
-- `anchor-state-machine-and-recovery`
 - `draft-review-options-and-activation`
 - `noise-boundaries-and-active-refresh`
 - `real-context-qa-and-final-verification`
 
 Next required checkpoint for `redesign-add-initiate-ui`:
 
-- `apply:anchor-state-machine-and-recovery`
+- `apply:draft-review-options-and-activation`
 
 ## Run Log
 
@@ -1408,3 +1408,25 @@ Next required checkpoint for `redesign-add-initiate-ui`:
 - Manifest:
   - Added `redesign-add-initiate-ui-apply-entry-role-and-attachment-review`.
 - Next checkpoint: redesign-add-initiate-ui:apply:anchor-state-machine-and-recovery
+
+## Run 2026-05-25T15:15:14Z
+
+- Automation: add-initiate-changes
+- Checkpoint: redesign-add-initiate-ui:apply:anchor-state-machine-and-recovery
+- Result: completed
+- Actions:
+  - Triggered `openspec-apply-change`, `superpowers:subagent-driven-development`, and per-task `superpowers:test-driven-development`.
+  - Implemented the Add / Initiate anchor review, planning progress, needs-input recovery, compile-failed retry, infeasible/draft/activation progress states, activation-failed recovery, cancelled state, and non-plan terminal actions.
+  - Added generation/request identity guards for stale session, stale draft-version, cancel invalidation, superseded starts, anchor confirmations, option effects, and activation responses.
+  - Updated the UI to keep review states to one prominent primary action, keep anchors editable when input is needed, and avoid visible raw state-machine tokens.
+  - Completed spec compliance and code quality review loops; both final re-reviews approved.
+- Verification:
+  - `xcodebuild test -project MalDaze.xcodeproj -scheme MalDaze -parallel-testing-enabled NO -only-testing:MalDazeTests/LearningAssistantViewModelTests -quiet`: passed.
+  - `xcodebuild test -project MalDaze.xcodeproj -scheme MalDaze -parallel-testing-enabled NO -only-testing:MalDazeTests/LearningAssistantUISourceTests -quiet`: passed.
+  - `openspec validate redesign-add-initiate-ui --strict`: valid.
+  - `git diff --check -- MalDaze/LearningAssistant/AssistantPanelView.swift MalDaze/LearningAssistant/LearningAssistantViewModel.swift MalDazeTests/LearningAssistantTests.swift`: no whitespace errors.
+- Commits:
+  - Implementation: 7b7b1adf6e8b506e494bbb383f01c6e2fedc51e5
+- Manifest:
+  - Added `redesign-add-initiate-ui-apply-anchor-state-machine-and-recovery`.
+- Next checkpoint: redesign-add-initiate-ui:apply:draft-review-options-and-activation

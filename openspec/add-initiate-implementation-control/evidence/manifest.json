@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-05-25T14:36:21Z",
+  "updatedAt": "2026-05-25T15:15:14Z",
   "entries": [
     {
       "id": "introduce-study-intake-router-product-deepen-round-1",
@@ -2657,6 +2657,65 @@
         }
       ],
       "nextCheckpoint": "redesign-add-initiate-ui:apply:anchor-state-machine-and-recovery"
+    },
+    {
+      "id": "redesign-add-initiate-ui-apply-anchor-state-machine-and-recovery",
+      "timestamp": "2026-05-25T15:15:14Z",
+      "kind": "apply_group",
+      "changeId": "redesign-add-initiate-ui",
+      "checkpoint": "redesign-add-initiate-ui:apply:anchor-state-machine-and-recovery",
+      "result": "completed",
+      "decision": "GO",
+      "commands": [
+        {
+          "command": "xcodebuild test -project MalDaze.xcodeproj -scheme MalDaze -parallel-testing-enabled NO -only-testing:MalDazeTests/LearningAssistantViewModelTests -quiet",
+          "exitCode": 0,
+          "summary": "passed"
+        },
+        {
+          "command": "xcodebuild test -project MalDaze.xcodeproj -scheme MalDaze -parallel-testing-enabled NO -only-testing:MalDazeTests/LearningAssistantUISourceTests -quiet",
+          "exitCode": 0,
+          "summary": "passed"
+        },
+        {
+          "command": "openspec validate redesign-add-initiate-ui --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        },
+        {
+          "command": "git diff --check -- MalDaze/LearningAssistant/AssistantPanelView.swift MalDaze/LearningAssistant/LearningAssistantViewModel.swift MalDazeTests/LearningAssistantTests.swift",
+          "exitCode": 0,
+          "summary": "no whitespace errors"
+        },
+        {
+          "command": "git commit -m \"Implement Add Initiate anchor state machine\"",
+          "exitCode": 0,
+          "summary": "7b7b1adf6e8b506e494bbb383f01c6e2fedc51e5"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/add-initiate-implementation-control/evidence/redesign-add-initiate-ui/apply-groups/anchor-state-machine-and-recovery.md",
+          "sha256": "34b1c9ed7dbbebdafb0712def3b1b96907033d4e7702c4481b84f639a93e75d5",
+          "description": "Apply group evidence for Add / Initiate anchor state machine and recovery."
+        },
+        {
+          "path": "MalDaze/LearningAssistant/AssistantPanelView.swift",
+          "sha256": "99f560684bc0c6f7671f1fce134362a539ff9adaba4c4357d25a9d8dc983435b",
+          "description": "Add / Initiate anchor and recovery UI with one-primary-action behavior."
+        },
+        {
+          "path": "MalDaze/LearningAssistant/LearningAssistantViewModel.swift",
+          "sha256": "f5269d33289c768d24d41b9b2a19ead98ef313355cfb0a9dc81745307cfda0eb",
+          "description": "Add / Initiate state machine, anchor confirmation, generation guards, and recovery actions."
+        },
+        {
+          "path": "MalDazeTests/LearningAssistantTests.swift",
+          "sha256": "0ec596b57d5b23d19926136ae37de5da35147c44bb884b898ba3235aba9a1527",
+          "description": "ViewModel and UI-source tests for anchor/recovery states, stale guards, cancel invalidation, and superseding."
+        }
+      ],
+      "nextCheckpoint": "redesign-add-initiate-ui:apply:draft-review-options-and-activation"
     }
   ]
 }

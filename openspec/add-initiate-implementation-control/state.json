@@ -5,9 +5,9 @@
   "currentChangeIndex": 4,
   "currentChange": "redesign-add-initiate-ui",
   "currentStep": "apply",
-  "currentCheckpoint": "redesign-add-initiate-ui:apply:anchor-state-machine-and-recovery",
+  "currentCheckpoint": "redesign-add-initiate-ui:apply:draft-review-options-and-activation",
   "currentAttempt": 0,
-  "runCounter": 38,
+  "runCounter": 39,
   "maxRetriesPerCheckpoint": 2,
   "requiredProductDeepenRounds": 3,
   "requiresScopeDependencyCheck": true,
@@ -76,12 +76,13 @@
     "currentGroupStartedAt": null,
     "completedGroupIds": [
       "session-adapter-and-api-contract",
-      "entry-role-and-attachment-review"
+      "entry-role-and-attachment-review",
+      "anchor-state-machine-and-recovery"
     ],
     "blockedGroupId": null,
     "taskGroupsFile": "openspec/add-initiate-implementation-control/evidence/redesign-add-initiate-ui/apply-task-groups.json",
-    "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/redesign-add-initiate-ui/apply-groups/entry-role-and-attachment-review.md",
-    "lastCommit": "d6e3ec280e5294d2bd8b7d1bd859999490630120"
+    "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/redesign-add-initiate-ui/apply-groups/anchor-state-machine-and-recovery.md",
+    "lastCommit": "7b7b1adf6e8b506e494bbb383f01c6e2fedc51e5"
   },
   "lock": {
     "path": "openspec/add-initiate-implementation-control/run.lock",
@@ -182,20 +183,21 @@
         "taskGroupsFile": "openspec/add-initiate-implementation-control/evidence/redesign-add-initiate-ui/apply-task-groups.json",
         "completedGroupIds": [
           "session-adapter-and-api-contract",
-          "entry-role-and-attachment-review"
+          "entry-role-and-attachment-review",
+          "anchor-state-machine-and-recovery"
         ],
-        "currentGroupId": "anchor-state-machine-and-recovery",
-        "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/redesign-add-initiate-ui/apply-groups/entry-role-and-attachment-review.md",
-        "lastCommit": "d6e3ec280e5294d2bd8b7d1bd859999490630120"
+        "currentGroupId": "draft-review-options-and-activation",
+        "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/redesign-add-initiate-ui/apply-groups/anchor-state-machine-and-recovery.md",
+        "lastCommit": "7b7b1adf6e8b506e494bbb383f01c6e2fedc51e5"
       }
     }
   ],
   "lastRun": {
-    "completedAt": "2026-05-25T14:36:21Z",
-    "checkpoint": "redesign-add-initiate-ui:apply:entry-role-and-attachment-review",
+    "completedAt": "2026-05-25T15:15:14Z",
+    "checkpoint": "redesign-add-initiate-ui:apply:anchor-state-machine-and-recovery",
     "result": "completed"
   },
-  "lastCompletedCheckpoint": "redesign-add-initiate-ui:apply:entry-role-and-attachment-review",
+  "lastCompletedCheckpoint": "redesign-add-initiate-ui:apply:anchor-state-machine-and-recovery",
   "lastMigration": {
     "completedAt": "2026-05-25T03:56:29Z",
     "id": "require-three-product-deepen-rounds",
@@ -215,8 +217,8 @@
   },
   "lastFailure": null,
   "lastVerification": {
-    "command": "xcodebuild test -project MalDaze.xcodeproj -scheme MalDaze -parallel-testing-enabled NO -only-testing:MalDazeTests/LearningAssistantViewModelTests -only-testing:MalDazeTests/LearningAssistantUISourceTests -quiet; openspec validate redesign-add-initiate-ui --strict; git diff --check -- MalDaze/LearningAssistant/AssistantPanelView.swift MalDaze/LearningAssistant/LearningAssistantViewModel.swift MalDazeTests/LearningAssistantTests.swift",
-    "result": "entry role and attachment review group verified; Swift focused tests passed, OpenSpec valid, diff check clean"
+    "command": "xcodebuild test -project MalDaze.xcodeproj -scheme MalDaze -parallel-testing-enabled NO -only-testing:MalDazeTests/LearningAssistantViewModelTests -quiet; xcodebuild test -project MalDaze.xcodeproj -scheme MalDaze -parallel-testing-enabled NO -only-testing:MalDazeTests/LearningAssistantUISourceTests -quiet; openspec validate redesign-add-initiate-ui --strict; git diff --check -- MalDaze/LearningAssistant/AssistantPanelView.swift MalDaze/LearningAssistant/LearningAssistantViewModel.swift MalDazeTests/LearningAssistantTests.swift",
+    "result": "anchor state machine group verified; Swift focused tests passed, OpenSpec valid, diff check clean"
   },
   "blockedReason": null
 }
