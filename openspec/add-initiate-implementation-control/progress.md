@@ -4,8 +4,8 @@
 
 - Phase: active
 - Current change: persist-intake-plan-drafts
-- Current step: scope_dependency_check
-- Current checkpoint: persist-intake-plan-drafts:scope_dependency_check
+- Current step: apply
+- Current checkpoint: persist-intake-plan-drafts:apply
 - Required product-deepen rounds before apply: 3
 - Required checkpoint after product deepening: scope_dependency_check
 - Product-deepen scope guard: every round must read adjacent changes and record scope decisions
@@ -426,3 +426,31 @@
 - Manifest:
   - Added `persist-intake-plan-drafts-product-deepen-round-3`.
 - Next checkpoint: persist-intake-plan-drafts:scope_dependency_check
+
+## Run 2026-05-25T06:24:10Z
+
+- Automation: add-initiate-changes
+- Checkpoint: persist-intake-plan-drafts:scope_dependency_check
+- Result: completed
+- Actions:
+  - Acquired `run.lock`.
+  - Read `state.json`, `runbook.md`, `progress.md`, `evidence/manifest.json`, and `workspace-baseline.json`.
+  - Ran `git status --porcelain=v1` and protected unrelated dirty files.
+  - Triggered `opsx-scope-decision`.
+  - Read current `persist-intake-plan-drafts` proposal, design, specs, tasks, and all three product-deepen records.
+  - Read upstream `introduce-study-intake-router` artifacts and the router-to-draft cross-change contract evidence.
+  - Read downstream `introduce-plan-compiler` artifacts and scheduler boundary notes.
+  - Wrote scope dependency evidence at `openspec/add-initiate-implementation-control/evidence/scope-dependency/persist-intake-plan-drafts.md`.
+- Scope result:
+  - Passed. The change remains a coherent data-layer draft persistence boundary.
+  - In scope: draft state, versioning, assumptions/provenance, migration, entry points, activation safety, fallback progress, and 60-minute capacity default.
+  - Out of scope: intake routing, compiler generation, deterministic scheduling, UI, and active-plan adjustment.
+  - Upstream contracts: router handoff facts are satisfied.
+  - Downstream contracts: compiler and scheduler dependencies are named without being prematurely implemented.
+- Verification:
+  - `openspec validate persist-intake-plan-drafts --strict`: valid.
+  - `openspec validate introduce-plan-compiler --strict`: valid.
+  - `openspec status --change persist-intake-plan-drafts`: 4/4 artifacts complete.
+- Manifest:
+  - Added `persist-intake-plan-drafts-scope-dependency-check`.
+- Next checkpoint: persist-intake-plan-drafts:apply

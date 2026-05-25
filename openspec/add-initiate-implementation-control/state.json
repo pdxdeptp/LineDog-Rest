@@ -4,10 +4,10 @@
   "phase": "active",
   "currentChangeIndex": 1,
   "currentChange": "persist-intake-plan-drafts",
-  "currentStep": "scope_dependency_check",
-  "currentCheckpoint": "persist-intake-plan-drafts:scope_dependency_check",
+  "currentStep": "apply",
+  "currentCheckpoint": "persist-intake-plan-drafts:apply",
   "currentAttempt": 0,
-  "runCounter": 11,
+  "runCounter": 12,
   "maxRetriesPerCheckpoint": 2,
   "requiredProductDeepenRounds": 3,
   "requiresScopeDependencyCheck": true,
@@ -62,11 +62,11 @@
     "requiredAfterProductDeepening": true,
     "requiredBeforeApply": true,
     "lastCheck": {
-      "completedAt": "2026-05-25T04:22:26Z",
-      "changeId": "introduce-study-intake-router",
-      "checkpoint": "introduce-study-intake-router:scope_dependency_check",
+      "completedAt": "2026-05-25T06:24:10Z",
+      "changeId": "persist-intake-plan-drafts",
+      "checkpoint": "persist-intake-plan-drafts:scope_dependency_check",
       "result": "passed",
-      "evidenceFile": "openspec/add-initiate-implementation-control/evidence/scope-dependency/introduce-study-intake-router.md"
+      "evidenceFile": "openspec/add-initiate-implementation-control/evidence/scope-dependency/persist-intake-plan-drafts.md"
     }
   },
   "applyCursor": {
@@ -113,7 +113,7 @@
       "id": "persist-intake-plan-drafts",
       "status": "in_progress",
       "productDeepenRoundsCompleted": 3,
-      "scopeDependencyCheckCompleted": false,
+      "scopeDependencyCheckCompleted": true,
       "applyCompleted": false,
       "applyTaskGroups": {
         "status": "not_planned",
@@ -171,11 +171,11 @@
     }
   ],
   "lastRun": {
-    "completedAt": "2026-05-25T06:10:40Z",
-    "checkpoint": "persist-intake-plan-drafts:product_deepen_round_3",
+    "completedAt": "2026-05-25T06:24:10Z",
+    "checkpoint": "persist-intake-plan-drafts:scope_dependency_check",
     "result": "completed"
   },
-  "lastCompletedCheckpoint": "persist-intake-plan-drafts:product_deepen_round_3",
+  "lastCompletedCheckpoint": "persist-intake-plan-drafts:scope_dependency_check",
   "lastMigration": {
     "completedAt": "2026-05-25T03:56:29Z",
     "id": "require-three-product-deepen-rounds",
@@ -196,7 +196,7 @@
   "lastFailure": null,
   "lastVerification": {
     "command": "openspec validate persist-intake-plan-drafts --strict",
-    "result": "valid after product-deepen round 3"
+    "result": "valid after scope dependency check"
   },
   "blockedReason": null
 }

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-05-25T06:10:42Z",
+  "updatedAt": "2026-05-25T06:24:10Z",
   "entries": [
     {
       "id": "introduce-study-intake-router-product-deepen-round-1",
@@ -749,6 +749,59 @@
         }
       ],
       "nextCheckpoint": "persist-intake-plan-drafts:scope_dependency_check"
+    },
+    {
+      "id": "persist-intake-plan-drafts-scope-dependency-check",
+      "timestamp": "2026-05-25T06:24:10Z",
+      "kind": "scope_dependency_check",
+      "changeId": "persist-intake-plan-drafts",
+      "checkpoint": "persist-intake-plan-drafts:scope_dependency_check",
+      "result": "completed",
+      "commands": [
+        {
+          "command": "openspec validate persist-intake-plan-drafts --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        },
+        {
+          "command": "openspec validate introduce-plan-compiler --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        },
+        {
+          "command": "openspec status --change persist-intake-plan-drafts",
+          "exitCode": 0,
+          "summary": "4/4 artifacts complete"
+        },
+        {
+          "command": "rg -n '^## Scope Decisions|^### In Scope|^### Out Of Scope|^### Deferred Upstream Dependencies|^### Downstream Contracts Preserved' openspec/changes/persist-intake-plan-drafts/review-records/product-deepen-round-*.md",
+          "exitCode": 0,
+          "summary": "all three product-deepen records contain required scope decision sections"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/add-initiate-implementation-control/evidence/scope-dependency/persist-intake-plan-drafts.md",
+          "sha256": "1cd7ea444d38168023b81417717acc7ba2ed310130cc7676a3f6d60ced098ecb",
+          "description": "Scope dependency check evidence for draft persistence boundaries."
+        },
+        {
+          "path": "openspec/changes/persist-intake-plan-drafts/review-records/product-deepen-round-1.md",
+          "sha256": "143b3ed034e8d05614e997904891feb2550bb539754d004d6973fbf90abc1dfc",
+          "description": "Round 1 product-deepen scope decisions verified."
+        },
+        {
+          "path": "openspec/changes/persist-intake-plan-drafts/review-records/product-deepen-round-2.md",
+          "sha256": "1cfe42a8ae07185021409a8866398f598bb48e2165484ada96b7e022bc94503f",
+          "description": "Round 2 product-deepen scope decisions verified."
+        },
+        {
+          "path": "openspec/changes/persist-intake-plan-drafts/review-records/product-deepen-round-3.md",
+          "sha256": "0f203a2663a110d026046d27f98a973d10d512bcb68f1a9053a23956ecb0238e",
+          "description": "Round 3 product-deepen scope decisions verified."
+        }
+      ],
+      "nextCheckpoint": "persist-intake-plan-drafts:apply"
     }
   ]
 }
