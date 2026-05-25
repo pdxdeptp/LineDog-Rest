@@ -127,7 +127,10 @@ struct MalDazeSettingsView: View {
                 case .deepseek:
                     return smartInputDeepSeekKey
                 case .gemini:
-                    return smartInputGeminiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? geminiAPIKey : smartInputGeminiKey
+                    if UserDefaults.standard.object(forKey: MalDazeDefaults.smartInputGeminiAPIKey) != nil {
+                        return smartInputGeminiKey
+                    }
+                    return geminiAPIKey
                 }
             },
             set: { newValue in

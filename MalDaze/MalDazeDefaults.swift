@@ -34,10 +34,11 @@ enum MalDazeDefaults {
     }
 
     static func resolvedBackendModel(defaults: UserDefaults = .standard) -> String {
-        resolvedModel(
+        let provider = resolvedBackendProvider(defaults: defaults)
+        return resolvedModel(
             rawModel: defaults.string(forKey: backendLLMModel),
-            provider: resolvedBackendProvider(defaults: defaults),
-            fallbackModel: defaultBackendLLMModel
+            provider: provider,
+            fallbackModel: LLMProviderCatalog.defaultModel(for: provider)
         )
     }
 
@@ -80,13 +81,19 @@ enum MalDazeDefaults {
     static func resolvedSmartInputAPIKey(for provider: LLMProviderID, defaults: UserDefaults = .standard) -> String {
         switch provider {
         case .gemini:
-            let newKey = trimmed(defaults.string(forKey: smartInputGeminiAPIKey))
-            return newKey.isEmpty ? trimmed(defaults.string(forKey: geminiAPIKey)) : newKey
+            return resolvedSmartInputGeminiAPIKey(defaults: defaults)
         case .openai:
             return trimmed(defaults.string(forKey: smartInputOpenAIAPIKey))
         case .deepseek:
             return trimmed(defaults.string(forKey: smartInputDeepSeekAPIKey))
         }
+    }
+
+    static func resolvedSmartInputGeminiAPIKey(defaults: UserDefaults = .standard) -> String {
+        if let newKey = defaults.object(forKey: smartInputGeminiAPIKey) as? String {
+            return trimmed(newKey)
+        }
+        return trimmed(defaults.string(forKey: geminiAPIKey))
     }
 
     private static func resolvedModel(rawModel: String?, provider: LLMProviderID, fallbackModel: String) -> String {

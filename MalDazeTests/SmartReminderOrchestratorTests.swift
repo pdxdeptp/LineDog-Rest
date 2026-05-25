@@ -28,6 +28,25 @@ final class SmartReminderOrchestratorTests: XCTestCase {
         XCTAssertTrue(LLMProviderCatalog.models(for: .deepseek).contains { $0.id == "deepseek-v4-flash" })
     }
 
+    func testBackendModelFallsBackToSelectedProviderDefault() {
+        let suiteName = "MalDaze.tests.backendProviderFallback.\(UUID().uuidString)"
+        let d = UserDefaults(suiteName: suiteName)!
+        defer { d.removePersistentDomain(forName: suiteName) }
+
+        d.set("openai", forKey: MalDazeDefaults.backendLLMProvider)
+        XCTAssertEqual(MalDazeDefaults.resolvedBackendModel(defaults: d), LLMProviderCatalog.defaultModel(for: .openai))
+
+        d.set("bad/name", forKey: MalDazeDefaults.backendLLMModel)
+        XCTAssertEqual(MalDazeDefaults.resolvedBackendModel(defaults: d), LLMProviderCatalog.defaultModel(for: .openai))
+
+        d.set("deepseek", forKey: MalDazeDefaults.backendLLMProvider)
+        d.removeObject(forKey: MalDazeDefaults.backendLLMModel)
+        XCTAssertEqual(MalDazeDefaults.resolvedBackendModel(defaults: d), LLMProviderCatalog.defaultModel(for: .deepseek))
+
+        d.set("bad:model", forKey: MalDazeDefaults.backendLLMModel)
+        XCTAssertEqual(MalDazeDefaults.resolvedBackendModel(defaults: d), LLMProviderCatalog.defaultModel(for: .deepseek))
+    }
+
     func testSmartInputConfigurationFallsBackToLegacyGeminiStorage() {
         let suiteName = "MalDaze.tests.smartInputFallback.\(UUID().uuidString)"
         let d = UserDefaults(suiteName: suiteName)!
@@ -45,6 +64,18 @@ final class SmartReminderOrchestratorTests: XCTestCase {
 
         XCTAssertEqual(MalDazeDefaults.resolvedSmartInputModel(defaults: d), "gemini-2.5-flash-lite")
         XCTAssertEqual(MalDazeDefaults.resolvedSmartInputAPIKey(for: .gemini, defaults: d), "new-smart-gemini-key")
+    }
+
+    func testSmartInputLegacyGeminiKeyCanBeClearedByNewSettingsStorage() {
+        let suiteName = "MalDaze.tests.smartInputLegacyClear.\(UUID().uuidString)"
+        let d = UserDefaults(suiteName: suiteName)!
+        defer { d.removePersistentDomain(forName: suiteName) }
+
+        d.set("legacy-gemini-key", forKey: MalDazeDefaults.geminiAPIKey)
+        XCTAssertEqual(MalDazeDefaults.resolvedSmartInputAPIKey(for: .gemini, defaults: d), "legacy-gemini-key")
+
+        d.set("", forKey: MalDazeDefaults.smartInputGeminiAPIKey)
+        XCTAssertEqual(MalDazeDefaults.resolvedSmartInputAPIKey(for: .gemini, defaults: d), "")
     }
 
     func testAssistantAndSmartInputProviderStorageRemainIndependent() {
