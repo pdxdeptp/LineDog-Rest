@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-05-25T12:17:11Z",
+  "updatedAt": "2026-05-25T12:28:41Z",
   "entries": [
     {
       "id": "introduce-study-intake-router-product-deepen-round-1",
@@ -2223,6 +2223,66 @@
         }
       ],
       "nextCheckpoint": "introduce-deadline-scheduler:apply:scheduler-dry-runs-final-verification"
+    },
+    {
+      "id": "introduce-deadline-scheduler-apply-scheduler-dry-runs-final-verification",
+      "timestamp": "2026-05-25T12:28:41Z",
+      "kind": "apply_group",
+      "changeId": "introduce-deadline-scheduler",
+      "checkpoint": "introduce-deadline-scheduler:apply:scheduler-dry-runs-final-verification",
+      "groupId": "scheduler-dry-runs-final-verification",
+      "result": "completed",
+      "commit": "59533f970ae2f988c3edd504e3ae65e5b314edc4",
+      "commands": [
+        {
+          "command": "cd assistant_backend && uv run pytest tests/test_study_plan_scheduling.py -k 'dry_run or resume_packaging or easyagent_rebuild'",
+          "exitCode": 0,
+          "summary": "2 passed, 33 deselected"
+        },
+        {
+          "command": "cd assistant_backend && uv run pytest tests/test_study_plan_scheduling.py",
+          "exitCode": 0,
+          "summary": "35 passed"
+        },
+        {
+          "command": "openspec validate introduce-deadline-scheduler --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        },
+        {
+          "command": "openspec instructions apply --change introduce-deadline-scheduler --json",
+          "exitCode": 0,
+          "summary": "36/36 tasks complete, state all_done"
+        },
+        {
+          "command": "git diff --check -- assistant_backend/src/study_plan/scheduling.py assistant_backend/tests/test_study_plan_scheduling.py openspec/changes/introduce-deadline-scheduler/tasks.md",
+          "exitCode": 0,
+          "summary": "no whitespace errors"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/add-initiate-implementation-control/evidence/introduce-deadline-scheduler/apply-groups/scheduler-dry-runs-final-verification.md",
+          "sha256": "74dcbca3a10212928bcd23fce1fd5a24cd9b9974d888d6ce32098f7d6e758179",
+          "description": "Apply group evidence, TDD record, verification, and next checkpoint."
+        },
+        {
+          "path": "assistant_backend/src/study_plan/scheduling.py",
+          "sha256": "cda99b9a73ba32dc293da392ae954c3f9b5bb72be6895fb5c2216b11a8a1f09c",
+          "description": "Scheduler risk report capacity math fields for dry-run acceptance examples."
+        },
+        {
+          "path": "assistant_backend/tests/test_study_plan_scheduling.py",
+          "sha256": "619013ffab07bc104ee050a290d49d63cb9558151aa8943efd6dfb57d6ce63ee",
+          "description": "Scheduler dry-run tests for feasible resume packaging and infeasible easyagent rebuild."
+        },
+        {
+          "path": "openspec/changes/introduce-deadline-scheduler/tasks.md",
+          "sha256": "cedd5077a97c7f56e379cc9b32defa744359a41dca3804f50e59a06646d0f78a",
+          "description": "Completed final scheduler dry-run task."
+        }
+      ],
+      "nextCheckpoint": "introduce-deadline-scheduler:apply:cross-change-contract-to-redesign-add-initiate-ui"
     }
   ]
 }

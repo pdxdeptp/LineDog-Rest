@@ -5,7 +5,7 @@
 - Phase: active
 - Current change: introduce-deadline-scheduler
 - Current step: apply
-- Current checkpoint: introduce-deadline-scheduler:apply:scheduler-dry-runs-final-verification
+- Current checkpoint: introduce-deadline-scheduler:apply:cross-change-contract-to-redesign-add-initiate-ui
 - Required product-deepen rounds before apply: 3
 - Required checkpoint after product deepening: scope_dependency_check
 - Product-deepen scope guard: every round must read adjacent changes and record scope decisions
@@ -45,10 +45,15 @@ Completed apply groups for `introduce-deadline-scheduler`:
 - `scheduler-contract-preflight-and-capacity`
 - `placement-buffer-splitting-fallback-and-risk`
 - `infeasibility-options-and-recompute-effects`
+- `scheduler-dry-runs-final-verification`
 
 Remaining apply groups for `introduce-deadline-scheduler`:
 
-- `scheduler-dry-runs-final-verification`
+- none
+
+Next required checkpoint for `introduce-deadline-scheduler`:
+
+- `cross-change-contract-to-redesign-add-initiate-ui`
 
 ## Run Log
 
@@ -1166,3 +1171,32 @@ Remaining apply groups for `introduce-deadline-scheduler`:
 - Manifest:
   - Added `introduce-deadline-scheduler-apply-infeasibility-options-and-recompute-effects`.
 - Next checkpoint: introduce-deadline-scheduler:apply:scheduler-dry-runs-final-verification
+
+## Run 2026-05-25T12:28:41Z Apply Group introduce-deadline-scheduler scheduler-dry-runs-final-verification
+
+- Automation: add-initiate-changes
+- Checkpoint: introduce-deadline-scheduler:apply:scheduler-dry-runs-final-verification
+- Result: completed
+- Actions:
+  - Acquired `run.lock`.
+  - Read `state.json`, `runbook.md`, `progress.md`, `evidence/manifest.json`, and `workspace-baseline.json`.
+  - Ran `git status --porcelain=v1` and protected unrelated dirty files.
+  - Triggered `openspec-apply-change`, `superpowers:subagent-driven-development`, and `superpowers:test-driven-development`.
+  - Wrote failing dry-run tests first, verified RED failures, then exposed scheduler capacity math in `ScheduleRiskReport`.
+  - Added feasible resume/project packaging dry-run coverage: 285 essential minutes, 300 available execution minutes, one reserved buffer day, and `draft_review`.
+  - Added infeasible easyagent source-understanding rebuild dry-run coverage: 525 essential minutes, 300 available execution minutes, 225-minute gap, hard deadline, no `accept_late_finish`, and no standalone `reduce_scope`.
+  - Marked task 4.12 complete.
+  - Wrote apply group evidence at `openspec/add-initiate-implementation-control/evidence/introduce-deadline-scheduler/apply-groups/scheduler-dry-runs-final-verification.md`.
+  - Created implementation commit `59533f970ae2f988c3edd504e3ae65e5b314edc4`.
+  - Protected unrelated dirty files and did not stage them.
+- Verification:
+  - `cd assistant_backend && uv run pytest tests/test_study_plan_scheduling.py -k 'dry_run or resume_packaging or easyagent_rebuild'`: 2 passed, 33 deselected.
+  - `cd assistant_backend && uv run pytest tests/test_study_plan_scheduling.py`: 35 passed.
+  - `openspec validate introduce-deadline-scheduler --strict`: valid.
+  - `openspec instructions apply --change introduce-deadline-scheduler --json`: 36/36 complete, state all_done.
+  - `git diff --check -- assistant_backend/src/study_plan/scheduling.py assistant_backend/tests/test_study_plan_scheduling.py openspec/changes/introduce-deadline-scheduler/tasks.md`: no whitespace errors.
+  - Spec compliance final review: approved.
+  - Code quality final review: approved.
+- Manifest:
+  - Added `introduce-deadline-scheduler-apply-scheduler-dry-runs-final-verification`.
+- Next checkpoint: introduce-deadline-scheduler:apply:cross-change-contract-to-redesign-add-initiate-ui

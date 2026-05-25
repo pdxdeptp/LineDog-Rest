@@ -5,9 +5,9 @@
   "currentChangeIndex": 3,
   "currentChange": "introduce-deadline-scheduler",
   "currentStep": "apply",
-  "currentCheckpoint": "introduce-deadline-scheduler:apply:scheduler-dry-runs-final-verification",
+  "currentCheckpoint": "introduce-deadline-scheduler:apply:cross-change-contract-to-redesign-add-initiate-ui",
   "currentAttempt": 0,
-  "runCounter": 31,
+  "runCounter": 32,
   "maxRetriesPerCheckpoint": 2,
   "requiredProductDeepenRounds": 3,
   "requiresScopeDependencyCheck": true,
@@ -76,12 +76,13 @@
     "completedGroupIds": [
       "scheduler-contract-preflight-and-capacity",
       "placement-buffer-splitting-fallback-and-risk",
-      "infeasibility-options-and-recompute-effects"
+      "infeasibility-options-and-recompute-effects",
+      "scheduler-dry-runs-final-verification"
     ],
     "blockedGroupId": null,
     "taskGroupsFile": "openspec/add-initiate-implementation-control/evidence/introduce-deadline-scheduler/apply-task-groups.json",
-    "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/introduce-deadline-scheduler/apply-groups/infeasibility-options-and-recompute-effects.md",
-    "lastCommit": "38242e79df7c23f6d545c5635904f46f1ee9c6e3"
+    "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/introduce-deadline-scheduler/apply-groups/scheduler-dry-runs-final-verification.md",
+    "lastCommit": "59533f970ae2f988c3edd504e3ae65e5b314edc4"
   },
   "lock": {
     "path": "openspec/add-initiate-implementation-control/run.lock",
@@ -156,18 +157,19 @@
       "status": "in_progress",
       "productDeepenRoundsCompleted": 3,
       "scopeDependencyCheckCompleted": true,
-      "applyCompleted": false,
+      "applyCompleted": true,
       "applyTaskGroups": {
-        "status": "in_progress",
+        "status": "completed",
         "taskGroupsFile": "openspec/add-initiate-implementation-control/evidence/introduce-deadline-scheduler/apply-task-groups.json",
         "completedGroupIds": [
           "scheduler-contract-preflight-and-capacity",
           "placement-buffer-splitting-fallback-and-risk",
-          "infeasibility-options-and-recompute-effects"
+          "infeasibility-options-and-recompute-effects",
+          "scheduler-dry-runs-final-verification"
         ],
-        "currentGroupId": "scheduler-dry-runs-final-verification",
-        "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/introduce-deadline-scheduler/apply-groups/infeasibility-options-and-recompute-effects.md",
-        "lastCommit": "38242e79df7c23f6d545c5635904f46f1ee9c6e3"
+        "currentGroupId": null,
+        "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/introduce-deadline-scheduler/apply-groups/scheduler-dry-runs-final-verification.md",
+        "lastCommit": "59533f970ae2f988c3edd504e3ae65e5b314edc4"
       }
     },
     {
@@ -187,12 +189,12 @@
     }
   ],
   "lastRun": {
-    "startedAt": "2026-05-25T12:17:11Z",
-    "completedAt": "2026-05-25T12:17:11Z",
-    "checkpoint": "introduce-deadline-scheduler:apply:infeasibility-options-and-recompute-effects",
+    "startedAt": "2026-05-25T12:28:41Z",
+    "completedAt": "2026-05-25T12:28:41Z",
+    "checkpoint": "introduce-deadline-scheduler:apply:scheduler-dry-runs-final-verification",
     "result": "completed"
   },
-  "lastCompletedCheckpoint": "introduce-deadline-scheduler:apply:infeasibility-options-and-recompute-effects",
+  "lastCompletedCheckpoint": "introduce-deadline-scheduler:apply:scheduler-dry-runs-final-verification",
   "lastMigration": {
     "completedAt": "2026-05-25T03:56:29Z",
     "id": "require-three-product-deepen-rounds",
@@ -212,8 +214,8 @@
   },
   "lastFailure": null,
   "lastVerification": {
-    "command": "cd assistant_backend && uv run pytest tests/test_study_plan_scheduling.py -k 'option or recompute or crunch or overload or reduce_scope or lower_depth or hard_deadline or late_finish'; cd assistant_backend && uv run pytest tests/test_study_plan_scheduling.py; openspec validate introduce-deadline-scheduler --strict; openspec instructions apply --change introduce-deadline-scheduler --json; git diff --check -- assistant_backend/src/study_plan/scheduling.py assistant_backend/tests/test_study_plan_scheduling.py openspec/changes/introduce-deadline-scheduler/tasks.md openspec/add-initiate-implementation-control/evidence/introduce-deadline-scheduler/apply-groups/infeasibility-options-and-recompute-effects.md",
-    "result": "targeted scheduler option tests passed; full scheduler tests passed; OpenSpec valid; instructions apply reports 35/36 complete; diff check clean"
+    "command": "cd assistant_backend && uv run pytest tests/test_study_plan_scheduling.py -k 'dry_run or resume_packaging or easyagent_rebuild'; cd assistant_backend && uv run pytest tests/test_study_plan_scheduling.py; openspec validate introduce-deadline-scheduler --strict; openspec instructions apply --change introduce-deadline-scheduler --json; git diff --check -- assistant_backend/src/study_plan/scheduling.py assistant_backend/tests/test_study_plan_scheduling.py openspec/changes/introduce-deadline-scheduler/tasks.md",
+    "result": "targeted scheduler dry-run tests passed; full scheduler tests passed; OpenSpec valid; instructions apply reports 36/36 complete and all_done; diff check clean"
   },
   "blockedReason": null
 }
