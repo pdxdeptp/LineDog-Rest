@@ -19,6 +19,59 @@ final class SmartReminderOrchestratorTests: XCTestCase {
         XCTAssertEqual(MalDazeGeminiModelCatalog.modelIdForAPI(defaults: d), MalDazeDefaults.defaultGeminiModelId)
     }
 
+    func testSharedLLMProviderCatalogExposesSmartInputProviderDefaults() {
+        XCTAssertEqual(LLMProviderCatalog.providerOptions.map(\.id.rawValue), ["gemini", "openai", "deepseek"])
+        XCTAssertEqual(LLMProviderCatalog.defaultModel(for: .gemini), MalDazeDefaults.defaultGeminiModelId)
+        XCTAssertEqual(LLMProviderCatalog.defaultModel(for: .openai), "gpt-5.5")
+        XCTAssertEqual(LLMProviderCatalog.defaultModel(for: .deepseek), "deepseek-v4-pro")
+        XCTAssertTrue(LLMProviderCatalog.models(for: .openai).contains { $0.id == "gpt-5.4-mini" })
+        XCTAssertTrue(LLMProviderCatalog.models(for: .deepseek).contains { $0.id == "deepseek-v4-flash" })
+    }
+
+    func testSmartInputConfigurationFallsBackToLegacyGeminiStorage() {
+        let suiteName = "MalDaze.tests.smartInputFallback.\(UUID().uuidString)"
+        let d = UserDefaults(suiteName: suiteName)!
+        defer { d.removePersistentDomain(forName: suiteName) }
+
+        d.set("legacy-gemini-key", forKey: MalDazeDefaults.geminiAPIKey)
+        d.set("gemini-2.5-pro", forKey: MalDazeDefaults.geminiModelId)
+
+        XCTAssertEqual(MalDazeDefaults.resolvedSmartInputProvider(defaults: d), .gemini)
+        XCTAssertEqual(MalDazeDefaults.resolvedSmartInputModel(defaults: d), "gemini-2.5-pro")
+        XCTAssertEqual(MalDazeDefaults.resolvedSmartInputAPIKey(for: .gemini, defaults: d), "legacy-gemini-key")
+
+        d.set("new-smart-gemini-key", forKey: MalDazeDefaults.smartInputGeminiAPIKey)
+        d.set("gemini-2.5-flash-lite", forKey: MalDazeDefaults.smartInputLLMModel)
+
+        XCTAssertEqual(MalDazeDefaults.resolvedSmartInputModel(defaults: d), "gemini-2.5-flash-lite")
+        XCTAssertEqual(MalDazeDefaults.resolvedSmartInputAPIKey(for: .gemini, defaults: d), "new-smart-gemini-key")
+    }
+
+    func testAssistantAndSmartInputProviderStorageRemainIndependent() {
+        let suiteName = "MalDaze.tests.independentLLM.\(UUID().uuidString)"
+        let d = UserDefaults(suiteName: suiteName)!
+        defer { d.removePersistentDomain(forName: suiteName) }
+
+        d.set("openai", forKey: MalDazeDefaults.backendLLMProvider)
+        d.set("gpt-5.4", forKey: MalDazeDefaults.backendLLMModel)
+        d.set("assistant-openai-key", forKey: MalDazeDefaults.backendOpenAIAPIKey)
+        d.set("deepseek", forKey: MalDazeDefaults.smartInputLLMProvider)
+        d.set("deepseek-v4-flash", forKey: MalDazeDefaults.smartInputLLMModel)
+        d.set("smart-deepseek-key", forKey: MalDazeDefaults.smartInputDeepSeekAPIKey)
+
+        XCTAssertEqual(MalDazeDefaults.resolvedBackendAPIKey(for: .openai, defaults: d), "assistant-openai-key")
+        XCTAssertEqual(MalDazeDefaults.resolvedSmartInputAPIKey(for: .deepseek, defaults: d), "smart-deepseek-key")
+        XCTAssertEqual(d.string(forKey: MalDazeDefaults.backendLLMModel), "gpt-5.4")
+        XCTAssertEqual(d.string(forKey: MalDazeDefaults.smartInputLLMModel), "deepseek-v4-flash")
+
+        d.set("gemini", forKey: MalDazeDefaults.smartInputLLMProvider)
+        d.set(LLMProviderCatalog.defaultModel(for: .gemini), forKey: MalDazeDefaults.smartInputLLMModel)
+
+        XCTAssertEqual(d.string(forKey: MalDazeDefaults.backendLLMProvider), "openai")
+        XCTAssertEqual(d.string(forKey: MalDazeDefaults.backendLLMModel), "gpt-5.4")
+        XCTAssertEqual(MalDazeDefaults.resolvedSmartInputModel(defaults: d), MalDazeDefaults.defaultGeminiModelId)
+    }
+
     func testDecodePayloadsFromJSONArray() throws {
         let json = """
         [{"title":"开chalse shwab","is_routine":false,"notes":null,"target_list_name":"Reminders","has_alarm":false,"alarm_date":{"year":2026,"month":3,"day":27,"hour":10,"minute":0},"priority":0},{"title":"去百合食品买零食","is_routine":false,"notes":null,"target_list_name":"Reminders","has_alarm":false,"alarm_date":{"year":2026,"month":3,"day":27,"hour":10,"minute":0},"priority":0}]

@@ -12,11 +12,94 @@ enum MalDazeDefaults {
     static let defaultBackendLLMModel    = "gemini-2.5-flash"
     static let defaultAssistantBackendLazyStartupEnabled = true
 
+    // 智能输入 LLM 配置（新 provider-aware 设置）
+    static let smartInputLLMProvider    = "MalDaze.smartInput.llmProvider"
+    static let smartInputLLMModel       = "MalDaze.smartInput.llmModel"
+    static let smartInputGeminiAPIKey   = "MalDaze.smartInput.geminiAPIKey"
+    static let smartInputOpenAIAPIKey   = "MalDaze.smartInput.openAIAPIKey"
+    static let smartInputDeepSeekAPIKey = "MalDaze.smartInput.deepSeekAPIKey"
+    static let defaultSmartInputLLMProvider = "gemini"
+    static let defaultSmartInputLLMModel    = "gemini-2.5-flash"
+
     static func resolvedAssistantBackendLazyStartupEnabled(defaults: UserDefaults = .standard) -> Bool {
         guard defaults.object(forKey: assistantBackendLazyStartupEnabled) != nil else {
             return defaultAssistantBackendLazyStartupEnabled
         }
         return defaults.bool(forKey: assistantBackendLazyStartupEnabled)
+    }
+
+    static func resolvedBackendProvider(defaults: UserDefaults = .standard) -> LLMProviderID {
+        let raw = defaults.string(forKey: backendLLMProvider) ?? defaultBackendLLMProvider
+        return LLMProviderCatalog.provider(for: raw)
+    }
+
+    static func resolvedBackendModel(defaults: UserDefaults = .standard) -> String {
+        resolvedModel(
+            rawModel: defaults.string(forKey: backendLLMModel),
+            provider: resolvedBackendProvider(defaults: defaults),
+            fallbackModel: defaultBackendLLMModel
+        )
+    }
+
+    static func resolvedBackendAPIKey(for provider: LLMProviderID, defaults: UserDefaults = .standard) -> String {
+        switch provider {
+        case .gemini:
+            return trimmed(defaults.string(forKey: backendGeminiAPIKey))
+        case .openai:
+            return trimmed(defaults.string(forKey: backendOpenAIAPIKey))
+        case .deepseek:
+            return trimmed(defaults.string(forKey: backendDeepSeekAPIKey))
+        }
+    }
+
+    static func resolvedSmartInputProvider(defaults: UserDefaults = .standard) -> LLMProviderID {
+        let raw = defaults.string(forKey: smartInputLLMProvider) ?? defaultSmartInputLLMProvider
+        return LLMProviderCatalog.provider(for: raw)
+    }
+
+    static func resolvedSmartInputModel(defaults: UserDefaults = .standard) -> String {
+        let provider = resolvedSmartInputProvider(defaults: defaults)
+        let newModel = defaults.object(forKey: smartInputLLMModel) as? String
+        let legacyGeminiModel = provider == .gemini ? defaults.object(forKey: geminiModelId) as? String : nil
+        if provider == .gemini,
+           let legacyGeminiModel,
+           newModel == nil {
+            return resolvedModel(
+                rawModel: legacyGeminiModel,
+                provider: provider,
+                fallbackModel: defaultGeminiModelId
+            )
+        }
+        return resolvedModel(
+            rawModel: newModel ?? legacyGeminiModel,
+            provider: provider,
+            fallbackModel: provider == .gemini ? defaultGeminiModelId : LLMProviderCatalog.defaultModel(for: provider)
+        )
+    }
+
+    static func resolvedSmartInputAPIKey(for provider: LLMProviderID, defaults: UserDefaults = .standard) -> String {
+        switch provider {
+        case .gemini:
+            let newKey = trimmed(defaults.string(forKey: smartInputGeminiAPIKey))
+            return newKey.isEmpty ? trimmed(defaults.string(forKey: geminiAPIKey)) : newKey
+        case .openai:
+            return trimmed(defaults.string(forKey: smartInputOpenAIAPIKey))
+        case .deepseek:
+            return trimmed(defaults.string(forKey: smartInputDeepSeekAPIKey))
+        }
+    }
+
+    private static func resolvedModel(rawModel: String?, provider: LLMProviderID, fallbackModel: String) -> String {
+        let raw = trimmed(rawModel)
+        guard !raw.isEmpty, !raw.contains("/"), !raw.contains(":") else {
+            return fallbackModel
+        }
+        let allowedIDs = Set(LLMProviderCatalog.models(for: provider).map(\.id))
+        return allowedIDs.contains(raw) ? raw : fallbackModel
+    }
+
+    private static func trimmed(_ value: String?) -> String {
+        value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
     }
 
     // 桌宠智能输入（Smart Reminder）— 勿改

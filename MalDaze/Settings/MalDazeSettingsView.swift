@@ -11,7 +11,12 @@ struct MalDazeSettingsView: View {
     @AppStorage(MalDazeDefaults.backendDeepSeekAPIKey) private var backendDeepSeekKey = ""
     @AppStorage(MalDazeDefaults.assistantBackendLazyStartupEnabled) private var assistantBackendLazyStartupEnabled = MalDazeDefaults.defaultAssistantBackendLazyStartupEnabled
 
-    // 桌宠智能输入（勿改）
+    // 桌宠智能输入 LLM
+    @AppStorage(MalDazeDefaults.smartInputLLMProvider)    private var smartInputProvider    = MalDazeDefaults.defaultSmartInputLLMProvider
+    @AppStorage(MalDazeDefaults.smartInputLLMModel)       private var smartInputModel       = MalDazeDefaults.defaultSmartInputLLMModel
+    @AppStorage(MalDazeDefaults.smartInputGeminiAPIKey)   private var smartInputGeminiKey   = ""
+    @AppStorage(MalDazeDefaults.smartInputOpenAIAPIKey)   private var smartInputOpenAIKey   = ""
+    @AppStorage(MalDazeDefaults.smartInputDeepSeekAPIKey) private var smartInputDeepSeekKey = ""
     @AppStorage(MalDazeDefaults.geminiAPIKey) private var geminiAPIKey = ""
     @AppStorage(MalDazeDefaults.geminiModelId) private var geminiModelId = MalDazeDefaults.defaultGeminiModelId
 
@@ -35,7 +40,7 @@ struct MalDazeSettingsView: View {
     @State private var isRecordingDeskShortcut = false
     @State private var isRecordingSevenMinuteShortcut = false
     @State private var isRecordingResetPetShortcut = false
-    @State private var selectedCategory: SettingsCategory = .learningAssistant
+    @State private var selectedCategory: SettingsCategory = .modelCredentials
     @State private var isBackendAPIKeyVisible = false
     @State private var isSmartInputAPIKeyVisible = false
 
@@ -78,40 +83,61 @@ struct MalDazeSettingsView: View {
     private var selectedBackendAPIKey: Binding<String> {
         Binding(
             get: {
-                switch backendProvider {
-                case "openai": return backendOpenAIKey
-                case "deepseek": return backendDeepSeekKey
-                default: return backendGeminiKey
+                switch LLMProviderCatalog.provider(for: backendProvider) {
+                case .openai: return backendOpenAIKey
+                case .deepseek: return backendDeepSeekKey
+                case .gemini: return backendGeminiKey
                 }
             },
             set: { newValue in
-                switch backendProvider {
-                case "openai": backendOpenAIKey = newValue
-                case "deepseek": backendDeepSeekKey = newValue
-                default: backendGeminiKey = newValue
+                switch LLMProviderCatalog.provider(for: backendProvider) {
+                case .openai: backendOpenAIKey = newValue
+                case .deepseek: backendDeepSeekKey = newValue
+                case .gemini: backendGeminiKey = newValue
                 }
             }
         )
     }
 
-    private var backendProviderDisplayName: String {
-        switch backendProvider {
-        case "openai": return "OpenAI"
-        case "deepseek": return "DeepSeek"
-        default: return "Google Gemini"
-        }
+    private var selectedSmartInputModel: Binding<String> {
+        Binding(
+            get: {
+                let provider = LLMProviderCatalog.provider(for: smartInputProvider)
+                if UserDefaults.standard.object(forKey: MalDazeDefaults.smartInputLLMModel) == nil, provider == .gemini {
+                    let legacy = geminiModelId.trimmingCharacters(in: .whitespacesAndNewlines)
+                    return legacy.isEmpty ? MalDazeDefaults.defaultGeminiModelId : legacy
+                }
+                if smartInputModel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    return LLMProviderCatalog.defaultModel(for: provider)
+                }
+                return smartInputModel
+            },
+            set: { newValue in
+                smartInputModel = newValue
+            }
+        )
     }
 
-    private var backendProviderSymbol: String {
-        switch backendProvider {
-        case "openai": return "sparkles"
-        case "deepseek": return "brain.head.profile"
-        default: return "diamond.fill"
-        }
-    }
-
-    private var backendAPIKeyVisibleLabel: String {
-        "\(backendProviderDisplayName) API Key"
+    private var selectedSmartInputAPIKey: Binding<String> {
+        Binding(
+            get: {
+                switch LLMProviderCatalog.provider(for: smartInputProvider) {
+                case .openai:
+                    return smartInputOpenAIKey
+                case .deepseek:
+                    return smartInputDeepSeekKey
+                case .gemini:
+                    return smartInputGeminiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? geminiAPIKey : smartInputGeminiKey
+                }
+            },
+            set: { newValue in
+                switch LLMProviderCatalog.provider(for: smartInputProvider) {
+                case .openai: smartInputOpenAIKey = newValue
+                case .deepseek: smartInputDeepSeekKey = newValue
+                case .gemini: smartInputGeminiKey = newValue
+                }
+            }
+        )
     }
 
     var body: some View {
@@ -136,10 +162,20 @@ struct MalDazeSettingsView: View {
         .tint(SettingsDesignPalette.paleBlueAccent)
         .frame(minWidth: 720, minHeight: 520)
         .onAppear {
-            let ids = Set(MalDazeGeminiModelCatalog.pickerOptions.map(\.id))
-            if !ids.contains(geminiModelId) {
-                geminiModelId = MalDazeDefaults.defaultGeminiModelId
-            }
+            repairModelSelectionsIfNeeded()
+        }
+    }
+
+    private func repairModelSelectionsIfNeeded() {
+        if !LLMProviderCatalog.models(for: backendProvider).contains(where: { $0.id == backendModel }) {
+            backendModel = LLMProviderCatalog.defaultModel(for: backendProvider)
+        }
+        if !LLMProviderCatalog.models(for: smartInputProvider).contains(where: { $0.id == selectedSmartInputModel.wrappedValue }) {
+            smartInputModel = LLMProviderCatalog.defaultModel(for: smartInputProvider)
+        }
+        let geminiIDs = Set(MalDazeGeminiModelCatalog.pickerOptions.map(\.id))
+        if !geminiIDs.contains(geminiModelId) {
+            geminiModelId = MalDazeDefaults.defaultGeminiModelId
         }
     }
 
@@ -184,63 +220,26 @@ struct MalDazeSettingsView: View {
     private var settingsDetailPane: some View {
         SettingsPane(category: selectedCategory) {
             switch selectedCategory {
-            case .learningAssistant:
-                learningAssistantSettingsPane
-            case .smartInput:
-                smartInputSettingsPane
+            case .modelCredentials:
+                modelCredentialsSettingsPane
             case .shortcuts:
                 shortcutsSettingsPane
             }
         }
     }
 
-    private var learningAssistantSettingsPane: some View {
+    private var modelCredentialsSettingsPane: some View {
         VStack(alignment: .leading, spacing: 12) {
-            SettingsGroup(
-                title: "学习助手 LLM",
-                subtitle: "影响中栏学习助手，下次后端启动时生效。",
+            LLMProviderSettingsCard(
+                title: "学习助手",
+                subtitle: "用于中栏学习助手生成计划、复盘与对话；下次后端启动时生效。",
+                providerContext: "学习助手后端",
                 systemImage: "server.rack",
-                trailing: "本机即时保存"
+                provider: $backendProvider,
+                model: $backendModel,
+                apiKey: selectedBackendAPIKey,
+                isKeyVisible: $isBackendAPIKeyVisible
             ) {
-                SettingsLabeledRow(
-                    title: "服务商与模型",
-                    subtitle: "切换服务商时会回到该服务商默认模型。"
-                ) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Picker("服务商", selection: $backendProvider) {
-                            Text("Google Gemini").tag("gemini")
-                            Text("OpenAI").tag("openai")
-                            Text("DeepSeek").tag("deepseek")
-                        }
-                        .pickerStyle(.segmented)
-                        .onChange(of: backendProvider) { newProvider in
-                            backendModel = BackendLLMCatalog.defaultModel(for: newProvider)
-                        }
-
-                        Picker("模型", selection: $backendModel) {
-                            ForEach(BackendLLMCatalog.models(for: backendProvider), id: \.id) { model in
-                                Text(model.label).tag(model.id)
-                            }
-                        }
-                        .pickerStyle(.menu)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                }
-
-                SettingsLabeledRow(
-                    title: backendAPIKeyVisibleLabel,
-                    subtitle: "用于学习助手后端生成计划、复盘与对话。"
-                ) {
-                    APIKeySettingRow(
-                        visibleLabel: backendAPIKeyVisibleLabel,
-                        providerName: backendProviderDisplayName,
-                        providerContext: "学习助手后端",
-                        systemImage: backendProviderSymbol,
-                        key: selectedBackendAPIKey,
-                        isKeyVisible: $isBackendAPIKeyVisible
-                    )
-                }
-
                 SettingsLabeledRow(
                     title: "懒启动学习助手后端",
                     subtitle: "更省电，但首次打开学习助手可能需要等待。"
@@ -257,44 +256,17 @@ struct MalDazeSettingsView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-        }
-    }
 
-    private var smartInputSettingsPane: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            SettingsGroup(
+            LLMProviderSettingsCard(
                 title: "智能输入",
-                subtitle: "用于自然语言解析提醒事项。",
+                subtitle: "用于自然语言解析提醒事项；与学习助手 Key、模型分开保存。",
+                providerContext: "智能输入提醒解析",
                 systemImage: "text.bubble",
-                trailing: "本机即时保存"
+                provider: $smartInputProvider,
+                model: selectedSmartInputModel,
+                apiKey: selectedSmartInputAPIKey,
+                isKeyVisible: $isSmartInputAPIKeyVisible
             ) {
-                SettingsLabeledRow(
-                    title: "Google Gemini API Key",
-                    subtitle: "用于智能输入自然语言提醒解析，与学习助手后端 Key 分开保存。"
-                ) {
-                    APIKeySettingRow(
-                        visibleLabel: "Google Gemini API Key",
-                        providerName: "Google Gemini",
-                        providerContext: "智能输入提醒解析",
-                        systemImage: "diamond.fill",
-                        key: $geminiAPIKey,
-                        isKeyVisible: $isSmartInputAPIKeyVisible
-                    )
-                }
-
-                SettingsLabeledRow(
-                    title: "Gemini 模型",
-                    subtitle: "若请求失败，可换一款或到 AI Studio 核对模型名。"
-                ) {
-                    Picker("Gemini 模型", selection: $geminiModelId) {
-                        ForEach(MalDazeGeminiModelCatalog.pickerOptions) { option in
-                            Text(option.label).tag(option.id)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-
                 ShortcutSettingRow(
                     title: "添加提醒",
                     subtitle: "默认 ⌘⇧<（小于号，物理键为逗号 + Shift）。通常无需辅助功能授权。",
@@ -428,32 +400,28 @@ private enum SettingsDesignPalette {
 }
 
 private enum SettingsCategory: String, CaseIterable, Identifiable {
-    case learningAssistant
-    case smartInput
+    case modelCredentials
     case shortcuts
 
     var id: Self { self }
 
     var title: String {
         switch self {
-        case .learningAssistant: return "学习助手"
-        case .smartInput: return "智能输入"
+        case .modelCredentials: return "模型与密钥"
         case .shortcuts: return "快捷键"
         }
     }
 
     var subtitle: String {
         switch self {
-        case .learningAssistant: return "后端模型与凭据"
-        case .smartInput: return "提醒解析"
+        case .modelCredentials: return "LLM 凭据与默认模型"
         case .shortcuts: return "全局操作"
         }
     }
 
     var systemImage: String {
         switch self {
-        case .learningAssistant: return "sparkles"
-        case .smartInput: return "text.bubble"
+        case .modelCredentials: return "key.horizontal"
         case .shortcuts: return "keyboard"
         }
     }
@@ -609,6 +577,100 @@ private struct SettingsGroup<Content: View>: View {
             RoundedRectangle(cornerRadius: 9, style: .continuous)
                 .strokeBorder(SettingsDesignPalette.border, lineWidth: 0.75)
         )
+    }
+}
+
+private struct LLMProviderSettingsCard<ExtraRows: View>: View {
+    let title: String
+    let subtitle: String
+    let providerContext: String
+    let systemImage: String
+    let provider: Binding<String>
+    let model: Binding<String>
+    let apiKey: Binding<String>
+    let isKeyVisible: Binding<Bool>
+    let extraRows: ExtraRows
+
+    init(
+        title: String,
+        subtitle: String,
+        providerContext: String,
+        systemImage: String,
+        provider: Binding<String>,
+        model: Binding<String>,
+        apiKey: Binding<String>,
+        isKeyVisible: Binding<Bool>,
+        @ViewBuilder extraRows: () -> ExtraRows
+    ) {
+        self.title = title
+        self.subtitle = subtitle
+        self.providerContext = providerContext
+        self.systemImage = systemImage
+        self.provider = provider
+        self.model = model
+        self.apiKey = apiKey
+        self.isKeyVisible = isKeyVisible
+        self.extraRows = extraRows()
+    }
+
+    private var selectedProvider: LLMProviderID {
+        LLMProviderCatalog.provider(for: provider.wrappedValue)
+    }
+
+    var body: some View {
+        SettingsGroup(
+            title: title,
+            subtitle: subtitle,
+            systemImage: systemImage,
+            trailing: "本机即时保存"
+        ) {
+            SettingsLabeledRow(
+                title: "服务商与模型",
+                subtitle: "切换服务商时会回到该服务商默认模型。"
+            ) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Picker("服务商", selection: provider) {
+                        ForEach(LLMProviderCatalog.providerOptions) { option in
+                            Text(option.label).tag(option.id.rawValue)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .onChange(of: provider.wrappedValue) { newProvider in
+                        model.wrappedValue = LLMProviderCatalog.defaultModel(for: newProvider)
+                    }
+
+                    Picker("模型", selection: model) {
+                        ForEach(LLMProviderCatalog.models(for: provider.wrappedValue), id: \.id) { option in
+                            Text(option.label).tag(option.id)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    Text("仅保存在本机 UserDefaults；切换此处不会改写另一项功能的服务商、模型或 API Key。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            SettingsLabeledRow(
+                title: selectedProvider.apiKeyLabel,
+                subtitle: "只读取和写入当前服务商在「\(title)」中的 API Key。"
+            ) {
+                APIKeySettingRow(
+                    visibleLabel: selectedProvider.apiKeyLabel,
+                    providerName: selectedProvider.displayName,
+                    providerContext: providerContext,
+                    systemImage: selectedProvider.systemImage,
+                    key: apiKey,
+                    isKeyVisible: isKeyVisible
+                )
+            }
+
+            extraRows
+        }
+        .tint(SettingsDesignPalette.paleBlueAccent)
     }
 }
 
@@ -959,39 +1021,6 @@ private struct GlobalShortcutKeyRecorder: NSViewRepresentable {
 
         private static let modifierOnlyKeyCodes: Set<UInt16> = [55, 56, 57, 58, 59, 60, 61, 62]
     }
-}
-
-// MARK: - 后端 LLM 模型目录
-
-enum BackendLLMCatalog {
-    struct Model { let id: String; let label: String }
-
-    static func models(for provider: String) -> [Model] {
-        switch provider {
-        case "openai":
-            return [
-                Model(id: "gpt-5.5",      label: "GPT-5.5"),
-                Model(id: "gpt-5.4",      label: "GPT-5.4"),
-                Model(id: "gpt-5.4-mini", label: "GPT-5.4 mini"),
-            ]
-        case "deepseek":
-            return [
-                Model(id: "deepseek-v4-pro",   label: "DeepSeek V4 Pro"),
-                Model(id: "deepseek-v4-flash", label: "DeepSeek V4 Flash"),
-            ]
-        default: // gemini
-            return [
-                Model(id: "gemini-3.1-pro-preview", label: "Gemini 3.1 Pro (Preview)"),
-                Model(id: "gemini-3.1-flash-lite",  label: "Gemini 3.1 Flash Lite"),
-                Model(id: "gemini-3-flash-preview",  label: "Gemini 3 Flash (Preview)"),
-                Model(id: "gemini-2.5-pro",          label: "Gemini 2.5 Pro"),
-                Model(id: "gemini-2.5-flash",        label: "Gemini 2.5 Flash"),
-                Model(id: "gemini-2.5-flash-lite",   label: "Gemini 2.5 Flash Lite"),
-            ]
-        }
-    }
-
-    static func defaultModel(for provider: String) -> String { models(for: provider)[0].id }
 }
 
 // MARK: - 独立设置窗（LSUIElement 下 `showSettingsWindow:` 往往无效）

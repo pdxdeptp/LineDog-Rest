@@ -1,24 +1,24 @@
 ## 1. Tests And Source Assertions
 
-- [ ] 1.1 Add failing settings assertions that the LLM/API-key category renders two instances of one reusable provider settings module.
-- [ ] 1.2 Add failing settings assertions that Smart Input exposes Gemini, OpenAI, and DeepSeek provider choices with provider-specific model defaults.
-- [ ] 1.3 Add failing persistence assertions for independent learning-assistant and Smart Input provider/model/key storage.
+- [x] 1.1 Add failing settings assertions that the LLM/API-key category renders two instances of one reusable provider settings module.
+- [x] 1.2 Add failing settings assertions that Smart Input exposes Gemini, OpenAI, and DeepSeek provider choices with provider-specific model defaults.
+- [x] 1.3 Add failing persistence assertions for independent learning-assistant and Smart Input provider/model/key storage.
 - [ ] 1.4 Add failing Smart Reminder runtime tests for provider-aware dispatch, selected-provider missing-key messages, and existing Gemini fallback.
 
 ## 2. Provider Configuration Model
 
-- [ ] 2.1 Add or generalize a provider ID and model catalog shared by learning assistant and Smart Input settings.
-- [ ] 2.2 Add Smart Input provider, model, Gemini key, OpenAI key, and DeepSeek key defaults while preserving existing Gemini-only fallback keys.
-- [ ] 2.3 Add helper bindings/resolvers that return the selected provider API key for each feature without cross-writing the other feature.
-- [ ] 2.4 Ensure switching either feature's provider resets only that feature's model to the selected provider default.
+- [x] 2.1 Add or generalize a provider ID and model catalog shared by learning assistant and Smart Input settings.
+- [x] 2.2 Add Smart Input provider, model, Gemini key, OpenAI key, and DeepSeek key defaults while preserving existing Gemini-only fallback keys.
+- [x] 2.3 Add helper bindings/resolvers that return the selected provider API key for each feature without cross-writing the other feature.
+- [x] 2.4 Ensure switching either feature's provider resets only that feature's model to the selected provider default.
 
 ## 3. Settings UI Redesign
 
-- [ ] 3.1 Replace duplicated learning-assistant and Smart Input provider controls with a reusable LLM provider settings module.
-- [ ] 3.2 Add a dedicated "模型与密钥" or equivalent settings category containing learning-assistant and Smart Input LLM cards.
-- [ ] 3.3 Render each LLM card with consistent provider picker, model picker, API key row, saved/empty state, show/hide control, local-only copy, and pale-blue accent.
-- [ ] 3.4 Keep feature-specific controls reachable without clutter: learning assistant lazy startup and Smart Input shortcut behavior must remain available.
-- [ ] 3.5 Preserve the settings window presenter, Esc handling, shortcut recorders, and existing category navigation behavior.
+- [x] 3.1 Replace duplicated learning-assistant and Smart Input provider controls with a reusable LLM provider settings module.
+- [x] 3.2 Add a dedicated "模型与密钥" or equivalent settings category containing learning-assistant and Smart Input LLM cards.
+- [x] 3.3 Render each LLM card with consistent provider picker, model picker, API key row, saved/empty state, show/hide control, local-only copy, and pale-blue accent.
+- [x] 3.4 Keep feature-specific controls reachable without clutter: learning assistant lazy startup and Smart Input shortcut behavior must remain available.
+- [x] 3.5 Preserve the settings window presenter, Esc handling, shortcut recorders, and existing category navigation behavior.
 
 ## 4. Smart Input Runtime
 

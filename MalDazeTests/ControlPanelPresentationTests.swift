@@ -862,22 +862,60 @@ final class ControlPanelPresentationTests: XCTestCase {
         XCTAssertTrue(apiKeyRowSource.contains(".accessibilityLabel"))
     }
 
-    func testSmartInputGeminiAPIKeyRowMatchesLearningAssistantGeminiPresentation() throws {
+    func testMalDazeSettingsRendersTwoSharedLLMProviderCardsInModelCredentialsCategory() throws {
         let settingsSource = try readProjectSource("MalDaze/Settings/MalDazeSettingsView.swift")
-        let smartInputSource = try propertySource(named: "smartInputSettingsPane", in: settingsSource)
+        let modelPaneSource = try propertySource(named: "modelCredentialsSettingsPane", in: settingsSource)
+        let cardSource = try structSource(named: "LLMProviderSettingsCard", in: settingsSource)
 
-        XCTAssertTrue(smartInputSource.contains("title: \"Google Gemini API Key\""))
-        XCTAssertTrue(smartInputSource.contains("visibleLabel: \"Google Gemini API Key\""))
-        XCTAssertTrue(smartInputSource.contains("providerName: \"Google Gemini\""))
-        XCTAssertTrue(smartInputSource.contains("systemImage: \"diamond.fill\""))
-        XCTAssertFalse(
-            smartInputSource.contains("Smart Input Gemini Key") || smartInputSource.contains("Smart Input Gemini API Key"),
-            "Smart Input should not look like a separate API-key input pattern from the learning-assistant Gemini row."
+        XCTAssertTrue(settingsSource.contains("case modelCredentials"))
+        XCTAssertTrue(settingsSource.contains("return \"模型与密钥\""))
+        XCTAssertEqual(
+            modelPaneSource.ranges(of: "LLMProviderSettingsCard(").count,
+            2,
+            "The dedicated model/key category should render learning assistant and Smart Input through two instances of the same reusable module."
         )
-        XCTAssertFalse(
-            smartInputSource.contains("Gemini for reminders") || smartInputSource.contains("sparkle.magnifyingglass"),
-            "Smart Input should reuse the same Gemini provider identity as the learning-assistant Gemini API-key card."
-        )
+        XCTAssertTrue(modelPaneSource.contains("title: \"学习助手\""))
+        XCTAssertTrue(modelPaneSource.contains("title: \"智能输入\""))
+        XCTAssertTrue(cardSource.contains("LLMProviderCatalog.providerOptions"))
+        XCTAssertTrue(cardSource.contains("LLMProviderCatalog.models(for: provider.wrappedValue)"))
+        XCTAssertTrue(cardSource.contains("LLMProviderCatalog.defaultModel(for: newProvider)"))
+        XCTAssertTrue(cardSource.contains("APIKeySettingRow("))
+        XCTAssertTrue(cardSource.contains("仅保存在本机 UserDefaults"))
+        XCTAssertTrue(cardSource.contains("SettingsDesignPalette.paleBlueAccent"))
+    }
+
+    func testMalDazeSettingsSmartInputUsesSharedProvidersAndIndependentStorageHooks() throws {
+        let settingsSource = try readProjectSource("MalDaze/Settings/MalDazeSettingsView.swift")
+        let defaultsSource = try readProjectSource("MalDaze/MalDazeDefaults.swift")
+        let catalogSource = try readProjectSource("MalDaze/SmartReminder/MalDazeGeminiModelCatalog.swift")
+        let modelPaneSource = try propertySource(named: "modelCredentialsSettingsPane", in: settingsSource)
+
+        let requiredSettingsTokens = [
+            "@AppStorage(MalDazeDefaults.smartInputLLMProvider)",
+            "@AppStorage(MalDazeDefaults.smartInputLLMModel)",
+            "@AppStorage(MalDazeDefaults.smartInputGeminiAPIKey)",
+            "@AppStorage(MalDazeDefaults.smartInputOpenAIAPIKey)",
+            "@AppStorage(MalDazeDefaults.smartInputDeepSeekAPIKey)",
+            "@AppStorage(MalDazeDefaults.geminiAPIKey)",
+            "@AppStorage(MalDazeDefaults.geminiModelId)",
+            "selectedSmartInputAPIKey",
+            "selectedSmartInputModel"
+        ]
+
+        for token in requiredSettingsTokens {
+            XCTAssertTrue(settingsSource.contains(token), "Settings should preserve Smart Input storage hook: \(token)")
+        }
+
+        XCTAssertTrue(modelPaneSource.contains("provider: $smartInputProvider"))
+        XCTAssertTrue(modelPaneSource.contains("model: selectedSmartInputModel"))
+        XCTAssertTrue(modelPaneSource.contains("apiKey: selectedSmartInputAPIKey"))
+        XCTAssertTrue(catalogSource.contains("enum LLMProviderID: String, CaseIterable"))
+        XCTAssertTrue(catalogSource.contains("case gemini"))
+        XCTAssertTrue(catalogSource.contains("case openai"))
+        XCTAssertTrue(catalogSource.contains("case deepseek"))
+        XCTAssertTrue(catalogSource.contains("enum LLMProviderCatalog"))
+        XCTAssertTrue(defaultsSource.contains("resolvedSmartInputAPIKey"))
+        XCTAssertTrue(defaultsSource.contains("resolvedSmartInputModel"))
     }
 
     func testMalDazeSettingsShortcutRowsUseReusableKeycapPresentation() throws {
@@ -901,10 +939,15 @@ final class ControlPanelPresentationTests: XCTestCase {
             "@AppStorage(MalDazeDefaults.backendGeminiAPIKey)",
             "@AppStorage(MalDazeDefaults.backendOpenAIAPIKey)",
             "@AppStorage(MalDazeDefaults.backendDeepSeekAPIKey)",
+            "@AppStorage(MalDazeDefaults.smartInputLLMProvider)",
+            "@AppStorage(MalDazeDefaults.smartInputLLMModel)",
+            "@AppStorage(MalDazeDefaults.smartInputGeminiAPIKey)",
+            "@AppStorage(MalDazeDefaults.smartInputOpenAIAPIKey)",
+            "@AppStorage(MalDazeDefaults.smartInputDeepSeekAPIKey)",
             "@AppStorage(MalDazeDefaults.geminiAPIKey)",
             "@AppStorage(MalDazeDefaults.geminiModelId)",
-            "BackendLLMCatalog.defaultModel(for: newProvider)",
-            "MalDazeGeminiModelCatalog.pickerOptions",
+            "LLMProviderCatalog.defaultModel(for: newProvider)",
+            "LLMProviderCatalog.providerOptions",
             "GlobalShortcutKeyRecorder(",
             "SettingsEscapeKeyMonitor(shortcutRecorderBusy: shortcutRecorderBusy)",
             "NSHostingController(rootView: MalDazeSettingsView())",
