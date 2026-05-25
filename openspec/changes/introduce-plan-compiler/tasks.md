@@ -1,11 +1,11 @@
 ## 1. Envelope And Scope
 
-- [ ] 1.1 Implement normalized `PlanningEnvelope` creation from confirmed role, anchors, source summaries, existing plan context, source roles, and provenance.
-- [ ] 1.2 Implement compiler result statuses `draft_review`, `needs_input`, and `compile_failed`, with `low_calibration` as a review flag and no scheduler-owned `infeasible_review`.
-- [ ] 1.3 Implement archetype selection matrix for finite learning, recurring practice, topic review, rebuild/clone, project packaging, and existing-project phase.
-- [ ] 1.4 Implement deterministic archetype tie-breakers for mixed signals and `needs_input` behavior when daily-work shape remains ambiguous.
-- [ ] 1.5 Implement secondary modifiers, included/excluded material scope boundary, confidence, and one-question ambiguity handling.
-- [ ] 1.6 Implement target-depth semantics for skim, can-use, project-level, interview-ready, and source-understanding.
+- [x] 1.1 Implement normalized `PlanningEnvelope` creation from confirmed role, anchors, source summaries, existing plan context, source roles, and provenance.
+- [x] 1.2 Implement compiler result statuses `draft_review`, `needs_input`, and `compile_failed`, with `low_calibration` as a review flag and no scheduler-owned `infeasible_review`.
+- [x] 1.3 Implement archetype selection matrix for finite learning, recurring practice, topic review, rebuild/clone, project packaging, and existing-project phase.
+- [x] 1.4 Implement deterministic archetype tie-breakers for mixed signals and `needs_input` behavior when daily-work shape remains ambiguous.
+- [x] 1.5 Implement secondary modifiers, included/excluded material scope boundary, confidence, and one-question ambiguity handling.
+- [x] 1.6 Implement target-depth semantics for skim, can-use, project-level, interview-ready, and source-understanding.
 
 ## 2. Phase And Task Generation
 
@@ -27,12 +27,12 @@
 
 ## 4. Tests
 
-- [ ] 4.1 Add envelope normalization tests.
-- [ ] 4.2 Add compiler status tests proving `needs_input` and `compile_failed` can persist without complete phases/tasks and compiler never returns scheduler-owned `infeasible_review`.
-- [ ] 4.3 Add archetype-selection tests for mixed GitHub cases such as `easyagent` as rebuild target versus interview-learning source.
-- [ ] 4.4 Add archetype tie-breaker tests proving target output, target depth, source role, and existing-plan draft kind precedence.
+- [x] 4.1 Add envelope normalization tests.
+- [x] 4.2 Add compiler status tests proving `needs_input` and `compile_failed` can persist without complete phases/tasks and compiler never returns scheduler-owned `infeasible_review`.
+- [x] 4.3 Add archetype-selection tests for mixed GitHub cases such as `easyagent` as rebuild target versus interview-learning source.
+- [x] 4.4 Add archetype tie-breaker tests proving target output, target depth, source role, and existing-plan draft kind precedence.
 - [ ] 4.5 Add source/goal synopsis tests for thin GitHub URL, course/module facts, Obsidian note snippets, and existing-plan context.
-- [ ] 4.6 Add target-depth tests proving the same source produces different obligations.
+- [x] 4.6 Add target-depth tests proving the same source produces different obligations.
 - [ ] 4.7 Add LLM contract tests for phase/task schema validation and forbidden date fields.
 - [ ] 4.8 Add repair tests proving repair cannot change user anchors or expand scope.
 - [ ] 4.9 Add bounded repair failure tests.
