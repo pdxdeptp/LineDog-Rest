@@ -937,7 +937,7 @@ private struct AddInitiateView: View {
                 inputCard
 
                 if vm.isStartingAddInitiateSession {
-                    progressRow("analyzing_input / routing_item")
+                    progressRow("正在分析输入")
                 }
 
                 if let error = vm.addInitiateError {
@@ -947,6 +947,8 @@ private struct AddInitiateView: View {
                 }
 
                 roleReviewCard
+                anchorReviewCard
+                recoveryAndReviewCard
                 terminalCard
 
                 Spacer(minLength: 0)
@@ -980,17 +982,20 @@ private struct AddInitiateView: View {
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
 
-            Button {
-                let submitted = rawInput.trimmingCharacters(in: .whitespacesAndNewlines)
-                title = submitted
-                Task { await vm.startAddInitiateSession(rawInput: submitted, sourceType: sourceType) }
-            } label: {
-                Label("Initiate / 立项", systemImage: "arrow.right.circle.fill")
+            if canShowAddInitiateInputPrimaryAction {
+                Button {
+                    let submitted = rawInput.trimmingCharacters(in: .whitespacesAndNewlines)
+                    title = submitted
+                    Task { await vm.startAddInitiateSession(rawInput: submitted, sourceType: sourceType) }
+                } label: {
+                    Label("Initiate / 立项", systemImage: "arrow.right.circle.fill")
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(rawInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || vm.isStartingAddInitiateSession)
             }
-            .buttonStyle(.borderedProminent)
-            .disabled(rawInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || vm.isStartingAddInitiateSession)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityIdentifier("addInitiatePrimaryActionCount_\(vm.addInitiatePrimaryActionCount)")
     }
 
     @ViewBuilder
@@ -1066,13 +1071,204 @@ private struct AddInitiateView: View {
     }
 
     @ViewBuilder
+    private var anchorReviewCard: some View {
+        if vm.addInitiateFlowState == .anchorReview ||
+            vm.addInitiateFlowState == .planningProgress ||
+            vm.addInitiateFlowState == .needsInput {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("规划锚点")
+                    .font(.headline)
+                    .accessibilityIdentifier("anchor_review")
+
+                TextField("截止日期 YYYY-MM-DD", text: $vm.addInitiateDeadline)
+                    .textFieldStyle(.roundedBorder)
+
+                Picker("截止类型", selection: $vm.addInitiateDeadlineType) {
+                    Text("可调整").tag("soft")
+                    Text("固定").tag("hard")
+                }
+                .pickerStyle(.radioGroup)
+
+                Stepper("可用时间 \(vm.addInitiateCapacityMinutes) 分钟/天", value: $vm.addInitiateCapacityMinutes, in: 15...720, step: 15)
+
+                TextField("目标产出", text: $vm.addInitiateTargetOutput)
+                    .textFieldStyle(.roundedBorder)
+
+                TextField("目标深度", text: $vm.addInitiateTargetDepth)
+                    .textFieldStyle(.roundedBorder)
+
+                TextEditor(text: $vm.addInitiateAssumptionsText)
+                    .frame(minHeight: 58)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6)
+                            .stroke(Color.secondary.opacity(0.25))
+                    )
+
+                if vm.addInitiateFlowState != .needsInput {
+                    Button {
+                        Task { await vm.confirmAddInitiateAnchors() }
+                    } label: {
+                        Label("生成草案", systemImage: "checkmark.circle.fill")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(vm.isConfirmingAddInitiateAnchors)
+                }
+
+                if vm.addInitiateFlowState == .planningProgress {
+                    progressRow("正在生成草案")
+                }
+            }
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(.controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+        }
+    }
+
+    @ViewBuilder
+    private var recoveryAndReviewCard: some View {
+        switch vm.addInitiateFlowState {
+        case .needsInput:
+            VStack(alignment: .leading, spacing: 10) {
+                Text("需要补充信息")
+                    .font(.headline)
+                    .accessibilityIdentifier("needs_input")
+                roleFact("角色", vm.addInitiateSession?.confirmedRole ?? "未定")
+                Text(addInitiateFocusedQuestionText)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                TextField("补充答案", text: $vm.addInitiateNeedsInputAnswer)
+                    .textFieldStyle(.roundedBorder)
+                Button {
+                    Task { await vm.answerAddInitiateNeedsInput() }
+                } label: {
+                    Label("继续规划", systemImage: "arrow.clockwise.circle.fill")
+                }
+                .buttonStyle(.borderedProminent)
+            }
+            .padding(10)
+            .background(Color(.controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+        case .compileFailed:
+            compactReviewStateCard(
+                title: "规划失败",
+                detail: vm.addInitiateSession?.error ?? "生成或校验失败，可重试。",
+                stateIdentifier: "compile_failed",
+                primaryLabel: "重试规划",
+                primaryIcon: "arrow.clockwise.circle.fill",
+                action: { Task { await vm.retryAddInitiatePlanning() } }
+            )
+        case .infeasibleReview:
+            compactReviewStateCard(
+                title: "排期不可行",
+                detail: "当前锚点不可行，可以先暂不处理。",
+                stateIdentifier: "infeasible_review",
+                primaryLabel: "暂不处理",
+                primaryIcon: "tray",
+                action: { vm.cancelAddInitiateFlow() }
+            )
+        case .draftReview:
+            compactReviewStateCard(
+                title: "草案已生成",
+                detail: "草案已生成，可以激活当前版本。",
+                stateIdentifier: "draft_review",
+                primaryLabel: "激活草案",
+                primaryIcon: "checkmark.circle.fill",
+                action: { Task { await vm.activateAddInitiateDraft() } }
+            )
+        case .activationFailed:
+            compactReviewStateCard(
+                title: "激活失败",
+                detail: vm.addInitiateSession?.error ?? "激活失败，草案仍保留。",
+                stateIdentifier: "activation_failed",
+                primaryLabel: "重试激活",
+                primaryIcon: "arrow.clockwise",
+                action: { Task { await vm.activateAddInitiateDraft() } }
+            )
+        case .cancelled:
+            compactReviewStateCard(
+                title: "已取消",
+                detail: "已取消，未创建主动学习任务。",
+                primaryLabel: "重新开始",
+                primaryIcon: "plus.circle",
+                action: { prepareForNewAddInitiateInput() }
+            )
+        default:
+            EmptyView()
+        }
+    }
+
+    @ViewBuilder
     private var terminalCard: some View {
         if let session = vm.addInitiateSession,
            session.reviewState == .storedNonPlan || session.reviewState == .materialAttached {
-            Label(session.reviewState == .materialAttached ? "材料已附加" : "已存为非计划条目", systemImage: "tray.full")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 8) {
+                Label(session.reviewState == .materialAttached ? "材料已附加" : "已存为非计划条目", systemImage: "tray.full")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Button {
+                    prepareForNewAddInitiateInput()
+                } label: {
+                    Label("继续添加", systemImage: "plus.circle")
+                }
+                .buttonStyle(.borderedProminent)
+            }
         }
+    }
+
+    private func compactReviewStateCard(
+        title: String,
+        detail: String,
+        stateIdentifier: String? = nil,
+        primaryLabel: String,
+        primaryIcon: String,
+        action: (() -> Void)? = nil
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.headline)
+                .accessibilityIdentifier(stateIdentifier ?? title)
+            Text(detail)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            HStack {
+                Button {
+                    action?()
+                } label: {
+                    Label(primaryLabel, systemImage: primaryIcon)
+                }
+                .buttonStyle(.borderedProminent)
+
+                Button {
+                    vm.cancelAddInitiateFlow()
+                } label: {
+                    Label("取消", systemImage: "xmark.circle")
+                }
+                .buttonStyle(.bordered)
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+    }
+
+    private var addInitiateFocusedQuestionText: String {
+        if let prompt = vm.addInitiateSession?.clarificationQuestion?["prompt"]?.value as? String {
+            return prompt
+        }
+        if let question = vm.addInitiateSession?.clarificationQuestion?["question"]?.value as? String {
+            return question
+        }
+        return "需要补充一个关键信息"
+    }
+
+    private var canShowAddInitiateInputPrimaryAction: Bool {
+        vm.addInitiateFlowState == .idleInput || vm.addInitiateFlowState == .routingProgress
+    }
+
+    private func prepareForNewAddInitiateInput() {
+        vm.prepareForNewAddInitiateInput()
+        rawInput = ""
+        title = ""
+        seededRoleReviewIdentity = nil
     }
 
     private func progressRow(_ label: String) -> some View {

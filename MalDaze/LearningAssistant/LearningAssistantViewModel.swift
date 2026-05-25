@@ -120,6 +120,24 @@ enum AddInitiateAttachmentMode: String, CaseIterable, Identifiable {
     }
 }
 
+enum AddInitiateFlowState: String, Equatable {
+    case idleInput = "idle_input"
+    case routingProgress = "routing_progress"
+    case roleReview = "role_review"
+    case nonPlanTerminal = "non_plan_terminal"
+    case anchorReview = "anchor_review"
+    case planningProgress = "planning_progress"
+    case needsInput = "needs_input"
+    case compileFailed = "compile_failed"
+    case infeasibleReview = "infeasible_review"
+    case draftReview = "draft_review"
+    case optionEffectProgress = "option_effect_progress"
+    case activationProgress = "activation_progress"
+    case activationFailed = "activation_failed"
+    case activated
+    case cancelled
+}
+
 struct AddInitiateExistingPlanCandidate: Identifiable, Equatable {
     let id: Int
     let title: String
@@ -175,6 +193,19 @@ final class LearningAssistantViewModel: ObservableObject {
     @Published private(set) var addInitiateClientRequestId: String? = nil
     @Published private(set) var addInitiateSession: AddInitiateSessionResponse? = nil
     @Published var addInitiateError: String? = nil
+    @Published var addInitiateDeadline: String = ""
+    @Published var addInitiateDeadlineType: String = "soft"
+    @Published var addInitiateCapacityMinutes: Int = 60
+    @Published var addInitiateTargetOutput: String = ""
+    @Published var addInitiateTargetDepth: String = "apply"
+    @Published var addInitiateAcceptedAssumptions: [String] = []
+    @Published var addInitiateAssumptionsText: String = "" {
+        didSet {
+            addInitiateAcceptedAssumptions = Self.parseAddInitiateAssumptions(addInitiateAssumptionsText)
+        }
+    }
+    @Published var addInitiateNeedsInputAnswer: String = ""
+    @Published private var addInitiateLocalFlowState: AddInitiateFlowState? = nil
 
     @Published var todayTotalMinutes: Int  = 0
     @Published var todayHighlights: String = ""
@@ -204,6 +235,7 @@ final class LearningAssistantViewModel: ObservableObject {
     @Published var isStartingStudyPlan = false
     @Published var isStartingAddInitiateSession = false
     @Published var isConfirmingAddInitiateRole = false
+    @Published var isConfirmingAddInitiateAnchors = false
     @Published var isSubmittingStudyPlanClarification = false
     @Published var isUpdatingStudyPlanDraft = false
     @Published var isConfirmingStudyPlanDraft = false
@@ -259,6 +291,45 @@ final class LearningAssistantViewModel: ObservableObject {
         } ?? []
     }
 
+    var addInitiateFlowState: AddInitiateFlowState {
+        if let addInitiateLocalFlowState { return addInitiateLocalFlowState }
+        if isStartingAddInitiateSession { return .routingProgress }
+        guard let session = addInitiateSession else { return .idleInput }
+        switch session.reviewState {
+        case .roleReview:
+            return .roleReview
+        case .anchorReview:
+            return .anchorReview
+        case .storedNonPlan, .materialAttached:
+            return .nonPlanTerminal
+        case .needsInput:
+            return .needsInput
+        case .compileFailed:
+            return .compileFailed
+        case .infeasibleReview:
+            return .infeasibleReview
+        case .draftReview:
+            return .draftReview
+        case .activationFailed:
+            return .activationFailed
+        case .activated:
+            return .activated
+        case .cancelled:
+            return .cancelled
+        case .error:
+            return .compileFailed
+        }
+    }
+
+    var addInitiatePrimaryActionCount: Int {
+        switch addInitiateFlowState {
+        case .routingProgress, .planningProgress, .optionEffectProgress, .activationProgress:
+            return 0
+        default:
+            return 1
+        }
+    }
+
     // MARK: - Private
 
     let api: any AssistantAPIClientProtocol
@@ -270,6 +341,10 @@ final class LearningAssistantViewModel: ObservableObject {
     private var rescheduleDebounceTask: Task<Void, Never>?
     private var dashboardRefreshTail: Task<Void, Never>?
     private var dashboardRefreshSequence = 0
+    private var addInitiateFlowGeneration = 0
+    private var addInitiateAnchorRequestSequence = 0
+    private var addInitiateOptionRequestSequence = 0
+    private var addInitiateActivationRequestSequence = 0
     private var studyCalendarLoadRequestSequence = 0
     private var studySmartProposalContexts: [String: StudySmartRedState] = [:]
     private var studySmartModeSettingRequestID = 0
@@ -874,14 +949,18 @@ final class LearningAssistantViewModel: ObservableObject {
 
     func startAddInitiateSession(rawInput: String, sourceType: AddInitiateSourceType) async {
         let trimmedInput = rawInput.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedInput.isEmpty, !isStartingAddInitiateSession else { return }
+        guard !trimmedInput.isEmpty else { return }
 
         let clientRequestId = UUID().uuidString
+        addInitiateFlowGeneration += 1
+        let operationGeneration = addInitiateFlowGeneration
         addInitiateRawInput = trimmedInput
         addInitiateSourceType = sourceType
         addInitiateClientRequestId = clientRequestId
         addInitiateSession = nil
         addInitiateError = nil
+        addInitiateLocalFlowState = nil
+        resetAddInitiateAnchors()
         isStartingAddInitiateSession = true
         defer { isStartingAddInitiateSession = false }
 
@@ -893,12 +972,14 @@ final class LearningAssistantViewModel: ObservableObject {
                     sourceType: sourceType.rawValue
                 )
             )
-            guard addInitiateClientRequestId == clientRequestId else { return }
+            guard addInitiateFlowGeneration == operationGeneration,
+                  addInitiateClientRequestId == clientRequestId else { return }
             addInitiateSession = response
             addInitiateError = response.error
             isOffline = false
         } catch {
-            guard addInitiateClientRequestId == clientRequestId else { return }
+            guard addInitiateFlowGeneration == operationGeneration,
+                  addInitiateClientRequestId == clientRequestId else { return }
             addInitiateError = "无法启动 Add / Initiate，请重试。"
             isOffline = true
         }
@@ -948,6 +1029,7 @@ final class LearningAssistantViewModel: ObservableObject {
             resolvedAttachmentMode = nil
         }
 
+        let operationGeneration = addInitiateFlowGeneration
         isConfirmingAddInitiateRole = true
         addInitiateError = nil
         defer { isConfirmingAddInitiateRole = false }
@@ -965,17 +1047,348 @@ final class LearningAssistantViewModel: ObservableObject {
                     canonicalRepoRole: session.canonicalRepoRole
                 )
             )
-            guard addInitiateSession?.sessionId == session.sessionId else { return }
+            guard addInitiateFlowGeneration == operationGeneration,
+                  addInitiateSession?.sessionId == session.sessionId else { return }
             addInitiateSession = response
             addInitiateError = response.error
+            addInitiateLocalFlowState = nil
+            seedAddInitiateAnchorsIfNeeded(from: response)
             isOffline = false
         } catch {
-            guard addInitiateSession?.sessionId == session.sessionId else { return }
+            guard addInitiateFlowGeneration == operationGeneration,
+                  addInitiateSession?.sessionId == session.sessionId else { return }
             addInitiateError = "角色确认失败，请重试。"
             if error is AssistantOfflineError {
                 isOffline = true
             }
         }
+    }
+
+    func confirmAddInitiateAnchors() async {
+        guard let session = addInitiateSession,
+              let draftId = session.draftId else {
+            addInitiateError = "缺少 Add / Initiate 草案，请重新确认角色。"
+            return
+        }
+        let trimmedDeadline = addInitiateDeadline.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedOutput = addInitiateTargetOutput.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedDepth = addInitiateTargetDepth.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedDeadline.isEmpty else {
+            addInitiateError = "请填写截止日期。"
+            return
+        }
+        guard addInitiateCapacityMinutes > 0 else {
+            addInitiateError = "可用时间必须大于 0 分钟。"
+            return
+        }
+        guard !trimmedOutput.isEmpty, !trimmedDepth.isEmpty else {
+            addInitiateError = "请填写目标产出和目标深度。"
+            return
+        }
+
+        let operationGeneration = addInitiateFlowGeneration
+        addInitiateAnchorRequestSequence += 1
+        let requestSequence = addInitiateAnchorRequestSequence
+        isConfirmingAddInitiateAnchors = true
+        addInitiateError = nil
+        addInitiateLocalFlowState = .planningProgress
+        defer { isConfirmingAddInitiateAnchors = false }
+
+        do {
+            let response = try await api.confirmAddInitiateAnchors(
+                AddInitiateAnchorConfirmationRequest(
+                    sessionId: session.sessionId,
+                    draftId: draftId,
+                    intakeItemId: session.intakeItemId,
+                    deadline: trimmedDeadline,
+                    deadlineType: addInitiateDeadlineType,
+                    capacityMinutes: addInitiateCapacityMinutes,
+                    targetOutput: trimmedOutput,
+                    targetDepth: trimmedDepth,
+                    assumptions: addInitiateAssumptionsPayload(),
+                    restWeekdays: nil,
+                    unavailableDates: nil,
+                    bufferPolicy: nil,
+                    loadShape: nil
+                )
+            )
+            guard isCurrentAddInitiateAnchorResponse(
+                response,
+                requestSessionId: session.sessionId,
+                requestDraftId: draftId,
+                requestDraftVersion: session.draftVersion,
+                operationGeneration: operationGeneration,
+                requestSequence: requestSequence
+            ) else {
+                if addInitiateFlowGeneration == operationGeneration,
+                   addInitiateSession?.sessionId == session.sessionId {
+                    addInitiateLocalFlowState = nil
+                }
+                return
+            }
+            addInitiateSession = response
+            addInitiateError = response.error
+            addInitiateLocalFlowState = nil
+            isOffline = false
+        } catch {
+            guard addInitiateFlowGeneration == operationGeneration,
+                  addInitiateSession?.sessionId == session.sessionId,
+                  addInitiateSession?.draftId == draftId else { return }
+            addInitiateLocalFlowState = nil
+            addInitiateError = "锚点确认失败，请重试。"
+            if error is AssistantOfflineError {
+                isOffline = true
+            }
+        }
+    }
+
+    func retryAddInitiatePlanning() async {
+        await confirmAddInitiateAnchors()
+    }
+
+    func applyAddInitiateOptionEffect(optionId: String) async {
+        guard let session = addInitiateSession,
+              let draftId = session.draftId,
+              let draftVersion = session.draftVersion else {
+            addInitiateError = "缺少可调整的 Add / Initiate 草案。"
+            return
+        }
+
+        let operationGeneration = addInitiateFlowGeneration
+        addInitiateOptionRequestSequence += 1
+        let requestSequence = addInitiateOptionRequestSequence
+        addInitiateError = nil
+        addInitiateLocalFlowState = .optionEffectProgress
+
+        do {
+            let response = try await api.applyAddInitiateOptionEffect(
+                AddInitiateOptionEffectRequest(
+                    sessionId: session.sessionId,
+                    draftId: draftId,
+                    draftVersion: draftVersion,
+                    optionId: optionId
+                )
+            )
+            guard isCurrentAddInitiateDraftResponse(
+                response,
+                requestSessionId: session.sessionId,
+                requestDraftId: draftId,
+                requestDraftVersion: draftVersion,
+                operationGeneration: operationGeneration,
+                requestSequence: requestSequence
+            ) else {
+                if addInitiateFlowGeneration == operationGeneration,
+                   addInitiateSession?.sessionId == session.sessionId {
+                    addInitiateLocalFlowState = nil
+                }
+                return
+            }
+            addInitiateSession = response
+            addInitiateError = response.error
+            addInitiateLocalFlowState = nil
+            isOffline = false
+        } catch {
+            guard addInitiateFlowGeneration == operationGeneration,
+                  addInitiateSession?.sessionId == session.sessionId,
+                  addInitiateSession?.draftId == draftId,
+                  addInitiateSession?.draftVersion == draftVersion else { return }
+            addInitiateLocalFlowState = nil
+            addInitiateError = "选项调整失败，请重试。"
+            if error is AssistantOfflineError {
+                isOffline = true
+            }
+        }
+    }
+
+    func activateAddInitiateDraft() async {
+        guard let session = addInitiateSession,
+              let draftId = session.draftId,
+              let draftVersion = session.draftVersion else {
+            addInitiateError = "缺少可激活的 Add / Initiate 草案。"
+            return
+        }
+
+        let operationGeneration = addInitiateFlowGeneration
+        addInitiateActivationRequestSequence += 1
+        let requestSequence = addInitiateActivationRequestSequence
+        addInitiateError = nil
+        addInitiateLocalFlowState = .activationProgress
+
+        do {
+            let response = try await api.activateAddInitiateDraft(
+                AddInitiateActivationRequest(
+                    sessionId: session.sessionId,
+                    draftId: draftId,
+                    draftVersion: draftVersion
+                )
+            )
+            guard isCurrentAddInitiateDraftResponse(
+                response,
+                requestSessionId: session.sessionId,
+                requestDraftId: draftId,
+                requestDraftVersion: draftVersion,
+                operationGeneration: operationGeneration,
+                requestSequence: requestSequence
+            ) else {
+                if addInitiateFlowGeneration == operationGeneration,
+                   addInitiateSession?.sessionId == session.sessionId {
+                    addInitiateLocalFlowState = nil
+                }
+                return
+            }
+            addInitiateSession = response
+            addInitiateError = response.error
+            addInitiateLocalFlowState = nil
+            isOffline = false
+        } catch {
+            guard addInitiateFlowGeneration == operationGeneration,
+                  addInitiateSession?.sessionId == session.sessionId,
+                  addInitiateSession?.draftId == draftId,
+                  addInitiateSession?.draftVersion == draftVersion else { return }
+            addInitiateLocalFlowState = nil
+            addInitiateError = "激活失败，请重试。"
+            if error is AssistantOfflineError {
+                isOffline = true
+            }
+        }
+    }
+
+    func answerAddInitiateNeedsInput() async {
+        let answer = addInitiateNeedsInputAnswer.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !answer.isEmpty {
+            let existing = Self.parseAddInitiateAssumptions(addInitiateAssumptionsText)
+            addInitiateAssumptionsText = (existing + [answer]).joined(separator: "\n")
+            addInitiateNeedsInputAnswer = ""
+        }
+        await confirmAddInitiateAnchors()
+    }
+
+    func cancelAddInitiateFlow() {
+        addInitiateFlowGeneration += 1
+        addInitiateLocalFlowState = .cancelled
+        addInitiateSession = nil
+        addInitiateError = nil
+    }
+
+    func prepareForNewAddInitiateInput() {
+        addInitiateFlowGeneration += 1
+        addInitiateRawInput = ""
+        addInitiateClientRequestId = nil
+        addInitiateSession = nil
+        addInitiateError = nil
+        addInitiateLocalFlowState = nil
+        resetAddInitiateAnchors()
+    }
+
+    private func resetAddInitiateAnchors() {
+        addInitiateDeadline = ""
+        addInitiateDeadlineType = "soft"
+        addInitiateCapacityMinutes = 60
+        addInitiateTargetOutput = ""
+        addInitiateTargetDepth = "apply"
+        addInitiateAcceptedAssumptions = []
+        addInitiateAssumptionsText = ""
+        addInitiateNeedsInputAnswer = ""
+    }
+
+    private func seedAddInitiateAnchorsIfNeeded(from session: AddInitiateSessionResponse) {
+        guard session.reviewState == .anchorReview else { return }
+        if addInitiateTargetOutput.isEmpty {
+            addInitiateTargetOutput = addInitiateRawInput
+        }
+        if addInitiateTargetDepth.isEmpty {
+            addInitiateTargetDepth = "apply"
+        }
+    }
+
+    private func addInitiateAssumptionsPayload() -> [String: AnyCodable]? {
+        let textAssumptions = Self.parseAddInitiateAssumptions(addInitiateAssumptionsText)
+        let assumptions = textAssumptions.isEmpty ? addInitiateAcceptedAssumptions : textAssumptions
+        guard !assumptions.isEmpty else { return nil }
+        return ["accepted": AnyCodable(assumptions)]
+    }
+
+    private static func parseAddInitiateAssumptions(_ text: String) -> [String] {
+        text
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+
+    private func isCurrentAddInitiateAnchorResponse(
+        _ response: AddInitiateSessionResponse,
+        requestSessionId: String,
+        requestDraftId: Int,
+        requestDraftVersion: Int?,
+        operationGeneration: Int,
+        requestSequence: Int
+    ) -> Bool {
+        guard addInitiateFlowGeneration == operationGeneration,
+              addInitiateLocalFlowState != .cancelled,
+              addInitiateAnchorRequestSequence == requestSequence,
+              response.sessionId == requestSessionId,
+              let current = addInitiateSession,
+              current.sessionId == requestSessionId else {
+            return false
+        }
+        if let currentDraftId = current.draftId, currentDraftId != requestDraftId {
+            return false
+        }
+        if let responseDraftId = response.draftId, responseDraftId != requestDraftId {
+            return false
+        }
+        if let requestDraftVersion,
+           let currentDraftVersion = current.draftVersion,
+           currentDraftVersion != requestDraftVersion {
+            return false
+        }
+        if let currentDraftVersion = current.draftVersion,
+           let responseDraftVersion = response.draftVersion,
+           responseDraftVersion < currentDraftVersion {
+            return false
+        }
+        if current.draftVersion != nil, response.draftVersion == nil {
+            return false
+        }
+        return true
+    }
+
+    private func isCurrentAddInitiateDraftResponse(
+        _ response: AddInitiateSessionResponse,
+        requestSessionId: String,
+        requestDraftId: Int,
+        requestDraftVersion: Int,
+        operationGeneration: Int,
+        requestSequence: Int
+    ) -> Bool {
+        let sequenceMatches: Bool
+        switch addInitiateLocalFlowState {
+        case .optionEffectProgress:
+            sequenceMatches = addInitiateOptionRequestSequence == requestSequence
+        case .activationProgress:
+            sequenceMatches = addInitiateActivationRequestSequence == requestSequence
+        default:
+            sequenceMatches = true
+        }
+        guard addInitiateFlowGeneration == operationGeneration,
+              addInitiateLocalFlowState != .cancelled,
+              sequenceMatches,
+              response.sessionId == requestSessionId,
+              response.draftId == requestDraftId,
+              let current = addInitiateSession,
+              current.sessionId == requestSessionId,
+              current.draftId == requestDraftId,
+              current.draftVersion == requestDraftVersion else {
+            return false
+        }
+        if let responseDraftVersion = response.draftVersion,
+           responseDraftVersion < requestDraftVersion {
+            return false
+        }
+        if response.draftVersion == nil {
+            return false
+        }
+        return true
     }
 
     // MARK: - Ingestion
