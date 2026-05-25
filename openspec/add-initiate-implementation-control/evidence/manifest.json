@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-05-25T09:15:11Z",
+  "updatedAt": "2026-05-25T09:44:22Z",
   "entries": [
     {
       "id": "introduce-study-intake-router-product-deepen-round-1",
@@ -1533,6 +1533,83 @@
         }
       ],
       "nextCheckpoint": "introduce-plan-compiler:apply:envelope-archetype-and-depth-core"
+    },
+    {
+      "id": "introduce-plan-compiler-apply-group-envelope-archetype-and-depth-core",
+      "timestamp": "2026-05-25T09:44:22Z",
+      "kind": "apply_group",
+      "changeId": "introduce-plan-compiler",
+      "checkpoint": "introduce-plan-compiler:apply:envelope-archetype-and-depth-core",
+      "groupId": "envelope-archetype-and-depth-core",
+      "result": "completed",
+      "commit": "b6f94fc525902a68eee3d9ed97afa805fad6fc66",
+      "commands": [
+        {
+          "command": "cd assistant_backend && uv run pytest tests/test_study_plan_compiler.py -k 'envelope or status or archetype or tie_breaker or depth'",
+          "exitCode": 0,
+          "summary": "23 passed"
+        },
+        {
+          "command": "cd assistant_backend && uv run pytest tests/test_study_plan_lifecycle.py -k 'needs_input or compile_failed or package'",
+          "exitCode": 0,
+          "summary": "31 passed, 12 deselected"
+        },
+        {
+          "command": "openspec validate introduce-plan-compiler --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        },
+        {
+          "command": "openspec instructions apply --change introduce-plan-compiler --json",
+          "exitCode": 0,
+          "summary": "11/31 tasks complete; state ready"
+        },
+        {
+          "command": "git diff --check -- assistant_backend/src/study_plan/compiler.py assistant_backend/src/study_plan/__init__.py assistant_backend/tests/test_study_plan_compiler.py openspec/changes/introduce-plan-compiler/tasks.md",
+          "exitCode": 0,
+          "summary": "no whitespace errors"
+        }
+      ],
+      "reviews": [
+        {
+          "type": "spec_compliance",
+          "result": "changes_required_then_fixed",
+          "summary": "Fixed GitHub rebuild role versus interview depth precedence and target-depth needs_input recovery; re-review approved."
+        },
+        {
+          "type": "code_quality",
+          "result": "changes_required_then_fixed",
+          "summary": "Fixed bare substring keyword matching and blocked-result recovery semantics; re-review approved with non-blocking P2 notes."
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/add-initiate-implementation-control/evidence/introduce-plan-compiler/apply-groups/envelope-archetype-and-depth-core.md",
+          "sha256": "62475ee11276e7e53b0da396e6489697aa9700e00e6985aefb8cae7b509bf873",
+          "description": "Apply group evidence, TDD record, review iterations, verification, and next checkpoint."
+        },
+        {
+          "path": "assistant_backend/src/study_plan/compiler.py",
+          "sha256": "6dd0357d88d38ff36bfcb658d1278e042a2da184231bf0d7c54741bc4da414af",
+          "description": "Plan compiler envelope normalization, status result, archetype/scope selection, and target-depth obligations."
+        },
+        {
+          "path": "assistant_backend/src/study_plan/__init__.py",
+          "sha256": "0ee12a6d0165ae3cd2cc5fef552e5225948c10c58bd733dda6a6e02f5d39b26a",
+          "description": "Study plan compiler exports."
+        },
+        {
+          "path": "assistant_backend/tests/test_study_plan_compiler.py",
+          "sha256": "f9d5eaafb6227c77e04513d812c880a491428e2fc3207c9c1c6943b08387915f",
+          "description": "TDD coverage for envelope, statuses, archetype matrix, tie-breakers, recovery semantics, keyword matching, and depth obligations."
+        },
+        {
+          "path": "openspec/changes/introduce-plan-compiler/tasks.md",
+          "sha256": "12b408067b928f8c74729a63b99ee3d07a6f66b344e37ffc61ad16fda103517e",
+          "description": "OpenSpec tasks updated for completed envelope/archetype/depth group."
+        }
+      ],
+      "nextCheckpoint": "introduce-plan-compiler:apply:synopsis-llm-validation-and-repair"
     }
   ]
 }

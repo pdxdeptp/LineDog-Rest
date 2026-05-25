@@ -5,9 +5,9 @@
   "currentChangeIndex": 2,
   "currentChange": "introduce-plan-compiler",
   "currentStep": "apply",
-  "currentCheckpoint": "introduce-plan-compiler:apply:envelope-archetype-and-depth-core",
+  "currentCheckpoint": "introduce-plan-compiler:apply:synopsis-llm-validation-and-repair",
   "currentAttempt": 0,
-  "runCounter": 21,
+  "runCounter": 22,
   "maxRetriesPerCheckpoint": 2,
   "requiredProductDeepenRounds": 3,
   "requiresScopeDependencyCheck": true,
@@ -72,13 +72,15 @@
   "applyCursor": {
     "schemaVersion": 1,
     "activeChange": "introduce-plan-compiler",
-    "currentGroupId": null,
+    "currentGroupId": "synopsis-llm-validation-and-repair",
     "currentGroupStartedAt": null,
-    "completedGroupIds": [],
+    "completedGroupIds": [
+      "envelope-archetype-and-depth-core"
+    ],
     "blockedGroupId": null,
     "taskGroupsFile": "openspec/add-initiate-implementation-control/evidence/introduce-plan-compiler/apply-task-groups.json",
-    "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/persist-intake-plan-drafts/apply-groups/fallback-progress-and-final-verification.md",
-    "lastCommit": "2e1ef56eedbf1bf40cccc79fdb09aea0c35dd28f"
+    "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/introduce-plan-compiler/apply-groups/envelope-archetype-and-depth-core.md",
+    "lastCommit": "b6f94fc525902a68eee3d9ed97afa805fad6fc66"
   },
   "lock": {
     "path": "openspec/add-initiate-implementation-control/run.lock",
@@ -136,12 +138,14 @@
       "scopeDependencyCheckCompleted": true,
       "applyCompleted": false,
       "applyTaskGroups": {
-        "status": "planned",
+        "status": "in_progress",
         "taskGroupsFile": "openspec/add-initiate-implementation-control/evidence/introduce-plan-compiler/apply-task-groups.json",
-        "completedGroupIds": [],
-        "currentGroupId": "envelope-archetype-and-depth-core",
-        "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/introduce-plan-compiler/apply-planning.md",
-        "lastCommit": null
+        "completedGroupIds": [
+          "envelope-archetype-and-depth-core"
+        ],
+        "currentGroupId": "synopsis-llm-validation-and-repair",
+        "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/introduce-plan-compiler/apply-groups/envelope-archetype-and-depth-core.md",
+        "lastCommit": "b6f94fc525902a68eee3d9ed97afa805fad6fc66"
       }
     },
     {
@@ -176,11 +180,11 @@
     }
   ],
   "lastRun": {
-    "completedAt": "2026-05-25T09:15:11Z",
-    "checkpoint": "introduce-plan-compiler:apply:planning",
+    "completedAt": "2026-05-25T09:44:22Z",
+    "checkpoint": "introduce-plan-compiler:apply:envelope-archetype-and-depth-core",
     "result": "completed"
   },
-  "lastCompletedCheckpoint": "introduce-plan-compiler:apply:planning",
+  "lastCompletedCheckpoint": "introduce-plan-compiler:apply:envelope-archetype-and-depth-core",
   "lastMigration": {
     "completedAt": "2026-05-25T03:56:29Z",
     "id": "require-three-product-deepen-rounds",
@@ -200,8 +204,8 @@
   },
   "lastFailure": null,
   "lastVerification": {
-    "command": "jq empty openspec/add-initiate-implementation-control/evidence/introduce-plan-compiler/apply-task-groups.json && openspec validate introduce-plan-compiler --strict && openspec status --change introduce-plan-compiler --json && openspec instructions apply --change introduce-plan-compiler --json",
-    "result": "apply planning complete and pre-apply checkpoint commit created; introduce-plan-compiler valid and ready with 31 pending tasks in three sequential apply groups"
+    "command": "cd assistant_backend && uv run pytest tests/test_study_plan_compiler.py -k 'envelope or status or archetype or tie_breaker or depth' && cd assistant_backend && uv run pytest tests/test_study_plan_lifecycle.py -k 'needs_input or compile_failed or package' && openspec validate introduce-plan-compiler --strict && openspec instructions apply --change introduce-plan-compiler --json",
+    "result": "23 compiler tests passed; 31 lifecycle tests passed; OpenSpec valid; apply progress 11/31 complete"
   },
   "blockedReason": null
 }

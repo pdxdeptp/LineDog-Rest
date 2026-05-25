@@ -5,7 +5,7 @@
 - Phase: active
 - Current change: introduce-plan-compiler
 - Current step: apply
-- Current checkpoint: introduce-plan-compiler:apply:envelope-archetype-and-depth-core
+- Current checkpoint: introduce-plan-compiler:apply:synopsis-llm-validation-and-repair
 - Required product-deepen rounds before apply: 3
 - Required checkpoint after product deepening: scope_dependency_check
 - Product-deepen scope guard: every round must read adjacent changes and record scope decisions
@@ -23,6 +23,10 @@ Completed apply groups for previous change `persist-intake-plan-drafts`:
 - `draft-package-versioning-and-entrypoints`
 - `activation-boundary-and-events`
 - `fallback-progress-and-final-verification`
+
+Completed apply groups for current change `introduce-plan-compiler`:
+
+- `envelope-archetype-and-depth-core`
 
 ## Run Log
 
@@ -831,3 +835,33 @@ Completed apply groups for previous change `persist-intake-plan-drafts`:
   - Wrote `openspec/add-initiate-implementation-control/evidence/commits/introduce-plan-compiler-pre-apply.md`.
   - Added `introduce-plan-compiler-pre-apply-checkpoint-commit` to the manifest.
 - Next checkpoint: introduce-plan-compiler:apply:envelope-archetype-and-depth-core
+
+## Run 2026-05-25T09:44:22Z Apply Group introduce-plan-compiler envelope-archetype-and-depth-core
+
+- Automation: add-initiate-changes
+- Checkpoint: introduce-plan-compiler:apply:envelope-archetype-and-depth-core
+- Result: completed
+- Actions:
+  - Acquired `run.lock`.
+  - Read `state.json`, `runbook.md`, `progress.md`, `evidence/manifest.json`, and `workspace-baseline.json`.
+  - Ran `git status --porcelain=v1` and protected unrelated dirty files.
+  - Triggered `openspec-apply-change`, `superpowers:subagent-driven-development`, and `superpowers:test-driven-development`.
+  - Implemented `assistant_backend/src/study_plan/compiler.py` and exports for envelope normalization, compiler statuses, archetype/scope selection, ambiguity recovery, and target-depth obligations.
+  - Added `assistant_backend/tests/test_study_plan_compiler.py` with TDD coverage for envelope, status, mixed GitHub archetype cases, tie-breakers, keyword negative cases, recovery semantics, and depth obligations.
+  - Updated `openspec/changes/introduce-plan-compiler/tasks.md` for tasks 1.1-1.6, 4.1-4.4, and 4.6.
+  - Wrote evidence at `openspec/add-initiate-implementation-control/evidence/introduce-plan-compiler/apply-groups/envelope-archetype-and-depth-core.md`.
+- Reviews:
+  - Spec compliance initially found two P1 issues; both were fixed with additional failing tests and re-review approved.
+  - Code quality initially found two P1 issues; both were fixed with additional failing tests and re-review approved.
+  - Non-blocking P2 notes remain for future typed output shapes and rationale-token test cleanup.
+- Verification:
+  - `cd assistant_backend && uv run pytest tests/test_study_plan_compiler.py -k 'envelope or status or archetype or tie_breaker or depth'`: 23 passed.
+  - `cd assistant_backend && uv run pytest tests/test_study_plan_lifecycle.py -k 'needs_input or compile_failed or package'`: 31 passed, 12 deselected.
+  - `openspec validate introduce-plan-compiler --strict`: valid.
+  - `openspec instructions apply --change introduce-plan-compiler --json`: 11/31 tasks complete.
+  - `git diff --check -- assistant_backend/src/study_plan/compiler.py assistant_backend/src/study_plan/__init__.py assistant_backend/tests/test_study_plan_compiler.py openspec/changes/introduce-plan-compiler/tasks.md`: no whitespace errors.
+- Commit:
+  - Implementation commit: `b6f94fc525902a68eee3d9ed97afa805fad6fc66`.
+- Manifest:
+  - Added `introduce-plan-compiler-apply-group-envelope-archetype-and-depth-core`.
+- Next checkpoint: introduce-plan-compiler:apply:synopsis-llm-validation-and-repair
