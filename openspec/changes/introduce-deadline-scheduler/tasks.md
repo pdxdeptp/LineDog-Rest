@@ -1,16 +1,16 @@
 ## 1. Scheduler Core
 
-- [ ] 1.1 Implement scheduler input gate that schedules only compiler `draft_review` packages and passes compiler `needs_input`/`compile_failed` through unchanged.
-- [ ] 1.2 Implement `ScheduledDraftReview`, `ScheduledDay`, scheduled item, `ScheduleRiskReport`, infeasibility option, and scheduler trace output shapes.
-- [ ] 1.3 Implement scheduler preflight defaults and `needs_input` for missing deadline, invalid date parsing, or empty schedulable task set.
-- [ ] 1.4 Implement inclusive local date-window construction from start date through deadline, including deadline-before-start infeasible review.
-- [ ] 1.5 Implement usable capacity from daily capacity, existing active load, rest days, and unavailable dates, with 60-minute fallback capacity.
+- [x] 1.1 Implement scheduler input gate that schedules only compiler `draft_review` packages and passes compiler `needs_input`/`compile_failed` through unchanged.
+- [x] 1.2 Implement `ScheduledDraftReview`, `ScheduledDay`, scheduled item, `ScheduleRiskReport`, infeasibility option, and scheduler trace output shapes.
+- [x] 1.3 Implement scheduler preflight defaults and `needs_input` for missing deadline, invalid date parsing, or empty schedulable task set.
+- [x] 1.4 Implement inclusive local date-window construction from start date through deadline, including deadline-before-start infeasible review.
+- [x] 1.5 Implement usable capacity from daily capacity, existing active load, rest days, and unavailable dates, with 60-minute fallback capacity.
 - [ ] 1.6 Implement default planning budget cap at 80% of usable capacity unless crunch/overload is accepted.
 - [ ] 1.7 Implement deterministic buffer reservation: zero days for fewer than three usable days, latest one usable day for three to six usable days, and latest ceil(20%) usable days clamped to one through five days for longer windows.
 - [ ] 1.8 Implement buffer erosion reporting and status blocking until buffer risk is explicitly accepted or constraints change.
 - [ ] 1.9 Implement balanced, front-loaded, and light-start load shapes as distribution-only choices with deterministic tie-breakers.
 - [ ] 1.10 Implement essential-before-optional placement and dependency preservation.
-- [ ] 1.11 Implement review-status derivation for scheduler `needs_input`, `draft_review`, and `infeasible_review`.
+- [x] 1.11 Implement review-status derivation for scheduler `needs_input`, `draft_review`, and `infeasible_review`.
 
 ## 2. Splitting And Risk
 
@@ -33,9 +33,9 @@
 
 ## 4. Tests
 
-- [ ] 4.1 Add scheduler input-gate and output-shape tests proving non-draft compiler statuses are not scheduled and scheduler returns review packages only.
-- [ ] 4.2 Add scheduler preflight tests for missing deadline `needs_input`, invalid dates, empty task sets, default start date, assumed deadline type, empty existing-load default, empty rest/unavailable defaults, standard buffer default, and visible assumptions.
-- [ ] 4.3 Add scheduler tests for inclusive local windows, deadline-before-start infeasible review, usable capacity, existing active load, rest days, unavailable dates, and 60-minute fallback capacity.
+- [x] 4.1 Add scheduler input-gate and output-shape tests proving non-draft compiler statuses are not scheduled and scheduler returns review packages only.
+- [x] 4.2 Add scheduler preflight tests for missing deadline `needs_input`, invalid dates, empty task sets, default start date, assumed deadline type, empty existing-load default, empty rest/unavailable defaults, standard buffer default, and visible assumptions.
+- [x] 4.3 Add scheduler tests for inclusive local windows, deadline-before-start infeasible review, usable capacity, existing active load, rest days, unavailable dates, and 60-minute fallback capacity.
 - [ ] 4.4 Add load-shape tests for balanced, front-loaded, and light-start placement tie-breakers without scope/dependency changes.
 - [ ] 4.5 Add buffer reservation, no-buffer, erosion, and accept-buffer-risk tests.
 - [ ] 4.6 Add continuation-session and unsplittable-task tests proving parent identity and dependency context are preserved.
