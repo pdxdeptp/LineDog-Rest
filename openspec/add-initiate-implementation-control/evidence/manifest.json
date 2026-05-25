@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-05-25T07:42:50Z",
+  "updatedAt": "2026-05-25T08:23:46Z",
   "entries": [
     {
       "id": "introduce-study-intake-router-product-deepen-round-1",
@@ -1072,6 +1072,103 @@
         }
       ],
       "nextCheckpoint": "persist-intake-plan-drafts:apply:activation-boundary-and-events"
+    },
+    {
+      "id": "persist-intake-plan-drafts-apply-group-activation-boundary-and-events",
+      "timestamp": "2026-05-25T08:23:46Z",
+      "kind": "apply_group",
+      "changeId": "persist-intake-plan-drafts",
+      "checkpoint": "persist-intake-plan-drafts:apply:activation-boundary-and-events",
+      "groupId": "activation-boundary-and-events",
+      "result": "completed",
+      "commit": "ab1587b60b1fed5c13c9185f7473ebdb52a371eb",
+      "commands": [
+        {
+          "command": "cd assistant_backend && uv run pytest tests/test_study_plan_lifecycle.py -k 'confirm or activation or stale or transaction or duplicate or discard or transition or target_plan or package'",
+          "exitCode": 0,
+          "summary": "38 passed, 4 deselected"
+        },
+        {
+          "command": "cd assistant_backend && uv run pytest tests/test_study_plan_router.py -k 'confirm_endpoint or cancel_endpoint or stale'",
+          "exitCode": 0,
+          "summary": "7 passed, 5 deselected, 2 third-party warnings"
+        },
+        {
+          "command": "cd assistant_backend && uv run pytest tests/test_study_views_today.py",
+          "exitCode": 0,
+          "summary": "4 passed, 2 third-party warnings"
+        },
+        {
+          "command": "cd assistant_backend && uv run pytest tests/test_study_plan_lifecycle.py tests/test_study_plan_router.py tests/test_study_views_today.py",
+          "exitCode": 0,
+          "summary": "58 passed, 2 third-party warnings"
+        },
+        {
+          "command": "openspec validate persist-intake-plan-drafts --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        },
+        {
+          "command": "openspec instructions apply --change persist-intake-plan-drafts --json",
+          "exitCode": 0,
+          "summary": "31/35 tasks complete"
+        },
+        {
+          "command": "git diff --check -- assistant_backend/src/study_plan/lifecycle.py assistant_backend/src/routers/study_plan.py assistant_backend/tests/test_study_plan_lifecycle.py assistant_backend/tests/test_study_plan_router.py assistant_backend/tests/test_study_views_today.py openspec/changes/persist-intake-plan-drafts/tasks.md",
+          "exitCode": 0,
+          "summary": "no whitespace errors"
+        }
+      ],
+      "reviews": [
+        {
+          "type": "spec_compliance",
+          "result": "approved",
+          "summary": "No remaining P0/P1/P2 findings after fixing router stale selection, required schedule version, latest activatable version semantics, and V1 lifecycle transition validation."
+        },
+        {
+          "type": "code_quality",
+          "result": "approved",
+          "summary": "No P0/P1 findings. P2 notes retained for malformed package JSON error semantics, historical total_units mismatch, package event duration estimates, and cancelled/discarded compatibility."
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/add-initiate-implementation-control/evidence/persist-intake-plan-drafts/apply-groups/activation-boundary-and-events.md",
+          "sha256": "d5ca66097776c1d79bab0dd4aaebd7bf828d549118785b85df38b6eb9a8f8915",
+          "description": "Apply group evidence, TDD trace, review iterations, verification, and residual P2 notes."
+        },
+        {
+          "path": "assistant_backend/src/study_plan/lifecycle.py",
+          "sha256": "35aa1b0ce45303df7767ad951b85ab67b8e77e205612194a7e85866b2a429eca",
+          "description": "Transactional activation boundary, latest activatable version lookup, activation event payload, existing-plan activation, and lifecycle transition validation."
+        },
+        {
+          "path": "assistant_backend/src/routers/study_plan.py",
+          "sha256": "9ed221b184a0aa0139b712ae46f067d3ff67e4055e964d125fc847b1a83d572e",
+          "description": "Confirm endpoint accepts optional observed draft_version and maps activation/cancel errors to 409/404."
+        },
+        {
+          "path": "assistant_backend/tests/test_study_plan_lifecycle.py",
+          "sha256": "0ef257308cc81e13a47a2b9d0bffe9bde81e2ca8951cf6c7fe43a38837a99808",
+          "description": "TDD tests for activation events, stale/latest-activatable behavior, activation-ready rejection, rollback, invalid transitions, duplicate activation, target-plan activation, and discard-after-activation."
+        },
+        {
+          "path": "assistant_backend/tests/test_study_plan_router.py",
+          "sha256": "33d251e4df5c338cec06578997138439ba9817a3c52a4a48151933236da6c39d",
+          "description": "Router tests for package activation, stale observed version rejection, and latest-activatable package confirmation."
+        },
+        {
+          "path": "assistant_backend/tests/test_study_views_today.py",
+          "sha256": "5821e58d3e069037a511b4671e94eb9141f5f26b538f28ad0972766c5dcfc342",
+          "description": "Today view regression for tasks created from persisted package activation."
+        },
+        {
+          "path": "openspec/changes/persist-intake-plan-drafts/tasks.md",
+          "sha256": "46b1f379c3863f70e9bf2fa134be388c0cd5238b3a462c8745a905c8f791c9e1",
+          "description": "OpenSpec tasks updated for completed activation boundary and activation tests."
+        }
+      ],
+      "nextCheckpoint": "persist-intake-plan-drafts:apply:fallback-progress-and-final-verification"
     }
   ]
 }

@@ -5,9 +5,9 @@
   "currentChangeIndex": 1,
   "currentChange": "persist-intake-plan-drafts",
   "currentStep": "apply",
-  "currentCheckpoint": "persist-intake-plan-drafts:apply:activation-boundary-and-events",
+  "currentCheckpoint": "persist-intake-plan-drafts:apply:fallback-progress-and-final-verification",
   "currentAttempt": 0,
-  "runCounter": 15,
+  "runCounter": 16,
   "maxRetriesPerCheckpoint": 2,
   "requiredProductDeepenRounds": 3,
   "requiresScopeDependencyCheck": true,
@@ -76,12 +76,13 @@
     "currentGroupStartedAt": null,
     "completedGroupIds": [
       "draft-schema-migration-and-defaults",
-      "draft-package-versioning-and-entrypoints"
+      "draft-package-versioning-and-entrypoints",
+      "activation-boundary-and-events"
     ],
     "blockedGroupId": null,
     "taskGroupsFile": "openspec/add-initiate-implementation-control/evidence/persist-intake-plan-drafts/apply-task-groups.json",
-    "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/persist-intake-plan-drafts/apply-groups/draft-package-versioning-and-entrypoints.md",
-    "lastCommit": "dd01c193c6690dd70b47f85df332100fac825425"
+    "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/persist-intake-plan-drafts/apply-groups/activation-boundary-and-events.md",
+    "lastCommit": "ab1587b60b1fed5c13c9185f7473ebdb52a371eb"
   },
   "lock": {
     "path": "openspec/add-initiate-implementation-control/run.lock",
@@ -123,11 +124,12 @@
         "taskGroupsFile": "openspec/add-initiate-implementation-control/evidence/persist-intake-plan-drafts/apply-task-groups.json",
         "completedGroupIds": [
           "draft-schema-migration-and-defaults",
-          "draft-package-versioning-and-entrypoints"
+          "draft-package-versioning-and-entrypoints",
+          "activation-boundary-and-events"
         ],
         "currentGroupId": null,
-        "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/persist-intake-plan-drafts/apply-groups/draft-package-versioning-and-entrypoints.md",
-        "lastCommit": "dd01c193c6690dd70b47f85df332100fac825425"
+        "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/persist-intake-plan-drafts/apply-groups/activation-boundary-and-events.md",
+        "lastCommit": "ab1587b60b1fed5c13c9185f7473ebdb52a371eb"
       }
     },
     {
@@ -177,11 +179,11 @@
     }
   ],
   "lastRun": {
-    "completedAt": "2026-05-25T07:42:50Z",
-    "checkpoint": "persist-intake-plan-drafts:apply:draft-package-versioning-and-entrypoints",
+    "completedAt": "2026-05-25T08:23:46Z",
+    "checkpoint": "persist-intake-plan-drafts:apply:activation-boundary-and-events",
     "result": "completed"
   },
-  "lastCompletedCheckpoint": "persist-intake-plan-drafts:apply:draft-package-versioning-and-entrypoints",
+  "lastCompletedCheckpoint": "persist-intake-plan-drafts:apply:activation-boundary-and-events",
   "lastMigration": {
     "completedAt": "2026-05-25T03:56:29Z",
     "id": "require-three-product-deepen-rounds",
@@ -202,7 +204,7 @@
   "lastFailure": null,
   "lastVerification": {
     "command": "openspec validate persist-intake-plan-drafts --strict",
-    "result": "valid after draft-package-versioning-and-entrypoints apply group"
+    "result": "valid after activation-boundary-and-events apply group"
   },
   "blockedReason": null
 }
