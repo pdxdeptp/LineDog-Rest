@@ -118,7 +118,9 @@ async def test_start_endpoint_returns_review_draft_and_clarification_without_act
 
     draft = await _fetchone(
         """
-        SELECT source_url, deadline, status, capacity_minutes, clarification_skipped
+        SELECT source_url, deadline, status, capacity_minutes, clarification_skipped,
+               intake_item_id, schema_version, draft_version, latest_version,
+               calibration_level, draft_kind, target_plan_id
         FROM study_project_drafts
         WHERE id = ?
         """,
@@ -130,6 +132,13 @@ async def test_start_endpoint_returns_review_draft_and_clarification_without_act
         "status": "review",
         "capacity_minutes": 75,
         "clarification_skipped": 0,
+        "intake_item_id": None,
+        "schema_version": 1,
+        "draft_version": 1,
+        "latest_version": 1,
+        "calibration_level": "standard",
+        "draft_kind": "new_plan",
+        "target_plan_id": None,
     }
     assert await _fetchall(
         "SELECT id FROM study_project_draft_tasks WHERE draft_id = ?",

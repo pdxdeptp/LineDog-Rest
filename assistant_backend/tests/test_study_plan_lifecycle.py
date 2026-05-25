@@ -109,6 +109,241 @@ async def test_create_draft_study_project_stays_in_review_without_active_daily_t
 
 
 @pytest.mark.asyncio
+async def test_create_draft_study_project_links_intake_item_idempotently_without_active_tasks(db):
+    lifecycle = _lifecycle_module()
+    cursor = await db.execute(
+        """
+        INSERT INTO study_intake_items
+            (client_request_id, raw_input, source_type, recommended_role, confidence)
+        VALUES ('req-draft-link', 'learn sqlite', 'url', 'new_plan', 'high')
+        """
+    )
+    intake_item_id = int(cursor.lastrowid)
+    await db.commit()
+
+    first = await lifecycle.create_draft_study_project(
+        db,
+        title="Learn SQLite",
+        source_url="https://example.com/sqlite",
+        deadline=date(2026, 6, 15),
+        capacity_minutes=60,
+        clarification_skipped=False,
+        intake_item_id=intake_item_id,
+        tasks=[
+            {
+                "title": "Read SQLite intro",
+                "estimated_minutes": 30,
+                "scheduled_date": date(2026, 6, 1),
+                "target_minutes": 30,
+            }
+        ],
+    )
+    second = await lifecycle.create_draft_study_project(
+        db,
+        title="Learn SQLite Again",
+        source_url="https://example.com/sqlite-again",
+        deadline=date(2026, 6, 20),
+        capacity_minutes=90,
+        clarification_skipped=True,
+        intake_item_id=intake_item_id,
+        tasks=[
+            {
+                "title": "This should not duplicate",
+                "estimated_minutes": 90,
+                "scheduled_date": date(2026, 6, 2),
+                "target_minutes": 90,
+            }
+        ],
+    )
+
+    assert second["id"] == first["id"]
+    assert first["intake_item_id"] == intake_item_id
+    assert first["schema_version"] == 1
+    assert first["draft_version"] == 1
+    assert first["latest_version"] == 1
+    assert first["calibration_level"] == "standard"
+    assert first["draft_kind"] == "new_plan"
+    assert first["target_plan_id"] is None
+    assert first["status"] == "review"
+    assert [task["title"] for task in second["tasks"]] == ["Read SQLite intro"]
+
+    headers = await _fetchall(
+        db,
+        "SELECT id FROM study_project_drafts WHERE intake_item_id = ?",
+        (intake_item_id,),
+    )
+    draft_tasks = await _fetchall(
+        db,
+        "SELECT id FROM study_project_draft_tasks WHERE draft_id = ?",
+        (first["id"],),
+    )
+    assert headers == [{"id": first["id"]}]
+    assert len(draft_tasks) == 1
+    assert await _fetchall(db, "SELECT id FROM resources WHERE status = 'active'") == []
+    assert await _fetchall(db, "SELECT id FROM tasks") == []
+
+
+@pytest.mark.asyncio
+async def test_init_db_migrates_legacy_draft_storage_idempotently_without_touching_active_rows(
+    tmp_path,
+):
+    from src.db.init import init_db
+    from src.db.schema import SCHEMA_SQL
+
+    db_path = tmp_path / "legacy-drafts.db"
+    async with aiosqlite.connect(db_path) as conn:
+        await conn.executescript(SCHEMA_SQL)
+        await conn.executescript(
+            """
+            DROP TABLE study_project_draft_tasks;
+            DROP TABLE study_project_drafts;
+
+            CREATE TABLE study_project_drafts (
+                id                    INTEGER PRIMARY KEY,
+                title                 TEXT    NOT NULL,
+                source_url            TEXT    NOT NULL,
+                deadline              DATE    NOT NULL,
+                status                TEXT    NOT NULL DEFAULT 'review',
+                capacity_minutes      INTEGER NOT NULL,
+                clarification_skipped INTEGER NOT NULL DEFAULT 0,
+                metadata              TEXT,
+                activated_resource_id INTEGER REFERENCES resources(id),
+                created_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE study_project_draft_tasks (
+                id                INTEGER PRIMARY KEY,
+                draft_id          INTEGER NOT NULL REFERENCES study_project_drafts(id),
+                title             TEXT    NOT NULL,
+                order_index       INTEGER NOT NULL,
+                estimated_minutes INTEGER NOT NULL,
+                scheduled_date    DATE    NOT NULL,
+                target_minutes    INTEGER NOT NULL
+            );
+            """
+        )
+        resource = await conn.execute(
+            """
+            INSERT INTO resources (title, type, tracking_mode, status, total_units)
+            VALUES ('Active Project', 'study_project', 'sequential', 'active', 1)
+            """
+        )
+        resource_id = int(resource.lastrowid)
+        unit = await conn.execute(
+            """
+            INSERT INTO units (resource_id, title, order_index, estimated_minutes, status)
+            VALUES (?, 'Active Unit', 0, 25, 'pending')
+            """,
+            (resource_id,),
+        )
+        await conn.execute(
+            """
+            INSERT INTO tasks
+                (unit_id, resource_id, title, task_kind, target_minutes,
+                 scheduled_date, originally_scheduled_date)
+            VALUES (?, ?, 'Active Task', 'time', 25, '2026-06-01', '2026-06-01')
+            """,
+            (int(unit.lastrowid), resource_id),
+        )
+        draft = await conn.execute(
+            """
+            INSERT INTO study_project_drafts
+                (title, source_url, deadline, status, capacity_minutes,
+                 clarification_skipped, metadata)
+            VALUES ('Legacy Draft', 'https://example.com/legacy', '2026-06-30',
+                    'review', 60, 0, '{}')
+            """
+        )
+        await conn.execute(
+            """
+            INSERT INTO study_project_draft_tasks
+                (draft_id, title, order_index, estimated_minutes, scheduled_date, target_minutes)
+            VALUES (?, 'Legacy Draft Task', 0, 30, '2026-06-10', 30)
+            """,
+            (int(draft.lastrowid),),
+        )
+        await conn.commit()
+
+    await init_db(str(db_path))
+    await init_db(str(db_path))
+
+    async with aiosqlite.connect(db_path) as conn:
+        conn.row_factory = aiosqlite.Row
+        draft_columns = {
+            row["name"] for row in await _fetchall(conn, "PRAGMA table_info(study_project_drafts)")
+        }
+        task_columns = {
+            row["name"] for row in await _fetchall(conn, "PRAGMA table_info(study_project_draft_tasks)")
+        }
+        legacy_draft = await _fetchone(
+            conn,
+            """
+            SELECT title, status, intake_item_id, schema_version, draft_version,
+                   latest_version, calibration_level, draft_kind, target_plan_id
+            FROM study_project_drafts
+            WHERE title = 'Legacy Draft'
+            """,
+        )
+        legacy_task = await _fetchone(
+            conn,
+            """
+            SELECT title, stable_task_id, phase_id, status, metadata, schedule_slices
+            FROM study_project_draft_tasks
+            WHERE title = 'Legacy Draft Task'
+            """,
+        )
+        active_task = await _fetchone(
+            conn,
+            """
+            SELECT r.title AS resource_title, t.title AS task_title, t.scheduled_date,
+                   t.completed_at
+            FROM resources r
+            JOIN tasks t ON t.resource_id = r.id
+            WHERE r.title = 'Active Project'
+            """,
+        )
+
+    assert {
+        "intake_item_id",
+        "schema_version",
+        "draft_version",
+        "latest_version",
+        "calibration_level",
+        "draft_kind",
+        "target_plan_id",
+        "updated_at",
+    }.issubset(draft_columns)
+    assert {"stable_task_id", "phase_id", "status", "metadata", "schedule_slices"}.issubset(
+        task_columns
+    )
+    assert legacy_draft == {
+        "title": "Legacy Draft",
+        "status": "review",
+        "intake_item_id": None,
+        "schema_version": 1,
+        "draft_version": 1,
+        "latest_version": 1,
+        "calibration_level": "standard",
+        "draft_kind": "new_plan",
+        "target_plan_id": None,
+    }
+    assert legacy_task == {
+        "title": "Legacy Draft Task",
+        "stable_task_id": None,
+        "phase_id": None,
+        "status": "draft",
+        "metadata": None,
+        "schedule_slices": None,
+    }
+    assert active_task == {
+        "resource_title": "Active Project",
+        "task_title": "Active Task",
+        "scheduled_date": "2026-06-01",
+        "completed_at": None,
+    }
+
+
+@pytest.mark.asyncio
 async def test_cancel_draft_study_project_discards_without_active_project_or_tasks(db):
     lifecycle = _lifecycle_module()
     draft = await lifecycle.create_draft_study_project(

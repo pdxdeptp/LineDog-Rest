@@ -51,26 +51,39 @@ CREATE INDEX IF NOT EXISTS idx_tasks_resource_id    ON tasks(resource_id);
 
 CREATE TABLE IF NOT EXISTS study_project_drafts (
     id                    INTEGER PRIMARY KEY,
+    intake_item_id        INTEGER REFERENCES study_intake_items(id),
     title                 TEXT    NOT NULL,
     source_url            TEXT    NOT NULL,
     deadline              DATE    NOT NULL,
     status                TEXT    NOT NULL DEFAULT 'review',
+    schema_version        INTEGER NOT NULL DEFAULT 1,
+    draft_version         INTEGER NOT NULL DEFAULT 1,
+    latest_version        INTEGER NOT NULL DEFAULT 1,
+    calibration_level     TEXT    NOT NULL DEFAULT 'standard',
+    draft_kind            TEXT    NOT NULL DEFAULT 'new_plan',
+    target_plan_id        INTEGER REFERENCES resources(id),
     capacity_minutes      INTEGER NOT NULL,
     clarification_skipped INTEGER NOT NULL DEFAULT 0,
     metadata              TEXT,
     activated_resource_id INTEGER REFERENCES resources(id),
-    created_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_study_project_drafts_status ON study_project_drafts(status);
 
 CREATE TABLE IF NOT EXISTS study_project_draft_tasks (
     id                INTEGER PRIMARY KEY,
     draft_id          INTEGER NOT NULL REFERENCES study_project_drafts(id),
+    stable_task_id    TEXT,
+    phase_id          TEXT,
     title             TEXT    NOT NULL,
     order_index       INTEGER NOT NULL,
     estimated_minutes INTEGER NOT NULL,
     scheduled_date    DATE    NOT NULL,
-    target_minutes    INTEGER NOT NULL
+    target_minutes    INTEGER NOT NULL,
+    status            TEXT    NOT NULL DEFAULT 'draft',
+    metadata          TEXT,
+    schedule_slices   TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_study_project_draft_tasks_order
     ON study_project_draft_tasks(draft_id, order_index);

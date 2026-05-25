@@ -280,15 +280,15 @@ async def test_planner_tool_get_tasks_by_date_returns_ids(db):
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_daily_capacity_default_is_60():
+async def test_daily_capacity_min_and_reduced_capacity_defaults_are_60():
     """
-    新数据库的 daily_capacity_min 默认值应为 "60"；
-    已有 "300" 的数据库经 init_db 迁移后应更新为 "60"。
+    新数据库的 daily_capacity_min / reduced_capacity_min 默认值应为 "60"；
+    已有 "300" 的数据库经 init_db 迁移后也应更新为 "60"。
     """
     import aiosqlite
     import tempfile
     import os
-    from src.db.schema import SCHEMA_SQL, DEFAULT_SYSTEM_STATE
+    from src.db.schema import SCHEMA_SQL
     from src.db.init import init_db
 
     # 1. 新建 DB：确认默认值为 "60"
@@ -298,11 +298,18 @@ async def test_daily_capacity_default_is_60():
         await init_db(new_db_path)
         async with aiosqlite.connect(new_db_path) as conn:
             async with conn.execute(
-                "SELECT value FROM system_state WHERE key = 'daily_capacity_min'"
+                """
+                SELECT key, value
+                FROM system_state
+                WHERE key IN ('daily_capacity_min', 'reduced_capacity_min')
+                ORDER BY key
+                """
             ) as cur:
-                row = await cur.fetchone()
-        assert row is not None, "daily_capacity_min should exist in system_state"
-        assert row[0] == "60", f"Expected '60', got {row[0]!r}"
+                rows = await cur.fetchall()
+        assert rows == [
+            ("daily_capacity_min", "60"),
+            ("reduced_capacity_min", "60"),
+        ]
     finally:
         os.unlink(new_db_path)
 
@@ -316,6 +323,9 @@ async def test_daily_capacity_default_is_60():
             await conn.execute(
                 "INSERT OR REPLACE INTO system_state (key, value) VALUES ('daily_capacity_min', '300')"
             )
+            await conn.execute(
+                "INSERT OR REPLACE INTO system_state (key, value) VALUES ('reduced_capacity_min', '300')"
+            )
             await conn.commit()
 
         # 执行 init_db（应触发迁移逻辑）
@@ -323,11 +333,18 @@ async def test_daily_capacity_default_is_60():
 
         async with aiosqlite.connect(migrate_db_path) as conn:
             async with conn.execute(
-                "SELECT value FROM system_state WHERE key = 'daily_capacity_min'"
+                """
+                SELECT key, value
+                FROM system_state
+                WHERE key IN ('daily_capacity_min', 'reduced_capacity_min')
+                ORDER BY key
+                """
             ) as cur:
-                row = await cur.fetchone()
-        assert row is not None
-        assert row[0] == "60", f"Migration failed: expected '60', got {row[0]!r}"
+                rows = await cur.fetchall()
+        assert rows == [
+            ("daily_capacity_min", "60"),
+            ("reduced_capacity_min", "60"),
+        ]
     finally:
         os.unlink(migrate_db_path)
 

@@ -14,8 +14,10 @@ def _iso(value: date | str) -> str:
 async def _fetch_draft(db: aiosqlite.Connection, draft_id: int) -> dict[str, Any]:
     async with db.execute(
         """
-        SELECT id, title, source_url, deadline, status, capacity_minutes,
-               clarification_skipped, activated_resource_id
+        SELECT id, intake_item_id, title, source_url, deadline, status,
+               schema_version, draft_version, latest_version, calibration_level,
+               draft_kind, target_plan_id, capacity_minutes, clarification_skipped,
+               activated_resource_id
         FROM study_project_drafts
         WHERE id = ?
         """,
@@ -51,10 +53,36 @@ async def create_draft_study_project(
     capacity_minutes: int,
     clarification_skipped: bool,
     tasks: list[dict[str, Any]],
+    intake_item_id: int | None = None,
+    draft_kind: str = "new_plan",
+    target_plan_id: int | None = None,
+    calibration_level: str = "standard",
 ) -> dict[str, Any]:
     await db.execute("BEGIN IMMEDIATE")
     try:
+        if intake_item_id is not None:
+            async with db.execute(
+                """
+                SELECT id
+                FROM study_project_drafts
+                WHERE intake_item_id = ?
+                  AND draft_kind = ?
+                  AND status IN (
+                      'review', 'draft_review', 'anchor_review', 'compiling',
+                      'needs_input', 'compile_failed', 'infeasible_review', 'activating'
+                  )
+                ORDER BY id ASC
+                LIMIT 1
+                """,
+                (intake_item_id, draft_kind),
+            ) as cursor:
+                existing = await cursor.fetchone()
+            if existing is not None:
+                await db.commit()
+                return await _fetch_draft(db, int(existing["id"]))
+
         metadata = {
+            "intake_item_id": intake_item_id,
             "source_url": source_url,
             "deadline": _iso(deadline),
             "capacity_minutes": capacity_minutes,
@@ -64,14 +92,20 @@ async def create_draft_study_project(
         cursor = await db.execute(
             """
             INSERT INTO study_project_drafts
-                (title, source_url, deadline, status, capacity_minutes,
-                 clarification_skipped, metadata)
-            VALUES (?, ?, ?, 'review', ?, ?, ?)
+                (intake_item_id, title, source_url, deadline, status,
+                 schema_version, draft_version, latest_version, calibration_level,
+                 draft_kind, target_plan_id, capacity_minutes, clarification_skipped,
+                 metadata)
+            VALUES (?, ?, ?, ?, 'review', 1, 1, 1, ?, ?, ?, ?, ?, ?)
             """,
             (
+                intake_item_id,
                 title,
                 source_url,
                 _iso(deadline),
+                calibration_level,
+                draft_kind,
+                target_plan_id,
                 capacity_minutes,
                 int(clarification_skipped),
                 json.dumps(metadata),
