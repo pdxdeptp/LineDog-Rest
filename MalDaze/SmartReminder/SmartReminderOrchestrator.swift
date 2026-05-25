@@ -73,14 +73,69 @@ private enum SmartReminderAlarmRouting {
 /// LLM → EventKit 编排；解析或请求失败时向用户报错，不再写入「纯标题」降级提醒。
 @MainActor
 final class SmartReminderOrchestrator {
-    private let gemini: GeminiRemindersGenerating
+    private struct LLMConfiguration {
+        let provider: LLMProviderID
+        let model: String
+        let apiKey: String
+        let apiKeyLabel: String
+    }
+
+    private final class GeminiAdapter: ReminderLLMGenerating, @unchecked Sendable {
+        private let gemini: GeminiRemindersGenerating
+
+        init(gemini: GeminiRemindersGenerating) {
+            self.gemini = gemini
+        }
+
+        func generateStructuredReminderJSON(
+            provider: LLMProviderID,
+            model: String,
+            systemPrompt: String,
+            userText: String,
+            apiKey: String,
+            timeoutSeconds: TimeInterval
+        ) async throws -> String {
+            try await gemini.generateStructuredReminderJSON(
+                systemPrompt: systemPrompt,
+                userText: userText,
+                apiKey: apiKey,
+                timeoutSeconds: timeoutSeconds
+            )
+        }
+    }
+
+    private let llm: ReminderLLMGenerating
     private let mutation: ReminderMutationServing
-    private let apiKeyProvider: () -> String?
+    private let llmConfigurationProvider: () -> LLMConfiguration
     private let timeoutSeconds: TimeInterval
 
     /// 展示用上下文（与 Prompt 一致）
     private let timeZoneLabel: String
     private let cityRegionLabel: String
+
+    init(
+        llm: ReminderLLMGenerating = ReminderLLMAPIClient(),
+        mutation: ReminderMutationServing = EventKitReminderMutationService(),
+        smartInputDefaults: UserDefaults = .standard,
+        timeZoneLabel: String = TimeZone.current.identifier,
+        cityRegionLabel: String = "本地系统时区",
+        timeoutSeconds: TimeInterval = 3.5
+    ) {
+        self.llm = llm
+        self.mutation = mutation
+        self.llmConfigurationProvider = {
+            let provider = MalDazeDefaults.resolvedSmartInputProvider(defaults: smartInputDefaults)
+            return LLMConfiguration(
+                provider: provider,
+                model: MalDazeDefaults.resolvedSmartInputModel(defaults: smartInputDefaults),
+                apiKey: MalDazeDefaults.resolvedSmartInputAPIKey(for: provider, defaults: smartInputDefaults),
+                apiKeyLabel: provider.apiKeyLabel
+            )
+        }
+        self.timeZoneLabel = timeZoneLabel
+        self.cityRegionLabel = cityRegionLabel
+        self.timeoutSeconds = timeoutSeconds
+    }
 
     init(
         gemini: GeminiRemindersGenerating = GeminiRemindersAPIClient(),
@@ -90,9 +145,16 @@ final class SmartReminderOrchestrator {
         cityRegionLabel: String = "本地系统时区",
         timeoutSeconds: TimeInterval = 3.5
     ) {
-        self.gemini = gemini
+        self.llm = GeminiAdapter(gemini: gemini)
         self.mutation = mutation
-        self.apiKeyProvider = apiKeyProvider
+        self.llmConfigurationProvider = {
+            LLMConfiguration(
+                provider: .gemini,
+                model: MalDazeGeminiModelCatalog.modelIdForAPI(),
+                apiKey: apiKeyProvider()?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "",
+                apiKeyLabel: "Gemini API Key"
+            )
+        }
         self.timeZoneLabel = timeZoneLabel
         self.cityRegionLabel = cityRegionLabel
         self.timeoutSeconds = timeoutSeconds
@@ -115,9 +177,10 @@ final class SmartReminderOrchestrator {
             listTitles: titles
         )
 
-        guard let key = apiKeyProvider(), !key.isEmpty else {
+        let llmConfiguration = llmConfigurationProvider()
+        guard !llmConfiguration.apiKey.isEmpty else {
             return SmartReminderRunResult(
-                toastMessage: "⚡️ 请先在设置中填写 Gemini API Key",
+                toastMessage: "⚡️ 请先在设置中填写 \(llmConfiguration.apiKeyLabel)",
                 undoItemIdentifiers: [],
                 wasFallback: false
             )
@@ -126,10 +189,12 @@ final class SmartReminderOrchestrator {
         let userMsg = SmartReminderPromptBuilder.userMessage(rawInput: trimmed)
         var parsedList: [LLMReminderJSONPayload] = []
         do {
-            let jsonText = try await gemini.generateStructuredReminderJSON(
+            let jsonText = try await llm.generateStructuredReminderJSON(
+                provider: llmConfiguration.provider,
+                model: llmConfiguration.model,
                 systemPrompt: system,
                 userText: userMsg,
-                apiKey: key,
+                apiKey: llmConfiguration.apiKey,
                 timeoutSeconds: timeoutSeconds
             )
             SmartReminderModelDebugLog.appendExchange(

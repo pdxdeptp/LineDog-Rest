@@ -7,9 +7,27 @@ enum GeminiRemindersAPIError: Error {
     case httpStatus(Int)
 }
 
+enum ReminderLLMAPIError: Error {
+    case invalidURL
+    case emptyResponse
+    case noChoices
+    case httpStatus(Int)
+}
+
 /// Gemini `generateContent`，JSON 输出；带请求超时（PRD 3.5s）。
 protocol GeminiRemindersGenerating: AnyObject {
     func generateStructuredReminderJSON(
+        systemPrompt: String,
+        userText: String,
+        apiKey: String,
+        timeoutSeconds: TimeInterval
+    ) async throws -> String
+}
+
+protocol ReminderLLMGenerating: AnyObject, Sendable {
+    func generateStructuredReminderJSON(
+        provider: LLMProviderID,
+        model: String,
         systemPrompt: String,
         userText: String,
         apiKey: String,
@@ -25,6 +43,23 @@ final class GeminiRemindersAPIClient: GeminiRemindersGenerating {
         timeoutSeconds: TimeInterval
     ) async throws -> String {
         let modelName = MalDazeGeminiModelCatalog.modelIdForAPI()
+        return try await generateStructuredReminderJSON(
+            model: modelName,
+            systemPrompt: systemPrompt,
+            userText: userText,
+            apiKey: apiKey,
+            timeoutSeconds: timeoutSeconds
+        )
+    }
+
+    func generateStructuredReminderJSON(
+        model: String,
+        systemPrompt: String,
+        userText: String,
+        apiKey: String,
+        timeoutSeconds: TimeInterval
+    ) async throws -> String {
+        let modelName = model.trimmingCharacters(in: .whitespacesAndNewlines)
         let encKey = apiKey.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? apiKey
         let urlStr = "https://generativelanguage.googleapis.com/v1beta/models/\(modelName):generateContent?key=\(encKey)"
         guard let url = URL(string: urlStr) else { throw GeminiRemindersAPIError.invalidURL }
@@ -71,6 +106,98 @@ final class GeminiRemindersAPIClient: GeminiRemindersGenerating {
             !text.isEmpty
         else {
             throw GeminiRemindersAPIError.noCandidates
+        }
+        return text
+    }
+}
+
+final class ReminderLLMAPIClient: ReminderLLMGenerating, @unchecked Sendable {
+    private let gemini = GeminiRemindersAPIClient()
+
+    func generateStructuredReminderJSON(
+        provider: LLMProviderID,
+        model: String,
+        systemPrompt: String,
+        userText: String,
+        apiKey: String,
+        timeoutSeconds: TimeInterval
+    ) async throws -> String {
+        switch provider {
+        case .gemini:
+            return try await gemini.generateStructuredReminderJSON(
+                model: model,
+                systemPrompt: systemPrompt,
+                userText: userText,
+                apiKey: apiKey,
+                timeoutSeconds: timeoutSeconds
+            )
+        case .openai:
+            return try await generateOpenAICompatibleReminderJSON(
+                endpoint: "https://api.openai.com/v1/chat/completions",
+                model: model,
+                systemPrompt: systemPrompt,
+                userText: userText,
+                apiKey: apiKey,
+                timeoutSeconds: timeoutSeconds
+            )
+        case .deepseek:
+            return try await generateOpenAICompatibleReminderJSON(
+                endpoint: "https://api.deepseek.com/chat/completions",
+                model: model,
+                systemPrompt: systemPrompt,
+                userText: userText,
+                apiKey: apiKey,
+                timeoutSeconds: timeoutSeconds
+            )
+        }
+    }
+
+    private func generateOpenAICompatibleReminderJSON(
+        endpoint: String,
+        model: String,
+        systemPrompt: String,
+        userText: String,
+        apiKey: String,
+        timeoutSeconds: TimeInterval
+    ) async throws -> String {
+        guard let url = URL(string: endpoint) else { throw ReminderLLMAPIError.invalidURL }
+
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+
+        let body: [String: Any] = [
+            "model": model,
+            "messages": [
+                ["role": "system", "content": systemPrompt],
+                ["role": "user", "content": userText],
+            ],
+            "temperature": 0.2,
+            "response_format": ["type": "json_object"],
+        ]
+        req.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let config = URLSessionConfiguration.ephemeral
+        config.timeoutIntervalForRequest = timeoutSeconds
+        config.timeoutIntervalForResource = timeoutSeconds + 0.5
+        let session = URLSession(configuration: config)
+
+        let (data, response) = try await session.data(for: req)
+        guard let http = response as? HTTPURLResponse else { throw ReminderLLMAPIError.emptyResponse }
+        guard (200 ... 299).contains(http.statusCode) else {
+            throw ReminderLLMAPIError.httpStatus(http.statusCode)
+        }
+
+        guard
+            let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let choices = json["choices"] as? [[String: Any]],
+            let first = choices.first,
+            let message = first["message"] as? [String: Any],
+            let text = message["content"] as? String,
+            !text.isEmpty
+        else {
+            throw ReminderLLMAPIError.noChoices
         }
         return text
     }

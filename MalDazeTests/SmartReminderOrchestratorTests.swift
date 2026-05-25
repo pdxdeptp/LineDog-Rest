@@ -103,6 +103,100 @@ final class SmartReminderOrchestratorTests: XCTestCase {
         XCTAssertEqual(MalDazeDefaults.resolvedSmartInputModel(defaults: d), MalDazeDefaults.defaultGeminiModelId)
     }
 
+    func testSmartInputDispatchUsesSelectedProviderModelAndKeyAtRequestTime() async {
+        let suiteName = "MalDaze.tests.providerDispatch.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let llm = MockReminderLLMClient()
+        llm.textToReturn = sampleJSON
+        let mutation = MockReminderMutationService()
+        mutation.calendars = [("cal-work", "工作", true)]
+        mutation.defaultCalendarId = "cal-work"
+
+        let orch = SmartReminderOrchestrator(
+            llm: llm,
+            mutation: mutation,
+            smartInputDefaults: defaults,
+            timeZoneLabel: "America/New_York",
+            cityRegionLabel: "TestCity",
+            timeoutSeconds: 4.25
+        )
+
+        defaults.set("openai", forKey: MalDazeDefaults.smartInputLLMProvider)
+        defaults.set("gpt-5.4-mini", forKey: MalDazeDefaults.smartInputLLMModel)
+        defaults.set("smart-openai-key", forKey: MalDazeDefaults.smartInputOpenAIAPIKey)
+
+        let r = await orch.run(rawUserInput: "明天下午三点半发邮件")
+        XCTAssertEqual(r?.toastMessage, "✅ 已添加")
+        XCTAssertEqual(mutation.lastCreateTitle, "发邮件")
+        XCTAssertEqual(llm.calls.count, 1)
+        XCTAssertEqual(llm.calls[0].provider, .openai)
+        XCTAssertEqual(llm.calls[0].model, "gpt-5.4-mini")
+        XCTAssertEqual(llm.calls[0].apiKey, "smart-openai-key")
+        XCTAssertEqual(llm.calls[0].timeoutSeconds, 4.25)
+        XCTAssertTrue(llm.calls[0].systemPrompt.contains("TestCity"))
+        XCTAssertTrue(llm.calls[0].systemPrompt.contains("工作"))
+        XCTAssertTrue(llm.calls[0].userText.contains("明天下午三点半发邮件"))
+    }
+
+    func testMissingSelectedProviderKeyNamesProviderAndDoesNotCallLLM() async {
+        let suiteName = "MalDaze.tests.missingSelectedProviderKey.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set("deepseek", forKey: MalDazeDefaults.smartInputLLMProvider)
+        defaults.set("deepseek-v4-flash", forKey: MalDazeDefaults.smartInputLLMModel)
+
+        let llm = MockReminderLLMClient()
+        llm.textToReturn = sampleJSON
+        let mutation = MockReminderMutationService()
+        mutation.calendars = [("cal1", "Inbox", true)]
+        mutation.defaultCalendarId = "cal1"
+
+        let orch = SmartReminderOrchestrator(
+            llm: llm,
+            mutation: mutation,
+            smartInputDefaults: defaults,
+            timeZoneLabel: "UTC",
+            cityRegionLabel: "X"
+        )
+
+        let r = await orch.run(rawUserInput: "原始整句备忘")
+        XCTAssertEqual(r?.toastMessage, "⚡️ 请先在设置中填写 DeepSeek API Key")
+        XCTAssertTrue(llm.calls.isEmpty)
+        XCTAssertNil(mutation.lastCreateTitle)
+    }
+
+    func testLegacyGeminiSmartInputSettingsStillDispatch() async {
+        let suiteName = "MalDaze.tests.legacyGeminiDispatch.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set("legacy-gemini-key", forKey: MalDazeDefaults.geminiAPIKey)
+        defaults.set("gemini-2.5-pro", forKey: MalDazeDefaults.geminiModelId)
+
+        let llm = MockReminderLLMClient()
+        llm.textToReturn = sampleJSON
+        let mutation = MockReminderMutationService()
+        mutation.calendars = [("cal-work", "工作", true)]
+        mutation.defaultCalendarId = "cal-work"
+
+        let orch = SmartReminderOrchestrator(
+            llm: llm,
+            mutation: mutation,
+            smartInputDefaults: defaults,
+            timeZoneLabel: "UTC",
+            cityRegionLabel: "X"
+        )
+
+        let r = await orch.run(rawUserInput: "明天下午三点半发邮件")
+        XCTAssertEqual(r?.toastMessage, "✅ 已添加")
+        XCTAssertEqual(mutation.lastCreateTitle, "发邮件")
+        XCTAssertEqual(llm.calls.count, 1)
+        XCTAssertEqual(llm.calls[0].provider, .gemini)
+        XCTAssertEqual(llm.calls[0].model, "gemini-2.5-pro")
+        XCTAssertEqual(llm.calls[0].apiKey, "legacy-gemini-key")
+    }
+
     func testDecodePayloadsFromJSONArray() throws {
         let json = """
         [{"title":"开chalse shwab","is_routine":false,"notes":null,"target_list_name":"Reminders","has_alarm":false,"alarm_date":{"year":2026,"month":3,"day":27,"hour":10,"minute":0},"priority":0},{"title":"去百合食品买零食","is_routine":false,"notes":null,"target_list_name":"Reminders","has_alarm":false,"alarm_date":{"year":2026,"month":3,"day":27,"hour":10,"minute":0},"priority":0}]
@@ -519,6 +613,41 @@ private final class MockGeminiRemindersClient: GeminiRemindersGenerating {
         apiKey: String,
         timeoutSeconds: TimeInterval
     ) async throws -> String {
+        if shouldThrow { throw URLError(.timedOut) }
+        return textToReturn ?? ""
+    }
+}
+
+private final class MockReminderLLMClient: ReminderLLMGenerating, @unchecked Sendable {
+    struct Call {
+        let provider: LLMProviderID
+        let model: String
+        let systemPrompt: String
+        let userText: String
+        let apiKey: String
+        let timeoutSeconds: TimeInterval
+    }
+
+    var textToReturn: String?
+    var shouldThrow = false
+    private(set) var calls: [Call] = []
+
+    func generateStructuredReminderJSON(
+        provider: LLMProviderID,
+        model: String,
+        systemPrompt: String,
+        userText: String,
+        apiKey: String,
+        timeoutSeconds: TimeInterval
+    ) async throws -> String {
+        calls.append(Call(
+            provider: provider,
+            model: model,
+            systemPrompt: systemPrompt,
+            userText: userText,
+            apiKey: apiKey,
+            timeoutSeconds: timeoutSeconds
+        ))
         if shouldThrow { throw URLError(.timedOut) }
         return textToReturn ?? ""
     }

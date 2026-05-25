@@ -79,7 +79,7 @@ final class AppViewModel: ObservableObject {
     private var cachedStatusLine: String = "自动模式：正在对齐系统时钟…"
     /// 避免 `syncPetDisplayMode` 在计时器 tick 中重复调用 `WindowManager`（模式未变时）。
     private var lastIdlePetModeAppliedToWindow: PetDisplayMode?
-    /// 智能输入等待 Gemini 时，桌宠与菜单栏显示「思考」态。
+    /// 智能输入等待 LLM 时，桌宠与菜单栏显示「思考」态。
     private var smartReminderThinkingActive = false
     private var smartReminderShortcutObserver: NSObjectProtocol?
     private var deskPetMenuShortcutObserver: NSObjectProtocol?
@@ -110,11 +110,7 @@ final class AppViewModel: ObservableObject {
         let rawStyle = UserDefaults.standard.string(forKey: MalDazeDefaults.breakInterruptStyle) ?? ""
         self.breakInterruptStyle = BreakInterruptStyle(rawValue: rawStyle) ?? .fullscreen
         self.deskReminders = deskReminders ?? DeskRemindersModel()
-        self.smartReminderOrchestrator = SmartReminderOrchestrator(
-            apiKeyProvider: {
-                UserDefaults.standard.string(forKey: MalDazeDefaults.geminiAPIKey)
-            }
-        )
+        self.smartReminderOrchestrator = SmartReminderOrchestrator()
         let ud = UserDefaults.standard
         let wMin = Self.clampedPomodoroWorkMinutes(ud.integer(forKey: MalDazeDefaults.pomodoroWorkDurationMinutes))
         let rMin = Self.clampedPomodoroRestMinutes(ud.integer(forKey: MalDazeDefaults.pomodoroRestDurationMinutes))
