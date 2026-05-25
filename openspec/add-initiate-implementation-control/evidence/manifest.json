@@ -2538,6 +2538,49 @@
         }
       ],
       "nextCheckpoint": "redesign-add-initiate-ui:apply:session-adapter-and-api-contract"
+    },
+    {
+      "id": "redesign-add-initiate-ui-pre-apply-checkpoint-commit",
+      "timestamp": "2026-05-25T13:06:50Z",
+      "kind": "pre_apply_checkpoint_commit",
+      "changeId": "redesign-add-initiate-ui",
+      "checkpoint": "redesign-add-initiate-ui:apply:pre_apply_checkpoint_commit",
+      "result": "completed",
+      "commands": [
+        {
+          "command": "git commit -m \"Prepare Add Initiate UI apply\"",
+          "exitCode": 0,
+          "summary": "fdc3124"
+        },
+        {
+          "command": "jq empty openspec/add-initiate-implementation-control/state.json",
+          "exitCode": 0,
+          "summary": "valid JSON"
+        },
+        {
+          "command": "jq empty openspec/add-initiate-implementation-control/evidence/manifest.json",
+          "exitCode": 0,
+          "summary": "valid JSON"
+        },
+        {
+          "command": "jq empty openspec/add-initiate-implementation-control/evidence/redesign-add-initiate-ui/apply-task-groups.json",
+          "exitCode": 0,
+          "summary": "valid JSON"
+        },
+        {
+          "command": "openspec validate redesign-add-initiate-ui --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/add-initiate-implementation-control/evidence/commits/redesign-add-initiate-ui-pre-apply.md",
+          "sha256": "f86b13a6442ef8eb7ec8ff9c30b09e4579686751568be957388f77b5ba081577",
+          "description": "Pre-apply checkpoint commit evidence for the Add / Initiate UI change."
+        }
+      ],
+      "nextCheckpoint": "redesign-add-initiate-ui:apply:session-adapter-and-api-contract"
     }
   ]
 }

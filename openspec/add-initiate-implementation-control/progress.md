@@ -1346,3 +1346,20 @@ Next required checkpoint for `redesign-add-initiate-ui`:
 - Manifest:
   - Added `redesign-add-initiate-ui-apply-planning`.
 - Next checkpoint: redesign-add-initiate-ui:apply:session-adapter-and-api-contract
+
+## Run 2026-05-25T13:06:50Z Pre-Apply Checkpoint
+
+- Automation: add-initiate-changes
+- Checkpoint: redesign-add-initiate-ui:apply:pre_apply_checkpoint_commit
+- Result: completed
+- Actions:
+  - Created pre-apply checkpoint commit `fdc3124` for the apply planning state.
+  - Wrote `evidence/commits/redesign-add-initiate-ui-pre-apply.md`.
+  - Updated `state.json.commitPolicy.lastCheckpointCommit`.
+  - Added manifest entry `redesign-add-initiate-ui-pre-apply-checkpoint-commit`.
+- Verification:
+  - `jq empty openspec/add-initiate-implementation-control/state.json`: valid.
+  - `jq empty openspec/add-initiate-implementation-control/evidence/manifest.json`: valid.
+  - `jq empty openspec/add-initiate-implementation-control/evidence/redesign-add-initiate-ui/apply-task-groups.json`: valid.
+  - `openspec validate redesign-add-initiate-ui --strict`: valid.
+- Next checkpoint: redesign-add-initiate-ui:apply:session-adapter-and-api-contract
