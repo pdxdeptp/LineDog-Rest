@@ -42,6 +42,10 @@ class DurationUpdateRequest(BaseModel):
     estimated_minutes: int = Field(gt=0)
 
 
+class ConfirmDraftRequest(BaseModel):
+    draft_version: int | None = Field(default=None, gt=0)
+
+
 def _json_safe(value: Any) -> Any:
     if isinstance(value, date):
         return value.isoformat()
@@ -94,7 +98,8 @@ def _decode_metadata(raw: str | None) -> dict[str, Any]:
 async def _fetch_draft(db: aiosqlite.Connection, draft_id: int) -> dict[str, Any]:
     async with db.execute(
         """
-        SELECT id, title, source_url, deadline, status, capacity_minutes,
+        SELECT id, title, source_url, deadline, status, draft_version,
+               latest_version, draft_kind, target_plan_id, capacity_minutes,
                clarification_skipped, metadata
         FROM study_project_drafts
         WHERE id = ?
@@ -422,19 +427,34 @@ async def cancel_draft(draft_id: int) -> dict[str, Any]:
         try:
             await cancel_draft_study_project(db, draft_id)
         except ValueError as exc:
-            raise HTTPException(status_code=404, detail=str(exc)) from exc
+            status_code = 404 if "not found" in str(exc).lower() else 409
+            raise HTTPException(status_code=status_code, detail=str(exc)) from exc
         draft = await _fetch_draft(db, draft_id)
     return _draft_response(draft)
 
 
 @router.post("/study-plan/drafts/{draft_id}/confirm")
-async def confirm_draft(draft_id: int) -> dict[str, Any]:
+async def confirm_draft(
+    draft_id: int,
+    body: ConfirmDraftRequest | None = None,
+) -> dict[str, Any]:
     async with get_db() as db:
         draft = await _fetch_draft(db, draft_id)
-        _ensure_review(draft)
-        if not draft["tasks"]:
+        requested_version = body.draft_version if body else None
+        if requested_version is None and draft["status"] not in {
+            "review",
+            "draft_review",
+            "infeasible_review",
+        }:
+            raise HTTPException(status_code=409, detail="Study plan draft is not reviewable")
+        if draft["status"] == "review" and not draft["tasks"] and requested_version is None:
             raise HTTPException(status_code=409, detail="Study plan draft has no tasks")
         try:
-            return await confirm_draft_study_project(db, draft_id)
+            return await confirm_draft_study_project(
+                db,
+                draft_id,
+                draft_version=requested_version or draft.get("draft_version"),
+                source="confirm_endpoint",
+            )
         except ValueError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc

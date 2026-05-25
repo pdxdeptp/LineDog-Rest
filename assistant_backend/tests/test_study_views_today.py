@@ -172,6 +172,68 @@ async def _seed_today_under_threshold_badge_facts(db_path: str) -> None:
         await db.commit()
 
 
+async def _activate_package_draft_for_today(db_path: str) -> int:
+    from src.study_plan import lifecycle
+
+    today = date.today().isoformat()
+    async with aiosqlite.connect(db_path) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute(
+            """
+            INSERT INTO study_intake_items
+                (client_request_id, raw_input, source_type, recommended_role, confidence)
+            VALUES ('req-today-package-activation', 'learn today activation',
+                    'text_goal', 'new_plan', 'high')
+            """
+        )
+        await db.commit()
+        shell = await lifecycle.create_or_load_draft_shell(
+            db,
+            intake_item_id=int(cursor.lastrowid),
+            title="Today Package Activation",
+            source_url="https://example.com/today-package",
+            deadline=today,
+            capacity_minutes=45,
+            assumptions={"deadline": {"value": today, "accepted": True}},
+        )
+        await lifecycle.save_draft_compiler_package_shell(
+            db,
+            draft_id=shell["id"],
+            status="compiling",
+            summary="Ready for compiler",
+            assumptions={"deadline": {"value": today, "accepted": True}},
+        )
+        await lifecycle.save_draft_compiler_package_shell(
+            db,
+            draft_id=shell["id"],
+            status="draft_review",
+            summary="Ready for today",
+            assumptions={"deadline": {"value": today, "accepted": True}},
+            phases=[{"phase_id": "today-phase", "title": "Today Phase"}],
+            tasks=[
+                {
+                    "stable_task_id": "today-task",
+                    "phase_id": "today-phase",
+                    "title": "Do persisted activation work",
+                    "estimate_minutes": 45,
+                    "schedule_slices": [
+                        {
+                            "schedule_slice_id": "today-slice",
+                            "scheduled_date": today,
+                            "target_minutes": 45,
+                        }
+                    ],
+                }
+            ],
+            activation_eligibility={
+                "activation_ready": True,
+                "schedule_version": "today-schedule-v1",
+            },
+        )
+        activated = await lifecycle.confirm_draft_study_project(db, shell["id"])
+        return int(activated["resource_id"])
+
+
 @pytest.mark.asyncio
 async def test_today_study_view_returns_persisted_active_project_tasks_without_morning_agent(
     client,
@@ -203,6 +265,34 @@ async def test_today_study_view_returns_persisted_active_project_tasks_without_m
             "resource_url": "https://example.com/algorithms",
             "unit_id": 201,
             "unit_title": "Graph Search",
+            "unit_url": None,
+            "rolled_day_count": 0,
+            "show_rolled_badge": False,
+        }
+    ]
+
+
+@pytest.mark.asyncio
+async def test_today_study_view_reads_tasks_created_from_persisted_package_activation(client):
+    resource_id = await _activate_package_draft_for_today(os.environ["DB_PATH"])
+
+    response = await client.get("/api/study-views/today")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["tasks"] == [
+        {
+            "id": 1,
+            "title": "Do persisted activation work",
+            "target_minutes": 45,
+            "completed_at": None,
+            "project_id": resource_id,
+            "project_title": "Today Package Activation",
+            "resource_id": resource_id,
+            "resource_title": "Today Package Activation",
+            "resource_url": "https://example.com/today-package",
+            "unit_id": 1,
+            "unit_title": "Do persisted activation work",
             "unit_url": None,
             "rolled_day_count": 0,
             "show_rolled_badge": False,

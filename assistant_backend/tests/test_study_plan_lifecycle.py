@@ -27,6 +27,37 @@ async def _fetchall(db: aiosqlite.Connection, sql: str, params: tuple = ()) -> l
     return [dict(row) for row in rows]
 
 
+class _FailingEventExecute:
+    def __init__(self, operation):
+        self._operation = operation
+        self._cursor = None
+
+    def __await__(self):
+        return self._operation.__await__()
+
+    async def __aenter__(self):
+        self._cursor = await self._operation
+        return self._cursor
+
+    async def __aexit__(self, exc_type, exc, tb) -> None:
+        if self._cursor is not None:
+            await self._cursor.close()
+
+
+class _FailingEventConnection:
+    def __init__(self, conn: aiosqlite.Connection) -> None:
+        self._conn = conn
+
+    def execute(self, sql: str, params: tuple = ()):
+        normalized = " ".join(sql.split()).lower()
+        if normalized.startswith("insert into events"):
+            raise RuntimeError("simulated event insert failure")
+        return _FailingEventExecute(self._conn.execute(sql, params))
+
+    def __getattr__(self, name: str):
+        return getattr(self._conn, name)
+
+
 class _BeforeBeginExecute:
     def __init__(self, operation, before_begin=None) -> None:
         self._operation = operation
@@ -229,6 +260,153 @@ def _planning_assumptions(**overrides):
     return assumptions
 
 
+async def _create_intake(db: aiosqlite.Connection, client_request_id: str) -> int:
+    cursor = await db.execute(
+        """
+        INSERT INTO study_intake_items
+            (client_request_id, raw_input, source_type, recommended_role, confidence)
+        VALUES (?, 'learn durable activation', 'text_goal', 'new_plan', 'high')
+        """,
+        (client_request_id,),
+    )
+    await db.commit()
+    return int(cursor.lastrowid)
+
+
+async def _save_compiling_package(db: aiosqlite.Connection, lifecycle, draft_id: int) -> dict:
+    return await lifecycle.save_draft_compiler_package_shell(
+        db,
+        draft_id=draft_id,
+        status="compiling",
+        summary="Compiling package",
+        assumptions=_planning_assumptions(),
+    )
+
+
+async def _force_package_version(
+    db: aiosqlite.Connection,
+    *,
+    draft_id: int,
+    draft_version: int,
+    intake_id: int | None,
+    status: str,
+    summary: str,
+    assumptions: dict | None = None,
+    tasks: list[dict] | None = None,
+    activation_eligibility: dict | None = None,
+) -> None:
+    assumptions = assumptions or _planning_assumptions()
+    tasks = tasks or []
+    activation_eligibility = activation_eligibility or {"activation_ready": False}
+    package = {
+        "schema_version": 1,
+        "draft_id": draft_id,
+        "draft_version": draft_version,
+        "intake_id": intake_id,
+        "status": status,
+        "summary": summary,
+        "assumptions": assumptions,
+        "phases": [],
+        "tasks": tasks,
+        "review_summary": {},
+        "activation_eligibility": activation_eligibility,
+    }
+    await db.execute(
+        """
+        INSERT INTO study_project_draft_versions (
+            draft_id, draft_version, schema_version, status, summary,
+            assumptions, package_json, phases, tasks, review_summary,
+            activation_eligibility
+        )
+        VALUES (?, ?, 1, ?, ?, ?, ?, '[]', ?, '{}', ?)
+        """,
+        (
+            draft_id,
+            draft_version,
+            status,
+            summary,
+            json.dumps(assumptions, sort_keys=True),
+            json.dumps(package, sort_keys=True),
+            json.dumps(tasks, sort_keys=True),
+            json.dumps(activation_eligibility, sort_keys=True),
+        ),
+    )
+    await db.execute(
+        """
+        UPDATE study_project_drafts
+        SET status = ?, draft_version = ?, latest_version = ?
+        WHERE id = ?
+        """,
+        (status, draft_version, draft_version, draft_id),
+    )
+    await db.commit()
+
+
+def _activation_ready_tasks(
+    *,
+    scheduled_date: str = "2026-08-10",
+    include_slices: bool = True,
+) -> list[dict]:
+    task = {
+        "stable_task_id": "task-activation-1",
+        "phase_id": "phase-activation",
+        "title": "Read activation notes",
+        "estimate_minutes": 40,
+    }
+    if include_slices:
+        task["schedule_slices"] = [
+            {
+                "schedule_slice_id": "slice-activation-1",
+                "scheduled_date": scheduled_date,
+                "target_minutes": 40,
+            }
+        ]
+    return [task]
+
+
+async def _create_activation_ready_shell(
+    db: aiosqlite.Connection,
+    lifecycle,
+    *,
+    client_request_id: str,
+    draft_kind: str = "new_plan",
+    target_plan_id: int | None = None,
+    tasks: list[dict] | None = None,
+    activation_eligibility: dict | None = None,
+    status: str = "draft_review",
+) -> dict:
+    intake_item_id = await _create_intake(db, client_request_id)
+    shell = await lifecycle.create_or_load_draft_shell(
+        db,
+        intake_item_id=intake_item_id,
+        title="Durable Activation",
+        source_url="https://example.com/durable-activation",
+        deadline="2026-08-30",
+        capacity_minutes=60,
+        draft_kind=draft_kind,
+        target_plan_id=target_plan_id,
+        assumptions=_planning_assumptions(),
+    )
+    await _save_compiling_package(db, lifecycle, shell["id"])
+    await lifecycle.save_draft_compiler_package_shell(
+        db,
+        draft_id=shell["id"],
+        status=status,
+        summary="Activation-ready draft",
+        assumptions=_planning_assumptions(),
+        phases=[{"phase_id": "phase-activation", "title": "Activation Phase"}],
+        tasks=tasks if tasks is not None else _activation_ready_tasks(),
+        review_summary={"headline": "Ready"},
+        activation_eligibility=activation_eligibility
+        if activation_eligibility is not None
+        else {
+            "activation_ready": True,
+            "schedule_version": "schedule-v1",
+        },
+    )
+    return await lifecycle.fetch_latest_draft_package(db, shell["id"])
+
+
 @pytest.mark.asyncio
 async def test_draft_package_persists_assumptions_provenance_and_latest_fetch(db):
     lifecycle = _lifecycle_module()
@@ -252,6 +430,7 @@ async def test_draft_package_persists_assumptions_provenance_and_latest_fetch(db
         calibration_level="standard",
         assumptions=_planning_assumptions(),
     )
+    await _save_compiling_package(db, lifecycle, shell["id"])
     saved = await lifecycle.save_draft_compiler_package_shell(
         db,
         draft_id=shell["id"],
@@ -324,6 +503,7 @@ async def test_save_package_shell_reloads_latest_version_inside_transaction(db):
         deadline="2026-07-20",
         capacity_minutes=60,
     )
+    await _save_compiling_package(db, lifecycle, shell["id"])
     await lifecycle.save_draft_compiler_package_shell(
         db,
         draft_id=shell["id"],
@@ -345,7 +525,7 @@ async def test_save_package_shell_reloads_latest_version_inside_transaction(db):
             "draft_id": shell["id"],
             "draft_version": 2,
             "intake_id": intake_item_id,
-            "status": "draft_review",
+            "status": "compiling",
             "summary": "Concurrent user edit",
             "assumptions": assumptions,
             "phases": [],
@@ -360,7 +540,7 @@ async def test_save_package_shell_reloads_latest_version_inside_transaction(db):
                 assumptions, package_json, phases, tasks, review_summary,
                 activation_eligibility
             )
-            VALUES (?, 2, 1, 'draft_review', 'Concurrent user edit',
+            VALUES (?, 2, 1, 'compiling', 'Concurrent user edit',
                     ?, ?, '[]', '[]', '{}', ?)
             """,
             (
@@ -373,7 +553,7 @@ async def test_save_package_shell_reloads_latest_version_inside_transaction(db):
         await db.execute(
             """
             UPDATE study_project_drafts
-            SET status = 'draft_review', draft_version = 2, latest_version = 2
+            SET status = 'compiling', draft_version = 2, latest_version = 2
             WHERE id = ?
             """,
             (shell["id"],),
@@ -450,6 +630,7 @@ async def test_draft_package_shells_allow_blocked_statuses_without_schedule_task
         deadline="2026-07-20",
         capacity_minutes=45,
     )
+    await _save_compiling_package(db, lifecycle, shell["id"])
 
     package = await lifecycle.save_draft_compiler_package_shell(
         db,
@@ -525,6 +706,7 @@ async def test_meaningful_edit_creates_new_draft_version_and_preserves_previous_
         deadline="2026-07-15",
         capacity_minutes=60,
     )
+    await _save_compiling_package(db, lifecycle, shell["id"])
     first = await lifecycle.save_draft_compiler_package_shell(
         db,
         draft_id=shell["id"],
@@ -593,6 +775,7 @@ async def test_meaningful_edit_rejects_package_update_status_override(db):
         deadline="2026-07-15",
         capacity_minutes=60,
     )
+    await _save_compiling_package(db, lifecycle, shell["id"])
     await lifecycle.save_draft_compiler_package_shell(
         db,
         draft_id=shell["id"],
@@ -637,6 +820,7 @@ async def test_display_metadata_update_does_not_create_new_draft_version(db):
         deadline="2026-07-25",
         capacity_minutes=60,
     )
+    await _save_compiling_package(db, lifecycle, shell["id"])
     await lifecycle.save_draft_compiler_package_shell(
         db,
         draft_id=shell["id"],
@@ -1047,13 +1231,13 @@ async def test_cancel_draft_study_project_discards_without_active_project_or_tas
 
     cancelled = await lifecycle.cancel_draft_study_project(db, draft["id"])
 
-    assert cancelled["status"] == "cancelled"
+    assert cancelled["status"] == "discarded"
     stored_draft = await _fetchone(
         db,
         "SELECT status FROM study_project_drafts WHERE id = ?",
         (draft["id"],),
     )
-    assert stored_draft == {"status": "cancelled"}
+    assert stored_draft == {"status": "discarded"}
     assert await _fetchall(db, "SELECT id FROM resources WHERE status = 'active'") == []
     assert await _fetchall(db, "SELECT id FROM tasks") == []
 
@@ -1168,7 +1352,7 @@ async def test_confirm_draft_study_project_activates_ordered_tasks_and_records_a
         "SELECT status, activated_resource_id FROM study_project_drafts WHERE id = ?",
         (draft["id"],),
     )
-    assert stored_draft == {"status": "confirmed", "activated_resource_id": activated["resource_id"]}
+    assert stored_draft == {"status": "active_plan", "activated_resource_id": activated["resource_id"]}
 
     event = await _fetchone(
         db,
@@ -1215,6 +1399,439 @@ async def test_confirm_draft_study_project_rejects_duplicate_confirm_without_sec
     assert resources == [{"id": first_activation["resource_id"]}]
     assert events == [{"id": 1}]
     assert tasks == [{"id": 1, "resource_id": first_activation["resource_id"]}]
+
+
+@pytest.mark.asyncio
+async def test_confirm_package_draft_records_activation_event_with_versions_and_created_task_ids(db):
+    lifecycle = _lifecycle_module()
+    package = await _create_activation_ready_shell(
+        db,
+        lifecycle,
+        client_request_id="req-package-activation-event",
+    )
+
+    activated = await lifecycle.confirm_draft_study_project(
+        db,
+        package["draft_id"],
+        draft_version=package["draft_version"],
+        actor="learner",
+        source="confirm_endpoint",
+    )
+
+    assert activated["status"] == "active"
+    assert activated["resource_id"] > 0
+    active_tasks = await _fetchall(
+        db,
+        "SELECT id, title, scheduled_date, target_minutes FROM tasks ORDER BY id",
+    )
+    assert active_tasks == [
+        {
+            "id": 1,
+            "title": "Read activation notes",
+            "scheduled_date": "2026-08-10",
+            "target_minutes": 40,
+        }
+    ]
+    stored_draft = await _fetchone(
+        db,
+        "SELECT status, activated_resource_id FROM study_project_drafts WHERE id = ?",
+        (package["draft_id"],),
+    )
+    assert stored_draft == {
+        "status": "active_plan",
+        "activated_resource_id": activated["resource_id"],
+    }
+    event = await _fetchone(
+        db,
+        "SELECT payload FROM events WHERE event_type = 'study_project_activated'",
+    )
+    payload = json.loads(event["payload"])
+    assert payload["draft_id"] == package["draft_id"]
+    assert payload["intake_item_id"] == package["intake_id"]
+    assert payload["activated_draft_version"] == package["draft_version"]
+    assert payload["schedule_version"] == "schedule-v1"
+    assert payload["resource_id"] == activated["resource_id"]
+    assert payload["target_plan_id"] is None
+    assert payload["created_active_task_ids"] == [1]
+    assert payload["assumptions"]["deadline"]["value"] == "2026-07-15"
+    assert payload["actor"] == "learner"
+    assert payload["source"] == "confirm_endpoint"
+    assert payload["activated_at"]
+
+
+@pytest.mark.asyncio
+async def test_confirm_package_draft_rejects_stale_requested_version_without_active_rows(db):
+    lifecycle = _lifecycle_module()
+    first = await _create_activation_ready_shell(
+        db,
+        lifecycle,
+        client_request_id="req-stale-activation",
+    )
+    await lifecycle.create_meaningful_draft_edit_version(
+        db,
+        draft_id=first["draft_id"],
+        edit_kind="scope",
+        package_updates={
+            "summary": "Newer activation-ready draft",
+            "tasks": _activation_ready_tasks(scheduled_date="2026-08-11"),
+            "activation_eligibility": {
+                "activation_ready": True,
+                "schedule_version": "schedule-v2",
+            },
+        },
+    )
+
+    with pytest.raises(ValueError, match="stale"):
+        await lifecycle.confirm_draft_study_project(
+            db,
+            first["draft_id"],
+            draft_version=first["draft_version"],
+        )
+
+    assert await _fetchall(db, "SELECT id FROM resources") == []
+    assert await _fetchall(db, "SELECT id FROM units") == []
+    assert await _fetchall(db, "SELECT id FROM tasks") == []
+    assert await _fetchall(db, "SELECT id FROM events WHERE event_type = 'study_project_activated'") == []
+    assert await _fetchone(
+        db,
+        "SELECT status, latest_version FROM study_project_drafts WHERE id = ?",
+        (first["draft_id"],),
+    ) == {"status": "draft_review", "latest_version": 2}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("blocked_status", ["needs_input", "compile_failed"])
+async def test_confirm_package_draft_allows_latest_activatable_before_newer_blocked_version(
+    db,
+    blocked_status,
+):
+    lifecycle = _lifecycle_module()
+    first = await _create_activation_ready_shell(
+        db,
+        lifecycle,
+        client_request_id=f"req-latest-activatable-before-{blocked_status}",
+    )
+    await _force_package_version(
+        db,
+        draft_id=first["draft_id"],
+        draft_version=2,
+        intake_id=first["intake_id"],
+        status=blocked_status,
+        summary=f"Newer {blocked_status} package",
+    )
+
+    activated = await lifecycle.confirm_draft_study_project(
+        db,
+        first["draft_id"],
+        draft_version=first["draft_version"],
+    )
+
+    assert activated["status"] == "active"
+    assert await _fetchone(
+        db,
+        "SELECT status, draft_version, latest_version, activated_resource_id FROM study_project_drafts WHERE id = ?",
+        (first["draft_id"],),
+    ) == {
+        "status": "active_plan",
+        "draft_version": 2,
+        "latest_version": 2,
+        "activated_resource_id": activated["resource_id"],
+    }
+    assert await _fetchall(db, "SELECT id FROM events WHERE event_type = 'study_project_activated'") == [
+        {"id": 1}
+    ]
+
+
+@pytest.mark.asyncio
+async def test_confirm_infeasible_review_package_can_activate_when_activation_ready(db):
+    lifecycle = _lifecycle_module()
+    package = await _create_activation_ready_shell(
+        db,
+        lifecycle,
+        client_request_id="req-infeasible-review-activation-ready",
+        status="infeasible_review",
+    )
+
+    activated = await lifecycle.confirm_draft_study_project(
+        db,
+        package["draft_id"],
+        draft_version=package["draft_version"],
+    )
+
+    assert activated["status"] == "active"
+    assert await _fetchall(db, "SELECT title FROM tasks ORDER BY id") == [
+        {"title": "Read activation notes"}
+    ]
+
+
+@pytest.mark.asyncio
+async def test_confirm_package_draft_rejects_missing_activation_ready_schedule_slices(db):
+    lifecycle = _lifecycle_module()
+    package = await _create_activation_ready_shell(
+        db,
+        lifecycle,
+        client_request_id="req-missing-slices",
+        tasks=_activation_ready_tasks(include_slices=False),
+    )
+
+    with pytest.raises(ValueError, match="activation-ready"):
+        await lifecycle.confirm_draft_study_project(db, package["draft_id"])
+
+    assert await _fetchall(db, "SELECT id FROM resources") == []
+    assert await _fetchall(db, "SELECT id FROM tasks") == []
+    assert await _fetchone(
+        db,
+        "SELECT status FROM study_project_drafts WHERE id = ?",
+        (package["draft_id"],),
+    ) == {"status": "draft_review"}
+
+
+@pytest.mark.asyncio
+async def test_confirm_package_draft_rejects_missing_schedule_version_without_active_rows(db):
+    lifecycle = _lifecycle_module()
+    package = await _create_activation_ready_shell(
+        db,
+        lifecycle,
+        client_request_id="req-missing-schedule-version",
+        activation_eligibility={"activation_ready": True},
+    )
+
+    with pytest.raises(ValueError, match="schedule version"):
+        await lifecycle.confirm_draft_study_project(db, package["draft_id"])
+
+    assert await _fetchall(db, "SELECT id FROM resources") == []
+    assert await _fetchall(db, "SELECT id FROM units") == []
+    assert await _fetchall(db, "SELECT id FROM tasks") == []
+    assert await _fetchall(db, "SELECT id FROM events WHERE event_type = 'study_project_activated'") == []
+    assert await _fetchone(
+        db,
+        "SELECT status, activated_resource_id FROM study_project_drafts WHERE id = ?",
+        (package["draft_id"],),
+    ) == {"status": "draft_review", "activated_resource_id": None}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status", ["needs_input", "compile_failed"])
+async def test_confirm_package_draft_rejects_non_activatable_states_without_active_rows(
+    db,
+    status,
+):
+    lifecycle = _lifecycle_module()
+    package = await _create_activation_ready_shell(
+        db,
+        lifecycle,
+        client_request_id=f"req-non-activatable-{status}",
+        status=status,
+        activation_eligibility={"activation_ready": False, "schedule_version": "schedule-v1"},
+    )
+
+    with pytest.raises(ValueError, match="not reviewable"):
+        await lifecycle.confirm_draft_study_project(db, package["draft_id"])
+
+    assert await _fetchall(db, "SELECT id FROM resources") == []
+    assert await _fetchall(db, "SELECT id FROM units") == []
+    assert await _fetchall(db, "SELECT id FROM tasks") == []
+    assert await _fetchall(db, "SELECT id FROM events WHERE event_type = 'study_project_activated'") == []
+    assert await _fetchone(
+        db,
+        "SELECT status, activated_resource_id FROM study_project_drafts WHERE id = ?",
+        (package["draft_id"],),
+    ) == {"status": status, "activated_resource_id": None}
+
+
+@pytest.mark.asyncio
+async def test_save_package_shell_rejects_invalid_anchor_to_draft_review_transition(db):
+    lifecycle = _lifecycle_module()
+    intake_item_id = await _create_intake(db, "req-invalid-anchor-to-draft-review")
+    shell = await lifecycle.create_or_load_draft_shell(
+        db,
+        intake_item_id=intake_item_id,
+        title="Invalid Transition",
+        source_url="https://example.com/invalid-transition",
+        deadline="2026-08-30",
+        capacity_minutes=60,
+        assumptions=_planning_assumptions(),
+    )
+
+    with pytest.raises(ValueError, match="transition"):
+        await lifecycle.save_draft_compiler_package_shell(
+            db,
+            draft_id=shell["id"],
+            status="draft_review",
+            summary="Skipped compiling",
+            assumptions=_planning_assumptions(),
+            activation_eligibility={
+                "activation_ready": True,
+                "schedule_version": "schedule-v1",
+            },
+        )
+
+    assert await _fetchone(
+        db,
+        "SELECT status, draft_version, latest_version, activated_resource_id FROM study_project_drafts WHERE id = ?",
+        (shell["id"],),
+    ) == {
+        "status": "anchor_review",
+        "draft_version": 1,
+        "latest_version": 1,
+        "activated_resource_id": None,
+    }
+    assert await _fetchall(
+        db,
+        "SELECT status FROM study_project_draft_versions WHERE draft_id = ?",
+        (shell["id"],),
+    ) == [{"status": "anchor_review"}]
+    assert await _fetchall(db, "SELECT id FROM resources") == []
+    assert await _fetchall(db, "SELECT id FROM events") == []
+
+
+@pytest.mark.asyncio
+async def test_meaningful_edit_rejects_invalid_draft_review_to_compiling_transition(db):
+    lifecycle = _lifecycle_module()
+    package = await _create_activation_ready_shell(
+        db,
+        lifecycle,
+        client_request_id="req-invalid-draft-review-to-compiling",
+    )
+
+    with pytest.raises(ValueError, match="transition"):
+        await lifecycle.create_meaningful_draft_edit_version(
+            db,
+            draft_id=package["draft_id"],
+            edit_kind="scope",
+            package_updates={"status": "compiling", "summary": "Invalid recompile"},
+        )
+
+    assert await _fetchone(
+        db,
+        "SELECT status, draft_version, latest_version FROM study_project_drafts WHERE id = ?",
+        (package["draft_id"],),
+    ) == {"status": "draft_review", "draft_version": 1, "latest_version": 1}
+    assert await _fetchall(
+        db,
+        "SELECT draft_version, status FROM study_project_draft_versions WHERE draft_id = ? ORDER BY draft_version",
+        (package["draft_id"],),
+    ) == [{"draft_version": 1, "status": "draft_review"}]
+    assert await _fetchall(db, "SELECT id FROM resources") == []
+    assert await _fetchall(db, "SELECT id FROM events") == []
+
+
+@pytest.mark.asyncio
+async def test_confirm_package_draft_rolls_back_active_rows_and_status_when_event_insert_fails(db):
+    lifecycle = _lifecycle_module()
+    package = await _create_activation_ready_shell(
+        db,
+        lifecycle,
+        client_request_id="req-event-rollback",
+    )
+
+    with pytest.raises(RuntimeError, match="event insert failure"):
+        await lifecycle.confirm_draft_study_project(
+            _FailingEventConnection(db),
+            package["draft_id"],
+        )
+
+    assert await _fetchall(db, "SELECT id FROM resources") == []
+    assert await _fetchall(db, "SELECT id FROM units") == []
+    assert await _fetchall(db, "SELECT id FROM tasks") == []
+    assert await _fetchall(db, "SELECT id FROM events") == []
+    assert await _fetchone(
+        db,
+        "SELECT status, activated_resource_id FROM study_project_drafts WHERE id = ?",
+        (package["draft_id"],),
+    ) == {"status": "draft_review", "activated_resource_id": None}
+
+
+@pytest.mark.asyncio
+async def test_confirm_existing_plan_package_appends_under_target_without_new_resource(db):
+    lifecycle = _lifecycle_module()
+    cursor = await db.execute(
+        """
+        INSERT INTO resources (title, type, tracking_mode, status, total_units)
+        VALUES ('Existing Active Plan', 'study_project', 'sequential', 'active', 1)
+        """
+    )
+    target_plan_id = int(cursor.lastrowid)
+    await db.commit()
+    package = await _create_activation_ready_shell(
+        db,
+        lifecycle,
+        client_request_id="req-target-plan-activation",
+        draft_kind="existing_plan_scheduled_work",
+        target_plan_id=target_plan_id,
+    )
+
+    activated = await lifecycle.confirm_draft_study_project(db, package["draft_id"])
+
+    assert activated["resource_id"] == target_plan_id
+    assert await _fetchall(db, "SELECT id, title FROM resources ORDER BY id") == [
+        {"id": target_plan_id, "title": "Existing Active Plan"}
+    ]
+    assert await _fetchall(
+        db,
+        "SELECT resource_id, title, order_index FROM units ORDER BY id",
+    ) == [
+        {
+            "resource_id": target_plan_id,
+            "title": "Read activation notes",
+            "order_index": 1,
+        }
+    ]
+    event = await _fetchone(
+        db,
+        "SELECT payload FROM events WHERE event_type = 'study_project_activated'",
+    )
+    payload = json.loads(event["payload"])
+    assert payload["resource_id"] == target_plan_id
+    assert payload["target_plan_id"] == target_plan_id
+
+
+@pytest.mark.asyncio
+async def test_confirm_package_draft_rejects_duplicate_activation_without_second_active_write(db):
+    lifecycle = _lifecycle_module()
+    package = await _create_activation_ready_shell(
+        db,
+        lifecycle,
+        client_request_id="req-package-duplicate-activation",
+    )
+    first_activation = await lifecycle.confirm_draft_study_project(db, package["draft_id"])
+
+    with pytest.raises(ValueError, match="already_activated"):
+        await lifecycle.confirm_draft_study_project(db, package["draft_id"])
+
+    assert await _fetchall(db, "SELECT id FROM resources WHERE type = 'study_project'") == [
+        {"id": first_activation["resource_id"]}
+    ]
+    assert await _fetchall(db, "SELECT id, resource_id FROM tasks") == [
+        {"id": 1, "resource_id": first_activation["resource_id"]}
+    ]
+    assert await _fetchall(db, "SELECT id FROM events WHERE event_type = 'study_project_activated'") == [
+        {"id": 1}
+    ]
+
+
+@pytest.mark.asyncio
+async def test_cancel_after_activation_is_rejected_without_changing_active_rows(db):
+    lifecycle = _lifecycle_module()
+    package = await _create_activation_ready_shell(
+        db,
+        lifecycle,
+        client_request_id="req-cancel-after-activation",
+    )
+    activated = await lifecycle.confirm_draft_study_project(db, package["draft_id"])
+
+    with pytest.raises(ValueError, match="activated"):
+        await lifecycle.cancel_draft_study_project(db, package["draft_id"])
+
+    assert await _fetchone(
+        db,
+        "SELECT status, activated_resource_id FROM study_project_drafts WHERE id = ?",
+        (package["draft_id"],),
+    ) == {"status": "active_plan", "activated_resource_id": activated["resource_id"]}
+    assert await _fetchall(
+        db,
+        "SELECT resource_id, title FROM tasks ORDER BY id",
+    ) == [{"resource_id": activated["resource_id"], "title": "Read activation notes"}]
 
 
 @pytest.mark.asyncio

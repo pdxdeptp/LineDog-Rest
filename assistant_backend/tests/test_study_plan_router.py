@@ -1,5 +1,6 @@
 """Study plan API router tests."""
 
+import json
 import os
 
 import aiosqlite
@@ -87,6 +88,139 @@ async def _draft_task_rows(draft_id: int) -> list[dict]:
         """,
         (draft_id,),
     )
+
+
+async def _insert_package_review_draft(
+    *,
+    client_request_id: str,
+    stale: bool = False,
+    blocked_latest_status: str | None = None,
+) -> int:
+    from src.study_plan import lifecycle
+
+    async with aiosqlite.connect(os.environ["DB_PATH"]) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute(
+            """
+            INSERT INTO study_intake_items
+                (client_request_id, raw_input, source_type, recommended_role, confidence)
+            VALUES (?, 'learn package router activation', 'text_goal', 'new_plan', 'high')
+            """,
+            (client_request_id,),
+        )
+        await db.commit()
+        shell = await lifecycle.create_or_load_draft_shell(
+            db,
+            intake_item_id=int(cursor.lastrowid),
+            title="Router Package Activation",
+            source_url="https://example.com/router-package",
+            deadline="2026-08-30",
+            capacity_minutes=60,
+            assumptions={"deadline": {"value": "2026-08-30", "accepted": True}},
+        )
+        await lifecycle.save_draft_compiler_package_shell(
+            db,
+            draft_id=shell["id"],
+            status="compiling",
+            summary="Router package compiling",
+            assumptions={"deadline": {"value": "2026-08-30", "accepted": True}},
+        )
+        await lifecycle.save_draft_compiler_package_shell(
+            db,
+            draft_id=shell["id"],
+            status="draft_review",
+            summary="Router-ready package",
+            assumptions={"deadline": {"value": "2026-08-30", "accepted": True}},
+            phases=[{"phase_id": "router-phase", "title": "Router Phase"}],
+            tasks=[
+                {
+                    "stable_task_id": "router-task",
+                    "phase_id": "router-phase",
+                    "title": "Confirm through router",
+                    "estimate_minutes": 35,
+                    "schedule_slices": [
+                        {
+                            "schedule_slice_id": "router-slice",
+                            "scheduled_date": "2026-08-20",
+                            "target_minutes": 35,
+                        }
+                    ],
+                }
+            ],
+            activation_eligibility={
+                "activation_ready": True,
+                "schedule_version": "router-schedule-v1",
+            },
+        )
+        if stale:
+            await lifecycle.create_meaningful_draft_edit_version(
+                db,
+                draft_id=shell["id"],
+                edit_kind="scope",
+                package_updates={
+                    "summary": "Newer router package",
+                    "tasks": [
+                        {
+                            "stable_task_id": "router-task-new",
+                            "phase_id": "router-phase",
+                            "title": "Newer task",
+                            "estimate_minutes": 20,
+                            "schedule_slices": [
+                                {
+                                    "scheduled_date": "2026-08-21",
+                                    "target_minutes": 20,
+                                }
+                            ],
+                        }
+                    ],
+                    "activation_eligibility": {
+                        "activation_ready": True,
+                        "schedule_version": "router-schedule-v2",
+                    },
+                },
+            )
+        if blocked_latest_status is not None:
+            package = {
+                "schema_version": 1,
+                "draft_id": shell["id"],
+                "draft_version": 2,
+                "intake_id": int(cursor.lastrowid),
+                "status": blocked_latest_status,
+                "summary": f"Newer {blocked_latest_status} package",
+                "assumptions": {"deadline": {"value": "2026-08-30", "accepted": True}},
+                "phases": [],
+                "tasks": [],
+                "review_summary": {},
+                "activation_eligibility": {"activation_ready": False},
+            }
+            await db.execute(
+                """
+                INSERT INTO study_project_draft_versions (
+                    draft_id, draft_version, schema_version, status, summary,
+                    assumptions, package_json, phases, tasks, review_summary,
+                    activation_eligibility
+                )
+                VALUES (?, 2, 1, ?, ?, ?, ?, '[]', '[]', '{}', ?)
+                """,
+                (
+                    shell["id"],
+                    blocked_latest_status,
+                    package["summary"],
+                    json.dumps(package["assumptions"], sort_keys=True),
+                    json.dumps(package, sort_keys=True),
+                    json.dumps(package["activation_eligibility"], sort_keys=True),
+                ),
+            )
+            await db.execute(
+                """
+                UPDATE study_project_drafts
+                SET status = ?, draft_version = 2, latest_version = 2
+                WHERE id = ?
+                """,
+                (blocked_latest_status, shell["id"]),
+            )
+            await db.commit()
+        return shell["id"]
 
 
 @pytest.mark.asyncio
@@ -313,7 +447,7 @@ async def test_cancel_endpoint_marks_draft_cancelled_without_active_resources_or
     assert response.status_code == 200
     payload = response.json()
     assert payload["id"] == draft_id
-    assert payload["status"] == "cancelled"
+    assert payload["status"] == "discarded"
     assert await _fetchall("SELECT id FROM resources WHERE status = 'active'") == []
     assert await _fetchall("SELECT id FROM tasks") == []
 
@@ -364,3 +498,73 @@ async def test_confirm_endpoint_creates_active_resource_and_tasks_only_after_con
     )
     assert len(active_tasks) == len(draft["tasks"])
     assert [task["title"] for task in active_tasks] == [task["title"] for task in draft["tasks"]]
+
+
+@pytest.mark.asyncio
+async def test_confirm_endpoint_accepts_package_draft_review_without_legacy_task_rows(client):
+    draft_id = await _insert_package_review_draft(client_request_id="req-router-package-confirm")
+
+    response = await client.post(f"/api/study-plan/drafts/{draft_id}/confirm")
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["id"] == draft_id
+    assert payload["status"] == "active"
+    assert payload["resource_id"] > 0
+    assert await _fetchall(
+        """
+        SELECT title, scheduled_date, target_minutes
+        FROM tasks
+        WHERE resource_id = ?
+        ORDER BY id
+        """,
+        (payload["resource_id"],),
+    ) == [
+        {
+            "title": "Confirm through router",
+            "scheduled_date": "2026-08-20",
+            "target_minutes": 35,
+        }
+    ]
+
+
+@pytest.mark.asyncio
+async def test_confirm_endpoint_returns_409_for_stale_package_draft_without_active_rows(client):
+    draft_id = await _insert_package_review_draft(
+        client_request_id="req-router-stale-package",
+        stale=True,
+    )
+
+    response = await client.post(
+        f"/api/study-plan/drafts/{draft_id}/confirm",
+        json={"draft_version": 1},
+    )
+
+    assert response.status_code == 409
+    assert "stale" in response.json()["detail"]
+    assert await _fetchall("SELECT id FROM resources") == []
+    assert await _fetchall("SELECT id FROM tasks") == []
+    assert await _fetchall("SELECT id FROM events WHERE event_type = 'study_project_activated'") == []
+
+
+@pytest.mark.asyncio
+async def test_confirm_endpoint_allows_observed_latest_activatable_before_newer_blocked_package(
+    client,
+):
+    draft_id = await _insert_package_review_draft(
+        client_request_id="req-router-latest-activatable-before-blocked",
+        blocked_latest_status="needs_input",
+    )
+
+    response = await client.post(
+        f"/api/study-plan/drafts/{draft_id}/confirm",
+        json={"draft_version": 1},
+    )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["id"] == draft_id
+    assert payload["status"] == "active"
+    assert await _fetchall(
+        "SELECT id FROM events WHERE event_type = 'study_project_activated'"
+    ) == [{"id": 1}]

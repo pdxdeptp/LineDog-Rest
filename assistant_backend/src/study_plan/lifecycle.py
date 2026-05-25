@@ -2,7 +2,7 @@
 
 import json
 from copy import deepcopy
-from datetime import date
+from datetime import date, datetime, timezone
 from typing import Any
 
 import aiosqlite
@@ -41,6 +41,16 @@ PACKAGE_CORE_FIELDS = {
     "review_summary",
     "activation_eligibility",
 }
+ACTIVATABLE_PACKAGE_STATUSES = {"draft_review", "infeasible_review"}
+DRAFT_PACKAGE_TRANSITIONS = {
+    "anchor_review": {"compiling"},
+    "compiling": {"needs_input", "compile_failed", "draft_review", "infeasible_review"},
+    "needs_input": {"anchor_review"},
+    "compile_failed": {"anchor_review"},
+    "infeasible_review": {"draft_review"},
+    "draft_review": set(),
+    "review": {"draft_review"},
+}
 
 
 def _iso(value: date | str) -> str:
@@ -60,9 +70,21 @@ def _json_loads(raw: str | None, fallback: Any) -> Any:
         return deepcopy(fallback)
 
 
+def _utc_now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
 def _validate_draft_package_status(status: str) -> None:
     if status not in DRAFT_PACKAGE_STATUSES:
         raise ValueError(f"unsupported draft package status: {status}")
+
+
+def _validate_draft_package_transition(current_status: str, next_status: str) -> None:
+    _validate_draft_package_status(next_status)
+    if current_status == next_status:
+        return
+    if next_status not in DRAFT_PACKAGE_TRANSITIONS.get(current_status, set()):
+        raise ValueError(f"invalid draft package transition: {current_status} -> {next_status}")
 
 
 def _ensure_draft_allows_package_write(draft: dict[str, Any]) -> None:
@@ -375,6 +397,25 @@ async def _has_draft_version_rows(db: aiosqlite.Connection, draft_id: int) -> bo
         return await cursor.fetchone() is not None
 
 
+async def _latest_activatable_package_version(
+    db: aiosqlite.Connection,
+    draft_id: int,
+) -> int | None:
+    async with db.execute(
+        f"""
+        SELECT MAX(draft_version) AS draft_version
+        FROM study_project_draft_versions
+        WHERE draft_id = ?
+          AND status IN ({",".join("?" for _ in ACTIVATABLE_PACKAGE_STATUSES)})
+        """,
+        (draft_id, *sorted(ACTIVATABLE_PACKAGE_STATUSES)),
+    ) as cursor:
+        row = await cursor.fetchone()
+    if row is None or row["draft_version"] is None:
+        return None
+    return int(row["draft_version"])
+
+
 def _package_from_version_row(row: dict[str, Any]) -> dict[str, Any]:
     package = _json_loads(row["package_json"], {})
     package.update(
@@ -524,6 +565,7 @@ async def save_draft_compiler_package_shell(
         draft = await _fetch_draft_header(db, draft_id)
         _ensure_draft_allows_package_write(draft)
         draft_version = int(draft["latest_version"])
+        _validate_draft_package_transition(draft["status"], status)
         package = await _upsert_draft_version(
             db,
             draft=draft,
@@ -636,6 +678,7 @@ async def create_meaningful_draft_edit_version(
         updated["draft_version"] = next_version
         updated["edit_kind"] = edit_kind
         status = updated.get("status") or draft["status"]
+        _validate_draft_package_transition(draft["status"], status)
         extra_fields = {
             key: value
             for key, value in updated.items()
@@ -726,6 +769,152 @@ async def _fetch_draft(db: aiosqlite.Connection, draft_id: int) -> dict[str, Any
         rows = await cursor.fetchall()
     draft["tasks"] = [dict(task) for task in rows]
     return draft
+
+
+def _activation_ready_schedule_version(package: dict[str, Any]) -> str | None:
+    eligibility = package.get("activation_eligibility") or {}
+    return (
+        eligibility.get("schedule_version")
+        or package.get("schedule_version")
+        or package.get("schedule", {}).get("version")
+    )
+
+
+def _package_activation_units(package: dict[str, Any]) -> list[dict[str, Any]]:
+    eligibility = package.get("activation_eligibility") or {}
+    package_tasks = package.get("tasks") or []
+    if package.get("status") not in ACTIVATABLE_PACKAGE_STATUSES or not eligibility.get(
+        "activation_ready"
+    ):
+        raise ValueError("draft package is not activation-ready")
+    if not package_tasks:
+        raise ValueError("draft package is not activation-ready: missing task data")
+
+    units: list[dict[str, Any]] = []
+    for index, task in enumerate(package_tasks):
+        slices = task.get("schedule_slices") or task.get("schedule") or []
+        if not isinstance(slices, list) or not slices:
+            raise ValueError("draft package is not activation-ready: missing schedule slices")
+
+        title = task.get("title")
+        if not title:
+            raise ValueError("draft package is not activation-ready: missing task title")
+
+        active_slices: list[dict[str, Any]] = []
+        total_minutes = 0
+        for schedule_slice in slices:
+            if not isinstance(schedule_slice, dict):
+                raise ValueError("draft package is not activation-ready: invalid schedule slice")
+            scheduled_date = schedule_slice.get("scheduled_date") or schedule_slice.get("date")
+            target_minutes = schedule_slice.get("target_minutes")
+            if not scheduled_date or target_minutes is None:
+                raise ValueError("draft package is not activation-ready: incomplete schedule slice")
+            minutes = int(target_minutes)
+            total_minutes += minutes
+            active_slices.append(
+                {
+                    "title": schedule_slice.get("title") or title,
+                    "scheduled_date": _iso(scheduled_date),
+                    "target_minutes": minutes,
+                }
+            )
+
+        units.append(
+            {
+                "title": title,
+                "order_index": index,
+                "estimated_minutes": int(
+                    task.get("estimate_minutes")
+                    or task.get("estimated_minutes")
+                    or total_minutes
+                ),
+                "slices": active_slices,
+            }
+        )
+    return units
+
+
+def _legacy_activation_units(draft: dict[str, Any]) -> list[dict[str, Any]]:
+    if not draft["tasks"]:
+        raise ValueError("Study plan draft has no tasks")
+    return [
+        {
+            "title": task["title"],
+            "order_index": int(task["order_index"]),
+            "estimated_minutes": int(task["estimated_minutes"]),
+            "slices": [
+                {
+                    "title": task["title"],
+                    "scheduled_date": task["scheduled_date"],
+                    "target_minutes": int(task["target_minutes"]),
+                }
+            ],
+        }
+        for task in draft["tasks"]
+    ]
+
+
+async def _next_unit_order_index(db: aiosqlite.Connection, resource_id: int) -> int:
+    async with db.execute(
+        """
+        SELECT
+            COALESCE(MAX(u.order_index) + 1, 0) AS next_from_units,
+            COALESCE(r.total_units, 0) AS next_from_resource
+        FROM resources r
+        LEFT JOIN units u ON u.resource_id = r.id
+        WHERE r.id = ?
+        GROUP BY r.id
+        """,
+        (resource_id,),
+    ) as cursor:
+        row = await cursor.fetchone()
+    if row is None:
+        raise ValueError("target_plan_id must reference an active study plan")
+    return max(int(row["next_from_units"]), int(row["next_from_resource"]))
+
+
+async def _insert_activation_units(
+    db: aiosqlite.Connection,
+    *,
+    resource_id: int,
+    units: list[dict[str, Any]],
+    start_order_index: int,
+) -> list[int]:
+    created_task_ids: list[int] = []
+    for offset, unit in enumerate(units):
+        unit_cursor = await db.execute(
+            """
+            INSERT INTO units
+                (resource_id, title, order_index, estimated_minutes, status)
+            VALUES (?, ?, ?, ?, 'pending')
+            """,
+            (
+                resource_id,
+                unit["title"],
+                start_order_index + offset,
+                unit["estimated_minutes"],
+            ),
+        )
+        unit_id = int(unit_cursor.lastrowid)
+        for schedule_slice in unit["slices"]:
+            task_cursor = await db.execute(
+                """
+                INSERT INTO tasks
+                    (unit_id, resource_id, title, task_kind, target_minutes,
+                     scheduled_date, originally_scheduled_date)
+                VALUES (?, ?, ?, 'time', ?, ?, ?)
+                """,
+                (
+                    unit_id,
+                    resource_id,
+                    schedule_slice["title"],
+                    schedule_slice["target_minutes"],
+                    schedule_slice["scheduled_date"],
+                    schedule_slice["scheduled_date"],
+                ),
+            )
+            created_task_ids.append(int(task_cursor.lastrowid))
+    return created_task_ids
 
 
 async def create_draft_study_project(
@@ -831,84 +1020,130 @@ async def cancel_draft_study_project(
     db: aiosqlite.Connection,
     draft_id: int,
 ) -> dict[str, Any]:
-    await db.execute(
-        "UPDATE study_project_drafts SET status = 'cancelled' WHERE id = ? AND status = 'review'",
-        (draft_id,),
-    )
-    await db.commit()
+    await db.execute("BEGIN IMMEDIATE")
+    try:
+        draft = await _fetch_draft_header(db, draft_id)
+        if draft["activated_resource_id"] is not None or draft["status"] == "active_plan":
+            raise ValueError("cannot discard an already activated draft")
+        if draft["status"] in {"discarded", "cancelled"}:
+            await db.commit()
+            return await _fetch_draft(db, draft_id)
+        if draft["status"] not in OPEN_DRAFT_STATUSES:
+            raise ValueError(f"cannot discard draft from state: {draft['status']}")
+        await db.execute(
+            """
+            UPDATE study_project_drafts
+            SET status = 'discarded', updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            (draft_id,),
+        )
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise
     return await _fetch_draft(db, draft_id)
 
 
 async def confirm_draft_study_project(
     db: aiosqlite.Connection,
     draft_id: int,
+    *,
+    draft_version: int | None = None,
+    actor: str | None = None,
+    source: str | None = None,
 ) -> dict[str, Any]:
     await db.execute("BEGIN IMMEDIATE")
     try:
+        header = await _fetch_draft_header(db, draft_id)
+        if header["activated_resource_id"] is not None or header["status"] == "active_plan":
+            raise ValueError("already_activated")
+
+        requested_version = int(draft_version or header["draft_version"])
+        header_latest_version = int(header["latest_version"])
+
+        draft = await _fetch_draft(db, draft_id)
+        package: dict[str, Any] | None = None
+        schedule_version: str | None = None
+        use_legacy_review = (
+            header["status"] == "review"
+            and requested_version == int(header["draft_version"])
+            and draft["tasks"]
+        )
+        if not use_legacy_review:
+            latest_activatable_version = await _latest_activatable_package_version(db, draft_id)
+            if latest_activatable_version is None:
+                raise ValueError(f"Study project draft is not reviewable: {draft_id}")
+            if requested_version != latest_activatable_version:
+                raise ValueError("stale draft activation requested")
+            package = await fetch_draft_package_version(db, draft_id, requested_version)
+            units = _package_activation_units(package)
+            schedule_version = _activation_ready_schedule_version(package)
+            if not schedule_version:
+                raise ValueError("draft package is not activation-ready: missing schedule version")
+        else:
+            units = _legacy_activation_units(draft)
+
         transition = await db.execute(
             """
             UPDATE study_project_drafts
-            SET status = 'activating'
-            WHERE id = ? AND status = 'review'
+            SET status = 'activating', updated_at = CURRENT_TIMESTAMP
+            WHERE id = ? AND status = ? AND latest_version = ?
             """,
-            (draft_id,),
+            (draft_id, header["status"], header_latest_version),
         )
         if transition.rowcount != 1:
-            await db.rollback()
-            raise ValueError(f"Study project draft is not reviewable: {draft_id}")
+            raise ValueError("stale draft activation requested")
 
-        draft = await _fetch_draft(db, draft_id)
-        resource_cursor = await db.execute(
-            """
-            INSERT INTO resources
-                (title, type, tracking_mode, url, status, total_units, deadline)
-            VALUES (?, 'study_project', 'sequential', ?, 'active', ?, ?)
-            """,
-            (
-                draft["title"],
-                draft["source_url"],
-                len(draft["tasks"]),
-                draft["deadline"],
-            ),
-        )
-        resource_id = resource_cursor.lastrowid
-
-        for task in draft["tasks"]:
-            unit_cursor = await db.execute(
+        if header["draft_kind"] == "new_plan":
+            resource_cursor = await db.execute(
                 """
-                INSERT INTO units
-                    (resource_id, title, order_index, estimated_minutes, status)
-                VALUES (?, ?, ?, ?, 'pending')
+                INSERT INTO resources
+                    (title, type, tracking_mode, url, status, total_units, deadline)
+                VALUES (?, 'study_project', 'sequential', ?, 'active', ?, ?)
                 """,
                 (
-                    resource_id,
-                    task["title"],
-                    task["order_index"],
-                    task["estimated_minutes"],
+                    draft["title"],
+                    draft["source_url"],
+                    len(units),
+                    draft["deadline"],
                 ),
             )
-            unit_id = unit_cursor.lastrowid
+            resource_id = int(resource_cursor.lastrowid)
+            target_plan_id = None
+            start_order_index = 0
+        else:
+            target_plan_id = header["target_plan_id"]
+            await _validate_draft_target_plan(
+                db,
+                draft_kind=header["draft_kind"],
+                target_plan_id=target_plan_id,
+            )
+            resource_id = int(target_plan_id)
+            start_order_index = await _next_unit_order_index(db, resource_id)
+
+        created_task_ids = await _insert_activation_units(
+            db,
+            resource_id=resource_id,
+            units=units,
+            start_order_index=start_order_index,
+        )
+
+        if header["draft_kind"] != "new_plan":
             await db.execute(
                 """
-                INSERT INTO tasks
-                    (unit_id, resource_id, title, task_kind, target_minutes,
-                     scheduled_date, originally_scheduled_date)
-                VALUES (?, ?, ?, 'time', ?, ?, ?)
+                UPDATE resources
+                SET total_units = COALESCE(total_units, 0) + ?
+                WHERE id = ?
                 """,
-                (
-                    unit_id,
-                    resource_id,
-                    task["title"],
-                    task["target_minutes"],
-                    task["scheduled_date"],
-                    task["scheduled_date"],
-                ),
+                (len(units), resource_id),
             )
 
         await db.execute(
             """
             UPDATE study_project_drafts
-            SET status = 'confirmed', activated_resource_id = ?
+            SET status = 'active_plan', activated_resource_id = ?,
+                updated_at = CURRENT_TIMESTAMP
             WHERE id = ? AND status = 'activating'
             """,
             (resource_id, draft_id),
@@ -916,7 +1151,17 @@ async def confirm_draft_study_project(
 
         payload = {
             "draft_id": draft_id,
+            "intake_item_id": draft["intake_item_id"],
+            "activated_draft_version": requested_version,
+            "schedule_version": schedule_version,
             "resource_id": resource_id,
+            "target_plan_id": target_plan_id,
+            "created_active_task_ids": created_task_ids,
+            "actor": actor,
+            "source": source,
+            "activated_at": _utc_now_iso(),
+            "draft_kind": header["draft_kind"],
+            "assumptions": package["assumptions"] if package else {},
             "source_url": draft["source_url"],
             "deadline": draft["deadline"],
             "capacity_minutes": draft["capacity_minutes"],
@@ -925,7 +1170,7 @@ async def confirm_draft_study_project(
         }
         await db.execute(
             "INSERT INTO events (event_type, payload) VALUES (?, ?)",
-            ("study_project_activated", json.dumps(payload)),
+            ("study_project_activated", _json_dumps(payload)),
         )
         await db.commit()
     except Exception:
