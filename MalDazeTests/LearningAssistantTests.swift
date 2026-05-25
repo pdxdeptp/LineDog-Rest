@@ -1970,7 +1970,7 @@ final class LearningAssistantUISourceTests: XCTestCase {
         XCTAssertTrue(source.contains("selectedPanelTab"))
         XCTAssertTrue(source.contains("bottomNavigationBar"))
         XCTAssertTrue(source.contains("首页"))
-        XCTAssertTrue(source.contains("添加资料"))
+        XCTAssertTrue(source.contains("立项"))
         XCTAssertTrue(source.contains("资料进度"))
         XCTAssertTrue(source.contains("调整计划"))
         XCTAssertTrue(source.contains("fetchDashboard()"))
@@ -2053,12 +2053,13 @@ final class LearningAssistantUISourceTests: XCTestCase {
         XCTAssertTrue(source.contains("isManagingResource(resource)"))
     }
 
-    func testAssistantPanelAddResourceUsesStudyPlanIntakeView() throws {
+    func testAssistantPanelAddResourceUsesAddInitiateView() throws {
         let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
 
         XCTAssertTrue(source.contains("case .addResource:"))
-        XCTAssertTrue(source.contains("StudyPlanIntakeView(vm: vm)"))
+        XCTAssertTrue(source.contains("AddInitiateView(vm: vm)"))
         XCTAssertFalse(source.contains("case .addResource:\n            IngestionView(vm: vm)"))
+        XCTAssertFalse(source.contains("case .addResource:\n            StudyPlanIntakeView(vm: vm)"))
     }
 
     func testAssistantPanelExposesFirstClassStudyViewsInBottomNavigation() throws {
@@ -2706,6 +2707,75 @@ final class LearningAssistantUISourceTests: XCTestCase {
         XCTAssertFalse(source.contains("guard hasSelectedDeadline"))
     }
 
+    func testAddInitiateSurfaceLabelsInputTypesAndAvoidsLegacyURLOnlyPrimaryWording() throws {
+        let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
+        let viewModelSource = try sourceFile("MalDaze/LearningAssistant/LearningAssistantViewModel.swift")
+        guard let start = source.range(of: "private struct AddInitiateView"),
+              let end = source[start.upperBound...].range(of: "private func progressRow") else {
+            XCTFail("AddInitiateView source section not found")
+            return
+        }
+        let addSource = String(source[start.lowerBound..<end.lowerBound])
+
+        XCTAssertTrue(source.contains("case .addResource:"))
+        XCTAssertTrue(source.contains("AddInitiateView(vm: vm)"))
+        XCTAssertTrue(source.contains("case .addResource: return \"添加/立项\""))
+        XCTAssertTrue(addSource.contains("Add / Initiate"))
+        XCTAssertTrue(addSource.contains("添加 / 立项"))
+        XCTAssertTrue(viewModelSource.contains("text_goal"))
+        XCTAssertTrue(viewModelSource.contains("url"))
+        XCTAssertTrue(viewModelSource.contains("github_repo"))
+        XCTAssertTrue(viewModelSource.contains("existing_project_snippet"))
+        XCTAssertTrue(viewModelSource.contains("interview_prep_item"))
+        XCTAssertTrue(viewModelSource.contains("resume_project_note"))
+        XCTAssertTrue(viewModelSource.contains("note_snippet"))
+        XCTAssertTrue(addSource.contains("vm.startAddInitiateSession"))
+        XCTAssertFalse(addSource.contains("学习资料 URL"))
+        XCTAssertFalse(addSource.contains("vm.startStudyPlan(url:"))
+        XCTAssertFalse(addSource.contains("vm.startIngestion"))
+    }
+
+    func testAddInitiateRoleReviewShowsReasonConfidenceSwitchingAndAttachmentModes() throws {
+        let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
+        let viewModelSource = try sourceFile("MalDaze/LearningAssistant/LearningAssistantViewModel.swift")
+        guard let start = source.range(of: "private struct AddInitiateView"),
+              let end = source[start.upperBound...].range(of: "private func progressRow") else {
+            XCTFail("AddInitiateView source section not found")
+            return
+        }
+        let addSource = String(source[start.lowerBound..<end.lowerBound])
+
+        XCTAssertTrue(addSource.contains("recommendedRole"))
+        XCTAssertTrue(addSource.contains("confidence"))
+        XCTAssertTrue(addSource.contains("reasonCodes"))
+        XCTAssertTrue(viewModelSource.contains("new_plan"))
+        XCTAssertTrue(viewModelSource.contains("attach_to_existing_plan"))
+        XCTAssertTrue(viewModelSource.contains("reference_material"))
+        XCTAssertTrue(viewModelSource.contains("later_resource"))
+        XCTAssertTrue(viewModelSource.contains("one_off_action"))
+        XCTAssertTrue(viewModelSource.contains("existingPlanCandidates"))
+        XCTAssertTrue(viewModelSource.contains("material_only"))
+        XCTAssertTrue(viewModelSource.contains("draft_phase"))
+        XCTAssertTrue(viewModelSource.contains("scheduled_work"))
+        XCTAssertTrue(viewModelSource.contains("辅助材料"))
+        XCTAssertTrue(addSource.contains("vm.confirmAddInitiateRole"))
+    }
+
+    func testAddInitiateRoleReviewSeedingResetsPerSessionSelections() throws {
+        let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
+        guard let start = source.range(of: "private struct AddInitiateView"),
+              let end = source[start.upperBound...].range(of: "private struct StudyPlanIntakeView") else {
+            XCTFail("AddInitiateView source section not found")
+            return
+        }
+        let addSource = String(source[start.lowerBound..<end.lowerBound])
+
+        XCTAssertTrue(addSource.contains("seededRoleReviewIdentity"))
+        XCTAssertTrue(addSource.contains("selectedExistingPlanID = vm.addInitiateExistingPlanCandidates.first?.id"))
+        XCTAssertTrue(addSource.contains("selectedAttachmentMode = .materialOnly"))
+        XCTAssertFalse(addSource.contains("selectedExistingPlanID = selectedExistingPlanID ??"))
+    }
+
     func testChatViewConsumesResourceAdjustPlanDraftText() throws {
         let source = try sourceFile("MalDaze/LearningAssistant/ChatView.swift")
 
@@ -2738,6 +2808,196 @@ final class LearningAssistantViewModelTests: XCTestCase {
         XCTAssertNil(vm.ingestionThreadId)
         XCTAssertFalse(vm.isOffline)
         XCTAssertEqual(vm.selectedOption, "B")  // default is now "B"
+    }
+
+    func testStartAddInitiateSessionUsesAdapterAndStoresRoleReviewState() async {
+        let mock = MockAssistantAPIClient()
+        mock.addInitiateStartResult = sampleAddInitiateRoleReviewSession()
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+
+        await vm.startAddInitiateSession(rawInput: "Ship an agent-browser demo", sourceType: .textGoal)
+
+        XCTAssertEqual(mock.startAddInitiateSessionCallCount, 1)
+        XCTAssertEqual(mock.lastAddInitiateStartRequest?.rawInput, "Ship an agent-browser demo")
+        XCTAssertEqual(mock.lastAddInitiateStartRequest?.sourceType, "text_goal")
+        XCTAssertFalse(mock.lastAddInitiateStartRequest?.clientRequestId.isEmpty ?? true)
+        XCTAssertNil(mock.lastStudyPlanStartURL)
+        XCTAssertNil(mock.lastConfirmIngestionConfirmed)
+        XCTAssertEqual(vm.addInitiateSession?.sessionId, "add-initiate-1")
+        XCTAssertEqual(vm.addInitiateSession?.reviewState, .roleReview)
+        XCTAssertEqual(vm.addInitiateRecommendedRole, "attach_to_existing_plan")
+        XCTAssertEqual(vm.addInitiateStage, .roleReview)
+        XCTAssertFalse(vm.isStartingAddInitiateSession)
+        XCTAssertNil(vm.addInitiateError)
+    }
+
+    func testStartAddInitiateGitHubRepoUsesAdapterAndNotLegacyStartPaths() async {
+        let mock = MockAssistantAPIClient()
+        mock.addInitiateStartResult = sampleAddInitiateRoleReviewSession()
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+
+        await vm.startAddInitiateSession(rawInput: "https://github.com/example/repo", sourceType: .githubRepo)
+
+        XCTAssertEqual(mock.startAddInitiateSessionCallCount, 1)
+        XCTAssertEqual(mock.lastAddInitiateStartRequest?.rawInput, "https://github.com/example/repo")
+        XCTAssertEqual(mock.lastAddInitiateStartRequest?.sourceType, "github_repo")
+        XCTAssertEqual(mock.startIngestionCallCount, 0)
+        XCTAssertNil(mock.lastStudyPlanStartURL)
+        XCTAssertEqual(vm.addInitiateSession?.reviewState, .roleReview)
+    }
+
+    func testConfirmAddInitiateMaterialOnlyAttachmentIsQuietAndMapsSupportingMaterialRole() async {
+        let mock = MockAssistantAPIClient()
+        mock.addInitiateStartResult = sampleAddInitiateRoleReviewSession()
+        mock.addInitiateRoleResult = sampleAddInitiateMaterialAttachedSession()
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+
+        await vm.startAddInitiateSession(rawInput: "MalDaze note", sourceType: .noteSnippet)
+        await vm.confirmAddInitiateRole(
+            title: "MalDaze note",
+            confirmedRole: .supportingMaterial,
+            existingPlanId: 7,
+            attachmentMode: .materialOnly
+        )
+
+        XCTAssertEqual(mock.confirmAddInitiateRoleCallCount, 1)
+        XCTAssertEqual(mock.lastAddInitiateRoleRequest?.sessionId, "add-initiate-1")
+        XCTAssertEqual(mock.lastAddInitiateRoleRequest?.intakeItemId, 11)
+        XCTAssertEqual(mock.lastAddInitiateRoleRequest?.confirmedRole, "attach_to_existing_plan")
+        XCTAssertEqual(mock.lastAddInitiateRoleRequest?.attachmentMode, "material_only")
+        XCTAssertEqual(mock.lastAddInitiateRoleRequest?.existingPlanId, 7)
+        XCTAssertEqual(vm.addInitiateSession?.reviewState, .materialAttached)
+        XCTAssertEqual(vm.addInitiateStage, .materialAttached)
+        XCTAssertEqual(mock.fetchStudyTodayViewCallCount, 0)
+        XCTAssertEqual(mock.fetchStudyProjectOverviewCallCount, 0)
+        XCTAssertEqual(mock.fetchStudyCalendarLoadCallCount, 0)
+        XCTAssertEqual(mock.fetchResourcesCallCount, 0)
+    }
+
+    func testConfirmAddInitiateNonAttachmentRolesDoNotLeakExistingPlanOrAttachmentMode() async {
+        let roles: [AddInitiateRoleChoice] = [.newPlan, .referenceMaterial, .laterResource, .oneOffAction]
+
+        for role in roles {
+            let mock = MockAssistantAPIClient()
+            mock.addInitiateStartResult = sampleAddInitiateRoleReviewSession()
+            mock.addInitiateRoleResult = sampleAddInitiateMaterialAttachedSession()
+            let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+
+            await vm.startAddInitiateSession(rawInput: "Candidate \(role.rawValue)", sourceType: .textGoal)
+            await vm.confirmAddInitiateRole(
+                title: "Candidate \(role.rawValue)",
+                confirmedRole: role,
+                existingPlanId: 7,
+                attachmentMode: .scheduledWork
+            )
+
+            XCTAssertEqual(mock.confirmAddInitiateRoleCallCount, 1)
+            let expectedRole = role == .oneOffAction ? "immediate_one_off" : role.rawValue
+            XCTAssertEqual(mock.lastAddInitiateRoleRequest?.confirmedRole, expectedRole)
+            XCTAssertNil(mock.lastAddInitiateRoleRequest?.existingPlanId, "\(role.rawValue) must not send existingPlanId")
+            XCTAssertNil(mock.lastAddInitiateRoleRequest?.attachmentMode, "\(role.rawValue) must not send attachmentMode")
+        }
+    }
+
+    func testConfirmAddInitiateAttachmentModesMapDraftPhaseAndScheduledWork() async {
+        let cases: [(AddInitiateAttachmentMode, String, String)] = [
+            (.draftPhase, "draft_phase", "Phase notes"),
+            (.scheduledWork, "scheduled_work", "Scheduled notes")
+        ]
+
+        for (mode, expectedMode, title) in cases {
+            let mock = MockAssistantAPIClient()
+            mock.addInitiateStartResult = sampleAddInitiateRoleReviewSession()
+            mock.addInitiateRoleResult = sampleAddInitiateMaterialAttachedSession()
+            let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+
+            await vm.startAddInitiateSession(rawInput: title, sourceType: .noteSnippet)
+            await vm.confirmAddInitiateRole(
+                title: title,
+                confirmedRole: .attachToExistingPlan,
+                existingPlanId: 7,
+                attachmentMode: mode
+            )
+
+            XCTAssertEqual(mock.confirmAddInitiateRoleCallCount, 1)
+            XCTAssertEqual(mock.lastAddInitiateRoleRequest?.confirmedRole, "attach_to_existing_plan")
+            XCTAssertEqual(mock.lastAddInitiateRoleRequest?.existingPlanId, 7)
+            XCTAssertEqual(mock.lastAddInitiateRoleRequest?.attachmentMode, expectedMode)
+        }
+    }
+
+    func testConfirmAddInitiateSupportingMaterialRequiresExistingPlanBeforeCallingAPI() async {
+        let mock = MockAssistantAPIClient()
+        mock.addInitiateStartResult = sampleAddInitiateRoleReviewSession()
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+
+        await vm.startAddInitiateSession(rawInput: "Loose note", sourceType: .noteSnippet)
+        await vm.confirmAddInitiateRole(
+            title: "Loose note",
+            confirmedRole: .supportingMaterial,
+            existingPlanId: nil,
+            attachmentMode: .materialOnly
+        )
+
+        XCTAssertEqual(mock.confirmAddInitiateRoleCallCount, 0)
+        XCTAssertNil(mock.lastAddInitiateRoleRequest)
+        XCTAssertNotNil(vm.addInitiateError)
+        XCTAssertEqual(vm.addInitiateSession?.reviewState, .roleReview)
+    }
+
+    func testConfirmAddInitiateAttachToExistingPlanRequiresPlanAndModeBeforeCallingAPI() async {
+        let missingPlan = MockAssistantAPIClient()
+        missingPlan.addInitiateStartResult = sampleAddInitiateRoleReviewSession()
+        var vm = LearningAssistantViewModel(api: missingPlan, autoLoadWhenReady: false)
+        await vm.startAddInitiateSession(rawInput: "Attach me", sourceType: .noteSnippet)
+        await vm.confirmAddInitiateRole(
+            title: "Attach me",
+            confirmedRole: .attachToExistingPlan,
+            existingPlanId: nil,
+            attachmentMode: .draftPhase
+        )
+        XCTAssertEqual(missingPlan.confirmAddInitiateRoleCallCount, 0)
+        XCTAssertNotNil(vm.addInitiateError)
+
+        let missingMode = MockAssistantAPIClient()
+        missingMode.addInitiateStartResult = sampleAddInitiateRoleReviewSession()
+        vm = LearningAssistantViewModel(api: missingMode, autoLoadWhenReady: false)
+        await vm.startAddInitiateSession(rawInput: "Attach me", sourceType: .noteSnippet)
+        await vm.confirmAddInitiateRole(
+            title: "Attach me",
+            confirmedRole: .attachToExistingPlan,
+            existingPlanId: 7,
+            attachmentMode: nil
+        )
+        XCTAssertEqual(missingMode.confirmAddInitiateRoleCallCount, 0)
+        XCTAssertNotNil(vm.addInitiateError)
+    }
+
+    func testConfirmAddInitiateStaleFailureDoesNotOverwriteNewSessionErrorOrOfflineState() async {
+        let mock = MockAssistantAPIClient()
+        mock.addInitiateStartResult = sampleAddInitiateRoleReviewSession(sessionId: "add-initiate-old", clientRequestId: "req-old", intakeItemId: 11)
+        mock.addInitiateRoleError = NSError(domain: "AddInitiateRole", code: 500)
+        mock.addInitiateRoleDelayNanoseconds = 100_000_000
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+
+        await vm.startAddInitiateSession(rawInput: "Old", sourceType: .noteSnippet)
+        let firstConfirm = Task {
+            await vm.confirmAddInitiateRole(
+                title: "Old",
+                confirmedRole: .attachToExistingPlan,
+                existingPlanId: 7,
+                attachmentMode: .draftPhase
+            )
+        }
+        await mock.waitForAddInitiateRoleCallCount(1)
+
+        mock.addInitiateStartResult = sampleAddInitiateRoleReviewSession(sessionId: "add-initiate-new", clientRequestId: "req-new", intakeItemId: 12)
+        await vm.startAddInitiateSession(rawInput: "New", sourceType: .textGoal)
+        await firstConfirm.value
+
+        XCTAssertEqual(vm.addInitiateSession?.sessionId, "add-initiate-new")
+        XCTAssertNil(vm.addInitiateError)
+        XCTAssertFalse(vm.isOffline)
     }
 
     // MARK: 1.4 / 3.2-3.6 首页 dashboard 状态层
@@ -5186,6 +5446,10 @@ private final class MockAssistantAPIClient: AssistantAPIClientProtocol, @uncheck
     var studySmartModeSettingsUpdateResultsQueue: [DelayedStudySmartModeSettingsUpdateResult] = []
     var studyDialogueAdjustmentPreviewResult = sampleStudyDialogueAdjustmentPreview()
     var studyDialogueAdjustmentApplyResult = sampleStudyDialogueAdjustmentApplyResult()
+    var addInitiateStartResult = sampleAddInitiateRoleReviewSession()
+    var addInitiateRoleResult = sampleAddInitiateMaterialAttachedSession()
+    var addInitiateRoleDelayNanoseconds: UInt64 = 0
+    var addInitiateRoleError: Error?
     var adjustmentError: Error?
 
     // Captured call arguments for assertions
@@ -5235,6 +5499,10 @@ private final class MockAssistantAPIClient: AssistantAPIClientProtocol, @uncheck
     private(set) var lastStudyDialogueApplyInstruction: String?
     private(set) var lastStudyDialogueApplyProjectId: Int?
     private(set) var lastStudyDialogueApplyPreview: StudyDialogueAdjustmentPreview?
+    private(set) var startAddInitiateSessionCallCount = 0
+    private(set) var lastAddInitiateStartRequest: AddInitiateStartSessionRequest?
+    private(set) var confirmAddInitiateRoleCallCount = 0
+    private(set) var lastAddInitiateRoleRequest: AddInitiateRoleConfirmationRequest?
     private(set) var lastStudyCalendarLoadStart: String?
     private(set) var lastStudyCalendarLoadEnd: String?
     private(set) var lastCompleteResourceId: Int?
@@ -5244,6 +5512,8 @@ private final class MockAssistantAPIClient: AssistantAPIClientProtocol, @uncheck
     private(set) var sendMessageCallCount = 0
     private(set) var confirmChatCallCount = 0
     private(set) var lastConfirmChatConfirmed: Bool?
+    private(set) var startIngestionCallCount = 0
+    private(set) var lastStartIngestionURL: String?
     private(set) var lastConfirmIngestionConfirmed: Bool?
     private(set) var lastConfirmIngestionOption: String?
     private(set) var lastConfirmIngestionDeadline: String?
@@ -5268,6 +5538,8 @@ private final class MockAssistantAPIClient: AssistantAPIClientProtocol, @uncheck
     private var studyCalendarLoadCallCountContinuations: [(expected: Int, continuation: CheckedContinuation<Void, Never>)] = []
     private let studySmartModeSettingsUpdateGateLock = NSLock()
     private var studySmartModeSettingsUpdateCallCountContinuations: [(expected: Int, continuation: CheckedContinuation<Void, Never>)] = []
+    private let addInitiateRoleGateLock = NSLock()
+    private var addInitiateRoleCallCountContinuations: [(expected: Int, continuation: CheckedContinuation<Void, Never>)] = []
 
     func waitForStudyPlanConfirmToStart() async {
         await withCheckedContinuation { continuation in
@@ -5310,6 +5582,21 @@ private final class MockAssistantAPIClient: AssistantAPIClientProtocol, @uncheck
                     return true
                 }
                 studySmartModeSettingsUpdateCallCountContinuations.append((expected, continuation))
+                return false
+            }
+            if shouldResumeImmediately {
+                continuation.resume()
+            }
+        }
+    }
+
+    func waitForAddInitiateRoleCallCount(_ expected: Int) async {
+        await withCheckedContinuation { continuation in
+            let shouldResumeImmediately = withAddInitiateRoleGateLock {
+                if confirmAddInitiateRoleCallCount >= expected {
+                    return true
+                }
+                addInitiateRoleCallCountContinuations.append((expected, continuation))
                 return false
             }
             if shouldResumeImmediately {
@@ -5563,6 +5850,8 @@ private final class MockAssistantAPIClient: AssistantAPIClientProtocol, @uncheck
 
     // Updated: now returns String (thread_id)
     func startIngestion(url: String, deadline: String, speedFactor: Double?) async throws -> String {
+        startIngestionCallCount += 1
+        lastStartIngestionURL = url
         if shouldThrowOffline { throw AssistantOfflineError() }
         return startIngestionThreadId
     }
@@ -5591,6 +5880,29 @@ private final class MockAssistantAPIClient: AssistantAPIClientProtocol, @uncheck
         lastConfirmIngestionOption = selectedOption
         lastConfirmIngestionDeadline = deadline
         lastConfirmIngestionSpeedFactor = speedFactor
+    }
+
+    func startAddInitiateSession(
+        _ request: AddInitiateStartSessionRequest
+    ) async throws -> AddInitiateSessionResponse {
+        startAddInitiateSessionCallCount += 1
+        lastAddInitiateStartRequest = request
+        if shouldThrowOffline { throw AssistantOfflineError() }
+        return addInitiateStartResult
+    }
+
+    func confirmAddInitiateRole(
+        _ request: AddInitiateRoleConfirmationRequest
+    ) async throws -> AddInitiateSessionResponse {
+        confirmAddInitiateRoleCallCount += 1
+        lastAddInitiateRoleRequest = request
+        signalAddInitiateRoleCallCountChanged()
+        if addInitiateRoleDelayNanoseconds > 0 {
+            try? await Task.sleep(nanoseconds: addInitiateRoleDelayNanoseconds)
+        }
+        if let addInitiateRoleError { throw addInitiateRoleError }
+        if shouldThrowOffline { throw AssistantOfflineError() }
+        return addInitiateRoleResult
     }
 
     func startStudyPlan(url: String, deadline: String, capacityMinutes: Int) async throws -> StudyPlanStartResponse {
@@ -5695,6 +6007,27 @@ private final class MockAssistantAPIClient: AssistantAPIClientProtocol, @uncheck
     private func withStudySmartModeSettingsUpdateGateLock<T>(_ body: () -> T) -> T {
         studySmartModeSettingsUpdateGateLock.lock()
         defer { studySmartModeSettingsUpdateGateLock.unlock() }
+        return body()
+    }
+
+    private func signalAddInitiateRoleCallCountChanged() {
+        let continuations = withAddInitiateRoleGateLock {
+            var ready: [CheckedContinuation<Void, Never>] = []
+            addInitiateRoleCallCountContinuations.removeAll { waiter in
+                if confirmAddInitiateRoleCallCount >= waiter.expected {
+                    ready.append(waiter.continuation)
+                    return true
+                }
+                return false
+            }
+            return ready
+        }
+        continuations.forEach { $0.resume() }
+    }
+
+    private func withAddInitiateRoleGateLock<T>(_ body: () -> T) -> T {
+        addInitiateRoleGateLock.lock()
+        defer { addInitiateRoleGateLock.unlock() }
         return body()
     }
 
@@ -5840,6 +6173,65 @@ private func sampleStudyPlanActivationResult() -> StudyPlanActivationResult {
         deadline: "2026-07-01",
         capacityMinutes: 60,
         clarificationSkipped: true
+    )
+}
+
+private func sampleAddInitiateRoleReviewSession(
+    sessionId: String = "add-initiate-1",
+    clientRequestId: String = "req-add-1",
+    intakeItemId: Int = 11,
+    recommendedRole: String? = "attach_to_existing_plan"
+) -> AddInitiateSessionResponse {
+    AddInitiateSessionResponse(
+        sessionId: sessionId,
+        clientRequestId: clientRequestId,
+        intakeItemId: intakeItemId,
+        draftId: nil,
+        draftVersion: nil,
+        stage: .roleReview,
+        reviewState: .roleReview,
+        recommendedRole: recommendedRole,
+        confirmedRole: nil,
+        confidence: "high",
+        reasonCodes: ["existing_project_context", "source_material"],
+        nextAction: "role_review",
+        createsActiveTasks: false,
+        resourceId: nil,
+        error: nil,
+        clarificationQuestion: nil,
+        existingPlanCandidates: [
+            ["id": AnyCodable(7), "title": AnyCodable("MalDaze")]
+        ],
+        attachmentModeSuggestion: "material_only",
+        canonicalRepoRole: nil,
+        reviewPackage: nil,
+        activationResult: nil
+    )
+}
+
+private func sampleAddInitiateMaterialAttachedSession() -> AddInitiateSessionResponse {
+    AddInitiateSessionResponse(
+        sessionId: "add-initiate-1",
+        clientRequestId: "req-add-1",
+        intakeItemId: 11,
+        draftId: nil,
+        draftVersion: nil,
+        stage: .materialAttached,
+        reviewState: .materialAttached,
+        recommendedRole: "attach_to_existing_plan",
+        confirmedRole: "attach_to_existing_plan",
+        confidence: "high",
+        reasonCodes: ["existing_project_context"],
+        nextAction: "done",
+        createsActiveTasks: false,
+        resourceId: 70,
+        error: nil,
+        clarificationQuestion: nil,
+        existingPlanCandidates: nil,
+        attachmentModeSuggestion: "material_only",
+        canonicalRepoRole: nil,
+        reviewPackage: nil,
+        activationResult: nil
     )
 }
 

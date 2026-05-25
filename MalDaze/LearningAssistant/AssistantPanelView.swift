@@ -117,7 +117,7 @@ struct AssistantPanelView: View {
         case .calendar:
             StudyCalendarLoadView(vm: vm)
         case .addResource:
-            StudyPlanIntakeView(vm: vm)
+            AddInitiateView(vm: vm)
         case .resourceProgress:
             resourcesPanel
         case .adjustPlan:
@@ -917,6 +917,215 @@ private struct ProjectOverviewView: View {
     private func deadlineDraft(for project: StudyProjectSummary) -> String {
         (deadlineDrafts[project.id] ?? project.deadline ?? "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
+private struct AddInitiateView: View {
+    @ObservedObject var vm: LearningAssistantViewModel
+
+    @State private var rawInput = ""
+    @State private var sourceType: AddInitiateSourceType = .textGoal
+    @State private var title = ""
+    @State private var selectedRole: AddInitiateRoleChoice = .newPlan
+    @State private var selectedAttachmentMode: AddInitiateAttachmentMode = .materialOnly
+    @State private var selectedExistingPlanID: Int?
+    @State private var seededRoleReviewIdentity: String?
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                inputCard
+
+                if vm.isStartingAddInitiateSession {
+                    progressRow("analyzing_input / routing_item")
+                }
+
+                if let error = vm.addInitiateError {
+                    Label(error, systemImage: "exclamationmark.triangle")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+
+                roleReviewCard
+                terminalCard
+
+                Spacer(minLength: 0)
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private var inputCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("Add / Initiate · 添加 / 立项", systemImage: "plus.circle")
+                .font(.headline)
+
+            Picker("类型", selection: $sourceType) {
+                ForEach(AddInitiateSourceType.allCases) { type in
+                    Text("\(type.label) · \(type.rawValue)").tag(type)
+                }
+            }
+            .pickerStyle(.menu)
+
+            TextEditor(text: $rawInput)
+                .frame(minHeight: 92)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(Color.secondary.opacity(0.25))
+                )
+                .help(sourceType.placeholder)
+
+            Text(sourceType.placeholder)
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+
+            Button {
+                let submitted = rawInput.trimmingCharacters(in: .whitespacesAndNewlines)
+                title = submitted
+                Task { await vm.startAddInitiateSession(rawInput: submitted, sourceType: sourceType) }
+            } label: {
+                Label("Initiate / 立项", systemImage: "arrow.right.circle.fill")
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(rawInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || vm.isStartingAddInitiateSession)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private var roleReviewCard: some View {
+        if let session = vm.addInitiateSession,
+           session.reviewState == .roleReview {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("角色确认")
+                    .font(.headline)
+
+                HStack(spacing: 10) {
+                    roleFact("推荐", session.recommendedRole ?? "未定")
+                    roleFact("信心", session.confidence ?? "unknown")
+                }
+
+                if let reasonCodes = session.reasonCodes, !reasonCodes.isEmpty {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("原因")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                        ForEach(reasonCodes, id: \.self) { reason in
+                            Text(reason)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
+                Picker("切换角色", selection: $selectedRole) {
+                    ForEach(AddInitiateRoleChoice.allCases) { role in
+                        Text("\(role.label) · \(role.rawValue)").tag(role)
+                    }
+                }
+                .pickerStyle(.menu)
+
+                if !vm.addInitiateExistingPlanCandidates.isEmpty {
+                    Picker("已有计划", selection: existingPlanSelection) {
+                        ForEach(vm.addInitiateExistingPlanCandidates) { plan in
+                            Text(plan.title).tag(Optional(plan.id))
+                        }
+                    }
+                    .pickerStyle(.menu)
+
+                    Picker("附件方式", selection: $selectedAttachmentMode) {
+                        ForEach(AddInitiateAttachmentMode.allCases) { mode in
+                            Text("\(mode.label) · \(mode.rawValue)").tag(mode)
+                        }
+                    }
+                    .pickerStyle(.radioGroup)
+                }
+
+                Button {
+                    Task {
+                        await vm.confirmAddInitiateRole(
+                            title: title.isEmpty ? rawInput : title,
+                            confirmedRole: selectedRole,
+                            existingPlanId: selectedExistingPlanID,
+                            attachmentMode: selectedAttachmentMode
+                        )
+                    }
+                } label: {
+                    Label("确认角色", systemImage: "checkmark.circle.fill")
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(vm.isConfirmingAddInitiateRole)
+            }
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(.controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+            .onAppear { seedRoleReview(from: session) }
+            .onChange(of: roleReviewIdentity(for: session)) { _ in seedRoleReview(from: session) }
+        }
+    }
+
+    @ViewBuilder
+    private var terminalCard: some View {
+        if let session = vm.addInitiateSession,
+           session.reviewState == .storedNonPlan || session.reviewState == .materialAttached {
+            Label(session.reviewState == .materialAttached ? "材料已附加" : "已存为非计划条目", systemImage: "tray.full")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func progressRow(_ label: String) -> some View {
+        HStack(spacing: 8) {
+            ProgressView()
+                .controlSize(.small)
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func roleFact(_ label: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(value)
+                .font(.callout.weight(.semibold))
+            Text(label)
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var existingPlanSelection: Binding<Int?> {
+        Binding(
+            get: { selectedExistingPlanID },
+            set: { selectedExistingPlanID = $0 }
+        )
+    }
+
+    private func seedRoleReview(from session: AddInitiateSessionResponse) {
+        let identity = roleReviewIdentity(for: session)
+        guard seededRoleReviewIdentity != identity else { return }
+        seededRoleReviewIdentity = identity
+
+        if let recommended = session.recommendedRole,
+           let role = AddInitiateRoleChoice.allCases.first(where: { $0.requestRole == recommended || $0.rawValue == recommended }) {
+            selectedRole = role
+        } else {
+            selectedRole = .newPlan
+        }
+        if let suggestion = session.attachmentModeSuggestion,
+           let mode = AddInitiateAttachmentMode(rawValue: suggestion) {
+            selectedAttachmentMode = mode
+        } else {
+            selectedAttachmentMode = .materialOnly
+        }
+        selectedExistingPlanID = vm.addInitiateExistingPlanCandidates.first?.id
+        title = title.isEmpty ? rawInput : title
+    }
+
+    private func roleReviewIdentity(for session: AddInitiateSessionResponse) -> String {
+        "\(session.sessionId):\(session.intakeItemId ?? -1)"
     }
 }
 
@@ -2228,7 +2437,7 @@ private extension AssistantPanelTab {
         case .home: return "今日"
         case .projectOverview: return "项目总览"
         case .calendar: return "日历"
-        case .addResource: return "添加资料"
+        case .addResource: return "添加/立项"
         case .resourceProgress: return "资料进度"
         case .adjustPlan: return "调整计划"
         case .settings: return "设置"

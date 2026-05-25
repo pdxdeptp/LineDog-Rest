@@ -35,6 +35,96 @@ enum AssistantDashboardPrimaryAction: Equatable {
     case addResource
 }
 
+enum AddInitiateSourceType: String, CaseIterable, Identifiable {
+    case textGoal = "text_goal"
+    case url
+    case githubRepo = "github_repo"
+    case existingProjectSnippet = "existing_project_snippet"
+    case interviewPrepItem = "interview_prep_item"
+    case resumeProjectNote = "resume_project_note"
+    case noteSnippet = "note_snippet"
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .textGoal: return "目标文本"
+        case .url: return "URL"
+        case .githubRepo: return "GitHub repo"
+        case .existingProjectSnippet: return "已有项目片段"
+        case .interviewPrepItem: return "面试准备"
+        case .resumeProjectNote: return "简历/项目笔记"
+        case .noteSnippet: return "笔记片段"
+        }
+    }
+
+    var placeholder: String {
+        switch self {
+        case .textGoal: return "例如：两周内做出 agent-browser demo"
+        case .url: return "https://example.com/course-or-article"
+        case .githubRepo: return "https://github.com/org/repo 或 org/repo"
+        case .existingProjectSnippet: return "粘贴已有项目上下文或下一步目标"
+        case .interviewPrepItem: return "例如：准备 backend/agent 系统设计面试"
+        case .resumeProjectNote: return "粘贴简历 bullet、项目说明或改写目标"
+        case .noteSnippet: return "粘贴一段想归档或立项的笔记"
+        }
+    }
+}
+
+enum AddInitiateRoleChoice: String, CaseIterable, Identifiable {
+    case newPlan = "new_plan"
+    case attachToExistingPlan = "attach_to_existing_plan"
+    case supportingMaterial = "supporting_material"
+    case referenceMaterial = "reference_material"
+    case laterResource = "later_resource"
+    case oneOffAction = "one_off_action"
+
+    var id: String { rawValue }
+
+    var requestRole: String {
+        switch self {
+        case .supportingMaterial:
+            return AddInitiateRoleChoice.attachToExistingPlan.rawValue
+        case .oneOffAction:
+            return "immediate_one_off"
+        default:
+            return rawValue
+        }
+    }
+
+    var label: String {
+        switch self {
+        case .newPlan: return "新计划"
+        case .attachToExistingPlan: return "加入已有计划"
+        case .supportingMaterial: return "辅助材料"
+        case .referenceMaterial: return "参考资料"
+        case .laterResource: return "稍后处理"
+        case .oneOffAction: return "一次性行动"
+        }
+    }
+}
+
+enum AddInitiateAttachmentMode: String, CaseIterable, Identifiable {
+    case materialOnly = "material_only"
+    case draftPhase = "draft_phase"
+    case scheduledWork = "scheduled_work"
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .materialOnly: return "辅助材料"
+        case .draftPhase: return "草案阶段"
+        case .scheduledWork: return "排入工作"
+        }
+    }
+}
+
+struct AddInitiateExistingPlanCandidate: Identifiable, Equatable {
+    let id: Int
+    let title: String
+}
+
 struct AssistantDashboardState: Equatable {
     let kind: AssistantDashboardKind
     let totalMinutes: Int
@@ -80,6 +170,11 @@ final class LearningAssistantViewModel: ObservableObject {
     @Published var studyPlanClarification: StudyPlanClarification? = nil
     @Published var studyPlanDraft: StudyPlanDraft? = nil
     @Published var studyPlanError: String? = nil
+    @Published var addInitiateRawInput: String = ""
+    @Published var addInitiateSourceType: AddInitiateSourceType = .textGoal
+    @Published private(set) var addInitiateClientRequestId: String? = nil
+    @Published private(set) var addInitiateSession: AddInitiateSessionResponse? = nil
+    @Published var addInitiateError: String? = nil
 
     @Published var todayTotalMinutes: Int  = 0
     @Published var todayHighlights: String = ""
@@ -107,6 +202,8 @@ final class LearningAssistantViewModel: ObservableObject {
     @Published var isSendingMessage   = false
     @Published var isIngesting        = false
     @Published var isStartingStudyPlan = false
+    @Published var isStartingAddInitiateSession = false
+    @Published var isConfirmingAddInitiateRole = false
     @Published var isSubmittingStudyPlanClarification = false
     @Published var isUpdatingStudyPlanDraft = false
     @Published var isConfirmingStudyPlanDraft = false
@@ -144,6 +241,22 @@ final class LearningAssistantViewModel: ObservableObject {
             return ingestionDraft != nil && !isRescheduling
         }
         return last == currentDeadline && lastSpeed == currentSpeedFactor && !isRescheduling
+    }
+
+    var addInitiateStage: AddInitiateStage? {
+        addInitiateSession?.stage
+    }
+
+    var addInitiateRecommendedRole: String? {
+        addInitiateSession?.recommendedRole
+    }
+
+    var addInitiateExistingPlanCandidates: [AddInitiateExistingPlanCandidate] {
+        addInitiateSession?.existingPlanCandidates?.compactMap { candidate in
+            guard let id = candidate["id"]?.value as? Int else { return nil }
+            let title = candidate["title"]?.value as? String ?? "计划 \(id)"
+            return AddInitiateExistingPlanCandidate(id: id, title: title)
+        } ?? []
     }
 
     // MARK: - Private
@@ -754,6 +867,114 @@ final class LearningAssistantViewModel: ObservableObject {
             if confirmed { await fetchTodayBriefing() }
         } catch {
             isOffline = true
+        }
+    }
+
+    // MARK: - Add / Initiate
+
+    func startAddInitiateSession(rawInput: String, sourceType: AddInitiateSourceType) async {
+        let trimmedInput = rawInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedInput.isEmpty, !isStartingAddInitiateSession else { return }
+
+        let clientRequestId = UUID().uuidString
+        addInitiateRawInput = trimmedInput
+        addInitiateSourceType = sourceType
+        addInitiateClientRequestId = clientRequestId
+        addInitiateSession = nil
+        addInitiateError = nil
+        isStartingAddInitiateSession = true
+        defer { isStartingAddInitiateSession = false }
+
+        do {
+            let response = try await api.startAddInitiateSession(
+                AddInitiateStartSessionRequest(
+                    clientRequestId: clientRequestId,
+                    rawInput: trimmedInput,
+                    sourceType: sourceType.rawValue
+                )
+            )
+            guard addInitiateClientRequestId == clientRequestId else { return }
+            addInitiateSession = response
+            addInitiateError = response.error
+            isOffline = false
+        } catch {
+            guard addInitiateClientRequestId == clientRequestId else { return }
+            addInitiateError = "无法启动 Add / Initiate，请重试。"
+            isOffline = true
+        }
+    }
+
+    func confirmAddInitiateRole(
+        title: String,
+        confirmedRole: AddInitiateRoleChoice,
+        existingPlanId: Int? = nil,
+        attachmentMode: AddInitiateAttachmentMode? = nil
+    ) async {
+        guard !isConfirmingAddInitiateRole else { return }
+        guard let session = addInitiateSession,
+              let intakeItemId = session.intakeItemId else {
+            addInitiateError = "缺少 Add / Initiate 会话，请重新提交。"
+            return
+        }
+        let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedTitle.isEmpty else {
+            addInitiateError = "请填写标题后再确认。"
+            return
+        }
+
+        let requestExistingPlanId: Int?
+        let resolvedAttachmentMode: AddInitiateAttachmentMode?
+        switch confirmedRole {
+        case .supportingMaterial:
+            guard let existingPlanId else {
+                addInitiateError = "请选择要附加的已有计划。"
+                return
+            }
+            requestExistingPlanId = existingPlanId
+            resolvedAttachmentMode = .materialOnly
+        case .attachToExistingPlan:
+            guard let existingPlanId else {
+                addInitiateError = "请选择要附加的已有计划。"
+                return
+            }
+            guard let attachmentMode else {
+                addInitiateError = "请选择附件方式。"
+                return
+            }
+            requestExistingPlanId = existingPlanId
+            resolvedAttachmentMode = attachmentMode
+        default:
+            requestExistingPlanId = nil
+            resolvedAttachmentMode = nil
+        }
+
+        isConfirmingAddInitiateRole = true
+        addInitiateError = nil
+        defer { isConfirmingAddInitiateRole = false }
+
+        do {
+            let response = try await api.confirmAddInitiateRole(
+                AddInitiateRoleConfirmationRequest(
+                    sessionId: session.sessionId,
+                    intakeItemId: intakeItemId,
+                    confirmedRole: confirmedRole.requestRole,
+                    title: trimmedTitle,
+                    url: addInitiateSourceType == .url ? addInitiateRawInput : nil,
+                    existingPlanId: requestExistingPlanId,
+                    attachmentMode: resolvedAttachmentMode?.rawValue,
+                    canonicalRepoRole: session.canonicalRepoRole
+                )
+            )
+            guard addInitiateSession?.sessionId == session.sessionId else { return }
+            addInitiateSession = response
+            addInitiateError = response.error
+            isOffline = false
+        } catch {
+            guard addInitiateSession?.sessionId == session.sessionId else { return }
+            addInitiateError = "角色确认失败，请重试。"
+            if error is AssistantOfflineError {
+                isOffline = true
+            }
         }
     }
 
