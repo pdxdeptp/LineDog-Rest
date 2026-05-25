@@ -5,9 +5,9 @@
   "currentChangeIndex": 0,
   "currentChange": "introduce-study-intake-router",
   "currentStep": "apply",
-  "currentCheckpoint": "introduce-study-intake-router:apply:intake-data-and-idempotency",
+  "currentCheckpoint": "introduce-study-intake-router:apply:source-preview-and-github-roles",
   "currentAttempt": 0,
-  "runCounter": 6,
+  "runCounter": 7,
   "maxRetriesPerCheckpoint": 2,
   "requiredProductDeepenRounds": 3,
   "requiresScopeDependencyCheck": true,
@@ -28,8 +28,13 @@
   "commitPolicy": {
     "checkpointRequiredBeforeApply": true,
     "commitEvidenceRoot": "openspec/add-initiate-implementation-control/evidence/commits",
-    "lastCheckpointCommit": null,
-    "pendingCommitReason": "OpenSpec/control artifacts are currently untracked; apply must not begin until a safe checkpoint commit is created or commit deferral is recorded with evidence."
+    "lastCheckpointCommit": {
+      "completedAt": "2026-05-25T04:44:45Z",
+      "changeId": "introduce-study-intake-router",
+      "commit": "4a5f6d43bdcc79ca9efea62d29dca707a103bdbb",
+      "evidenceFile": "openspec/add-initiate-implementation-control/evidence/commits/introduce-study-intake-router-pre-apply.md"
+    },
+    "pendingCommitReason": null
   },
   "crossChangeContracts": {
     "schemaVersion": 1,
@@ -62,11 +67,13 @@
     "activeChange": "introduce-study-intake-router",
     "currentGroupId": null,
     "currentGroupStartedAt": null,
-    "completedGroupIds": [],
+    "completedGroupIds": [
+      "intake-data-and-idempotency"
+    ],
     "blockedGroupId": null,
     "taskGroupsFile": "openspec/add-initiate-implementation-control/evidence/introduce-study-intake-router/apply-task-groups.json",
-    "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/introduce-study-intake-router/apply-planning.md",
-    "lastCommit": null
+    "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/introduce-study-intake-router/apply-groups/intake-data-and-idempotency.md",
+    "lastCommit": "08104306ceb192cb60fab92e91d9f4a650d4951a"
   },
   "lock": {
     "path": "openspec/add-initiate-implementation-control/run.lock",
@@ -87,10 +94,12 @@
       "applyTaskGroups": {
         "status": "planned",
         "taskGroupsFile": "openspec/add-initiate-implementation-control/evidence/introduce-study-intake-router/apply-task-groups.json",
-        "completedGroupIds": [],
+        "completedGroupIds": [
+          "intake-data-and-idempotency"
+        ],
         "currentGroupId": null,
-        "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/introduce-study-intake-router/apply-planning.md",
-        "lastCommit": null
+        "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/introduce-study-intake-router/apply-groups/intake-data-and-idempotency.md",
+        "lastCommit": "08104306ceb192cb60fab92e91d9f4a650d4951a"
       }
     },
     {
@@ -155,11 +164,11 @@
     }
   ],
   "lastRun": {
-    "completedAt": "2026-05-25T04:38:40Z",
+    "completedAt": "2026-05-25T04:44:45Z",
     "checkpoint": "introduce-study-intake-router:apply:intake-data-and-idempotency",
-    "result": "policy_corrected_resume"
+    "result": "completed"
   },
-  "lastCompletedCheckpoint": "introduce-study-intake-router:apply:planning",
+  "lastCompletedCheckpoint": "introduce-study-intake-router:apply:intake-data-and-idempotency",
   "lastMigration": {
     "completedAt": "2026-05-25T03:56:29Z",
     "id": "require-three-product-deepen-rounds",
@@ -179,8 +188,8 @@
   },
   "lastFailure": null,
   "lastVerification": {
-    "command": "openspec validate introduce-study-intake-router --strict && openspec status --change introduce-study-intake-router --json && jq empty apply-task-groups.json",
-    "result": "valid; current change ready; apply task groups JSON valid"
+    "command": "cd assistant_backend && uv run pytest tests/test_study_intake_router.py && cd assistant_backend && uv run pytest tests/test_study_plan_router.py tests/test_study_views_today.py && openspec validate introduce-study-intake-router --strict",
+    "result": "intake tests passed 6/6; study plan/today regression passed 12/12 with 2 warnings; OpenSpec valid"
   },
   "blockedReason": null
 }

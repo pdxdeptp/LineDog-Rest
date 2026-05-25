@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-05-25T04:38:40Z",
+  "updatedAt": "2026-05-25T04:44:45Z",
   "entries": [
     {
       "id": "introduce-study-intake-router-product-deepen-round-1",
@@ -336,6 +336,110 @@
         }
       ],
       "nextCheckpoint": "introduce-study-intake-router:apply:intake-data-and-idempotency"
+    },
+    {
+      "id": "introduce-study-intake-router-pre-apply-checkpoint-commit",
+      "timestamp": "2026-05-25T04:44:45Z",
+      "kind": "pre_apply_commit",
+      "changeId": "introduce-study-intake-router",
+      "checkpoint": "introduce-study-intake-router:apply:intake-data-and-idempotency",
+      "result": "completed",
+      "commit": "4a5f6d43bdcc79ca9efea62d29dca707a103bdbb",
+      "commands": [
+        {
+          "command": "jq empty openspec/add-initiate-implementation-control/state.json",
+          "exitCode": 0,
+          "summary": "valid JSON"
+        },
+        {
+          "command": "jq empty openspec/add-initiate-implementation-control/evidence/manifest.json",
+          "exitCode": 0,
+          "summary": "valid JSON"
+        },
+        {
+          "command": "jq empty openspec/add-initiate-implementation-control/evidence/introduce-study-intake-router/apply-task-groups.json",
+          "exitCode": 0,
+          "summary": "valid JSON"
+        },
+        {
+          "command": "openspec validate introduce-study-intake-router --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        },
+        {
+          "command": "git commit -m \"Prepare study intake router apply\"",
+          "exitCode": 0,
+          "summary": "created pre-apply checkpoint commit 4a5f6d4"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/add-initiate-implementation-control/evidence/commits/introduce-study-intake-router-pre-apply.md",
+          "sha256": "e1e775f46b005395b4d65bbd2a4da8e67851111c5f0d4ce8d596eadd7d2d5b1c",
+          "description": "Pre-apply checkpoint commit evidence."
+        }
+      ],
+      "nextCheckpoint": "introduce-study-intake-router:apply:intake-data-and-idempotency"
+    },
+    {
+      "id": "introduce-study-intake-router-apply-group-intake-data-and-idempotency",
+      "timestamp": "2026-05-25T04:44:45Z",
+      "kind": "apply_group",
+      "changeId": "introduce-study-intake-router",
+      "checkpoint": "introduce-study-intake-router:apply:intake-data-and-idempotency",
+      "groupId": "intake-data-and-idempotency",
+      "result": "completed",
+      "commit": "08104306ceb192cb60fab92e91d9f4a650d4951a",
+      "commands": [
+        {
+          "command": "cd assistant_backend && uv run pytest tests/test_study_intake_router.py",
+          "exitCode": 0,
+          "summary": "6 passed"
+        },
+        {
+          "command": "cd assistant_backend && uv run pytest tests/test_study_plan_router.py tests/test_study_views_today.py",
+          "exitCode": 0,
+          "summary": "12 passed, 2 warnings"
+        },
+        {
+          "command": "openspec validate introduce-study-intake-router --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        },
+        {
+          "command": "openspec instructions apply --change introduce-study-intake-router --json",
+          "exitCode": 0,
+          "summary": "6/21 tasks complete"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/add-initiate-implementation-control/evidence/introduce-study-intake-router/apply-groups/intake-data-and-idempotency.md",
+          "sha256": "624bf288c55275eebc239c5422038772d9a22dce679333a65df2b671918ce1c0",
+          "description": "Apply group evidence, verification, and review summary."
+        },
+        {
+          "path": "assistant_backend/src/db/schema.py",
+          "sha256": "298d7e946f922bb9c51715ad9bd22d616d549b0e3e1d6c7a8f57fea8e86bcffc",
+          "description": "Schema additions for intake items, non-plan items, and material attachments."
+        },
+        {
+          "path": "assistant_backend/src/study_plan/intake.py",
+          "sha256": "9691f6debb6954cbf9d2d9a382bdc386c200569b702a353f2d460a3e84c89249",
+          "description": "Intake persistence and idempotency helpers."
+        },
+        {
+          "path": "assistant_backend/tests/test_study_intake_router.py",
+          "sha256": "67897459220fa49aded91657aac9fdadf9fd8c2cd9164e8e953c3fc455abbed3",
+          "description": "TDD tests for idempotency, Today exclusion, and transaction safety."
+        },
+        {
+          "path": "openspec/changes/introduce-study-intake-router/tasks.md",
+          "sha256": "2e15ec04a5065b842cdb63f2a0cb71564d2611646456b37ab0bbe0d11e60bdf2",
+          "description": "OpenSpec tasks updated for completed group tasks."
+        }
+      ],
+      "nextCheckpoint": "introduce-study-intake-router:apply:source-preview-and-github-roles"
     }
   ]
 }

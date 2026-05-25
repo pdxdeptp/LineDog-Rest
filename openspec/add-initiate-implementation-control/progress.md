@@ -5,6 +5,7 @@
 - Phase: active
 - Current change: introduce-study-intake-router
 - Current step: apply
+- Current checkpoint: introduce-study-intake-router:apply:source-preview-and-github-roles
 - Required product-deepen rounds before apply: 3
 - Required checkpoint after product deepening: scope_dependency_check
 - Product-deepen scope guard: every round must read adjacent changes and record scope decisions
@@ -192,3 +193,52 @@
   - Reclassified `docs/agent-workflow.md` as `protected_unrelated_dirty` for this apply group.
   - Cleared `state.json.blockedReason` and restored phase to `active`.
 - Next checkpoint: introduce-study-intake-router:apply:intake-data-and-idempotency
+
+## Run 2026-05-25T04:44:45Z
+
+- Automation: add-initiate-changes
+- Checkpoint: introduce-study-intake-router:apply:intake-data-and-idempotency
+- Status: in progress
+- Actions:
+  - Acquired `run.lock`.
+  - Classified dirty workspace paths by current apply target overlap.
+  - Protected unrelated dirty files without staging them.
+  - Created pre-apply checkpoint commit `4a5f6d43bdcc79ca9efea62d29dca707a103bdbb`.
+  - Wrote commit evidence at `openspec/add-initiate-implementation-control/evidence/commits/introduce-study-intake-router-pre-apply.md`.
+  - Set `state.json.applyCursor.currentGroupId` to `intake-data-and-idempotency`.
+- Protected unrelated dirty paths:
+  - `docs/agent-workflow.md`
+  - `openspec/changes/harden-add-initiate-automation-control/design.md`
+  - `openspec/changes/harden-add-initiate-automation-control/proposal.md`
+  - `openspec/changes/harden-add-initiate-automation-control/tasks.md`
+  - `openspec/changes/redesign-study-intake-planning/iteration-records/round-16-split-readiness-review.md`
+  - `openspec/changes/redesign-study-intake-planning/pre-split-readiness-audit.md`
+  - `openspec/changes/redesign-study-intake-planning/split-decision.md`
+  - `openspec/changes/redesign-study-intake-planning/tasks.md`
+- Next action:
+  - Continue the `intake-data-and-idempotency` apply group with TDD.
+
+## Run 2026-05-25T04:44:45Z Apply Group Completed
+
+- Automation: add-initiate-changes
+- Checkpoint: introduce-study-intake-router:apply:intake-data-and-idempotency
+- Result: completed
+- Implementation commit:
+  - `08104306ceb192cb60fab92e91d9f4a650d4951a`
+- Actions:
+  - Implemented intake item persistence separate from active tasks.
+  - Added idempotent `client_request_id` intake creation.
+  - Added reference/later non-plan persistence.
+  - Added material-only active-plan attachment persistence.
+  - Added Today-exclusion and idempotency tests.
+  - Fixed code-quality P1 around broad `INSERT OR IGNORE` by using targeted conflict handling plus explicit transactions.
+  - Marked tasks `1.1`, `3.1`, `3.2`, `3.3`, `4.5`, and `4.6` complete.
+- Verification:
+  - `cd assistant_backend && uv run pytest tests/test_study_intake_router.py`: 6 passed.
+  - `cd assistant_backend && uv run pytest tests/test_study_plan_router.py tests/test_study_views_today.py`: 12 passed, 2 warnings.
+  - `openspec validate introduce-study-intake-router --strict`: valid.
+  - Spec compliance review: approved.
+  - Code quality review: approved after P1 fix and re-review.
+- Evidence:
+  - `openspec/add-initiate-implementation-control/evidence/introduce-study-intake-router/apply-groups/intake-data-and-idempotency.md`
+- Next checkpoint: introduce-study-intake-router:apply:source-preview-and-github-roles

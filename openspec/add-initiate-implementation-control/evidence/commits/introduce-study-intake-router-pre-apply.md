@@ -1,0 +1,33 @@
+# Pre-Apply Checkpoint Commit: introduce-study-intake-router
+
+- Timestamp: 2026-05-25T04:44:45Z
+- Change: introduce-study-intake-router
+- Commit hash: 4a5f6d43bdcc79ca9efea62d29dca707a103bdbb
+- Staged paths:
+  - `openspec/add-initiate-implementation-control/evidence/apply-task-groups.schema.md`
+  - `openspec/add-initiate-implementation-control/evidence/failures/2026-05-25T043840Z-overlapping-user-changes.md`
+  - `openspec/add-initiate-implementation-control/evidence/failures/failure-log.jsonl`
+  - `openspec/add-initiate-implementation-control/evidence/introduce-study-intake-router/apply-planning.md`
+  - `openspec/add-initiate-implementation-control/evidence/introduce-study-intake-router/apply-task-groups.json`
+  - `openspec/add-initiate-implementation-control/evidence/manifest.json`
+  - `openspec/add-initiate-implementation-control/evidence/manifest.schema.md`
+  - `openspec/add-initiate-implementation-control/evidence/migrations/2026-05-25-require-three-product-deepen-rounds.md`
+  - `openspec/add-initiate-implementation-control/evidence/policy-updates/2026-05-25T043840Z-dirty-workspace-policy.md`
+  - `openspec/add-initiate-implementation-control/evidence/scope-dependency/introduce-study-intake-router.md`
+  - `openspec/add-initiate-implementation-control/evidence/scope-dependency/schema.md`
+  - `openspec/add-initiate-implementation-control/progress.md`
+  - `openspec/add-initiate-implementation-control/runbook.md`
+  - `openspec/add-initiate-implementation-control/state.json`
+  - `openspec/changes/introduce-study-intake-router/design.md`
+  - `openspec/changes/introduce-study-intake-router/review-records/product-deepen-round-1.md`
+  - `openspec/changes/introduce-study-intake-router/review-records/product-deepen-round-2.md`
+  - `openspec/changes/introduce-study-intake-router/review-records/product-deepen-round-3.md`
+  - `openspec/changes/introduce-study-intake-router/specs/learning-data-layer/spec.md`
+  - `openspec/changes/introduce-study-intake-router/specs/study-intake-planning/spec.md`
+- Verification commands:
+  - `jq empty openspec/add-initiate-implementation-control/state.json`
+  - `jq empty openspec/add-initiate-implementation-control/evidence/manifest.json`
+  - `jq empty openspec/add-initiate-implementation-control/evidence/introduce-study-intake-router/apply-task-groups.json`
+  - `openspec validate introduce-study-intake-router --strict`
+- Result: pre-apply checkpoint commit created without staging protected unrelated dirty files.
+- Next checkpoint: introduce-study-intake-router:apply:intake-data-and-idempotency
