@@ -29,10 +29,10 @@
     "checkpointRequiredBeforeApply": true,
     "commitEvidenceRoot": "openspec/add-initiate-implementation-control/evidence/commits",
     "lastCheckpointCommit": {
-      "completedAt": "2026-05-25T09:15:11Z",
-      "changeId": "introduce-plan-compiler",
-      "commit": "73274553d0231c6cfba5170cf507a1fba09d3381",
-      "evidenceFile": "openspec/add-initiate-implementation-control/evidence/commits/introduce-plan-compiler-pre-apply.md"
+      "completedAt": "2026-05-25T11:19:11Z",
+      "changeId": "introduce-deadline-scheduler",
+      "commit": "8a0093e70deb03aa61a16f7fceb9a5e5d1a46e88",
+      "evidenceFile": "openspec/add-initiate-implementation-control/evidence/commits/introduce-deadline-scheduler-pre-apply.md"
     },
     "pendingCommitReason": null
   },
@@ -181,10 +181,10 @@
   ],
   "lastRun": {
     "completedAt": "2026-05-25T11:19:11Z",
-    "checkpoint": "introduce-deadline-scheduler:apply:planning",
+    "checkpoint": "introduce-deadline-scheduler:apply:pre_apply_checkpoint_commit",
     "result": "completed"
   },
-  "lastCompletedCheckpoint": "introduce-deadline-scheduler:apply:planning",
+  "lastCompletedCheckpoint": "introduce-deadline-scheduler:apply:pre_apply_checkpoint_commit",
   "lastMigration": {
     "completedAt": "2026-05-25T03:56:29Z",
     "id": "require-three-product-deepen-rounds",
@@ -204,8 +204,8 @@
   },
   "lastFailure": null,
   "lastVerification": {
-    "command": "jq empty state/manifest/apply-task-groups; openspec validate introduce-deadline-scheduler --strict; openspec status --change introduce-deadline-scheduler --json; openspec instructions apply --change introduce-deadline-scheduler --json",
-    "result": "apply planning valid; scheduler OpenSpec valid; apply instructions ready with 36 pending tasks"
+    "command": "git commit -m \"Prepare deadline scheduler apply\"; jq empty state/manifest/apply-task-groups; openspec validate introduce-deadline-scheduler --strict",
+    "result": "pre-apply checkpoint commit created and recorded; scheduler OpenSpec remains valid"
   },
   "blockedReason": null
 }

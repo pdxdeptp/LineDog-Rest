@@ -1064,3 +1064,23 @@ Planned apply groups for `introduce-deadline-scheduler`:
 - Manifest:
   - Added `introduce-deadline-scheduler-apply-planning`.
 - Next checkpoint: introduce-deadline-scheduler:apply:scheduler-contract-preflight-and-capacity
+
+## Run 2026-05-25T11:19:11Z Pre-Apply Checkpoint Commit introduce-deadline-scheduler
+
+- Automation: add-initiate-changes
+- Checkpoint: introduce-deadline-scheduler:apply:pre_apply_checkpoint_commit
+- Result: completed
+- Actions:
+  - Created safe pre-apply checkpoint commit `8a0093e70deb03aa61a16f7fceb9a5e5d1a46e88` via `git commit -m "Prepare deadline scheduler apply"`.
+  - Wrote commit evidence at `openspec/add-initiate-implementation-control/evidence/commits/introduce-deadline-scheduler-pre-apply.md`.
+  - Updated `state.json.commitPolicy.lastCheckpointCommit` for scheduler apply.
+  - Added `introduce-deadline-scheduler-pre-apply-checkpoint-commit` to the manifest.
+  - Did not stage protected unrelated dirty files.
+- Verification:
+  - `jq empty openspec/add-initiate-implementation-control/state.json`: valid.
+  - `jq empty openspec/add-initiate-implementation-control/evidence/manifest.json`: valid.
+  - `jq empty openspec/add-initiate-implementation-control/evidence/introduce-deadline-scheduler/apply-task-groups.json`: valid.
+  - `openspec validate introduce-deadline-scheduler --strict`: valid.
+- Manifest:
+  - Added `introduce-deadline-scheduler-pre-apply-checkpoint-commit`.
+- Next checkpoint: introduce-deadline-scheduler:apply:scheduler-contract-preflight-and-capacity

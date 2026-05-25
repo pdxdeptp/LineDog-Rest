@@ -1994,6 +1994,50 @@
         }
       ],
       "nextCheckpoint": "introduce-deadline-scheduler:apply:scheduler-contract-preflight-and-capacity"
+    },
+    {
+      "id": "introduce-deadline-scheduler-pre-apply-checkpoint-commit",
+      "timestamp": "2026-05-25T11:19:11Z",
+      "kind": "pre_apply_commit",
+      "changeId": "introduce-deadline-scheduler",
+      "checkpoint": "introduce-deadline-scheduler:apply:scheduler-contract-preflight-and-capacity",
+      "result": "completed",
+      "commit": "8a0093e70deb03aa61a16f7fceb9a5e5d1a46e88",
+      "commands": [
+        {
+          "command": "git commit -m \"Prepare deadline scheduler apply\"",
+          "exitCode": 0,
+          "summary": "pre-apply checkpoint commit created"
+        },
+        {
+          "command": "jq empty openspec/add-initiate-implementation-control/state.json",
+          "exitCode": 0,
+          "summary": "valid JSON"
+        },
+        {
+          "command": "jq empty openspec/add-initiate-implementation-control/evidence/manifest.json",
+          "exitCode": 0,
+          "summary": "valid JSON"
+        },
+        {
+          "command": "jq empty openspec/add-initiate-implementation-control/evidence/introduce-deadline-scheduler/apply-task-groups.json",
+          "exitCode": 0,
+          "summary": "valid JSON"
+        },
+        {
+          "command": "openspec validate introduce-deadline-scheduler --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/add-initiate-implementation-control/evidence/commits/introduce-deadline-scheduler-pre-apply.md",
+          "sha256": "9e347bfcbe558dff1c932c1d8ba705e3cdf3715d5c238a68d2837934f09bc56e",
+          "description": "Pre-apply checkpoint commit evidence."
+        }
+      ],
+      "nextCheckpoint": "introduce-deadline-scheduler:apply:scheduler-contract-preflight-and-capacity"
     }
   ]
 }
