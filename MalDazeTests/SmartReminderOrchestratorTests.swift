@@ -197,6 +197,122 @@ final class SmartReminderOrchestratorTests: XCTestCase {
         XCTAssertEqual(llm.calls[0].apiKey, "legacy-gemini-key")
     }
 
+    func testOpenAICompatibleClientPreservesArrayJSONContractInRequest() async throws {
+        let expectedText = #"[{"title":"任务甲"},{"title":"任务乙"}]"#
+        try configureSmartReminderHTTPStub(jsonObject: [
+            "choices": [
+                [
+                    "message": [
+                        "content": expectedText
+                    ]
+                ]
+            ]
+        ])
+        let client = ReminderLLMAPIClient(urlSessionConfiguration: smartReminderStubConfiguration())
+
+        let result = try await client.generateStructuredReminderJSON(
+            provider: .openai,
+            model: "gpt-5.4-mini",
+            systemPrompt: "Return reminder JSON.",
+            userText: "明天提醒我两件事",
+            apiKey: "openai-test-key",
+            timeoutSeconds: 1
+        )
+
+        let request = try XCTUnwrap(SmartReminderURLProtocolStub.lastRequest)
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertEqual(request.url?.absoluteString, "https://api.openai.com/v1/chat/completions")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer openai-test-key")
+
+        let bodyData = try XCTUnwrap(request.httpBodyStreamData)
+        let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: bodyData) as? [String: Any])
+        XCTAssertEqual(payload["model"] as? String, "gpt-5.4-mini")
+        XCTAssertEqual(payload["temperature"] as? Double, 0.2)
+        XCTAssertNil(payload["response_format"])
+
+        let messages = try XCTUnwrap(payload["messages"] as? [[String: Any]])
+        XCTAssertEqual(messages.count, 2)
+        XCTAssertEqual(messages[0]["role"] as? String, "system")
+        XCTAssertEqual(messages[0]["content"] as? String, "Return reminder JSON.")
+        XCTAssertEqual(messages[1]["role"] as? String, "user")
+        XCTAssertEqual(messages[1]["content"] as? String, "明天提醒我两件事")
+        XCTAssertEqual(result, expectedText)
+    }
+
+    func testGeminiClientUsesExplicitModelAndParsesCandidateText() async throws {
+        let expectedText = #"{"title":"买牛奶"}"#
+        try configureSmartReminderHTTPStub(jsonObject: [
+            "candidates": [
+                [
+                    "content": [
+                        "parts": [
+                            [
+                                "text": expectedText
+                            ]
+                        ]
+                    ]
+                ]
+            ]
+        ])
+        let client = ReminderLLMAPIClient(urlSessionConfiguration: smartReminderStubConfiguration())
+
+        let result = try await client.generateStructuredReminderJSON(
+            provider: .gemini,
+            model: "gemini-explicit-model",
+            systemPrompt: "System prompt",
+            userText: "买牛奶",
+            apiKey: "gemini-test-key",
+            timeoutSeconds: 1
+        )
+
+        let request = try XCTUnwrap(SmartReminderURLProtocolStub.lastRequest)
+        let components = try XCTUnwrap(URLComponents(url: try XCTUnwrap(request.url), resolvingAgainstBaseURL: false))
+        let queryItems = Dictionary(uniqueKeysWithValues: (components.queryItems ?? []).map { ($0.name, $0.value) })
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertEqual(components.path, "/v1beta/models/gemini-explicit-model:generateContent")
+        XCTAssertEqual(queryItems["key"], "gemini-test-key")
+
+        let bodyData = try XCTUnwrap(request.httpBodyStreamData)
+        let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: bodyData) as? [String: Any])
+        XCTAssertNotNil(payload["systemInstruction"])
+        XCTAssertNotNil(payload["contents"])
+        let generationConfig = try XCTUnwrap(payload["generationConfig"] as? [String: Any])
+        XCTAssertEqual(generationConfig["responseMimeType"] as? String, "application/json")
+        XCTAssertEqual(result, expectedText)
+    }
+
+    func testReminderLLMHTTPStatusLocalizedDescriptionIncludesStatusWithoutKey() async throws {
+        try configureSmartReminderHTTPStub(jsonObject: ["error": "rate limited"], statusCode: 429)
+        let client = ReminderLLMAPIClient(urlSessionConfiguration: smartReminderStubConfiguration())
+
+        do {
+            _ = try await client.generateStructuredReminderJSON(
+                provider: .openai,
+                model: "gpt-5.4-mini",
+                systemPrompt: "System prompt",
+                userText: "Text",
+                apiKey: "secret-key-should-not-leak",
+                timeoutSeconds: 1
+            )
+            XCTFail("Expected HTTP status error")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("429"))
+            XCTAssertFalse(error.localizedDescription.contains("secret-key-should-not-leak"))
+        }
+    }
+
+    func testReminderLLMErrorDescriptionsAreProviderSafe() {
+        XCTAssertTrue(GeminiRemindersAPIError.invalidURL.localizedDescription.contains("Invalid Gemini request URL"))
+        XCTAssertTrue(GeminiRemindersAPIError.emptyResponse.localizedDescription.contains("Gemini returned an empty response"))
+        XCTAssertTrue(GeminiRemindersAPIError.noCandidates.localizedDescription.contains("Gemini response did not include candidate text"))
+        XCTAssertTrue(GeminiRemindersAPIError.httpStatus(503).localizedDescription.contains("503"))
+
+        XCTAssertTrue(ReminderLLMAPIError.invalidURL.localizedDescription.contains("Invalid reminder LLM request URL"))
+        XCTAssertTrue(ReminderLLMAPIError.emptyResponse.localizedDescription.contains("reminder LLM provider returned an empty response"))
+        XCTAssertTrue(ReminderLLMAPIError.noChoices.localizedDescription.contains("reminder LLM provider response did not include message text"))
+        XCTAssertTrue(ReminderLLMAPIError.httpStatus(429).localizedDescription.contains("429"))
+    }
+
     func testDecodePayloadsFromJSONArray() throws {
         let json = """
         [{"title":"开chalse shwab","is_routine":false,"notes":null,"target_list_name":"Reminders","has_alarm":false,"alarm_date":{"year":2026,"month":3,"day":27,"hour":10,"minute":0},"priority":0},{"title":"去百合食品买零食","is_routine":false,"notes":null,"target_list_name":"Reminders","has_alarm":false,"alarm_date":{"year":2026,"month":3,"day":27,"hour":10,"minute":0},"priority":0}]
@@ -701,4 +817,65 @@ private final class MockReminderMutationService: ReminderMutationServing {
     }
 
     func removeReminder(calendarItemIdentifier: String) async throws {}
+}
+
+private final class SmartReminderURLProtocolStub: URLProtocol {
+    nonisolated(unsafe) static var responseData = Data()
+    nonisolated(unsafe) static var statusCode = 200
+    nonisolated(unsafe) static var lastRequest: URLRequest?
+
+    override class func canInit(with request: URLRequest) -> Bool {
+        true
+    }
+
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest {
+        request
+    }
+
+    override func startLoading() {
+        Self.lastRequest = request
+        let response = HTTPURLResponse(
+            url: request.url!,
+            statusCode: Self.statusCode,
+            httpVersion: nil,
+            headerFields: ["Content-Type": "application/json"]
+        )!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: Self.responseData)
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
+}
+
+private func configureSmartReminderHTTPStub(jsonObject: [String: Any], statusCode: Int = 200) throws {
+    SmartReminderURLProtocolStub.responseData = try JSONSerialization.data(withJSONObject: jsonObject)
+    SmartReminderURLProtocolStub.statusCode = statusCode
+    SmartReminderURLProtocolStub.lastRequest = nil
+}
+
+private func smartReminderStubConfiguration() -> URLSessionConfiguration {
+    let configuration = URLSessionConfiguration.ephemeral
+    configuration.protocolClasses = [SmartReminderURLProtocolStub.self]
+    return configuration
+}
+
+private extension URLRequest {
+    var httpBodyStreamData: Data? {
+        guard let stream = httpBodyStream else { return httpBody }
+        stream.open()
+        defer { stream.close() }
+
+        var data = Data()
+        let bufferSize = 1024
+        let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
+        defer { buffer.deallocate() }
+
+        while stream.hasBytesAvailable {
+            let read = stream.read(buffer, maxLength: bufferSize)
+            if read <= 0 { break }
+            data.append(buffer, count: read)
+        }
+        return data
+    }
 }

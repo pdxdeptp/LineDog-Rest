@@ -1,17 +1,43 @@
 import Foundation
 
-enum GeminiRemindersAPIError: Error {
+enum GeminiRemindersAPIError: Error, LocalizedError {
     case invalidURL
     case emptyResponse
     case noCandidates
     case httpStatus(Int)
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidURL:
+            return "Invalid Gemini request URL."
+        case .emptyResponse:
+            return "Gemini returned an empty response."
+        case .noCandidates:
+            return "Gemini response did not include candidate text."
+        case .httpStatus(let statusCode):
+            return "Gemini request failed with HTTP status \(statusCode)."
+        }
+    }
 }
 
-enum ReminderLLMAPIError: Error {
+enum ReminderLLMAPIError: Error, LocalizedError {
     case invalidURL
     case emptyResponse
     case noChoices
     case httpStatus(Int)
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidURL:
+            return "Invalid reminder LLM request URL."
+        case .emptyResponse:
+            return "The reminder LLM provider returned an empty response."
+        case .noChoices:
+            return "The reminder LLM provider response did not include message text."
+        case .httpStatus(let statusCode):
+            return "The reminder LLM provider request failed with HTTP status \(statusCode)."
+        }
+    }
 }
 
 /// Gemini `generateContent`，JSON 输出；带请求超时（PRD 3.5s）。
@@ -36,6 +62,12 @@ protocol ReminderLLMGenerating: AnyObject, Sendable {
 }
 
 final class GeminiRemindersAPIClient: GeminiRemindersGenerating {
+    private let urlSessionConfiguration: URLSessionConfiguration
+
+    init(urlSessionConfiguration: URLSessionConfiguration = URLSessionConfiguration.ephemeral) {
+        self.urlSessionConfiguration = urlSessionConfiguration
+    }
+
     func generateStructuredReminderJSON(
         systemPrompt: String,
         userText: String,
@@ -85,10 +117,7 @@ final class GeminiRemindersAPIClient: GeminiRemindersGenerating {
         ]
         req.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-        let config = URLSessionConfiguration.ephemeral
-        config.timeoutIntervalForRequest = timeoutSeconds
-        config.timeoutIntervalForResource = timeoutSeconds + 0.5
-        let session = URLSession(configuration: config)
+        let session = makeSession(timeoutSeconds: timeoutSeconds)
 
         let (data, response) = try await session.data(for: req)
         guard let http = response as? HTTPURLResponse else { throw GeminiRemindersAPIError.emptyResponse }
@@ -109,10 +138,23 @@ final class GeminiRemindersAPIClient: GeminiRemindersGenerating {
         }
         return text
     }
+
+    private func makeSession(timeoutSeconds: TimeInterval) -> URLSession {
+        let config = (urlSessionConfiguration.copy() as? URLSessionConfiguration) ?? URLSessionConfiguration.ephemeral
+        config.timeoutIntervalForRequest = timeoutSeconds
+        config.timeoutIntervalForResource = timeoutSeconds + 0.5
+        return URLSession(configuration: config)
+    }
 }
 
 final class ReminderLLMAPIClient: ReminderLLMGenerating, @unchecked Sendable {
-    private let gemini = GeminiRemindersAPIClient()
+    private let gemini: GeminiRemindersAPIClient
+    private let urlSessionConfiguration: URLSessionConfiguration
+
+    init(urlSessionConfiguration: URLSessionConfiguration = URLSessionConfiguration.ephemeral) {
+        self.urlSessionConfiguration = urlSessionConfiguration
+        self.gemini = GeminiRemindersAPIClient(urlSessionConfiguration: urlSessionConfiguration)
+    }
 
     func generateStructuredReminderJSON(
         provider: LLMProviderID,
@@ -174,14 +216,10 @@ final class ReminderLLMAPIClient: ReminderLLMGenerating, @unchecked Sendable {
                 ["role": "user", "content": userText],
             ],
             "temperature": 0.2,
-            "response_format": ["type": "json_object"],
         ]
         req.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-        let config = URLSessionConfiguration.ephemeral
-        config.timeoutIntervalForRequest = timeoutSeconds
-        config.timeoutIntervalForResource = timeoutSeconds + 0.5
-        let session = URLSession(configuration: config)
+        let session = makeSession(timeoutSeconds: timeoutSeconds)
 
         let (data, response) = try await session.data(for: req)
         guard let http = response as? HTTPURLResponse else { throw ReminderLLMAPIError.emptyResponse }
@@ -200,5 +238,12 @@ final class ReminderLLMAPIClient: ReminderLLMGenerating, @unchecked Sendable {
             throw ReminderLLMAPIError.noChoices
         }
         return text
+    }
+
+    private func makeSession(timeoutSeconds: TimeInterval) -> URLSession {
+        let config = (urlSessionConfiguration.copy() as? URLSessionConfiguration) ?? URLSessionConfiguration.ephemeral
+        config.timeoutIntervalForRequest = timeoutSeconds
+        config.timeoutIntervalForResource = timeoutSeconds + 0.5
+        return URLSession(configuration: config)
     }
 }
