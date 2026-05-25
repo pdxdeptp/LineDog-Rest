@@ -1,5 +1,6 @@
 """Study plan deterministic scheduling tests."""
 
+from copy import deepcopy
 import importlib
 from datetime import date
 
@@ -405,7 +406,7 @@ def test_scheduler_reports_optional_unscheduled_minutes_without_blocking_draft_r
         ),
         start_date="2026-06-01",
         deadline="2026-06-01",
-        daily_capacity_min=30,
+        daily_capacity_min=40,
         rest_weekdays=[],
     )
 
@@ -446,7 +447,7 @@ def test_scheduler_places_essential_work_before_optional_when_capacity_is_tight(
         ),
         start_date="2026-06-01",
         deadline="2026-06-01",
-        daily_capacity_min=60,
+        daily_capacity_min=80,
         rest_weekdays=[],
     )
 
@@ -477,8 +478,558 @@ def test_scheduler_capacity_gap_reports_missing_minutes_not_whole_task_estimate(
     )
 
     assert review["status"] == "infeasible_review"
-    assert review["risk_report"]["capacity_gap_minutes"] == 30
+    assert review["risk_report"]["capacity_gap_minutes"] == 42
     assert review["risk_report"]["expected_late_tasks"] == ["oversized"]
+
+
+def test_scheduler_buffer_reservation_uses_planning_budget_and_blocks_erosion():
+    scheduling = _scheduling_module()
+
+    no_buffer = scheduling.schedule_draft_review(
+        _compiler_package(
+            tasks=[
+                {
+                    "id": "day-1",
+                    "phase_id": "phase-1",
+                    "title": "Short window work",
+                    "estimated_minutes": 80,
+                    "classification": "essential",
+                }
+            ]
+        ),
+        start_date="2026-06-01",
+        deadline="2026-06-02",
+        daily_capacity_min=100,
+        rest_weekdays=[],
+    )
+    eroded = scheduling.schedule_draft_review(
+        _compiler_package(
+            tasks=[
+                {
+                    "id": f"essential-{index}",
+                    "phase_id": "phase-1",
+                    "title": f"Essential {index}",
+                    "estimated_minutes": 80,
+                    "classification": "essential",
+                }
+                for index in range(1, 4)
+            ]
+        ),
+        start_date="2026-06-01",
+        deadline="2026-06-03",
+        daily_capacity_min=100,
+        rest_weekdays=[],
+    )
+    accepted_buffer_risk = scheduling.schedule_draft_review(
+        _compiler_package(
+            tasks=[
+                {
+                    "id": f"essential-{index}",
+                    "phase_id": "phase-1",
+                    "title": f"Essential {index}",
+                    "estimated_minutes": 80,
+                    "classification": "essential",
+                }
+                for index in range(1, 4)
+            ],
+            accepted_risks=["buffer_erosion"],
+        ),
+        start_date="2026-06-01",
+        deadline="2026-06-03",
+        daily_capacity_min=100,
+        rest_weekdays=[],
+    )
+
+    assert [day["planning_budget_min"] for day in no_buffer["scheduled_days"]] == [
+        80,
+        80,
+    ]
+    assert no_buffer["risk_report"]["buffer_days_reserved"] == []
+    assert no_buffer["risk_report"]["fits_as_written"] is True
+    assert [day["reserved_buffer"] for day in eroded["scheduled_days"]] == [
+        False,
+        False,
+        True,
+    ]
+    assert eroded["scheduled_days"][2]["items"][0]["task_id"] == "essential-3"
+    assert eroded["scheduled_days"][2]["load_state"] == "uses_buffer"
+    assert eroded["status"] == "infeasible_review"
+    assert eroded["risk_report"]["buffer_days_reserved"] == ["2026-06-03"]
+    assert eroded["risk_report"]["buffer_erosion"] is True
+    assert accepted_buffer_risk["status"] == "draft_review"
+    assert accepted_buffer_risk["risk_report"]["buffer_erosion"] is True
+
+
+def test_scheduler_load_shape_tie_breakers_change_distribution_only():
+    scheduling = _scheduling_module()
+    tasks = [
+        {
+            "id": f"task-{index}",
+            "phase_id": "phase-1",
+            "title": f"Task {index}",
+            "estimated_minutes": 25,
+            "classification": "essential",
+        }
+        for index in range(1, 5)
+    ]
+
+    balanced = scheduling.schedule_draft_review(
+        _compiler_package(tasks=tasks, load_shape="balanced"),
+        start_date="2026-06-01",
+        deadline="2026-06-02",
+        daily_capacity_min=100,
+        rest_weekdays=[],
+    )
+    front_loaded = scheduling.schedule_draft_review(
+        _compiler_package(tasks=tasks, load_shape="front_loaded"),
+        start_date="2026-06-01",
+        deadline="2026-06-02",
+        daily_capacity_min=100,
+        rest_weekdays=[],
+    )
+    light_start = scheduling.schedule_draft_review(
+        _compiler_package(tasks=tasks, load_shape="light_start"),
+        start_date="2026-06-01",
+        deadline="2026-06-02",
+        daily_capacity_min=100,
+        rest_weekdays=[],
+    )
+
+    assert [day["planned_minutes"] for day in balanced["scheduled_days"]] == [50, 50]
+    assert [day["planned_minutes"] for day in front_loaded["scheduled_days"]] == [75, 25]
+    assert [day["planned_minutes"] for day in light_start["scheduled_days"]] == [25, 75]
+    assert {
+        item["task_id"]
+        for review in (balanced, front_loaded, light_start)
+        for day in review["scheduled_days"]
+        for item in day["items"]
+    } == {"task-1", "task-2", "task-3", "task-4"}
+
+
+def test_scheduler_preserves_dependency_order_and_places_optional_last():
+    scheduling = _scheduling_module()
+
+    review = scheduling.schedule_draft_review(
+        _compiler_package(
+            tasks=[
+                {
+                    "id": "optional",
+                    "phase_id": "phase-1",
+                    "title": "Optional polish",
+                    "estimated_minutes": 40,
+                    "classification": "optional",
+                },
+                {
+                    "id": "prep",
+                    "phase_id": "phase-1",
+                    "title": "Prepare core",
+                    "estimated_minutes": 60,
+                    "classification": "essential",
+                },
+                {
+                    "id": "build",
+                    "phase_id": "phase-1",
+                    "title": "Build after prep",
+                    "estimated_minutes": 60,
+                    "classification": "essential",
+                    "depends_on": ["prep"],
+                },
+            ]
+        ),
+        start_date="2026-06-01",
+        deadline="2026-06-02",
+        daily_capacity_min=80,
+        rest_weekdays=[],
+    )
+
+    placements = {
+        item["task_id"]: (day["date"], item["sequence_index"])
+        for day in review["scheduled_days"]
+        for item in day["items"]
+    }
+    assert placements["prep"] <= placements["build"]
+    assert review["unscheduled_tasks"] == [
+        {
+            "task_id": "optional",
+            "estimated_minutes": 40,
+            "classification": "optional",
+            "reason": "insufficient_capacity",
+        }
+    ]
+
+
+def test_scheduler_reorders_ready_tasks_to_preserve_dependencies():
+    scheduling = _scheduling_module()
+
+    review = scheduling.schedule_draft_review(
+        _compiler_package(
+            tasks=[
+                {
+                    "id": "build",
+                    "phase_id": "phase-1",
+                    "title": "Build after prep",
+                    "estimated_minutes": 60,
+                    "classification": "essential",
+                    "depends_on": ["prep"],
+                },
+                {
+                    "id": "prep",
+                    "phase_id": "phase-1",
+                    "title": "Prepare core",
+                    "estimated_minutes": 60,
+                    "classification": "essential",
+                },
+            ]
+        ),
+        start_date="2026-06-01",
+        deadline="2026-06-02",
+        daily_capacity_min=80,
+        rest_weekdays=[],
+    )
+
+    ordered_items = [
+        item["task_id"]
+        for day in review["scheduled_days"]
+        for item in day["items"]
+    ]
+    assert review["status"] == "draft_review"
+    assert ordered_items == ["prep", "build"]
+    assert review["unscheduled_tasks"] == []
+
+
+def test_scheduler_continuation_sessions_preserve_parent_identity_and_context():
+    scheduling = _scheduling_module()
+
+    review = scheduling.schedule_draft_review(
+        _compiler_package(
+            tasks=[
+                {
+                    "id": "essay",
+                    "phase_id": "phase-1",
+                    "title": "Write project essay",
+                    "estimated_minutes": 160,
+                    "classification": "essential",
+                    "completion_criteria": ["draft", "revise"],
+                    "source_refs": [{"id": "brief"}],
+                    "split_points": [
+                        {"id": "outline", "minutes": 80, "output": "outline"},
+                        {"id": "draft", "minutes": 80, "output": "draft"},
+                    ],
+                }
+            ]
+        ),
+        start_date="2026-06-01",
+        deadline="2026-06-02",
+        daily_capacity_min=100,
+        rest_weekdays=[],
+    )
+
+    sessions = [
+        (day, item)
+        for day in review["scheduled_days"]
+        for item in day["items"]
+    ]
+    assert [item["task_id"] for _, item in sessions] == ["essay", "essay"]
+    assert [item["session_id"] for _, item in sessions] == [
+        "essay:outline",
+        "essay:draft",
+    ]
+    assert [day["date"] for day, _ in sessions] == [
+        date(2026, 6, 1),
+        date(2026, 6, 2),
+    ]
+    assert [day["planned_minutes"] for day in review["scheduled_days"]] == [80, 80]
+    assert [item["parent_task_id"] for _, item in sessions] == ["essay", "essay"]
+    assert [item["sequence_index"] for _, item in sessions] == [0, 1]
+    assert [item["normal_mode"]["output"] for _, item in sessions] == [
+        "outline",
+        "draft",
+    ]
+    assert sessions[0][1]["classification"] == "essential"
+    assert sessions[0][1]["completion_criteria"] == ["draft", "revise"]
+    assert sessions[0][1]["source_refs"] == [{"id": "brief"}]
+
+
+def test_scheduler_numeric_continuation_sessions_include_visible_note():
+    scheduling = _scheduling_module()
+
+    review = scheduling.schedule_draft_review(
+        _compiler_package(
+            tasks=[
+                {
+                    "id": "essay",
+                    "phase_id": "phase-1",
+                    "title": "Write project essay",
+                    "estimated_minutes": 160,
+                    "classification": "essential",
+                    "multi_session_minutes": [80, 80],
+                }
+            ]
+        ),
+        start_date="2026-06-01",
+        deadline="2026-06-02",
+        daily_capacity_min=100,
+        rest_weekdays=[],
+    )
+
+    assert [
+        item["normal_mode"]["output"]
+        for day in review["scheduled_days"]
+        for item in day["items"]
+    ] == ["Continuation 1", "Continuation 2"]
+
+
+def test_scheduler_rejects_split_sessions_that_do_not_conserve_parent_estimate():
+    scheduling = _scheduling_module()
+
+    review = scheduling.schedule_draft_review(
+        _compiler_package(
+            tasks=[
+                {
+                    "id": "essay",
+                    "phase_id": "phase-1",
+                    "title": "Write project essay",
+                    "estimated_minutes": 160,
+                    "classification": "essential",
+                    "split_points": [
+                        {"id": "outline", "minutes": 80, "output": "outline"}
+                    ],
+                }
+            ]
+        ),
+        start_date="2026-06-01",
+        deadline="2026-06-02",
+        daily_capacity_min=100,
+        rest_weekdays=[],
+    )
+
+    assert review["status"] == "infeasible_review"
+    assert review["scheduled_days"][0]["items"] == []
+    assert review["unscheduled_tasks"] == [
+        {
+            "task_id": "essay",
+            "estimated_minutes": 160,
+            "classification": "essential",
+            "reason": "split_estimate_mismatch",
+        }
+    ]
+    assert review["risk_report"]["expected_late_tasks"] == ["essay"]
+
+
+def test_scheduler_rolls_back_trial_buffer_erosion_when_split_task_cannot_fit():
+    scheduling = _scheduling_module()
+
+    review = scheduling.schedule_draft_review(
+        _compiler_package(
+            tasks=[
+                {
+                    "id": "too-big",
+                    "phase_id": "phase-1",
+                    "title": "Too much work",
+                    "estimated_minutes": 320,
+                    "classification": "essential",
+                    "split_points": [
+                        {"id": "one", "minutes": 80, "output": "one"},
+                        {"id": "two", "minutes": 80, "output": "two"},
+                        {"id": "three", "minutes": 80, "output": "three"},
+                        {"id": "four", "minutes": 80, "output": "four"},
+                    ],
+                }
+            ]
+        ),
+        start_date="2026-06-01",
+        deadline="2026-06-03",
+        daily_capacity_min=100,
+        rest_weekdays=[],
+    )
+
+    assert review["status"] == "infeasible_review"
+    assert all(day["items"] == [] for day in review["scheduled_days"])
+    assert review["risk_report"]["buffer_erosion"] is False
+    assert review["unscheduled_tasks"][0]["task_id"] == "too-big"
+
+
+def test_scheduler_fallback_metadata_is_not_counted_as_active_task_completion():
+    scheduling = _scheduling_module()
+    compiler_package = _compiler_package(
+        tasks=[
+            {
+                "id": "normal-work",
+                "phase_id": "phase-1",
+                "title": "Normal work",
+                "estimated_minutes": 60,
+                "classification": "essential",
+                "fallback_mode": {
+                    "fallback_minutes": 15,
+                    "fallback_output": "skim notes",
+                    "risk_effect": "preserves_momentum",
+                },
+            }
+        ],
+        today_actions=["must not be touched"],
+    )
+    before = deepcopy(compiler_package)
+
+    review = scheduling.schedule_draft_review(
+        compiler_package,
+        start_date="2026-06-01",
+        deadline="2026-06-01",
+        daily_capacity_min=100,
+        rest_weekdays=[],
+    )
+
+    item = review["scheduled_days"][0]["items"][0]
+    assert compiler_package == before
+    assert item["normal_mode"]["minutes"] == 60
+    assert item["fallback_mode"] == {
+        "fallback_minutes": 15,
+        "fallback_output": "skim notes",
+        "risk_effect": "preserves_momentum",
+    }
+    assert review["scheduled_days"][0]["planned_minutes"] == 60
+    assert "today_actions" not in review
+    assert "active_tasks" not in review
+    item["fallback_mode"]["fallback_minutes"] = 1
+    assert compiler_package["tasks"][0]["fallback_mode"]["fallback_minutes"] == 15
+
+
+def test_scheduler_risk_report_includes_capacity_gap_rough_estimates_and_existing_load_conflicts():
+    scheduling = _scheduling_module()
+
+    review = scheduling.schedule_draft_review(
+        _compiler_package(
+            tasks=[
+                {
+                    "id": "fit",
+                    "phase_id": "phase-1",
+                    "title": "Fits with conflict",
+                    "estimated_minutes": 60,
+                    "classification": "essential",
+                    "estimate_confidence": "low",
+                },
+                {
+                    "id": "oversized",
+                    "phase_id": "phase-1",
+                    "title": "Too large",
+                    "estimated_minutes": 120,
+                    "classification": "essential",
+                    "estimate_confidence": "rough",
+                },
+                {
+                    "id": "stretch",
+                    "phase_id": "phase-1",
+                    "title": "Stretch",
+                    "estimated_minutes": 60,
+                    "classification": "stretch",
+                    "estimate_confidence": "high",
+                },
+            ]
+        ),
+        start_date="2026-06-01",
+        deadline="2026-06-01",
+        daily_capacity_min=100,
+        existing_active_load={"2026-06-01": 20},
+        rest_weekdays=[],
+    )
+
+    assert review["status"] == "infeasible_review"
+    assert review["risk_report"]["capacity_gap_minutes"] == 116
+    assert review["risk_report"]["optional_unscheduled_minutes"] == 60
+    assert review["risk_report"]["expected_late_tasks"] == ["oversized"]
+    assert review["risk_report"]["estimate_confidence_summary"] == {
+        "low": 1,
+        "rough": 1,
+        "high": 1,
+    }
+    assert review["risk_report"]["existing_load_conflicts"] == ["2026-06-01"]
+
+
+def test_scheduler_reports_accepted_overloaded_dates_without_hiding_risk():
+    scheduling = _scheduling_module()
+
+    review = scheduling.schedule_draft_review(
+        _compiler_package(
+            tasks=[
+                {
+                    "id": "overload",
+                    "phase_id": "phase-1",
+                    "title": "Accepted heavy day",
+                    "estimated_minutes": 90,
+                    "classification": "essential",
+                }
+            ],
+            accepted_risks=["accept_overload"],
+            accepted_overload_dates=["2026-06-01"],
+        ),
+        start_date="2026-06-01",
+        deadline="2026-06-01",
+        daily_capacity_min=100,
+        existing_active_load={"2026-06-01": 20},
+        rest_weekdays=[],
+    )
+
+    assert review["status"] == "draft_review"
+    assert review["scheduled_days"][0]["planned_minutes"] == 90
+    assert review["scheduled_days"][0]["load_state"] == "over_capacity"
+    assert review["risk_report"]["overloaded_dates"] == ["2026-06-01"]
+
+
+def test_scheduler_accepts_overload_when_existing_load_consumes_all_usable_capacity():
+    scheduling = _scheduling_module()
+
+    review = scheduling.schedule_draft_review(
+        _compiler_package(
+            tasks=[
+                {
+                    "id": "overload-zero-usable",
+                    "phase_id": "phase-1",
+                    "title": "Accepted full-load day",
+                    "estimated_minutes": 30,
+                    "classification": "essential",
+                }
+            ],
+            accepted_risks=["accept_overload"],
+            accepted_overload_dates=["2026-06-01"],
+        ),
+        start_date="2026-06-01",
+        deadline="2026-06-01",
+        daily_capacity_min=60,
+        existing_active_load={"2026-06-01": 60},
+        rest_weekdays=[],
+    )
+
+    assert review["status"] == "draft_review"
+    assert review["scheduled_days"][0]["usable_capacity_min"] == 0
+    assert review["scheduled_days"][0]["planned_minutes"] == 30
+    assert review["scheduled_days"][0]["load_state"] == "over_capacity"
+    assert review["risk_report"]["overloaded_dates"] == ["2026-06-01"]
+
+
+def test_scheduler_capacity_gap_excludes_unaccepted_reserved_buffer():
+    scheduling = _scheduling_module()
+
+    review = scheduling.schedule_draft_review(
+        _compiler_package(
+            tasks=[
+                {
+                    "id": f"essential-{index}",
+                    "phase_id": "phase-1",
+                    "title": f"Essential {index}",
+                    "estimated_minutes": 80,
+                    "classification": "essential",
+                }
+                for index in range(1, 4)
+            ]
+        ),
+        start_date="2026-06-01",
+        deadline="2026-06-03",
+        daily_capacity_min=100,
+        rest_weekdays=[],
+    )
+
+    assert review["status"] == "infeasible_review"
+    assert review["risk_report"]["capacity_gap_minutes"] == 80
+    assert review["risk_report"]["buffer_erosion"] is True
 
 
 def test_initial_schedule_is_deterministic_and_skips_default_saturday_rest_day():
