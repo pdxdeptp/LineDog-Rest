@@ -2822,6 +2822,59 @@ final class LearningAssistantUISourceTests: XCTestCase {
         XCTAssertFalse(addSource.contains("title: \"cancelled\""))
     }
 
+    func testAddInitiateDraftReviewUISourceIsSummaryFirstWithExplicitExpansionControls() throws {
+        let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
+        guard let start = source.range(of: "private struct AddInitiateView"),
+              let end = source[start.upperBound...].range(of: "private struct StudyPlanIntakeView") else {
+            XCTFail("AddInitiateView source section not found")
+            return
+        }
+        let addSource = String(source[start.lowerBound..<end.lowerBound])
+
+        XCTAssertTrue(addSource.contains("addInitiateDraftReviewSummary"))
+        XCTAssertTrue(addSource.contains("首周摘要"))
+        XCTAssertTrue(addSource.contains("缓冲"))
+        XCTAssertTrue(addSource.contains("低能量 fallback"))
+        XCTAssertTrue(addSource.contains("容量风险"))
+        XCTAssertTrue(addSource.contains("截止风险"))
+        XCTAssertTrue(addSource.contains("DisclosureGroup(\"完整排期\""))
+        XCTAssertTrue(addSource.contains("DisclosureGroup(\"来源细节\""))
+        XCTAssertTrue(addSource.contains("DisclosureGroup(\"单项编辑\""))
+        XCTAssertTrue(addSource.contains("ForEach(summary.fullScheduleDays"))
+        XCTAssertTrue(addSource.contains("ForEach(day.items"))
+        XCTAssertTrue(addSource.contains("editableTaskRow"))
+        XCTAssertTrue(addSource.contains("TextField(\"任务标题\""))
+        XCTAssertTrue(addSource.contains("Stepper(value: addInitiateTaskEditMinutesBinding"))
+        XCTAssertTrue(addSource.contains("vm.beginAddInitiateTaskEdit(item)"))
+        XCTAssertFalse(addSource.contains("disabledEditRow"))
+        XCTAssertFalse(addSource.contains(".disabled(true)"))
+        XCTAssertFalse(addSource.contains("共 \\(summary.fullScheduleDayCount) 天，默认只展示首周摘要。"))
+        XCTAssertFalse(addSource.contains("可编辑项 \\(summary.editableTaskCount) 个，编辑后需重新审阅。"))
+    }
+
+    func testAddInitiateInfeasibleAndActivationUISourceUsesCanonicalOptionsRetryEditCancel() throws {
+        let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
+        guard let start = source.range(of: "private struct AddInitiateView"),
+              let end = source[start.upperBound...].range(of: "private struct StudyPlanIntakeView") else {
+            XCTFail("AddInitiateView source section not found")
+            return
+        }
+        let addSource = String(source[start.lowerBound..<end.lowerBound])
+
+        XCTAssertTrue(addSource.contains("addInitiateInfeasibleOptionChoices"))
+        XCTAssertTrue(addSource.contains("option.optionId"))
+        XCTAssertTrue(addSource.contains("option.localizedLabel"))
+        XCTAssertTrue(addSource.contains("applyAddInitiateOptionEffect(optionId: option.optionId)"))
+        XCTAssertTrue(addSource.contains("canActivateAddInitiateDraft"))
+        XCTAssertTrue(addSource.contains("editAddInitiateDraft"))
+        XCTAssertTrue(addSource.contains("重试激活"))
+        XCTAssertTrue(addSource.contains("继续编辑"))
+        XCTAssertTrue(addSource.contains("取消"))
+        XCTAssertTrue(addSource.contains("case .optionEffectProgress"))
+        XCTAssertTrue(addSource.contains("infeasibleReviewCard(isApplyingOption: true)"))
+        XCTAssertFalse(addSource.contains("draftReviewCard(isApplyingOption: true)"))
+    }
+
     func testChatViewConsumesResourceAdjustPlanDraftText() throws {
         let source = try sourceFile("MalDaze/LearningAssistant/ChatView.swift")
 
@@ -3398,6 +3451,506 @@ final class LearningAssistantViewModelTests: XCTestCase {
         XCTAssertEqual(mock.fetchStudyCalendarLoadCallCount, 0)
     }
 
+    func testActivationFailedRetryCallsActivationAPIWithPreservedDraftVersion() async {
+        let mock = MockAssistantAPIClient()
+        mock.addInitiateStartResult = sampleAddInitiateRoleReviewSession()
+        mock.addInitiateRoleResult = sampleAddInitiateAnchorReviewSession()
+        mock.addInitiateAnchorResult = sampleAddInitiateDraftReviewSession(draftVersion: 3)
+        mock.addInitiateActivationResult = sampleAddInitiateActivationFailedSession(draftVersion: 3)
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+
+        await vm.startAddInitiateSession(rawInput: "Retry activation", sourceType: .textGoal)
+        await vm.confirmAddInitiateRole(title: "Retry activation", confirmedRole: .newPlan)
+        vm.addInitiateDeadline = "2026-11-02"
+        vm.addInitiateTargetOutput = "draft"
+        vm.addInitiateTargetDepth = "apply"
+        await vm.confirmAddInitiateAnchors()
+        await vm.activateAddInitiateDraft()
+
+        mock.addInitiateActivationResult = sampleAddInitiateActivatedSession(draftVersion: 3)
+        await vm.activateAddInitiateDraft()
+
+        XCTAssertEqual(mock.activateAddInitiateDraftCallCount, 2)
+        XCTAssertEqual(mock.lastAddInitiateActivationRequest?.draftId, 501)
+        XCTAssertEqual(mock.lastAddInitiateActivationRequest?.draftVersion, 3)
+        XCTAssertEqual(vm.addInitiateFlowState, .activated)
+    }
+
+    func testDraftReviewSummaryUsesFirstSevenDaysRiskFactsAndFallbackMetadata() async {
+        let mock = MockAssistantAPIClient()
+        mock.addInitiateStartResult = sampleAddInitiateRoleReviewSession()
+        mock.addInitiateRoleResult = sampleAddInitiateAnchorReviewSession()
+        mock.addInitiateAnchorResult = sampleAddInitiateDraftReviewSession(
+            draftVersion: 3,
+            reviewPackage: sampleAddInitiateDraftReviewPackage(dayCount: 8)
+        )
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+
+        await vm.startAddInitiateSession(rawInput: "Ship AgentGuide rebuild", sourceType: .textGoal)
+        await vm.confirmAddInitiateRole(title: "AgentGuide rebuild", confirmedRole: .newPlan)
+        vm.addInitiateDeadline = "2026-06-12"
+        vm.addInitiateDeadlineType = "hard"
+        vm.addInitiateCapacityMinutes = 75
+        vm.addInitiateTargetOutput = "reviewable rebuild plan"
+        vm.addInitiateTargetDepth = "apply"
+        await vm.confirmAddInitiateAnchors()
+
+        let summary = vm.addInitiateDraftReviewSummary
+        XCTAssertEqual(summary?.roleLabel, "新计划")
+        XCTAssertEqual(summary?.targetOutput, "reviewable rebuild plan")
+        XCTAssertEqual(summary?.assumptions, ["weekdays only", "ship demo first"])
+        XCTAssertEqual(summary?.firstWeekDays.count, 7)
+        XCTAssertEqual(summary?.firstWeekDays.map(\.date), [
+            "2026-06-01",
+            "2026-06-02",
+            "2026-06-03",
+            "2026-06-04",
+            "2026-06-05",
+            "2026-06-06",
+            "2026-06-07"
+        ])
+        XCTAssertEqual(summary?.firstWeekDays.first?.plannedMinutes, 60)
+        XCTAssertEqual(summary?.firstWeekDays.first?.loadStateLabel, "预算内")
+        XCTAssertEqual(summary?.firstWeekDays.first?.fallbackCue, "低能量：skim notes，风险：范围可见")
+        XCTAssertEqual(summary?.bufferSummary, "预留缓冲：2026-06-06；缓冲被侵蚀")
+        XCTAssertEqual(summary?.fallbackSummary, "替代执行：skim notes；风险影响：范围可见")
+        XCTAssertEqual(summary?.capacityRiskFacts, [
+            "必要工作 480 分钟",
+            "可用容量 420 分钟",
+            "容量缺口 60 分钟",
+            "超载日期 2026-06-03",
+            "预计延期 task-7",
+            "已有负荷 2026-06-04"
+        ])
+        XCTAssertEqual(summary?.deadlineRisk, "硬截止日期压力")
+        XCTAssertFalse(summary?.rendersEveryScheduledItemByDefault ?? true)
+    }
+
+    func testDraftReviewFirstWeekUsesShorterAvailableWindow() async {
+        let mock = MockAssistantAPIClient()
+        mock.addInitiateStartResult = sampleAddInitiateRoleReviewSession()
+        mock.addInitiateRoleResult = sampleAddInitiateAnchorReviewSession()
+        mock.addInitiateAnchorResult = sampleAddInitiateDraftReviewSession(
+            reviewPackage: sampleAddInitiateDraftReviewPackage(dayCount: 3)
+        )
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+
+        await vm.startAddInitiateSession(rawInput: "Short window", sourceType: .textGoal)
+        await vm.confirmAddInitiateRole(title: "Short window", confirmedRole: .newPlan)
+        vm.addInitiateDeadline = "2026-06-03"
+        vm.addInitiateTargetOutput = "short plan"
+        vm.addInitiateTargetDepth = "apply"
+        await vm.confirmAddInitiateAnchors()
+
+        XCTAssertEqual(vm.addInitiateDraftReviewSummary?.firstWeekDays.count, 3)
+    }
+
+    func testInfeasibleOptionsUseCanonicalLocalizedLabelsAndFilterLateFinishForHardDeadlines() async {
+        let mock = MockAssistantAPIClient()
+        mock.addInitiateStartResult = sampleAddInitiateRoleReviewSession()
+        mock.addInitiateRoleResult = sampleAddInitiateAnchorReviewSession()
+        mock.addInitiateAnchorResult = sampleAddInitiateInfeasibleReviewSession(deadlineType: "hard")
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+
+        await vm.startAddInitiateSession(rawInput: "Hard deadline rebuild", sourceType: .githubRepo)
+        await vm.confirmAddInitiateRole(title: "Hard deadline rebuild", confirmedRole: .newPlan)
+        vm.addInitiateDeadline = "2026-06-05"
+        vm.addInitiateDeadlineType = "hard"
+        vm.addInitiateTargetOutput = "working rebuild"
+        vm.addInitiateTargetDepth = "apply"
+        await vm.confirmAddInitiateAnchors()
+
+        let options = vm.addInitiateInfeasibleOptionChoices
+        XCTAssertEqual(options.map(\.optionId), ["reduce_scope", "lower_depth", "extend_deadline", "store_for_later"])
+        XCTAssertEqual(options.map(\.localizedLabel), ["缩小范围", "降低深度", "调整截止日期", "存为稍后处理"])
+        XCTAssertFalse(options.map(\.optionId).contains("accept_late_finish"))
+    }
+
+    func testInfeasibleReviewProjectsConcreteRiskFacts() async {
+        let mock = MockAssistantAPIClient()
+        mock.addInitiateStartResult = sampleAddInitiateRoleReviewSession()
+        mock.addInitiateRoleResult = sampleAddInitiateAnchorReviewSession()
+        mock.addInitiateAnchorResult = sampleAddInitiateInfeasibleReviewSession(deadlineType: "hard")
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+
+        await vm.startAddInitiateSession(rawInput: "Risk facts", sourceType: .githubRepo)
+        await vm.confirmAddInitiateRole(title: "Risk facts", confirmedRole: .newPlan)
+        vm.addInitiateDeadline = "2026-06-05"
+        vm.addInitiateTargetOutput = "risk review"
+        vm.addInitiateTargetDepth = "apply"
+        await vm.confirmAddInitiateAnchors()
+
+        XCTAssertEqual(vm.addInitiateInfeasibleRiskFacts, [
+            "容量缺口 90 分钟",
+            "超载日期 2026-06-04",
+            "预计延期 task-2",
+            "缓冲被侵蚀",
+            "低校准"
+        ])
+    }
+
+    func testDraftReviewPerTaskEditDraftRecordsLocallyWithoutActiveRefresh() async throws {
+        let mock = MockAssistantAPIClient()
+        mock.addInitiateStartResult = sampleAddInitiateRoleReviewSession()
+        mock.addInitiateRoleResult = sampleAddInitiateAnchorReviewSession()
+        mock.addInitiateAnchorResult = sampleAddInitiateDraftReviewSession(
+            reviewPackage: sampleAddInitiateDraftReviewPackage(dayCount: 2)
+        )
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+
+        await vm.startAddInitiateSession(rawInput: "Editable draft", sourceType: .textGoal)
+        await vm.confirmAddInitiateRole(title: "Editable draft", confirmedRole: .newPlan)
+        vm.addInitiateDeadline = "2026-06-12"
+        vm.addInitiateTargetOutput = "editable plan"
+        vm.addInitiateTargetDepth = "apply"
+        await vm.confirmAddInitiateAnchors()
+
+        let item = try XCTUnwrap(vm.addInitiateDraftReviewSummary?.fullScheduleDays.first?.items.first)
+        vm.beginAddInitiateTaskEdit(item)
+        vm.updateAddInitiateTaskEditTitle(itemId: item.id, title: "Edited task title")
+        vm.updateAddInitiateTaskEditMinutes(itemId: item.id, minutes: 35)
+
+        XCTAssertEqual(vm.addInitiateTaskEditDrafts[item.id]?.title, "Edited task title")
+        XCTAssertEqual(vm.addInitiateTaskEditDrafts[item.id]?.minutes, 35)
+        XCTAssertEqual(vm.addInitiateFlowState, .draftReview)
+        XCTAssertEqual(mock.fetchStudyTodayViewCallCount, 0)
+        XCTAssertEqual(mock.fetchStudyProjectOverviewCallCount, 0)
+        XCTAssertEqual(mock.fetchStudyCalendarLoadCallCount, 0)
+    }
+
+    func testOptionEffectAcceptsNewReviewStorageAndFocusedNeedsInputResults() async {
+        let newReview = MockAssistantAPIClient()
+        newReview.addInitiateStartResult = sampleAddInitiateRoleReviewSession()
+        newReview.addInitiateRoleResult = sampleAddInitiateAnchorReviewSession()
+        newReview.addInitiateAnchorResult = sampleAddInitiateInfeasibleReviewSession()
+        newReview.addInitiateOptionResult = sampleAddInitiateDraftReviewSession(draftVersion: 4)
+        var vm = LearningAssistantViewModel(api: newReview, autoLoadWhenReady: false)
+        await vm.startAddInitiateSession(rawInput: "Option review", sourceType: .textGoal)
+        await vm.confirmAddInitiateRole(title: "Option review", confirmedRole: .newPlan)
+        vm.addInitiateDeadline = "2026-06-10"
+        vm.addInitiateTargetOutput = "review"
+        vm.addInitiateTargetDepth = "apply"
+        await vm.confirmAddInitiateAnchors()
+        await vm.applyAddInitiateOptionEffect(optionId: "reduce_scope")
+        XCTAssertEqual(vm.addInitiateFlowState, .draftReview)
+        XCTAssertEqual(vm.addInitiateSession?.draftVersion, 4)
+
+        let storage = MockAssistantAPIClient()
+        storage.addInitiateStartResult = sampleAddInitiateRoleReviewSession()
+        storage.addInitiateRoleResult = sampleAddInitiateAnchorReviewSession()
+        storage.addInitiateAnchorResult = sampleAddInitiateInfeasibleReviewSession()
+        storage.addInitiateOptionResult = sampleAddInitiateStoredLaterSession()
+        vm = LearningAssistantViewModel(api: storage, autoLoadWhenReady: false)
+        await vm.startAddInitiateSession(rawInput: "Store later", sourceType: .textGoal)
+        await vm.confirmAddInitiateRole(title: "Store later", confirmedRole: .newPlan)
+        vm.addInitiateDeadline = "2026-06-10"
+        vm.addInitiateTargetOutput = "stored"
+        vm.addInitiateTargetDepth = "apply"
+        await vm.confirmAddInitiateAnchors()
+        await vm.applyAddInitiateOptionEffect(optionId: "store_for_later")
+        XCTAssertEqual(vm.addInitiateFlowState, .nonPlanTerminal)
+        XCTAssertEqual(vm.addInitiateSession?.reviewState, .storedNonPlan)
+
+        let needsInput = MockAssistantAPIClient()
+        needsInput.addInitiateStartResult = sampleAddInitiateRoleReviewSession()
+        needsInput.addInitiateRoleResult = sampleAddInitiateAnchorReviewSession()
+        needsInput.addInitiateAnchorResult = sampleAddInitiateInfeasibleReviewSession()
+        needsInput.addInitiateOptionResult = sampleAddInitiateNeedsInputSession(draftVersion: 2)
+        vm = LearningAssistantViewModel(api: needsInput, autoLoadWhenReady: false)
+        await vm.startAddInitiateSession(rawInput: "Need one answer", sourceType: .textGoal)
+        await vm.confirmAddInitiateRole(title: "Need one answer", confirmedRole: .newPlan)
+        vm.addInitiateDeadline = "2026-06-10"
+        vm.addInitiateTargetOutput = "needs input"
+        vm.addInitiateTargetDepth = "apply"
+        await vm.confirmAddInitiateAnchors()
+        await vm.applyAddInitiateOptionEffect(optionId: "answer_one_question")
+        XCTAssertEqual(vm.addInitiateFlowState, .needsInput)
+    }
+
+    func testOptionEffectCompilerRecomputeHandoffReturnsToAnchorReview() async {
+        let mock = MockAssistantAPIClient()
+        mock.addInitiateStartResult = sampleAddInitiateRoleReviewSession()
+        mock.addInitiateRoleResult = sampleAddInitiateAnchorReviewSession()
+        mock.addInitiateAnchorResult = sampleAddInitiateInfeasibleReviewSession()
+        mock.addInitiateOptionResult = sampleAddInitiateNeedsInputSession(draftVersion: 2)
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+
+        await vm.startAddInitiateSession(rawInput: "Recompute handoff", sourceType: .textGoal)
+        await vm.confirmAddInitiateRole(title: "Recompute handoff", confirmedRole: .newPlan)
+        vm.addInitiateDeadline = "2026-06-10"
+        vm.addInitiateTargetOutput = "recomputed"
+        vm.addInitiateTargetDepth = "apply"
+        await vm.confirmAddInitiateAnchors()
+        await vm.applyAddInitiateOptionEffect(optionId: "lower_depth")
+
+        XCTAssertEqual(mock.lastAddInitiateOptionRequest?.optionId, "lower_depth")
+        XCTAssertEqual(vm.addInitiateFlowState, .needsInput)
+        XCTAssertEqual(vm.addInitiateSession?.reviewState, .needsInput)
+        XCTAssertEqual(vm.addInitiateSession?.draftVersion, 2)
+    }
+
+    func testOptionEffectSendsParametersFromAnchorsFocusedAnswerAndLocalTaskEdits() async throws {
+        let mock = MockAssistantAPIClient()
+        mock.addInitiateStartResult = sampleAddInitiateRoleReviewSession()
+        mock.addInitiateRoleResult = sampleAddInitiateAnchorReviewSession()
+        mock.addInitiateAnchorResult = sampleAddInitiateDraftReviewSession(
+            draftVersion: 2,
+            reviewPackage: sampleAddInitiateDraftReviewPackage(dayCount: 2)
+        )
+        mock.addInitiateOptionResult = sampleAddInitiateDraftReviewSession(draftVersion: 3)
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+
+        await vm.startAddInitiateSession(rawInput: "Parameterized options", sourceType: .textGoal)
+        await vm.confirmAddInitiateRole(title: "Parameterized options", confirmedRole: .newPlan)
+        vm.addInitiateDeadline = "2026-06-20"
+        vm.addInitiateCapacityMinutes = 95
+        vm.addInitiateTargetOutput = "parameterized review"
+        vm.addInitiateTargetDepth = "skim"
+        await vm.confirmAddInitiateAnchors()
+        mock.addInitiateOptionResult = sampleAddInitiateDraftReviewSession(
+            draftVersion: 2,
+            reviewPackage: sampleAddInitiateDraftReviewPackage(dayCount: 2)
+        )
+
+        await vm.applyAddInitiateOptionEffect(optionId: "lower_depth")
+        XCTAssertEqual(mock.lastAddInitiateOptionRequest?.parameters?.keys.sorted(), ["requested_depth"])
+        XCTAssertEqual(mock.lastAddInitiateOptionRequest?.parameters?["requested_depth"]?.value as? String, "skim")
+
+        await vm.applyAddInitiateOptionEffect(optionId: "increase_capacity")
+        XCTAssertEqual(mock.lastAddInitiateOptionRequest?.parameters?.keys.sorted(), ["new_daily_capacity_min"])
+        XCTAssertEqual(mock.lastAddInitiateOptionRequest?.parameters?["new_daily_capacity_min"]?.value as? Int, 95)
+
+        await vm.applyAddInitiateOptionEffect(optionId: "extend_deadline")
+        XCTAssertEqual(mock.lastAddInitiateOptionRequest?.parameters?.keys.sorted(), ["new_deadline"])
+        XCTAssertEqual(mock.lastAddInitiateOptionRequest?.parameters?["new_deadline"]?.value as? String, "2026-06-20")
+
+        vm.addInitiateNeedsInputAnswer = "Skip chapter 9."
+        await vm.applyAddInitiateOptionEffect(optionId: "answer_one_question")
+        XCTAssertNil(mock.lastAddInitiateOptionRequest?.parameters)
+
+        let item = try XCTUnwrap(vm.addInitiateDraftReviewSummary?.fullScheduleDays.first?.items.first)
+        vm.beginAddInitiateTaskEdit(item)
+        vm.updateAddInitiateTaskEditTitle(itemId: item.id, title: "Edited task")
+        vm.updateAddInitiateTaskEditMinutes(itemId: item.id, minutes: 35)
+        await vm.applyAddInitiateOptionEffect(optionId: "edit_estimates")
+        XCTAssertEqual(mock.lastAddInitiateOptionRequest?.parameters?.keys.sorted(), ["estimate_edits"])
+        let estimateEdits = mock.lastAddInitiateOptionRequest?.parameters?["estimate_edits"]?.value as? [String: Int]
+        XCTAssertEqual(estimateEdits?[item.id], 35)
+
+        await vm.applyAddInitiateOptionEffect(optionId: "rebalance")
+        XCTAssertEqual(mock.lastAddInitiateOptionRequest?.parameters?.keys.sorted(), ["load_shape"])
+        XCTAssertEqual(mock.lastAddInitiateOptionRequest?.parameters?["load_shape"]?.value as? String, "steady")
+    }
+
+    func testActivationFailedWithoutReviewPackagePreservesCurrentDraftSummary() async {
+        let preservedPackage = sampleAddInitiateDraftReviewPackage(dayCount: 2)
+        let mock = MockAssistantAPIClient()
+        mock.addInitiateStartResult = sampleAddInitiateRoleReviewSession()
+        mock.addInitiateRoleResult = sampleAddInitiateAnchorReviewSession()
+        mock.addInitiateAnchorResult = sampleAddInitiateDraftReviewSession(
+            draftVersion: 3,
+            reviewPackage: preservedPackage
+        )
+        mock.addInitiateActivationResult = sampleAddInitiateActivationFailedSession(
+            draftVersion: 3,
+            reviewPackage: nil
+        )
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+
+        await vm.startAddInitiateSession(rawInput: "Preserve failed activation", sourceType: .textGoal)
+        await vm.confirmAddInitiateRole(title: "Preserve failed activation", confirmedRole: .newPlan)
+        vm.addInitiateDeadline = "2026-06-20"
+        vm.addInitiateTargetOutput = "reviewable rebuild plan"
+        vm.addInitiateTargetDepth = "apply"
+        await vm.confirmAddInitiateAnchors()
+        await vm.activateAddInitiateDraft()
+
+        XCTAssertEqual(vm.addInitiateFlowState, .activationFailed)
+        XCTAssertEqual(vm.addInitiateDraftReviewSummary?.targetOutput, "reviewable rebuild plan")
+        XCTAssertEqual(vm.addInitiateDraftReviewSummary?.fullScheduleDayCount, 2)
+    }
+
+    func testStaleDraftActivationIsBlockedBeforeCallingAPIAndEditCancelRetryPathsRemainAvailable() async {
+        let mock = MockAssistantAPIClient()
+        mock.addInitiateStartResult = sampleAddInitiateRoleReviewSession()
+        mock.addInitiateRoleResult = sampleAddInitiateAnchorReviewSession()
+        mock.addInitiateAnchorResult = sampleAddInitiateDraftReviewSession(
+            draftVersion: 2,
+            reviewPackage: sampleAddInitiateDraftReviewPackage(dayCount: 2, latestDraftVersion: 3)
+        )
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+
+        await vm.startAddInitiateSession(rawInput: "Stale draft", sourceType: .textGoal)
+        await vm.confirmAddInitiateRole(title: "Stale draft", confirmedRole: .newPlan)
+        vm.addInitiateDeadline = "2026-06-12"
+        vm.addInitiateTargetOutput = "stale"
+        vm.addInitiateTargetDepth = "apply"
+        await vm.confirmAddInitiateAnchors()
+
+        XCTAssertFalse(vm.canActivateAddInitiateDraft)
+        await vm.activateAddInitiateDraft()
+        XCTAssertEqual(mock.activateAddInitiateDraftCallCount, 0)
+        XCTAssertEqual(vm.addInitiateError, "草案已变更，请先重新载入最新版本。")
+
+        vm.editAddInitiateDraft()
+        XCTAssertEqual(vm.addInitiateFlowState, .anchorReview)
+        XCTAssertEqual(vm.addInitiateSession?.draftVersion, 2)
+
+        vm.cancelAddInitiateFlow()
+        XCTAssertEqual(vm.addInitiateFlowState, .cancelled)
+    }
+
+    func testPackageDraftVersionMismatchBlocksActivationAndRetry() async {
+        let package = sampleAddInitiateDraftReviewPackage(dayCount: 2, packageDraftVersion: 3)
+        let mock = MockAssistantAPIClient()
+        mock.addInitiateStartResult = sampleAddInitiateRoleReviewSession()
+        mock.addInitiateRoleResult = sampleAddInitiateAnchorReviewSession()
+        mock.addInitiateAnchorResult = sampleAddInitiateDraftReviewSession(draftVersion: 2, reviewPackage: package)
+        mock.addInitiateActivationResult = sampleAddInitiateActivationFailedSession(draftVersion: 2, reviewPackage: package)
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+
+        await vm.startAddInitiateSession(rawInput: "Package mismatch", sourceType: .textGoal)
+        await vm.confirmAddInitiateRole(title: "Package mismatch", confirmedRole: .newPlan)
+        vm.addInitiateDeadline = "2026-06-20"
+        vm.addInitiateTargetOutput = "mismatch"
+        vm.addInitiateTargetDepth = "apply"
+        await vm.confirmAddInitiateAnchors()
+
+        XCTAssertFalse(vm.canActivateAddInitiateDraft)
+        await vm.activateAddInitiateDraft()
+        XCTAssertEqual(mock.activateAddInitiateDraftCallCount, 0)
+
+        mock.addInitiateAnchorResult = sampleAddInitiateActivationFailedSession(draftVersion: 2, reviewPackage: package)
+        await vm.confirmAddInitiateAnchors()
+        XCTAssertEqual(vm.addInitiateFlowState, .activationFailed)
+        XCTAssertFalse(vm.canActivateAddInitiateDraft)
+        await vm.activateAddInitiateDraft()
+        XCTAssertEqual(mock.activateAddInitiateDraftCallCount, 0)
+    }
+
+    func testDraftReviewSummaryParsesCamelCaseReviewPackageAndLatestDraftVersion() async {
+        let mock = MockAssistantAPIClient()
+        mock.addInitiateStartResult = sampleAddInitiateRoleReviewSession()
+        mock.addInitiateRoleResult = sampleAddInitiateAnchorReviewSession()
+        mock.addInitiateAnchorResult = sampleAddInitiateDraftReviewSession(
+            draftVersion: 2,
+            reviewPackage: sampleAddInitiateCamelCaseDraftReviewPackage(latestDraftVersion: 4)
+        )
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+
+        await vm.startAddInitiateSession(rawInput: "Camel review", sourceType: .textGoal)
+        await vm.confirmAddInitiateRole(title: "Camel review", confirmedRole: .newPlan)
+        vm.addInitiateDeadline = "2026-06-20"
+        vm.addInitiateTargetOutput = "camel review plan"
+        vm.addInitiateTargetDepth = "overview"
+        await vm.confirmAddInitiateAnchors()
+
+        let summary = vm.addInitiateDraftReviewSummary
+        XCTAssertEqual(summary?.firstWeekDays.first?.plannedMinutes, 70)
+        XCTAssertEqual(summary?.firstWeekDays.first?.loadStateLabel, "使用缓冲")
+        XCTAssertEqual(summary?.firstWeekDays.first?.fallbackCue, "低能量：outline only，风险：保留范围")
+        XCTAssertEqual(summary?.fullScheduleDays.first?.items.first?.id, "camel-task")
+        XCTAssertEqual(summary?.fullScheduleDays.first?.items.first?.minutes, 70)
+        XCTAssertEqual(summary?.sourceDetailLines, ["标题: Camel Guide", "类型: GitHub 仓库"])
+        XCTAssertEqual(summary?.deadlineRisk, "硬截止日期压力")
+        XCTAssertFalse(vm.canActivateAddInitiateDraft)
+    }
+
+    func testVisibleReviewProjectionHumanizesUnknownRawIds() async {
+        let package = sampleAddInitiateDraftReviewPackage(
+            dayCount: 1,
+            loadState: "deep_focus_required",
+            deadlineRisk: "custom_date_window_risk",
+            sourceDetails: ["source_kind": "github_repo"]
+        )
+        let mock = MockAssistantAPIClient()
+        mock.addInitiateStartResult = sampleAddInitiateRoleReviewSession()
+        mock.addInitiateRoleResult = sampleAddInitiateAnchorReviewSession()
+        mock.addInitiateAnchorResult = sampleAddInitiateDraftReviewSession(reviewPackage: package)
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+
+        await vm.startAddInitiateSession(rawInput: "Humanize raw ids", sourceType: .textGoal)
+        await vm.confirmAddInitiateRole(title: "Humanize raw ids", confirmedRole: .newPlan)
+        vm.addInitiateDeadline = "2026-06-20"
+        vm.addInitiateTargetOutput = "humanized"
+        vm.addInitiateTargetDepth = "apply"
+        await vm.confirmAddInitiateAnchors()
+
+        let summary = vm.addInitiateDraftReviewSummary
+        XCTAssertEqual(summary?.firstWeekDays.first?.loadStateLabel, "Deep focus required")
+        XCTAssertEqual(summary?.deadlineRisk, "Custom date window risk")
+        XCTAssertEqual(summary?.sourceDetailLines, ["来源类型: GitHub 仓库"])
+
+        let optionPackage: [String: AnyCodable] = [
+            "risk_report": AnyCodable([
+                "canonical_infeasibility_option_ids": ["custom_option_id"]
+            ])
+        ]
+        mock.addInitiateAnchorResult = sampleAddInitiateInfeasibleReviewSession(
+            deadlineType: "soft",
+            reviewPackage: optionPackage
+        )
+        await vm.confirmAddInitiateAnchors()
+        XCTAssertEqual(vm.addInitiateInfeasibleOptionChoices.first?.localizedLabel, "Custom option id")
+    }
+
+    func testOptionEffectNewDraftClearsLocalTaskEditDraftsForReusedTaskId() async throws {
+        let package = sampleAddInitiateDraftReviewPackage(dayCount: 1)
+        let mock = MockAssistantAPIClient()
+        mock.addInitiateStartResult = sampleAddInitiateRoleReviewSession()
+        mock.addInitiateRoleResult = sampleAddInitiateAnchorReviewSession()
+        mock.addInitiateAnchorResult = sampleAddInitiateDraftReviewSession(draftVersion: 2, reviewPackage: package)
+        mock.addInitiateOptionResult = sampleAddInitiateDraftReviewSession(draftVersion: 3, reviewPackage: package)
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+
+        await vm.startAddInitiateSession(rawInput: "Clear local edits", sourceType: .textGoal)
+        await vm.confirmAddInitiateRole(title: "Clear local edits", confirmedRole: .newPlan)
+        vm.addInitiateDeadline = "2026-06-20"
+        vm.addInitiateTargetOutput = "clear edits"
+        vm.addInitiateTargetDepth = "apply"
+        await vm.confirmAddInitiateAnchors()
+
+        let item = try XCTUnwrap(vm.addInitiateDraftReviewSummary?.fullScheduleDays.first?.items.first)
+        vm.beginAddInitiateTaskEdit(item)
+        vm.updateAddInitiateTaskEditTitle(itemId: item.id, title: "Stale local title")
+        XCTAssertFalse(vm.addInitiateTaskEditDrafts.isEmpty)
+
+        await vm.applyAddInitiateOptionEffect(optionId: "reduce_scope")
+
+        XCTAssertEqual(vm.addInitiateSession?.draftVersion, 3)
+        XCTAssertTrue(vm.addInitiateTaskEditDrafts.isEmpty)
+        XCTAssertEqual(vm.addInitiateTaskEditTitle(for: item), item.title)
+    }
+
+    func testAnchorReconfirmationNewDraftClearsLocalTaskEditDraftsForReusedTaskId() async throws {
+        let package = sampleAddInitiateDraftReviewPackage(dayCount: 1)
+        let mock = MockAssistantAPIClient()
+        mock.addInitiateStartResult = sampleAddInitiateRoleReviewSession()
+        mock.addInitiateRoleResult = sampleAddInitiateAnchorReviewSession()
+        mock.addInitiateAnchorResult = sampleAddInitiateDraftReviewSession(draftVersion: 2, reviewPackage: package)
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+
+        await vm.startAddInitiateSession(rawInput: "Anchor clear edits", sourceType: .textGoal)
+        await vm.confirmAddInitiateRole(title: "Anchor clear edits", confirmedRole: .newPlan)
+        vm.addInitiateDeadline = "2026-06-20"
+        vm.addInitiateTargetOutput = "anchor clears edits"
+        vm.addInitiateTargetDepth = "apply"
+        await vm.confirmAddInitiateAnchors()
+
+        let item = try XCTUnwrap(vm.addInitiateDraftReviewSummary?.fullScheduleDays.first?.items.first)
+        vm.beginAddInitiateTaskEdit(item)
+        vm.updateAddInitiateTaskEditTitle(itemId: item.id, title: "Stale anchor title")
+        XCTAssertFalse(vm.addInitiateTaskEditDrafts.isEmpty)
+
+        mock.addInitiateAnchorResult = sampleAddInitiateDraftReviewSession(draftVersion: 3, reviewPackage: package)
+        vm.editAddInitiateDraft()
+        await vm.confirmAddInitiateAnchors()
+
+        XCTAssertEqual(vm.addInitiateSession?.draftVersion, 3)
+        XCTAssertTrue(vm.addInitiateTaskEditDrafts.isEmpty)
+        XCTAssertEqual(vm.addInitiateTaskEditTitle(for: item), item.title)
+    }
+
     // MARK: 1.4 / 3.2-3.6 首页 dashboard 状态层
 
     func testFetchDashboardAggregatesBriefingAndResourcesIntoSummaryState() async {
@@ -3530,6 +4083,28 @@ final class LearningAssistantViewModelTests: XCTestCase {
         XCTAssertTrue(vm.isConnecting)
         XCTAssertEqual(mock.fetchBriefingCallCount, 0)
         XCTAssertEqual(mock.fetchResourcesCallCount, 0)
+    }
+
+    func testAutoLoadDisabledIgnoresBackendReadyNotificationUntilDashboardOpen() async throws {
+        let mock = MockAssistantAPIClient()
+        let backend = MockBackendLifecycle()
+        backend.isReady = false
+        let vm = LearningAssistantViewModel(
+            api: mock,
+            backendLifecycle: backend,
+            autoLoadWhenReady: false
+        )
+
+        XCTAssertFalse(vm.isConnecting)
+        NotificationCenter.default.post(name: .backendDidBecomeReady, object: nil)
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        XCTAssertFalse(vm.isConnecting)
+        XCTAssertEqual(mock.fetchStudyTodayViewCallCount, 0)
+        XCTAssertEqual(mock.fetchResourcesCallCount, 0)
+
+        await vm.refreshForDashboardOpen()
+        XCTAssertTrue(vm.isConnecting)
     }
 
     func testFetchDashboardSerializesConcurrentRefreshesWithoutDroppingLaterRequest() async {
@@ -6930,7 +7505,8 @@ private func sampleAddInitiateDraftReviewSession(
     clientRequestId: String = "req-add-1",
     intakeItemId: Int = 11,
     draftId: Int = 501,
-    draftVersion: Int? = 2
+    draftVersion: Int? = 2,
+    reviewPackage: [String: AnyCodable] = ["summary": AnyCodable("Feasible draft")]
 ) -> AddInitiateSessionResponse {
     AddInitiateSessionResponse(
         sessionId: sessionId,
@@ -6952,7 +7528,67 @@ private func sampleAddInitiateDraftReviewSession(
         existingPlanCandidates: nil,
         attachmentModeSuggestion: nil,
         canonicalRepoRole: nil,
-        reviewPackage: ["summary": AnyCodable("Feasible draft")],
+        reviewPackage: reviewPackage,
+        activationResult: nil
+    )
+}
+
+private func sampleAddInitiateInfeasibleReviewSession(
+    sessionId: String = "add-initiate-1",
+    clientRequestId: String = "req-add-1",
+    intakeItemId: Int = 11,
+    draftId: Int = 501,
+    draftVersion: Int? = 2,
+    deadlineType: String = "soft",
+    reviewPackage: [String: AnyCodable]? = nil
+) -> AddInitiateSessionResponse {
+    AddInitiateSessionResponse(
+        sessionId: sessionId,
+        clientRequestId: clientRequestId,
+        intakeItemId: intakeItemId,
+        draftId: draftId,
+        draftVersion: draftVersion,
+        stage: .infeasibleReview,
+        reviewState: .infeasibleReview,
+        recommendedRole: "new_plan",
+        confirmedRole: "new_plan",
+        confidence: "high",
+        reasonCodes: ["capacity_gap"],
+        nextAction: "choose_option",
+        createsActiveTasks: false,
+        resourceId: nil,
+        error: nil,
+        clarificationQuestion: nil,
+        existingPlanCandidates: nil,
+        attachmentModeSuggestion: nil,
+        canonicalRepoRole: nil,
+        reviewPackage: reviewPackage ?? sampleAddInitiateInfeasibleReviewPackage(deadlineType: deadlineType),
+        activationResult: nil
+    )
+}
+
+private func sampleAddInitiateStoredLaterSession() -> AddInitiateSessionResponse {
+    AddInitiateSessionResponse(
+        sessionId: "add-initiate-1",
+        clientRequestId: "req-add-1",
+        intakeItemId: 11,
+        draftId: nil,
+        draftVersion: nil,
+        stage: .storedNonPlan,
+        reviewState: .storedNonPlan,
+        recommendedRole: "new_plan",
+        confirmedRole: "later_resource",
+        confidence: "high",
+        reasonCodes: ["stored_for_later"],
+        nextAction: "done",
+        createsActiveTasks: false,
+        resourceId: nil,
+        error: nil,
+        clarificationQuestion: nil,
+        existingPlanCandidates: nil,
+        attachmentModeSuggestion: nil,
+        canonicalRepoRole: nil,
+        reviewPackage: nil,
         activationResult: nil
     )
 }
@@ -6962,7 +7598,8 @@ private func sampleAddInitiateActivationFailedSession(
     clientRequestId: String = "req-add-1",
     intakeItemId: Int = 11,
     draftId: Int = 501,
-    draftVersion: Int = 2
+    draftVersion: Int = 2,
+    reviewPackage: [String: AnyCodable]? = ["summary": AnyCodable("Draft preserved")]
 ) -> AddInitiateSessionResponse {
     AddInitiateSessionResponse(
         sessionId: sessionId,
@@ -6984,9 +7621,181 @@ private func sampleAddInitiateActivationFailedSession(
         existingPlanCandidates: nil,
         attachmentModeSuggestion: nil,
         canonicalRepoRole: nil,
-        reviewPackage: ["summary": AnyCodable("Draft preserved")],
+        reviewPackage: reviewPackage,
         activationResult: nil
     )
+}
+
+private func sampleAddInitiateActivatedSession(
+    sessionId: String = "add-initiate-1",
+    clientRequestId: String = "req-add-1",
+    intakeItemId: Int = 11,
+    draftId: Int = 501,
+    draftVersion: Int = 2
+) -> AddInitiateSessionResponse {
+    AddInitiateSessionResponse(
+        sessionId: sessionId,
+        clientRequestId: clientRequestId,
+        intakeItemId: intakeItemId,
+        draftId: draftId,
+        draftVersion: draftVersion,
+        stage: .activated,
+        reviewState: .activated,
+        recommendedRole: "new_plan",
+        confirmedRole: "new_plan",
+        confidence: "high",
+        reasonCodes: ["activated"],
+        nextAction: "done",
+        createsActiveTasks: true,
+        resourceId: 88,
+        error: nil,
+        clarificationQuestion: nil,
+        existingPlanCandidates: nil,
+        attachmentModeSuggestion: nil,
+        canonicalRepoRole: nil,
+        reviewPackage: ["summary": AnyCodable("Activated")],
+        activationResult: ["status": AnyCodable("active"), "resource_id": AnyCodable(88)]
+    )
+}
+
+private func sampleAddInitiateDraftReviewPackage(
+    dayCount: Int,
+    latestDraftVersion: Int? = nil,
+    packageDraftVersion: Int? = nil,
+    loadState: String? = nil,
+    deadlineRisk: String = "hard_deadline_pressure",
+    sourceDetails: [String: String]? = nil
+) -> [String: AnyCodable] {
+    let days: [[String: Any]] = (0..<dayCount).map { index in
+        let fallbackMode: Any = index == 0 ? [
+            "fallback_minutes": 15,
+            "fallback_output": "skim notes",
+            "risk_effect": "scope_visible"
+        ] : NSNull()
+        let day: [String: Any] = [
+            "date": "2026-06-\(String(format: "%02d", index + 1))",
+            "planned_minutes": index == 0 ? 60 : 45,
+            "load_state": loadState ?? (index == 2 ? "over_capacity" : "within_budget"),
+            "reserved_buffer": index == 5,
+            "items": [
+                [
+                    "task_id": "task-\(index + 1)",
+                    "scheduled_minutes": index == 0 ? 60 : 45,
+                    "normal_mode": [
+                        "title": "Task \(index + 1)",
+                        "output": "normal output \(index + 1)"
+                    ],
+                    "fallback_mode": fallbackMode
+                ]
+            ]
+        ]
+        return day
+    }
+    var package: [String: Any] = [
+        "role": "new_plan",
+        "target_output": "reviewable rebuild plan",
+        "target_depth": "apply",
+        "deadline_type": "hard",
+        "deadline_fit": "fits_with_risk",
+        "assumptions": ["weekdays only", "ship demo first"],
+        "scheduled_days": days,
+        "risk_report": [
+            "fits_as_written": false,
+            "essential_work_minutes": 480,
+            "available_execution_capacity_minutes": 420,
+            "capacity_gap_minutes": 60,
+            "overloaded_dates": ["2026-06-03"],
+            "expected_late_tasks": ["task-7"],
+            "buffer_days_reserved": ["2026-06-06"],
+            "buffer_erosion": true,
+            "existing_load_conflicts": ["2026-06-04"],
+            "date_window_risk": deadlineRisk
+        ],
+        "source_details": sourceDetails ?? [
+            "kind": "github_repo",
+            "title": "AgentGuide"
+        ]
+    ]
+    if let latestDraftVersion {
+        package["latest_draft_version"] = latestDraftVersion
+    }
+    if let packageDraftVersion {
+        package["draft_version"] = packageDraftVersion
+    }
+    return package.mapValues { AnyCodable($0) }
+}
+
+private func sampleAddInitiateCamelCaseDraftReviewPackage(
+    latestDraftVersion: Int? = nil
+) -> [String: AnyCodable] {
+    var package: [String: Any] = [
+        "role": "new_plan",
+        "targetOutput": "camel review plan",
+        "targetDepth": "overview",
+        "deadlineType": "hard",
+        "deadlineFit": "fits_with_risk",
+        "assumptions": ["camel inputs"],
+        "scheduledDays": [
+            [
+                "date": "2026-06-01",
+                "plannedMinutes": 70,
+                "loadState": "uses_buffer",
+                "items": [
+                    [
+                        "taskId": "camel-task",
+                        "scheduledMinutes": 70,
+                        "normalMode": [
+                            "title": "Camel Task",
+                            "output": "normal"
+                        ],
+                        "fallbackMode": [
+                            "fallbackOutput": "outline only",
+                            "riskEffect": "preserves_scope"
+                        ]
+                    ]
+                ]
+            ]
+        ],
+        "riskReport": [
+            "dateWindowRisk": "hard_deadline_pressure",
+            "bufferErosion": true
+        ],
+        "sourceDetails": [
+            "kind": "github_repo",
+            "title": "Camel Guide"
+        ]
+    ]
+    if let latestDraftVersion {
+        package["latestDraftVersion"] = latestDraftVersion
+    }
+    return package.mapValues { AnyCodable($0) }
+}
+
+private func sampleAddInitiateInfeasibleReviewPackage(deadlineType: String) -> [String: AnyCodable] {
+    [
+        "deadline_type": AnyCodable(deadlineType),
+        "risk_report": AnyCodable([
+            "capacity_gap_minutes": 90,
+            "overloaded_dates": ["2026-06-04"],
+            "expected_late_tasks": ["task-2"],
+            "buffer_erosion": true,
+            "low_calibration": true,
+            "canonical_infeasibility_option_ids": [
+                "reduce_scope",
+                "lower_depth",
+                "extend_deadline",
+                "accept_late_finish",
+                "store_for_later"
+            ]
+        ]),
+        "infeasibility_options": AnyCodable([
+            ["id": "reduce_scope", "effect_type": "review_recompute"],
+            ["id": "lower_depth", "effect_type": "compiler_recompute_required"],
+            ["id": "extend_deadline", "effect_type": "review_recompute"],
+            ["id": "accept_late_finish", "effect_type": "review_recompute"],
+            ["id": "store_for_later", "effect_type": "storage"]
+        ])
+    ]
 }
 
 private func sampleStudyTodayView(

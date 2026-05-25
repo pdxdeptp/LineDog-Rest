@@ -143,6 +143,61 @@ struct AddInitiateExistingPlanCandidate: Identifiable, Equatable {
     let title: String
 }
 
+struct AddInitiateDraftReviewDaySummary: Equatable {
+    let date: String
+    let plannedMinutes: Int
+    let loadStateLabel: String
+    let fallbackCue: String?
+}
+
+struct AddInitiateDraftScheduleItem: Identifiable, Equatable {
+    let id: String
+    let title: String
+    let minutes: Int
+    let fallbackCue: String?
+}
+
+struct AddInitiateDraftScheduleDay: Identifiable, Equatable {
+    let date: String
+    let plannedMinutes: Int
+    let loadStateLabel: String
+    let items: [AddInitiateDraftScheduleItem]
+
+    var id: String { date }
+}
+
+struct AddInitiateTaskEditDraft: Equatable {
+    let itemId: String
+    var title: String
+    var minutes: Int
+}
+
+struct AddInitiateDraftReviewSummary: Equatable {
+    let roleLabel: String
+    let targetOutput: String
+    let targetDepth: String
+    let deadlineFit: String
+    let assumptions: [String]
+    let firstWeekDays: [AddInitiateDraftReviewDaySummary]
+    let bufferSummary: String?
+    let fallbackSummary: String?
+    let capacityRiskFacts: [String]
+    let deadlineRisk: String?
+    let sourceDetailLines: [String]
+    let fullScheduleDays: [AddInitiateDraftScheduleDay]
+    let fullScheduleDayCount: Int
+    let editableTaskCount: Int
+    let rendersEveryScheduledItemByDefault: Bool
+}
+
+struct AddInitiateInfeasibleOptionChoice: Identifiable, Equatable {
+    let optionId: String
+    let localizedLabel: String
+    let effectDescription: String
+
+    var id: String { optionId }
+}
+
 struct AssistantDashboardState: Equatable {
     let kind: AssistantDashboardKind
     let totalMinutes: Int
@@ -205,6 +260,7 @@ final class LearningAssistantViewModel: ObservableObject {
         }
     }
     @Published var addInitiateNeedsInputAnswer: String = ""
+    @Published private(set) var addInitiateTaskEditDrafts: [String: AddInitiateTaskEditDraft] = [:]
     @Published private var addInitiateLocalFlowState: AddInitiateFlowState? = nil
 
     @Published var todayTotalMinutes: Int  = 0
@@ -330,6 +386,86 @@ final class LearningAssistantViewModel: ObservableObject {
         }
     }
 
+    var addInitiateDraftReviewSummary: AddInitiateDraftReviewSummary? {
+        guard let session = addInitiateSession,
+              session.reviewState == .draftReview || session.reviewState == .activationFailed,
+              let package = session.reviewPackage else {
+            return nil
+        }
+        return Self.buildAddInitiateDraftReviewSummary(
+            package: package,
+            session: session,
+            fallbackTargetOutput: addInitiateTargetOutput,
+            fallbackTargetDepth: addInitiateTargetDepth
+        )
+    }
+
+    var addInitiateInfeasibleOptionChoices: [AddInitiateInfeasibleOptionChoice] {
+        guard let package = addInitiateSession?.reviewPackage else { return [] }
+        let packageDeadlineType = Self.stringValue(Self.pairedValue(in: package, snake: "deadline_type", camel: "deadlineType"))
+            ?? addInitiateDeadlineType
+        let hardDeadline = packageDeadlineType.lowercased() == "hard"
+        let optionDictionaries = Self.arrayValue(Self.pairedValue(in: package, snake: "infeasibility_options", camel: "infeasibilityOptions"))
+            .compactMap(Self.dictionaryValue)
+        let idsFromOptions = optionDictionaries.compactMap { Self.stringValue($0["id"]) }
+        let riskReport = Self.dictionaryValue(Self.pairedValue(in: package, snake: "risk_report", camel: "riskReport")) ?? [:]
+        let idsFromRisk = Self.stringArrayValue(Self.pairedValue(in: riskReport, snake: "canonical_infeasibility_option_ids", camel: "canonicalInfeasibilityOptionIds")) ?? []
+        let ids = idsFromOptions.isEmpty ? idsFromRisk : idsFromOptions
+        var seen: Set<String> = []
+        return ids.compactMap { optionId in
+            guard !optionId.isEmpty else { return nil }
+            guard !(hardDeadline && optionId == "accept_late_finish") else { return nil }
+            guard seen.insert(optionId).inserted else { return nil }
+            let effect = optionDictionaries
+                .first { Self.stringValue($0["id"]) == optionId }
+                .flatMap { Self.stringValue(Self.pairedValue(in: $0, snake: "effect_type", camel: "effectType")) }
+            return AddInitiateInfeasibleOptionChoice(
+                optionId: optionId,
+                localizedLabel: Self.localizedAddInitiateOptionLabel(optionId),
+                effectDescription: Self.localizedAddInitiateOptionEffect(effect)
+            )
+        }
+    }
+
+    var addInitiateInfeasibleRiskFacts: [String] {
+        guard let package = addInitiateSession?.reviewPackage,
+              let riskReport = Self.dictionaryValue(Self.pairedValue(in: package, snake: "risk_report", camel: "riskReport")) else {
+            return []
+        }
+        var facts = Self.addInitiateCapacityRiskFacts(from: riskReport).filter { fact in
+            !fact.hasPrefix("必要工作") && !fact.hasPrefix("可用容量") && !fact.hasPrefix("已有负荷")
+        }
+        if Self.boolValue(Self.pairedValue(in: riskReport, snake: "buffer_erosion", camel: "bufferErosion")) == true {
+            facts.append("缓冲被侵蚀")
+        }
+        if Self.hasLowCalibrationFact(in: riskReport) {
+            facts.append("低校准")
+        }
+        return facts
+    }
+
+    var canActivateAddInitiateDraft: Bool {
+        guard addInitiateFlowState == .draftReview || addInitiateFlowState == .activationFailed,
+              let session = addInitiateSession,
+              let draftVersion = session.draftVersion,
+              session.draftId != nil else {
+            return false
+        }
+        guard let package = session.reviewPackage else { return true }
+        if let isLatest = Self.boolValue(Self.pairedValue(in: package, snake: "is_latest_version", camel: "isLatestVersion")), !isLatest {
+            return false
+        }
+        if let packageDraftVersion = Self.intValue(Self.pairedValue(in: package, snake: "draft_version", camel: "draftVersion")),
+           packageDraftVersion != draftVersion {
+            return false
+        }
+        if let latestDraftVersion = Self.intValue(Self.pairedValue(in: package, snake: "latest_draft_version", camel: "latestDraftVersion")),
+           latestDraftVersion > draftVersion {
+            return false
+        }
+        return true
+    }
+
     // MARK: - Private
 
     let api: any AssistantAPIClientProtocol
@@ -362,6 +498,7 @@ final class LearningAssistantViewModel: ObservableObject {
         self.orderStore = orderStore
         self.todayProvider = todayProvider
         self.backendLifecycle = backendLifecycle
+        isConnecting = autoLoadWhenReady
         readyObserver = NotificationCenter.default.addObserver(
             forName: .backendDidBecomeReady,
             object: nil,
@@ -369,7 +506,7 @@ final class LearningAssistantViewModel: ObservableObject {
         ) { [weak self] _ in
             guard let self else { return }
             Task { @MainActor [weak self] in
-                guard let self, self.isConnecting else { return }
+                guard let self, autoLoadWhenReady, self.isConnecting else { return }
                 self.isConnecting = false
                 await self.fetchDashboard()
             }
@@ -974,6 +1111,7 @@ final class LearningAssistantViewModel: ObservableObject {
             )
             guard addInitiateFlowGeneration == operationGeneration,
                   addInitiateClientRequestId == clientRequestId else { return }
+            reconcileAddInitiateTaskEditDrafts(previous: addInitiateSession, next: response)
             addInitiateSession = response
             addInitiateError = response.error
             isOffline = false
@@ -1126,6 +1264,7 @@ final class LearningAssistantViewModel: ObservableObject {
                 }
                 return
             }
+            reconcileAddInitiateTaskEditDrafts(previous: addInitiateSession, next: response)
             addInitiateSession = response
             addInitiateError = response.error
             addInitiateLocalFlowState = nil
@@ -1166,10 +1305,11 @@ final class LearningAssistantViewModel: ObservableObject {
                     sessionId: session.sessionId,
                     draftId: draftId,
                     draftVersion: draftVersion,
-                    optionId: optionId
+                    optionId: optionId,
+                    parameters: buildAddInitiateOptionParameters(optionId: optionId)
                 )
             )
-            guard isCurrentAddInitiateDraftResponse(
+            guard isCurrentAddInitiateOptionResponse(
                 response,
                 requestSessionId: session.sessionId,
                 requestDraftId: draftId,
@@ -1183,6 +1323,7 @@ final class LearningAssistantViewModel: ObservableObject {
                 }
                 return
             }
+            reconcileAddInitiateTaskEditDrafts(previous: addInitiateSession, next: response)
             addInitiateSession = response
             addInitiateError = response.error
             addInitiateLocalFlowState = nil
@@ -1205,6 +1346,10 @@ final class LearningAssistantViewModel: ObservableObject {
               let draftId = session.draftId,
               let draftVersion = session.draftVersion else {
             addInitiateError = "缺少可激活的 Add / Initiate 草案。"
+            return
+        }
+        guard canActivateAddInitiateDraft else {
+            addInitiateError = "草案已变更，请先重新载入最新版本。"
             return
         }
 
@@ -1236,8 +1381,10 @@ final class LearningAssistantViewModel: ObservableObject {
                 }
                 return
             }
-            addInitiateSession = response
-            addInitiateError = response.error
+            let preservedResponse = Self.preserveAddInitiateReviewPackageIfNeeded(response, current: addInitiateSession)
+            reconcileAddInitiateTaskEditDrafts(previous: addInitiateSession, next: preservedResponse)
+            addInitiateSession = preservedResponse
+            addInitiateError = preservedResponse.error
             addInitiateLocalFlowState = nil
             isOffline = false
         } catch {
@@ -1251,6 +1398,111 @@ final class LearningAssistantViewModel: ObservableObject {
                 isOffline = true
             }
         }
+    }
+
+    func editAddInitiateDraft() {
+        guard addInitiateSession?.draftId != nil else {
+            addInitiateError = "缺少可编辑的 Add / Initiate 草案。"
+            return
+        }
+        addInitiateError = nil
+        addInitiateLocalFlowState = .anchorReview
+    }
+
+    func beginAddInitiateTaskEdit(_ item: AddInitiateDraftScheduleItem) {
+        if addInitiateTaskEditDrafts[item.id] == nil {
+            addInitiateTaskEditDrafts[item.id] = AddInitiateTaskEditDraft(
+                itemId: item.id,
+                title: item.title,
+                minutes: item.minutes
+            )
+        }
+    }
+
+    func addInitiateTaskEditTitle(for item: AddInitiateDraftScheduleItem) -> String {
+        addInitiateTaskEditDrafts[item.id]?.title ?? item.title
+    }
+
+    func addInitiateTaskEditMinutes(for item: AddInitiateDraftScheduleItem) -> Int {
+        addInitiateTaskEditDrafts[item.id]?.minutes ?? item.minutes
+    }
+
+    func updateAddInitiateTaskEditTitle(itemId: String, title: String) {
+        guard var draft = addInitiateTaskEditDrafts[itemId] else {
+            addInitiateTaskEditDrafts[itemId] = AddInitiateTaskEditDraft(
+                itemId: itemId,
+                title: title,
+                minutes: 0
+            )
+            return
+        }
+        draft.title = title
+        addInitiateTaskEditDrafts[itemId] = draft
+    }
+
+    func updateAddInitiateTaskEditMinutes(itemId: String, minutes: Int) {
+        let clampedMinutes = max(5, minutes)
+        guard var draft = addInitiateTaskEditDrafts[itemId] else {
+            addInitiateTaskEditDrafts[itemId] = AddInitiateTaskEditDraft(
+                itemId: itemId,
+                title: "",
+                minutes: clampedMinutes
+            )
+            return
+        }
+        draft.minutes = clampedMinutes
+        addInitiateTaskEditDrafts[itemId] = draft
+    }
+
+    private func buildAddInitiateOptionParameters(optionId: String) -> [String: AnyCodable]? {
+        var parameters: [String: AnyCodable] = [:]
+
+        switch optionId {
+        case "lower_depth":
+            let depth = addInitiateTargetDepth.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !depth.isEmpty {
+                parameters["requested_depth"] = AnyCodable(depth)
+            }
+        case "increase_capacity":
+            if addInitiateCapacityMinutes > 0 {
+                parameters["new_daily_capacity_min"] = AnyCodable(addInitiateCapacityMinutes)
+            }
+        case "extend_deadline":
+            let deadline = addInitiateDeadline.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !deadline.isEmpty {
+                parameters["new_deadline"] = AnyCodable(deadline)
+            }
+        case "answer_one_question":
+            if let questionId = addInitiateFocusedQuestionId() {
+                parameters["question_id"] = AnyCodable(questionId)
+            }
+        case "edit_estimates":
+            addLocalTaskEditParameters(to: &parameters)
+        case "rebalance":
+            parameters["load_shape"] = AnyCodable("steady")
+        default:
+            if !addInitiateTaskEditDrafts.isEmpty {
+                addLocalTaskEditParameters(to: &parameters)
+            }
+        }
+
+        return parameters.isEmpty ? nil : parameters
+    }
+
+    private func addLocalTaskEditParameters(to parameters: inout [String: AnyCodable]) {
+        guard !addInitiateTaskEditDrafts.isEmpty else { return }
+        let edits = Dictionary(uniqueKeysWithValues: addInitiateTaskEditDrafts.values
+            .sorted { $0.itemId < $1.itemId }
+            .map { draft in
+                (draft.itemId, draft.minutes)
+            })
+        parameters["estimate_edits"] = AnyCodable(edits)
+    }
+
+    private func addInitiateFocusedQuestionId() -> String? {
+        guard let question = addInitiateSession?.clarificationQuestion else { return nil }
+        return Self.stringValue(Self.pairedValue(in: question, snake: "question_id", camel: "questionId"))
+            ?? Self.stringValue(question["id"]?.value)
     }
 
     func answerAddInitiateNeedsInput() async {
@@ -1268,6 +1520,7 @@ final class LearningAssistantViewModel: ObservableObject {
         addInitiateLocalFlowState = .cancelled
         addInitiateSession = nil
         addInitiateError = nil
+        addInitiateTaskEditDrafts = [:]
     }
 
     func prepareForNewAddInitiateInput() {
@@ -1289,6 +1542,7 @@ final class LearningAssistantViewModel: ObservableObject {
         addInitiateAcceptedAssumptions = []
         addInitiateAssumptionsText = ""
         addInitiateNeedsInputAnswer = ""
+        addInitiateTaskEditDrafts = [:]
     }
 
     private func seedAddInitiateAnchorsIfNeeded(from session: AddInitiateSessionResponse) {
@@ -1313,6 +1567,451 @@ final class LearningAssistantViewModel: ObservableObject {
             .components(separatedBy: .newlines)
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
+    }
+
+    private static func buildAddInitiateDraftReviewSummary(
+        package: [String: AnyCodable],
+        session: AddInitiateSessionResponse,
+        fallbackTargetOutput: String,
+        fallbackTargetDepth: String
+    ) -> AddInitiateDraftReviewSummary {
+        let scheduledDays = arrayValue(pairedValue(in: package, snake: "scheduled_days", camel: "scheduledDays"))
+            .compactMap(dictionaryValue)
+        let riskReport = dictionaryValue(pairedValue(in: package, snake: "risk_report", camel: "riskReport")) ?? [:]
+        let firstWeekDays = scheduledDays.prefix(7).map(addInitiateDaySummary)
+        let fallbackSummary = firstFallbackMetadata(in: scheduledDays).map { fallback in
+            let output = stringValue(pairedValue(in: fallback, snake: "fallback_output", camel: "fallbackOutput"))
+                ?? stringValue(fallback["output"])
+                ?? "可降级产出"
+            if let riskEffect = stringValue(pairedValue(in: fallback, snake: "risk_effect", camel: "riskEffect")) {
+                return "替代执行：\(output)；风险影响：\(localizedAddInitiateToken(riskEffect))"
+            }
+            return "替代执行：\(output)"
+        }
+        let sourceDetailLines = dictionaryValue(pairedValue(in: package, snake: "source_details", camel: "sourceDetails"))?
+            .compactMap { key, value -> String? in
+                guard let text = stringValue(value) else { return nil }
+                return "\(localizedAddInitiateSourceDetailKey(key)): \(localizedAddInitiateSourceDetailValue(text))"
+            }
+            .sorted() ?? []
+        let fullScheduleDays = scheduledDays.map(addInitiateScheduleDay)
+        let editableTaskCount = fullScheduleDays.reduce(0) { $0 + $1.items.count }
+
+        return AddInitiateDraftReviewSummary(
+            roleLabel: localizedAddInitiateRoleLabel(
+                stringValue(package["role"]?.value)
+                    ?? session.confirmedRole
+                    ?? session.recommendedRole
+                    ?? ""
+            ),
+            targetOutput: stringValue(pairedValue(in: package, snake: "target_output", camel: "targetOutput"))
+                ?? fallbackTargetOutput,
+            targetDepth: stringValue(pairedValue(in: package, snake: "target_depth", camel: "targetDepth"))
+                ?? fallbackTargetDepth,
+            deadlineFit: localizedAddInitiateToken(
+                stringValue(pairedValue(in: package, snake: "deadline_fit", camel: "deadlineFit"))
+                    ?? stringValue(package["status"]?.value)
+                    ?? "review"
+            ),
+            assumptions: addInitiateAssumptions(from: package["assumptions"]?.value),
+            firstWeekDays: firstWeekDays,
+            bufferSummary: addInitiateBufferSummary(from: riskReport),
+            fallbackSummary: fallbackSummary,
+            capacityRiskFacts: addInitiateCapacityRiskFacts(from: riskReport),
+            deadlineRisk: (stringValue(pairedValue(in: riskReport, snake: "date_window_risk", camel: "dateWindowRisk"))
+                ?? stringValue(pairedValue(in: package, snake: "deadline_risk", camel: "deadlineRisk")))
+                .map(localizedAddInitiateToken),
+            sourceDetailLines: sourceDetailLines,
+            fullScheduleDays: fullScheduleDays,
+            fullScheduleDayCount: fullScheduleDays.count,
+            editableTaskCount: editableTaskCount,
+            rendersEveryScheduledItemByDefault: false
+        )
+    }
+
+    private static func addInitiateDaySummary(_ day: [String: Any]) -> AddInitiateDraftReviewDaySummary {
+        let loadState = stringValue(pairedValue(in: day, snake: "load_state", camel: "loadState")) ?? "within_budget"
+        return AddInitiateDraftReviewDaySummary(
+            date: stringValue(day["date"]) ?? "未定日期",
+            plannedMinutes: intValue(pairedValue(in: day, snake: "planned_minutes", camel: "plannedMinutes")) ?? 0,
+            loadStateLabel: localizedAddInitiateLoadState(loadState),
+            fallbackCue: addInitiateFallbackCue(in: day) ?? addInitiateRiskCue(loadState)
+        )
+    }
+
+    private static func addInitiateScheduleDay(_ day: [String: Any]) -> AddInitiateDraftScheduleDay {
+        let loadState = stringValue(pairedValue(in: day, snake: "load_state", camel: "loadState")) ?? "within_budget"
+        let items = arrayValue(day["items"])
+            .compactMap(dictionaryValue)
+            .map(addInitiateScheduleItem)
+        return AddInitiateDraftScheduleDay(
+            date: stringValue(day["date"]) ?? "未定日期",
+            plannedMinutes: intValue(pairedValue(in: day, snake: "planned_minutes", camel: "plannedMinutes")) ?? 0,
+            loadStateLabel: localizedAddInitiateLoadState(loadState),
+            items: items
+        )
+    }
+
+    private static func addInitiateScheduleItem(_ item: [String: Any]) -> AddInitiateDraftScheduleItem {
+        let normalMode = dictionaryValue(pairedValue(in: item, snake: "normal_mode", camel: "normalMode")) ?? [:]
+        let fallbackMode = dictionaryValue(pairedValue(in: item, snake: "fallback_mode", camel: "fallbackMode"))
+        let id = stringValue(pairedValue(in: item, snake: "task_id", camel: "taskId"))
+            ?? stringValue(normalMode["title"])
+            ?? UUID().uuidString
+        let title = stringValue(normalMode["title"])
+            ?? stringValue(item["title"])
+            ?? id
+        let fallbackCue = fallbackMode.flatMap { fallback in
+            let output = stringValue(pairedValue(in: fallback, snake: "fallback_output", camel: "fallbackOutput"))
+                ?? stringValue(fallback["output"])
+                ?? "可降级产出"
+            if let riskEffect = stringValue(pairedValue(in: fallback, snake: "risk_effect", camel: "riskEffect")) {
+                return "低能量：\(output)，风险：\(localizedAddInitiateToken(riskEffect))"
+            }
+            return "低能量：\(output)"
+        }
+        return AddInitiateDraftScheduleItem(
+            id: id,
+            title: title,
+            minutes: intValue(pairedValue(in: item, snake: "scheduled_minutes", camel: "scheduledMinutes"))
+                ?? intValue(normalMode["minutes"])
+                ?? 0,
+            fallbackCue: fallbackCue
+        )
+    }
+
+    private static func addInitiateFallbackCue(in day: [String: Any]) -> String? {
+        let items = arrayValue(day["items"]).compactMap(dictionaryValue)
+        guard let fallback = items.lazy.compactMap({
+            dictionaryValue(pairedValue(in: $0, snake: "fallback_mode", camel: "fallbackMode"))
+        }).first else {
+            return nil
+        }
+        let output = stringValue(pairedValue(in: fallback, snake: "fallback_output", camel: "fallbackOutput"))
+            ?? stringValue(fallback["output"])
+            ?? "可降级产出"
+        if let riskEffect = stringValue(pairedValue(in: fallback, snake: "risk_effect", camel: "riskEffect")) {
+            return "低能量：\(output)，风险：\(localizedAddInitiateToken(riskEffect))"
+        }
+        return "低能量：\(output)"
+    }
+
+    private static func addInitiateRiskCue(_ loadState: String) -> String? {
+        switch loadState {
+        case "over_capacity":
+            return "风险：超出容量"
+        case "over_budget":
+            return "风险：接近上限"
+        case "uses_buffer":
+            return "使用缓冲"
+        default:
+            return nil
+        }
+    }
+
+    private static func firstFallbackMetadata(in scheduledDays: [[String: Any]]) -> [String: Any]? {
+        for day in scheduledDays {
+            let items = arrayValue(day["items"]).compactMap(dictionaryValue)
+            if let fallback = items.lazy.compactMap({
+                dictionaryValue(pairedValue(in: $0, snake: "fallback_mode", camel: "fallbackMode"))
+            }).first {
+                return fallback
+            }
+        }
+        return nil
+    }
+
+    private static func addInitiateAssumptions(from rawValue: Any?) -> [String] {
+        if let strings = stringArrayValue(rawValue) {
+            return strings
+        }
+        return arrayValue(rawValue).compactMap { item in
+            if let text = stringValue(item) { return text }
+            guard let dict = dictionaryValue(item) else { return nil }
+            return stringValue(dict["assumption"])
+                ?? stringValue(dict["value"])
+                ?? stringValue(dict["field"])
+        }
+    }
+
+    private static func addInitiateBufferSummary(from riskReport: [String: Any]) -> String? {
+        let reserved = stringArrayValue(pairedValue(in: riskReport, snake: "buffer_days_reserved", camel: "bufferDaysReserved")) ?? []
+        let eroded = boolValue(pairedValue(in: riskReport, snake: "buffer_erosion", camel: "bufferErosion")) ?? false
+        switch (reserved.isEmpty, eroded) {
+        case (false, true):
+            return "预留缓冲：\(reserved.joined(separator: "、"))；缓冲被侵蚀"
+        case (false, false):
+            return "预留缓冲：\(reserved.joined(separator: "、"))"
+        case (true, true):
+            return "缓冲被侵蚀"
+        case (true, false):
+            return nil
+        }
+    }
+
+    private static func addInitiateCapacityRiskFacts(from riskReport: [String: Any]) -> [String] {
+        var facts: [String] = []
+        if let minutes = intValue(pairedValue(in: riskReport, snake: "essential_work_minutes", camel: "essentialWorkMinutes")), minutes > 0 {
+            facts.append("必要工作 \(minutes) 分钟")
+        }
+        if let minutes = intValue(pairedValue(in: riskReport, snake: "available_execution_capacity_minutes", camel: "availableExecutionCapacityMinutes")), minutes > 0 {
+            facts.append("可用容量 \(minutes) 分钟")
+        }
+        if let minutes = intValue(pairedValue(in: riskReport, snake: "capacity_gap_minutes", camel: "capacityGapMinutes")), minutes > 0 {
+            facts.append("容量缺口 \(minutes) 分钟")
+        }
+        if let dates = stringArrayValue(pairedValue(in: riskReport, snake: "overloaded_dates", camel: "overloadedDates")), !dates.isEmpty {
+            facts.append("超载日期 \(dates.joined(separator: "、"))")
+        }
+        if let tasks = stringArrayValue(pairedValue(in: riskReport, snake: "expected_late_tasks", camel: "expectedLateTasks")), !tasks.isEmpty {
+            facts.append("预计延期 \(tasks.joined(separator: "、"))")
+        }
+        if let conflicts = stringArrayValue(pairedValue(in: riskReport, snake: "existing_load_conflicts", camel: "existingLoadConflicts")), !conflicts.isEmpty {
+            facts.append("已有负荷 \(conflicts.joined(separator: "、"))")
+        }
+        return facts
+    }
+
+    private static func hasLowCalibrationFact(in riskReport: [String: Any]) -> Bool {
+        if boolValue(pairedValue(in: riskReport, snake: "low_calibration", camel: "lowCalibration")) == true {
+            return true
+        }
+        let confidence = dictionaryValue(pairedValue(in: riskReport, snake: "estimate_confidence_summary", camel: "estimateConfidenceSummary")) ?? [:]
+        return (intValue(confidence["low"]) ?? 0) > 0 ||
+            (intValue(confidence["rough"]) ?? 0) > 0
+    }
+
+    private static func localizedAddInitiateRoleLabel(_ rawRole: String) -> String {
+        switch rawRole {
+        case "new_plan": return "新计划"
+        case "attach_to_existing_plan": return "加入已有计划"
+        case "reference_material": return "参考资料"
+        case "later_resource": return "稍后处理"
+        case "immediate_one_off", "one_off_action": return "一次性行动"
+        default: return rawRole.isEmpty ? "未定" : rawRole
+        }
+    }
+
+    private static func localizedAddInitiateLoadState(_ rawState: String) -> String {
+        switch rawState {
+        case "within_budget": return "预算内"
+        case "over_budget": return "接近上限"
+        case "over_capacity": return "超出容量"
+        case "uses_buffer": return "使用缓冲"
+        default: return localizedAddInitiateToken(rawState)
+        }
+    }
+
+    private static func localizedAddInitiateOptionLabel(_ optionId: String) -> String {
+        switch optionId {
+        case "reduce_scope": return "缩小范围"
+        case "lower_depth": return "降低深度"
+        case "extend_deadline": return "调整截止日期"
+        case "increase_capacity": return "增加可用时间"
+        case "accept_crunch": return "接受紧凑安排"
+        case "accept_buffer_risk": return "接受缓冲风险"
+        case "accept_overload": return "接受超载日期"
+        case "answer_one_question": return "回答一个问题"
+        case "edit_estimates": return "调整估算"
+        case "accept_rough_draft": return "接受粗略草案"
+        case "accept_late_finish": return "接受延期完成"
+        case "store_for_later": return "存为稍后处理"
+        case "rebalance": return "重新平衡"
+        default: return localizedAddInitiateToken(optionId)
+        }
+    }
+
+    private static func localizedAddInitiateOptionEffect(_ effectType: String?) -> String {
+        switch effectType {
+        case "compiler_recompute_required":
+            return "需要重新生成"
+        case "storage":
+            return "安静存储"
+        case "needs_input":
+            return "补一个信息"
+        default:
+            return "重新排期后再审阅"
+        }
+    }
+
+    private static func localizedAddInitiateSourceDetailKey(_ key: String) -> String {
+        switch key {
+        case "kind", "type": return "类型"
+        case "source_kind", "sourceKind": return "来源类型"
+        case "title": return "标题"
+        case "url": return "链接"
+        default: return localizedAddInitiateToken(key)
+        }
+    }
+
+    private static func localizedAddInitiateSourceDetailValue(_ value: String) -> String {
+        switch value {
+        case "github_repo": return "GitHub 仓库"
+        case "text_goal": return "文本目标"
+        case "note_snippet": return "笔记片段"
+        case "url": return "链接"
+        default: return localizedAddInitiateToken(value)
+        }
+    }
+
+    private static func localizedAddInitiateToken(_ rawValue: String) -> String {
+        switch rawValue {
+        case "hard_deadline_pressure": return "硬截止日期压力"
+        case "fits_with_risk": return "可行但有风险"
+        case "preserves_scope": return "保留范围"
+        case "scope_visible": return "范围可见"
+        default:
+            let words = rawValue
+                .replacingOccurrences(of: "-", with: "_")
+                .split(separator: "_")
+                .map(String.init)
+            guard !words.isEmpty else { return rawValue }
+            let joined = words.joined(separator: " ")
+            return joined.prefix(1).uppercased() + String(joined.dropFirst())
+        }
+    }
+
+    private static func pairedValue(
+        in dictionary: [String: AnyCodable],
+        snake: String,
+        camel: String
+    ) -> Any? {
+        dictionary[snake]?.value ?? dictionary[camel]?.value
+    }
+
+    private static func pairedValue(
+        in dictionary: [String: Any],
+        snake: String,
+        camel: String
+    ) -> Any? {
+        dictionary[snake] ?? dictionary[camel]
+    }
+
+    private static func dictionaryValue(_ value: Any?) -> [String: Any]? {
+        if let dict = value as? [String: Any] {
+            return dict
+        }
+        if let dict = value as? [String: AnyCodable] {
+            return dict.mapValues(\.value)
+        }
+        if value is NSNull {
+            return nil
+        }
+        return nil
+    }
+
+    private static func arrayValue(_ value: Any?) -> [Any] {
+        if let array = value as? [Any] {
+            return array
+        }
+        if let array = value as? [AnyCodable] {
+            return array.map(\.value)
+        }
+        return []
+    }
+
+    private static func stringArrayValue(_ value: Any?) -> [String]? {
+        if let strings = value as? [String] {
+            return strings
+        }
+        let strings = arrayValue(value).compactMap(stringValue)
+        return strings.isEmpty ? nil : strings
+    }
+
+    private static func stringValue(_ value: Any?) -> String? {
+        if let value = value as? AnyCodable {
+            return stringValue(value.value)
+        }
+        if let value = value as? String {
+            return value
+        }
+        if let value = value as? Int {
+            return String(value)
+        }
+        if let value = value as? Double {
+            return String(value)
+        }
+        return nil
+    }
+
+    private static func intValue(_ value: Any?) -> Int? {
+        if let value = value as? AnyCodable {
+            return intValue(value.value)
+        }
+        if let value = value as? Int {
+            return value
+        }
+        if let value = value as? Double {
+            return Int(value)
+        }
+        if let value = value as? String {
+            return Int(value)
+        }
+        return nil
+    }
+
+    private static func boolValue(_ value: Any?) -> Bool? {
+        if let value = value as? AnyCodable {
+            return boolValue(value.value)
+        }
+        if let value = value as? Bool {
+            return value
+        }
+        if let value = value as? String {
+            return ["true", "yes", "1"].contains(value.lowercased())
+        }
+        return nil
+    }
+
+    private static func preserveAddInitiateReviewPackageIfNeeded(
+        _ response: AddInitiateSessionResponse,
+        current: AddInitiateSessionResponse?
+    ) -> AddInitiateSessionResponse {
+        guard response.reviewPackage == nil,
+              let current,
+              current.sessionId == response.sessionId,
+              current.draftId == response.draftId,
+              current.draftVersion == response.draftVersion,
+              let reviewPackage = current.reviewPackage else {
+            return response
+        }
+
+        return AddInitiateSessionResponse(
+            sessionId: response.sessionId,
+            clientRequestId: response.clientRequestId,
+            intakeItemId: response.intakeItemId,
+            draftId: response.draftId,
+            draftVersion: response.draftVersion,
+            stage: response.stage,
+            reviewState: response.reviewState,
+            recommendedRole: response.recommendedRole,
+            confirmedRole: response.confirmedRole,
+            confidence: response.confidence,
+            reasonCodes: response.reasonCodes,
+            nextAction: response.nextAction,
+            createsActiveTasks: response.createsActiveTasks,
+            resourceId: response.resourceId,
+            error: response.error,
+            clarificationQuestion: response.clarificationQuestion,
+            existingPlanCandidates: response.existingPlanCandidates,
+            attachmentModeSuggestion: response.attachmentModeSuggestion,
+            canonicalRepoRole: response.canonicalRepoRole,
+            reviewPackage: reviewPackage,
+            activationResult: response.activationResult
+        )
+    }
+
+    private func reconcileAddInitiateTaskEditDrafts(
+        previous: AddInitiateSessionResponse?,
+        next: AddInitiateSessionResponse
+    ) {
+        guard !addInitiateTaskEditDrafts.isEmpty else { return }
+        guard previous?.sessionId == next.sessionId,
+              previous?.draftId == next.draftId,
+              previous?.draftVersion == next.draftVersion else {
+            addInitiateTaskEditDrafts = [:]
+            return
+        }
     }
 
     private func isCurrentAddInitiateAnchorResponse(
@@ -1351,6 +2050,39 @@ final class LearningAssistantViewModel: ObservableObject {
             return false
         }
         return true
+    }
+
+    private func isCurrentAddInitiateOptionResponse(
+        _ response: AddInitiateSessionResponse,
+        requestSessionId: String,
+        requestDraftId: Int,
+        requestDraftVersion: Int,
+        operationGeneration: Int,
+        requestSequence: Int
+    ) -> Bool {
+        guard addInitiateFlowGeneration == operationGeneration,
+              addInitiateLocalFlowState != .cancelled,
+              addInitiateOptionRequestSequence == requestSequence,
+              response.sessionId == requestSessionId,
+              let current = addInitiateSession,
+              current.sessionId == requestSessionId,
+              current.draftId == requestDraftId,
+              current.draftVersion == requestDraftVersion else {
+            return false
+        }
+
+        switch response.reviewState {
+        case .storedNonPlan, .materialAttached, .cancelled:
+            return response.createsActiveTasks == false
+        case .anchorReview, .needsInput, .compileFailed, .infeasibleReview, .draftReview, .activationFailed:
+            guard response.draftId == requestDraftId,
+                  let responseDraftVersion = response.draftVersion else {
+                return false
+            }
+            return responseDraftVersion >= requestDraftVersion
+        case .roleReview, .activated, .error:
+            return false
+        }
     }
 
     private func isCurrentAddInitiateDraftResponse(

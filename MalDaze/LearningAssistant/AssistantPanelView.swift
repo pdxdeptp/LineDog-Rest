@@ -1157,32 +1157,16 @@ private struct AddInitiateView: View {
                 action: { Task { await vm.retryAddInitiatePlanning() } }
             )
         case .infeasibleReview:
-            compactReviewStateCard(
-                title: "排期不可行",
-                detail: "当前锚点不可行，可以先暂不处理。",
-                stateIdentifier: "infeasible_review",
-                primaryLabel: "暂不处理",
-                primaryIcon: "tray",
-                action: { vm.cancelAddInitiateFlow() }
-            )
+            infeasibleReviewCard
         case .draftReview:
-            compactReviewStateCard(
-                title: "草案已生成",
-                detail: "草案已生成，可以激活当前版本。",
-                stateIdentifier: "draft_review",
-                primaryLabel: "激活草案",
-                primaryIcon: "checkmark.circle.fill",
-                action: { Task { await vm.activateAddInitiateDraft() } }
-            )
+            draftReviewCard(isApplyingOption: false)
+        case .optionEffectProgress:
+            VStack(alignment: .leading, spacing: 10) {
+                progressRow("正在应用选项")
+                infeasibleReviewCard(isApplyingOption: true)
+            }
         case .activationFailed:
-            compactReviewStateCard(
-                title: "激活失败",
-                detail: vm.addInitiateSession?.error ?? "激活失败，草案仍保留。",
-                stateIdentifier: "activation_failed",
-                primaryLabel: "重试激活",
-                primaryIcon: "arrow.clockwise",
-                action: { Task { await vm.activateAddInitiateDraft() } }
-            )
+            activationFailedCard
         case .cancelled:
             compactReviewStateCard(
                 title: "已取消",
@@ -1193,6 +1177,298 @@ private struct AddInitiateView: View {
             )
         default:
             EmptyView()
+        }
+    }
+
+    private var infeasibleReviewCard: some View {
+        infeasibleReviewCard(isApplyingOption: false)
+    }
+
+    private func infeasibleReviewCard(isApplyingOption: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("排期不可行")
+                .font(.headline)
+                .accessibilityIdentifier("infeasible_review")
+
+            ForEach(vm.addInitiateInfeasibleRiskFacts, id: \.self) { fact in
+                Label(fact, systemImage: "exclamationmark.triangle")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("可选处理")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+
+                ForEach(vm.addInitiateInfeasibleOptionChoices) { option in
+                    Button {
+                        Task { await vm.applyAddInitiateOptionEffect(optionId: option.optionId) }
+                    } label: {
+                        HStack {
+                            Text(option.localizedLabel)
+                            Spacer(minLength: 8)
+                            Text(option.effectDescription)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(isApplyingOption)
+                    .accessibilityIdentifier("addInitiateOption_\(option.optionId)")
+                }
+            }
+
+            Button {
+                vm.cancelAddInitiateFlow()
+            } label: {
+                Label("暂不处理", systemImage: "tray")
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(isApplyingOption)
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+    }
+
+    private func draftReviewCard(isApplyingOption: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("草案审阅")
+                .font(.headline)
+                .accessibilityIdentifier("draft_review")
+
+            if let summary = vm.addInitiateDraftReviewSummary {
+                HStack(spacing: 10) {
+                    roleFact("角色", summary.roleLabel)
+                    roleFact("目标深度", summary.targetDepth)
+                }
+
+                Text(summary.targetOutput)
+                    .font(.callout.weight(.semibold))
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if !summary.assumptions.isEmpty {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("关键假设")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                        ForEach(summary.assumptions, id: \.self) { assumption in
+                            Text(assumption)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("首周摘要")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    ForEach(summary.firstWeekDays, id: \.date) { day in
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            Text(day.date)
+                                .font(.caption.monospacedDigit().weight(.semibold))
+                            Text("\(day.plannedMinutes) 分钟")
+                                .font(.caption)
+                            Text(day.loadStateLabel)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            if let fallbackCue = day.fallbackCue {
+                                Text(fallbackCue)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+
+                reviewFactLine(title: "缓冲", value: summary.bufferSummary)
+                reviewFactLine(title: "低能量 fallback", value: summary.fallbackSummary)
+                reviewFactLine(title: "截止风险", value: summary.deadlineRisk)
+
+                if !summary.capacityRiskFacts.isEmpty {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("容量风险")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                        ForEach(summary.capacityRiskFacts, id: \.self) { fact in
+                            Text(fact)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
+                DisclosureGroup("完整排期") {
+                    ForEach(summary.fullScheduleDays) { day in
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("\(day.date) · \(day.plannedMinutes) 分钟 · \(day.loadStateLabel)")
+                                .font(.caption.weight(.semibold))
+                            ForEach(day.items) { item in
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("\(item.title) · \(item.minutes) 分钟")
+                                    if let fallbackCue = item.fallbackCue {
+                                        Text(fallbackCue)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                                .font(.caption)
+                            }
+                        }
+                    }
+                }
+
+                DisclosureGroup("来源细节") {
+                    if summary.sourceDetailLines.isEmpty {
+                        Text("暂无来源细节")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(summary.sourceDetailLines, id: \.self) { line in
+                            Text(line)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
+                DisclosureGroup("单项编辑") {
+                    ForEach(summary.fullScheduleDays) { day in
+                        ForEach(day.items) { item in
+                            editableTaskRow(item)
+                        }
+                    }
+                }
+            } else {
+                Text("草案已生成，可以激活当前版本。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            HStack {
+                Button {
+                    Task { await vm.activateAddInitiateDraft() }
+                } label: {
+                    Label("激活草案", systemImage: "checkmark.circle.fill")
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(isApplyingOption || !vm.canActivateAddInitiateDraft)
+
+                Button {
+                    vm.editAddInitiateDraft()
+                } label: {
+                    Label("继续编辑", systemImage: "slider.horizontal.3")
+                }
+                .buttonStyle(.bordered)
+                .disabled(isApplyingOption)
+
+                Button {
+                    vm.cancelAddInitiateFlow()
+                } label: {
+                    Label("取消", systemImage: "xmark.circle")
+                }
+                .buttonStyle(.bordered)
+                .disabled(isApplyingOption)
+            }
+
+            if !vm.canActivateAddInitiateDraft {
+                Text("草案已变更，请先重新载入最新版本。")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+    }
+
+    private func editableTaskRow(_ item: AddInitiateDraftScheduleItem) -> some View {
+        HStack(spacing: 8) {
+            TextField("任务标题", text: addInitiateTaskEditTitleBinding(for: item))
+                .textFieldStyle(.roundedBorder)
+            Stepper(value: addInitiateTaskEditMinutesBinding(for: item), in: 5...600, step: 5) {
+                Text("\(vm.addInitiateTaskEditMinutes(for: item)) 分钟")
+                    .font(.caption.monospacedDigit())
+            }
+            Button {
+                vm.beginAddInitiateTaskEdit(item)
+            } label: {
+                Label("记录编辑", systemImage: "pencil")
+            }
+            .labelStyle(.iconOnly)
+            .buttonStyle(.borderless)
+            .help("记录本地编辑草稿，激活前不会创建主动任务")
+        }
+        .onAppear { vm.beginAddInitiateTaskEdit(item) }
+    }
+
+    private func addInitiateTaskEditTitleBinding(for item: AddInitiateDraftScheduleItem) -> Binding<String> {
+        Binding(
+            get: { vm.addInitiateTaskEditTitle(for: item) },
+            set: { vm.updateAddInitiateTaskEditTitle(itemId: item.id, title: $0) }
+        )
+    }
+
+    private func addInitiateTaskEditMinutesBinding(for item: AddInitiateDraftScheduleItem) -> Binding<Int> {
+        Binding(
+            get: { vm.addInitiateTaskEditMinutes(for: item) },
+            set: { vm.updateAddInitiateTaskEditMinutes(itemId: item.id, minutes: $0) }
+        )
+    }
+
+    private var activationFailedCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("激活失败")
+                .font(.headline)
+                .accessibilityIdentifier("activation_failed")
+            Text(vm.addInitiateSession?.error ?? "激活失败，草案仍保留。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            HStack {
+                Button {
+                    Task { await vm.activateAddInitiateDraft() }
+                } label: {
+                    Label("重试激活", systemImage: "arrow.clockwise")
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(!vm.canActivateAddInitiateDraft)
+
+                Button {
+                    vm.editAddInitiateDraft()
+                } label: {
+                    Label("继续编辑", systemImage: "slider.horizontal.3")
+                }
+                .buttonStyle(.bordered)
+
+                Button {
+                    vm.cancelAddInitiateFlow()
+                } label: {
+                    Label("取消", systemImage: "xmark.circle")
+                }
+                .buttonStyle(.bordered)
+            }
+            if !vm.canActivateAddInitiateDraft {
+                Text("草案已变更，请先重新载入最新版本。")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+    }
+
+    @ViewBuilder
+    private func reviewFactLine(title: String, value: String?) -> some View {
+        if let value, !value.isEmpty {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(title)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Text(value)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 
