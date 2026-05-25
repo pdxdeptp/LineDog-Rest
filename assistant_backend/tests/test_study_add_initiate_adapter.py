@@ -1,5 +1,7 @@
 """Add / Initiate orchestration adapter contract tests."""
 
+from datetime import date, timedelta
+
 import pytest
 
 
@@ -80,7 +82,7 @@ async def test_add_initiate_start_session_tracks_identity_progress_and_no_active
         db,
         client_request_id="req-add-initiate-session",
         raw_input="Build a deadline-driven backend interview prep plan by August 1.",
-        source_type="interview_prep",
+        source_type="interview_prep_item",
         progress=progress,
     )
 
@@ -161,6 +163,138 @@ async def test_add_initiate_start_session_ambiguous_route_returns_needs_input(db
     assert response["clarificationQuestion"]["prompt"].count("?") == 1
     assert response["createsActiveTasks"] is False
     assert await _fetchall(db, "SELECT id FROM tasks") == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("case_id", "raw_input", "source_type", "expected_role"),
+    [
+        (
+            "agentguide-finite-learning",
+            "Use https://example.com/AgentGuide to build a tool-calling demo and interview notes by 2026-08-01.",
+            "url",
+            "new_plan",
+        ),
+        (
+            "easyagent-rebuild",
+            "https://github.com/example/easyagent rebuild the minimal agent loop and explain the call flow by 2026-08-01.",
+            "github_repo",
+            "new_plan",
+        ),
+        (
+            "leetcode-cadence",
+            "Study LeetCode Hot 100 and LingChaShan recurring practice by 2026-08-01.",
+            "text_goal",
+            "new_plan",
+        ),
+        (
+            "agent-backend-interview-prep",
+            "Prepare agent and backend interview prep notes with project-linked examples by 2026-08-01.",
+            "interview_prep_item",
+            "new_plan",
+        ),
+        (
+            "resume-project-rewrite",
+            "Package assistant backend work into resume bullets and a project story by 2026-08-01.",
+            "resume_project_note",
+            "new_plan",
+        ),
+        (
+            "maldaze-existing-project-material",
+            "Add this MalDaze backend checklist to my existing project as supporting material.",
+            "existing_project_snippet",
+            "attach_to_existing_plan",
+        ),
+        (
+            "maldaze-note-snippet-material",
+            "MalDaze note snippet: Add/Initiate backend review checklist and adapter contract notes. Attach this material to my existing MalDaze project.",
+            "note_snippet",
+            "attach_to_existing_plan",
+        ),
+    ],
+)
+async def test_add_initiate_real_context_sessions_preserve_review_contract_without_active_noise(
+    db,
+    case_id,
+    raw_input,
+    source_type,
+    expected_role,
+):
+    from src.db.queries import get_study_calendar_load, get_today_study_view_tasks
+    from src.routers.study_smart_mode import (
+        _build_fact_issues,
+        _build_proposal_options_with_db,
+        _build_read_only_smart_snapshot_with_db,
+    )
+    from src.study_plan.add_initiate import AddInitiateProgressBuffer, start_add_initiate_session
+
+    existing_plan_id = None
+    if expected_role == "attach_to_existing_plan":
+        cursor = await db.execute(
+            """
+            INSERT INTO resources (title, type, tracking_mode, status, total_units)
+            VALUES ('MalDaze Existing Project', 'study_project', 'sequential', 'active', 1)
+            """
+        )
+        existing_plan_id = int(cursor.lastrowid)
+        await db.commit()
+
+    progress = AddInitiateProgressBuffer()
+
+    response = await start_add_initiate_session(
+        db,
+        client_request_id=f"req-real-context-{case_id}",
+        raw_input=raw_input,
+        source_type=source_type,
+        existing_plan_id=existing_plan_id,
+        progress=progress,
+    )
+
+    assert response["sessionId"] == f"add-initiate-{response['intakeItemId']}"
+    assert response["clientRequestId"] == f"req-real-context-{case_id}"
+    assert response["recommendedRole"] == expected_role
+    assert response["reviewState"] == "role_review"
+    assert response["stage"] == "role_review"
+    assert response["createsActiveTasks"] is False
+    assert "thread_id" not in response
+    assert "threadId" not in response
+
+    stored_items = await _fetchall(
+        db,
+        """
+        SELECT source_type, confirmation_state
+        FROM study_intake_items
+        WHERE id = ?
+        """,
+        (response["intakeItemId"],),
+    )
+    assert stored_items == [{"source_type": source_type, "confirmation_state": "pending"}]
+
+    events = progress.events_for(response["sessionId"])
+    assert [event["stage"] for event in events] == [
+        "analyzing_input",
+        "routing_item",
+        "role_review",
+    ]
+    assert all(event["sessionId"] == response["sessionId"] for event in events)
+    assert all(event["createsActiveTasks"] is False for event in events)
+    assert await _fetchall(db, "SELECT id FROM tasks") == []
+    today = date.today()
+    assert await get_today_study_view_tasks(db, today) == []
+
+    calendar_load = await get_study_calendar_load(db, today, today + timedelta(days=14))
+    assert calendar_load["days"]
+    assert all(day["scheduled_task_count"] == 0 for day in calendar_load["days"])
+    assert all(day["total_target_minutes"] == 0 for day in calendar_load["days"])
+
+    snapshot = await _build_read_only_smart_snapshot_with_db(db, today)
+    assert snapshot["calendar"]["days"] == calendar_load["days"]
+    # There is no standalone reminder/deadline-risk query; those noise paths are
+    # covered indirectly by empty active tasks, calendar load, and smart proposals.
+    smart_noise_issues = _build_fact_issues(snapshot)
+    assert smart_noise_issues == []
+    assert await _build_proposal_options_with_db(db, smart_noise_issues, "morning") == []
+    assert await _build_proposal_options_with_db(db, smart_noise_issues, "after_adjustment") == []
 
 
 @pytest.mark.asyncio

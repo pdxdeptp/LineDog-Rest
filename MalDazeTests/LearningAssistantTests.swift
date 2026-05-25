@@ -2985,6 +2985,76 @@ final class LearningAssistantViewModelTests: XCTestCase {
         XCTAssertEqual(vm.addInitiateSession?.reviewState, .roleReview)
     }
 
+    func testStartAddInitiateRealContextFixturesUseTypedAdapterAndStayQuietBeforeActivation() async {
+        let fixtures: [(name: String, rawInput: String, sourceType: AddInitiateSourceType, expectedSourceType: String)] = [
+            (
+                "AgentGuide URL",
+                "https://agentguide.dev/course build a text-first agent workflow course",
+                .url,
+                "url"
+            ),
+            (
+                "LeetCode cadence",
+                "Create a four-week LeetCode cadence with two graph problems and one review block each weekday",
+                .textGoal,
+                "text_goal"
+            ),
+            (
+                "easyagent repo rebuild",
+                "https://github.com/example/easyagent rebuild the repo notes into a staged learning plan",
+                .githubRepo,
+                "github_repo"
+            ),
+            (
+                "MalDaze existing-project material",
+                "MalDaze Add / Initiate has review states wired; attach this material to the existing planning redesign",
+                .existingProjectSnippet,
+                "existing_project_snippet"
+            ),
+            (
+                "agent/backend interview prep",
+                "Prepare agent runtime and backend system design interview drills with mock questions",
+                .interviewPrepItem,
+                "interview_prep_item"
+            ),
+            (
+                "resume/project rewrite",
+                "Rewrite the easyagent and MalDaze project bullets for a senior backend-agent resume narrative",
+                .resumeProjectNote,
+                "resume_project_note"
+            ),
+            (
+                "MalDaze material note",
+                "Note: Add / Initiate material-only attachments must stay out of Today until activation",
+                .noteSnippet,
+                "note_snippet"
+            )
+        ]
+
+        for fixture in fixtures {
+            let mock = MockAssistantAPIClient()
+            mock.addInitiateStartResult = sampleAddInitiateRoleReviewSession()
+            let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+
+            await vm.startAddInitiateSession(rawInput: fixture.rawInput, sourceType: fixture.sourceType)
+
+            XCTAssertEqual(mock.startAddInitiateSessionCallCount, 1, fixture.name)
+            XCTAssertEqual(mock.lastAddInitiateStartRequest?.rawInput, fixture.rawInput, fixture.name)
+            XCTAssertEqual(mock.lastAddInitiateStartRequest?.sourceType, fixture.expectedSourceType, fixture.name)
+            XCTAssertFalse(mock.lastAddInitiateStartRequest?.clientRequestId.isEmpty ?? true, fixture.name)
+            XCTAssertEqual(mock.startIngestionCallCount, 0, "\(fixture.name) must not use legacy URL ingestion")
+            XCTAssertNil(mock.lastStudyPlanStartURL, "\(fixture.name) must not start the legacy URL-only primary path")
+            XCTAssertNil(mock.lastConfirmIngestionConfirmed, "\(fixture.name) must not confirm legacy ingestion")
+            XCTAssertEqual(vm.addInitiateSession?.reviewState, .roleReview, fixture.name)
+            XCTAssertEqual(vm.addInitiateStage, .roleReview, fixture.name)
+            XCTAssertEqual(vm.addInitiateSession?.createsActiveTasks, false, fixture.name)
+            XCTAssertEqual(mock.fetchStudyTodayViewCallCount, 0, "\(fixture.name) must stay quiet before activation")
+            XCTAssertEqual(mock.fetchStudyProjectOverviewCallCount, 0, "\(fixture.name) must stay quiet before activation")
+            XCTAssertEqual(mock.fetchStudyCalendarLoadCallCount, 0, "\(fixture.name) must stay quiet before activation")
+            XCTAssertEqual(mock.generateStudySmartProposalsCallCount, 0, "\(fixture.name) must stay quiet before activation")
+        }
+    }
+
     func testConfirmAddInitiateMaterialOnlyAttachmentIsQuietAndMapsSupportingMaterialRole() async {
         let mock = MockAssistantAPIClient()
         mock.addInitiateStartResult = sampleAddInitiateRoleReviewSession()
