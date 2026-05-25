@@ -4,10 +4,10 @@
   "phase": "active",
   "currentChangeIndex": 2,
   "currentChange": "introduce-plan-compiler",
-  "currentStep": "scope_dependency_check",
-  "currentCheckpoint": "introduce-plan-compiler:scope_dependency_check",
+  "currentStep": "apply",
+  "currentCheckpoint": "introduce-plan-compiler:apply",
   "currentAttempt": 0,
-  "runCounter": 19,
+  "runCounter": 20,
   "maxRetriesPerCheckpoint": 2,
   "requiredProductDeepenRounds": 3,
   "requiresScopeDependencyCheck": true,
@@ -62,11 +62,11 @@
     "requiredAfterProductDeepening": true,
     "requiredBeforeApply": true,
     "lastCheck": {
-      "completedAt": "2026-05-25T06:24:10Z",
-      "changeId": "persist-intake-plan-drafts",
-      "checkpoint": "persist-intake-plan-drafts:scope_dependency_check",
+      "completedAt": "2026-05-25T09:05:11Z",
+      "changeId": "introduce-plan-compiler",
+      "checkpoint": "introduce-plan-compiler:scope_dependency_check",
       "result": "passed",
-      "evidenceFile": "openspec/add-initiate-implementation-control/evidence/scope-dependency/persist-intake-plan-drafts.md"
+      "evidenceFile": "openspec/add-initiate-implementation-control/evidence/scope-dependency/introduce-plan-compiler.md"
     }
   },
   "applyCursor": {
@@ -133,7 +133,7 @@
       "id": "introduce-plan-compiler",
       "status": "in_progress",
       "productDeepenRoundsCompleted": 3,
-      "scopeDependencyCheckCompleted": false,
+      "scopeDependencyCheckCompleted": true,
       "applyCompleted": false,
       "applyTaskGroups": {
         "status": "not_planned",
@@ -176,11 +176,11 @@
     }
   ],
   "lastRun": {
-    "completedAt": "2026-05-25T08:54:41Z",
-    "checkpoint": "introduce-plan-compiler:product_deepen_round_3",
+    "completedAt": "2026-05-25T09:05:11Z",
+    "checkpoint": "introduce-plan-compiler:scope_dependency_check",
     "result": "completed"
   },
-  "lastCompletedCheckpoint": "introduce-plan-compiler:product_deepen_round_3",
+  "lastCompletedCheckpoint": "introduce-plan-compiler:scope_dependency_check",
   "lastMigration": {
     "completedAt": "2026-05-25T03:56:29Z",
     "id": "require-three-product-deepen-rounds",
@@ -200,8 +200,8 @@
   },
   "lastFailure": null,
   "lastVerification": {
-    "command": "openspec validate introduce-plan-compiler --strict",
-    "result": "valid after product_deepen_round_3 real-context fixture and sensitive-content updates"
+    "command": "openspec validate introduce-plan-compiler --strict && openspec validate persist-intake-plan-drafts --strict && openspec validate introduce-deadline-scheduler --strict && openspec status --change introduce-plan-compiler --json",
+    "result": "scope dependency check passed; current/upstream/downstream changes valid; introduce-plan-compiler artifacts present"
   },
   "blockedReason": null
 }

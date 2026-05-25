@@ -4,8 +4,8 @@
 
 - Phase: active
 - Current change: introduce-plan-compiler
-- Current step: scope_dependency_check
-- Current checkpoint: introduce-plan-compiler:scope_dependency_check
+- Current step: apply
+- Current checkpoint: introduce-plan-compiler:apply
 - Required product-deepen rounds before apply: 3
 - Required checkpoint after product deepening: scope_dependency_check
 - Product-deepen scope guard: every round must read adjacent changes and record scope decisions
@@ -771,3 +771,30 @@ Completed apply groups for previous change `persist-intake-plan-drafts`:
 - Manifest:
   - Added `introduce-plan-compiler-product-deepen-round-3`.
 - Next checkpoint: introduce-plan-compiler:scope_dependency_check
+
+## Run 2026-05-25T09:05:11Z Scope Dependency Check introduce-plan-compiler
+
+- Automation: add-initiate-changes
+- Checkpoint: introduce-plan-compiler:scope_dependency_check
+- Result: completed
+- Actions:
+  - Acquired `run.lock`.
+  - Read `state.json`, `runbook.md`, `progress.md`, `evidence/manifest.json`, and `workspace-baseline.json`.
+  - Ran `git status --porcelain=v1` and protected unrelated dirty files.
+  - Read current `introduce-plan-compiler` proposal, design, specs, tasks, and all three product-deepen records.
+  - Read adjacent upstream `persist-intake-plan-drafts` and downstream `introduce-deadline-scheduler` artifacts.
+  - Verified all three product-deepen records contain explicit scope decisions.
+  - Wrote scope dependency evidence at `openspec/add-initiate-implementation-control/evidence/scope-dependency/introduce-plan-compiler.md`.
+- Scope result:
+  - Passed. `introduce-plan-compiler` owns PlanningEnvelope, archetype/depth/synopsis, LLM contracts, validation/repair, estimate normalization, compiler trace, real-context unscheduled fixtures, and sensitive-content boundaries.
+  - Upstream draft persistence handoff is satisfied or explicitly deferred for shallow source facts and legacy assumptions.
+  - Downstream scheduler contracts are named without being implemented: final dates, capacity math, buffer/risk, option effects, and `infeasible_review` remain scheduler-owned.
+  - No scope drift or design conflict found.
+- Verification:
+  - `openspec validate introduce-plan-compiler --strict`: valid.
+  - `openspec validate persist-intake-plan-drafts --strict`: valid.
+  - `openspec validate introduce-deadline-scheduler --strict`: valid.
+  - `openspec status --change introduce-plan-compiler --json`: proposal/design/specs/tasks artifacts present.
+- Manifest:
+  - Added `introduce-plan-compiler-scope-dependency-check`.
+- Next checkpoint: introduce-plan-compiler:apply

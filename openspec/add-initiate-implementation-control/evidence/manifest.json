@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-05-25T08:54:41Z",
+  "updatedAt": "2026-05-25T09:05:11Z",
   "entries": [
     {
       "id": "introduce-study-intake-router-product-deepen-round-1",
@@ -1428,6 +1428,44 @@
         }
       ],
       "nextCheckpoint": "introduce-plan-compiler:scope_dependency_check"
+    },
+    {
+      "id": "introduce-plan-compiler-scope-dependency-check",
+      "timestamp": "2026-05-25T09:05:11Z",
+      "kind": "scope_dependency_check",
+      "changeId": "introduce-plan-compiler",
+      "checkpoint": "introduce-plan-compiler:scope_dependency_check",
+      "result": "completed",
+      "commands": [
+        {
+          "command": "openspec validate introduce-plan-compiler --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        },
+        {
+          "command": "openspec validate persist-intake-plan-drafts --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        },
+        {
+          "command": "openspec validate introduce-deadline-scheduler --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        },
+        {
+          "command": "openspec status --change introduce-plan-compiler --json",
+          "exitCode": 0,
+          "summary": "proposal/design/specs/tasks artifacts present"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/add-initiate-implementation-control/evidence/scope-dependency/introduce-plan-compiler.md",
+          "sha256": "cde318d74fcb7f748be0a395efbee24174f880ea142075c0fa8b7c6a2e9177de",
+          "description": "Scope dependency check confirming compiler scope boundaries, upstream contracts, and downstream scheduler handoff."
+        }
+      ],
+      "nextCheckpoint": "introduce-plan-compiler:apply"
     }
   ]
 }
