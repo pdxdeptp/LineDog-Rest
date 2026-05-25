@@ -4,8 +4,8 @@
 
 - Phase: active
 - Current change: introduce-deadline-scheduler
-- Current step: product_deepen_round_1
-- Current checkpoint: introduce-deadline-scheduler:product_deepen_round_1
+- Current step: scope_dependency_check
+- Current checkpoint: introduce-deadline-scheduler:scope_dependency_check
 - Required product-deepen rounds before apply: 3
 - Required checkpoint after product deepening: scope_dependency_check
 - Product-deepen scope guard: every round must read adjacent changes and record scope decisions
@@ -29,6 +29,12 @@ Completed apply groups for `introduce-plan-compiler`:
 - `envelope-archetype-and-depth-core`
 - `synopsis-llm-validation-and-repair`
 - `estimates-trace-fixtures-and-final-verification`
+
+Product-deepen rounds completed for `introduce-deadline-scheduler`:
+
+- round 1
+- round 2
+- round 3
 
 ## Run Log
 
@@ -950,3 +956,53 @@ Completed apply groups for `introduce-plan-compiler`:
 - Manifest:
   - Added `introduce-plan-compiler-to-introduce-deadline-scheduler-cross-change-contract`.
 - Next checkpoint: introduce-deadline-scheduler:product_deepen_round_1
+
+## Run 2026-05-25T10:59:11Z Product Deepen introduce-deadline-scheduler Round 1
+
+- Automation: add-initiate-changes
+- Checkpoint: introduce-deadline-scheduler:product_deepen_round_1
+- Result: completed
+- Actions:
+  - Triggered `opsx-product-deepen`.
+  - Read scheduler proposal, design, spec, and tasks.
+  - Read upstream `introduce-plan-compiler` and downstream `redesign-add-initiate-ui` boundaries.
+  - Added `review-records/product-deepen-round-1.md`.
+  - Fixed P0 ambiguity around scheduler output shape, input gate, status derivation, pure option effects, and recompute/handoff boundaries.
+- Verification:
+  - `openspec validate introduce-deadline-scheduler --strict`: valid.
+- Manifest:
+  - Added `introduce-deadline-scheduler-product-deepen-round-1`.
+- Next checkpoint: introduce-deadline-scheduler:product_deepen_round_2
+
+## Run 2026-05-25T10:59:11Z Product Deepen introduce-deadline-scheduler Round 2
+
+- Automation: add-initiate-changes
+- Checkpoint: introduce-deadline-scheduler:product_deepen_round_2
+- Result: completed
+- Actions:
+  - Triggered `opsx-product-deepen`.
+  - Re-reviewed scheduler algorithm determinism after Round 1.
+  - Added `review-records/product-deepen-round-2.md`.
+  - Fixed P0 ambiguity around deterministic buffer counts, load-shape tie-breakers, crunch versus overload semantics, and fallback mode not counting as full completion.
+- Verification:
+  - `openspec validate introduce-deadline-scheduler --strict`: valid.
+- Manifest:
+  - Added `introduce-deadline-scheduler-product-deepen-round-2`.
+- Next checkpoint: introduce-deadline-scheduler:product_deepen_round_3
+
+## Run 2026-05-25T10:59:11Z Product Deepen introduce-deadline-scheduler Round 3
+
+- Automation: add-initiate-changes
+- Checkpoint: introduce-deadline-scheduler:product_deepen_round_3
+- Result: completed
+- Actions:
+  - Triggered `opsx-product-deepen`.
+  - Re-reviewed scheduler preflight, adjacent compiler/UI boundaries, and missing-anchor behavior.
+  - Added `review-records/product-deepen-round-3.md`.
+  - Fixed P0 ambiguity around missing deadline, invalid dates, empty schedulable task sets, safe defaults, and scheduler `needs_input`.
+  - Stopped before `scope_dependency_check` as required by the heartbeat/runbook.
+- Verification:
+  - `openspec validate introduce-deadline-scheduler --strict`: valid.
+- Manifest:
+  - Added `introduce-deadline-scheduler-product-deepen-round-3`.
+- Next checkpoint: introduce-deadline-scheduler:scope_dependency_check

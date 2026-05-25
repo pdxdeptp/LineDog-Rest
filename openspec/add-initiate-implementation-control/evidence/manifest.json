@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-05-25T10:49:11Z",
+  "updatedAt": "2026-05-25T10:59:11Z",
   "entries": [
     {
       "id": "introduce-study-intake-router-product-deepen-round-1",
@@ -1799,6 +1799,90 @@
         }
       ],
       "nextCheckpoint": "introduce-deadline-scheduler:product_deepen_round_1"
+    },
+    {
+      "id": "introduce-deadline-scheduler-product-deepen-round-1",
+      "timestamp": "2026-05-25T10:59:11Z",
+      "kind": "checkpoint",
+      "changeId": "introduce-deadline-scheduler",
+      "checkpoint": "introduce-deadline-scheduler:product_deepen_round_1",
+      "result": "completed",
+      "commands": [
+        {
+          "command": "openspec validate introduce-deadline-scheduler --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/changes/introduce-deadline-scheduler/review-records/product-deepen-round-1.md",
+          "sha256": "c98bb0ceda9b1caeeb6c2098be9440a3dd3274325cc73efd9c41f7a58f5f3bb9",
+          "description": "Round 1 product deepening evidence with scheduler output/status/option-effect P0 fixes."
+        }
+      ],
+      "nextCheckpoint": "introduce-deadline-scheduler:product_deepen_round_2"
+    },
+    {
+      "id": "introduce-deadline-scheduler-product-deepen-round-2",
+      "timestamp": "2026-05-25T10:59:11Z",
+      "kind": "checkpoint",
+      "changeId": "introduce-deadline-scheduler",
+      "checkpoint": "introduce-deadline-scheduler:product_deepen_round_2",
+      "result": "completed",
+      "commands": [
+        {
+          "command": "openspec validate introduce-deadline-scheduler --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/changes/introduce-deadline-scheduler/review-records/product-deepen-round-2.md",
+          "sha256": "179b5ee1778c60eafc6e21c9e74fb004abb045517cc768deb87693ed9e34bb5f",
+          "description": "Round 2 product deepening evidence with buffer/crunch/overload/fallback algorithm clarifications."
+        }
+      ],
+      "nextCheckpoint": "introduce-deadline-scheduler:product_deepen_round_3"
+    },
+    {
+      "id": "introduce-deadline-scheduler-product-deepen-round-3",
+      "timestamp": "2026-05-25T10:59:11Z",
+      "kind": "checkpoint",
+      "changeId": "introduce-deadline-scheduler",
+      "checkpoint": "introduce-deadline-scheduler:product_deepen_round_3",
+      "result": "completed",
+      "commands": [
+        {
+          "command": "openspec validate introduce-deadline-scheduler --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/changes/introduce-deadline-scheduler/review-records/product-deepen-round-3.md",
+          "sha256": "d28acd457ed8da4c55b74c47c03bb5e68a85e30bc9077cc225a8dfc1922bb66c",
+          "description": "Round 3 product deepening evidence with scheduler preflight needs_input clarification."
+        },
+        {
+          "path": "openspec/changes/introduce-deadline-scheduler/design.md",
+          "sha256": "22e3e787b2d48bb8ff613c7bcf840a354bb52dc6f8e919779c751a2a0f366cd1",
+          "description": "Scheduler design updated with input preflight, scheduler needs_input, and defaultable anchor rules."
+        },
+        {
+          "path": "openspec/changes/introduce-deadline-scheduler/specs/study-intake-planning/spec.md",
+          "sha256": "5950bc70f5f9211e6473a5809ef890e6a2ace53e708a2dec99ae3bb9b10df216",
+          "description": "Scheduler spec updated with preflight defaults, missing deadline needs_input, and empty task-set recovery."
+        },
+        {
+          "path": "openspec/changes/introduce-deadline-scheduler/tasks.md",
+          "sha256": "a03a4fb0a84ebf53f4fffdaa2893281833cbf2886a37ca03cc5aa0c1e9e45cab",
+          "description": "Scheduler tasks expanded for preflight defaults and scheduler needs_input tests."
+        }
+      ],
+      "nextCheckpoint": "introduce-deadline-scheduler:scope_dependency_check"
     }
   ]
 }

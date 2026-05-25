@@ -4,10 +4,10 @@
   "phase": "active",
   "currentChangeIndex": 3,
   "currentChange": "introduce-deadline-scheduler",
-  "currentStep": "product_deepen_round_1",
-  "currentCheckpoint": "introduce-deadline-scheduler:product_deepen_round_1",
+  "currentStep": "scope_dependency_check",
+  "currentCheckpoint": "introduce-deadline-scheduler:scope_dependency_check",
   "currentAttempt": 0,
-  "runCounter": 25,
+  "runCounter": 26,
   "maxRetriesPerCheckpoint": 2,
   "requiredProductDeepenRounds": 3,
   "requiresScopeDependencyCheck": true,
@@ -151,7 +151,7 @@
     {
       "id": "introduce-deadline-scheduler",
       "status": "in_progress",
-      "productDeepenRoundsCompleted": 0,
+      "productDeepenRoundsCompleted": 3,
       "scopeDependencyCheckCompleted": false,
       "applyCompleted": false,
       "applyTaskGroups": {
@@ -180,11 +180,11 @@
     }
   ],
   "lastRun": {
-    "completedAt": "2026-05-25T10:49:11Z",
-    "checkpoint": "introduce-plan-compiler:apply:cross-change-contract-to-introduce-deadline-scheduler",
+    "completedAt": "2026-05-25T10:59:11Z",
+    "checkpoint": "introduce-deadline-scheduler:product_deepen_round_3",
     "result": "completed"
   },
-  "lastCompletedCheckpoint": "introduce-plan-compiler:apply:cross-change-contract-to-introduce-deadline-scheduler",
+  "lastCompletedCheckpoint": "introduce-deadline-scheduler:product_deepen_round_3",
   "lastMigration": {
     "completedAt": "2026-05-25T03:56:29Z",
     "id": "require-three-product-deepen-rounds",
@@ -204,8 +204,8 @@
   },
   "lastFailure": null,
   "lastVerification": {
-    "command": "openspec validate introduce-plan-compiler --strict && openspec validate introduce-deadline-scheduler --strict && openspec instructions apply --change introduce-plan-compiler --json && openspec status --change introduce-deadline-scheduler --json",
-    "result": "compiler valid; deadline scheduler valid; compiler apply progress 31/31 complete state all_done; scheduler artifacts present"
+    "command": "openspec validate introduce-deadline-scheduler --strict",
+    "result": "valid after product-deepen round 3 preflight clarification; next checkpoint scope_dependency_check"
   },
   "blockedReason": null
 }

@@ -41,12 +41,100 @@ Excluded:
 
 If daily capacity is missing, use the learning preference default of 60 minutes.
 
+The scheduler accepts only compiler `draft_review` packages. Compiler `needs_input`
+and `compile_failed` packages pass through to draft persistence/UI recovery and are
+not scheduled by this change.
+
+## Scheduler Output Contract
+
+The scheduler returns a `ScheduledDraftReview` package. It is a pure review
+payload; activation and persistence writes remain downstream.
+
+Top-level fields:
+
+- `schema_version`;
+- `draft_id` and source `compiler_package_version`;
+- `status`: `draft_review`, `infeasible_review`, or `needs_input`;
+- `scheduled_days`: dated review rows with planned work, fallback mode, and daily load;
+- `unscheduled_tasks`: optional/stretch or unsplittable work not placed;
+- `risk_report`;
+- `infeasibility_options`;
+- `assumptions`;
+- `scheduler_trace`.
+
+`scheduled_days[]` contains:
+
+- `date`;
+- `raw_capacity_min`;
+- `existing_load_min`;
+- `usable_capacity_min`;
+- `planning_budget_min`;
+- `planned_minutes`;
+- `load_state`: `within_budget`, `uses_buffer`, `over_budget`, or `over_capacity`;
+- `items[]`, each with `task_id`, `phase_id`, `session_id`, `parent_task_id` when split, `sequence_index`, `scheduled_minutes`, `classification`, `completion_criteria`, `source_refs`, `normal_mode`, and optional `fallback_mode`.
+
+The scheduler must not write active tasks, create Today actions, or mutate the
+compiler package. It returns enough deterministic facts for draft persistence and
+the Add / Initiate UI to store, review, retry, or activate later.
+
+`draft_review` means all essential scheduled work finishes inside the deadline
+without unaccepted overload and without unaccepted buffer erosion. Optional or
+stretch work may remain unscheduled if the risk report makes that explicit.
+
+`infeasible_review` means at least one essential task is late, unscheduled,
+over-capacity, or requires unaccepted buffer/crunch/overload to finish.
+
+`needs_input` means scheduling cannot run because a scheduler-required anchor is
+missing or invalid and should not be guessed. It includes at most one focused
+question plus visible defaultable assumptions and does not require `scheduled_days`.
+
+## Scheduler Input Preflight
+
+The scheduler preflight validates anchors before placement.
+
+Required anchors:
+
+- at least one validated task candidate in a compiler `draft_review` package;
+- deadline;
+- deadline type, defaulting to `assumed` when deadline is present but type is missing;
+- start date, defaulting to today when missing.
+
+Defaultable anchors:
+
+- daily capacity defaults to 60 minutes;
+- existing active load defaults to empty load with a visible assumption;
+- rest weekdays and unavailable dates default to empty lists;
+- buffer policy defaults to standard reservation.
+
+If deadline is missing, date parsing fails, or no schedulable task candidate is
+available, the scheduler returns `needs_input` rather than inventing a deadline
+or creating an impossible plan.
+
+## Date And Capacity Rules
+
+All date calculations use the user's current local calendar day. The date window
+is inclusive from `start_date` through `deadline`.
+
+If `start_date` is missing, use today. If `deadline` is before `start_date`,
+return `infeasible_review` with a hard date-window risk and do not place work
+after the deadline.
+
+Rest days and unavailable dates stay inside the date window with zero normal
+capacity so review can explain why work was not placed there. They are not
+normal placement days. Fallback/reading work can appear on those dates only when
+the user explicitly chooses that date or a later option effect permits it.
+
+Existing active load is read as per-date confirmed minutes. The scheduler may
+show conflicts but must not move or edit those active tasks.
+
 ## Capacity Terms
 
 - `rawCapacity(date)`: user's available minutes for that date.
 - `existingLoad(date)`: minutes already occupied by confirmed active plans.
 - `usableCapacity(date)`: `max(0, rawCapacity - existingLoad)`.
 - `planningBudget(date)`: usable capacity available to the new draft. By default, new plans use at most 80% of usable capacity unless the user chooses crunch/overload.
+- `reservedBuffer(date)`: capacity intentionally kept empty before the deadline.
+- `executionBudget(date)`: planning budget available before unaccepted buffer or overload is consumed.
 
 Rest days and unavailable days have zero normal placement capacity. They may only receive fallback/reading work when the user explicitly chooses that date.
 
@@ -66,6 +154,36 @@ Rest days and unavailable days have zero normal placement capacity. They may onl
 
 The scheduler must not lower target depth, extend deadline, move existing active tasks, invent missing tasks, or create Today actions before activation.
 
+Buffer details:
+
+- If there are fewer than 3 usable normal-placement days, reserve 0 buffer days and record `no_buffer_available`.
+- If there are 3-6 usable normal-placement days, reserve the latest 1 usable day.
+- If there are 7 or more usable normal-placement days, reserve the latest `ceil(usable_days * 0.2)` usable days, clamped to 1-5 days.
+- Reserved buffer days remain visible in `scheduled_days` with `reservedBuffer=true`.
+- Normal placement first uses non-buffer execution budgets. If essential work can fit only by using reserved buffer, the scheduler may show that placement but must mark `buffer_erosion` and return `infeasible_review` until the user accepts buffer risk or changes constraints.
+
+Placement details:
+
+- Essential tasks are placed in compiler order after dependencies are satisfied.
+- Optional and stretch tasks are attempted only after essential work has a feasible placement.
+- A task may be placed on a date only when its dependencies are already completed on earlier sessions or earlier items on the same date.
+- If no feasible date exists, keep the task in dependency order, record the first failed constraint, and include it in `unscheduled_tasks` or `expected_late_tasks`.
+
+Load shapes change distribution, not scope:
+
+- `balanced`: choose the date with the lowest planned-minutes-to-budget ratio; tie-break by earliest date.
+- `front_loaded`: choose the earliest date with remaining execution budget.
+- `light_start`: cap the first usable day at 50% of its planning budget; then use balanced placement with the same tie-breakers.
+
+Load shapes never override dependency order, rest/unavailable dates, hard deadlines, or accepted/unaccepted overload rules.
+
+Acceptance modes:
+
+- Normal mode caps placement at `planningBudget(date)` and avoids reserved buffer.
+- `accept_crunch` raises selected dates from 80% planning budget up to 100% of `usableCapacity(date)` and reruns scheduling. It does not exceed usable capacity.
+- `accept_overload` permits planned minutes above `usableCapacity(date)` on explicitly selected dates and records those dates as overloaded.
+- `accept_buffer_risk` permits using reserved buffer while keeping buffer erosion visible in the review package.
+
 ## Continuation Sessions
 
 If a task estimate exceeds the normal planning budget for available days:
@@ -74,6 +192,21 @@ If a task estimate exceeds the normal planning budget for available days:
 - keep parent task id and sequence number;
 - include session estimate and visible sub-output or continuation note;
 - if no meaningful split exists, return expected-late, overload, or capacity-gap facts.
+
+Split sessions inherit the parent task's classification and dependency constraints.
+Downstream UI can render them as one task with dated sessions; the scheduler must
+not create unrelated new tasks.
+
+Fallback mode is review metadata, not a replacement for normal completion. A
+scheduled item may expose compiler-provided fallback work with:
+
+- `fallback_minutes`;
+- `fallback_output`;
+- `risk_effect`: `preserves_momentum`, `creates_follow_up`, or `changes_plan_risk`.
+
+Fallback minutes do not count as completing the full scheduled item unless a
+later adjustment or user choice explicitly converts the plan. That conversion is
+outside this change.
 
 ## Risk Report
 
@@ -90,6 +223,16 @@ The scheduler returns:
 - canonical infeasibility option ids.
 
 Infeasibility is a review state, not an exception.
+
+`capacity_gap_minutes` is calculated against essential work first:
+
+`max(0, essential_minutes - available_execution_minutes_before_unaccepted_buffer_or_overload)`.
+
+Optional/stretch gaps are reported separately as `optional_unscheduled_minutes`.
+
+`buffer_erosion` records the reserved buffer days or minutes consumed by normal
+work before any explicit user acceptance. Buffer erosion can coexist with zero
+capacity gap.
 
 ## Infeasibility Option Mapping
 
@@ -117,6 +260,15 @@ For hard deadlines, `accept_late_finish` is not available.
 - `accept_late_finish`: allowed only for soft/assumed deadlines.
 
 `reduce_scope` and `lower_depth` may require cooperation with the compiler, but the scheduler owns the before/after fit math and option availability.
+
+Option effects are deterministic recomputation requests. They return a new
+`ScheduledDraftReview` version or a storage/recompile request. They do not
+silently activate the draft.
+
+- `reduce_scope` reruns scheduling after removing scheduler-eligible optional or stretch work.
+- `lower_depth` returns a `compiler_recompute_required` handoff with requested target depth, removed evidence preview, and current fit facts; compiler regeneration remains outside this change.
+- `answer_one_question` returns a `compiler_recompute_required` handoff with the missing or low-calibration question.
+- `edit_estimates` reruns scheduling with user-edited estimates while preserving task ids and dependencies.
 
 ## Scope And Depth Reductions
 
