@@ -1509,6 +1509,30 @@
         }
       ],
       "nextCheckpoint": "introduce-plan-compiler:apply:envelope-archetype-and-depth-core"
+    },
+    {
+      "id": "introduce-plan-compiler-pre-apply-checkpoint-commit",
+      "timestamp": "2026-05-25T09:15:11Z",
+      "kind": "pre_apply_commit",
+      "changeId": "introduce-plan-compiler",
+      "checkpoint": "introduce-plan-compiler:apply:envelope-archetype-and-depth-core",
+      "result": "completed",
+      "commit": "73274553d0231c6cfba5170cf507a1fba09d3381",
+      "commands": [
+        {
+          "command": "git commit -m \"Prepare plan compiler apply\"",
+          "exitCode": 0,
+          "summary": "pre-apply checkpoint commit created"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/add-initiate-implementation-control/evidence/commits/introduce-plan-compiler-pre-apply.md",
+          "sha256": "2da537b2557e680ef5c5acff69e96c415472c478d5d044bcfab53e8b225539cc",
+          "description": "Pre-apply checkpoint commit evidence."
+        }
+      ],
+      "nextCheckpoint": "introduce-plan-compiler:apply:envelope-archetype-and-depth-core"
     }
   ]
 }

@@ -826,4 +826,8 @@ Completed apply groups for previous change `persist-intake-plan-drafts`:
   - `openspec instructions apply --change introduce-plan-compiler --json`: 31/31 tasks pending, state ready.
 - Manifest:
   - Added `introduce-plan-compiler-apply-planning`.
+- Pre-apply checkpoint:
+  - Created commit `73274553d0231c6cfba5170cf507a1fba09d3381` from explicit planning/control pathspecs only.
+  - Wrote `openspec/add-initiate-implementation-control/evidence/commits/introduce-plan-compiler-pre-apply.md`.
+  - Added `introduce-plan-compiler-pre-apply-checkpoint-commit` to the manifest.
 - Next checkpoint: introduce-plan-compiler:apply:envelope-archetype-and-depth-core
