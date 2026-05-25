@@ -5,7 +5,7 @@
 - Phase: active
 - Current change: introduce-study-intake-router
 - Current step: apply
-- Current checkpoint: introduce-study-intake-router:apply:routing-contracts-and-confirmation
+- Current checkpoint: introduce-study-intake-router:apply:cross-change-contract-to-persist-intake-plan-drafts
 - Required product-deepen rounds before apply: 3
 - Required checkpoint after product deepening: scope_dependency_check
 - Product-deepen scope guard: every round must read adjacent changes and record scope decisions
@@ -275,3 +275,45 @@
 - Evidence:
   - `openspec/add-initiate-implementation-control/evidence/introduce-study-intake-router/apply-groups/intake-data-and-idempotency.md`
 - Next checkpoint: introduce-study-intake-router:apply:source-preview-and-github-roles
+
+## Run 2026-05-25T05:56:51Z
+
+- Automation: add-initiate-changes
+- Checkpoint: introduce-study-intake-router:apply:routing-contracts-and-confirmation
+- Result: completed
+- Implementation commit:
+  - `5955c594c1da37fc090d185d0f5e20771b2af429`
+- Actions:
+  - Ran `openspec-apply-change` with subagent-driven development and per-task TDD.
+  - Added `/api/study-intake/route` and `/api/study-intake/confirm`.
+  - Registered the study intake router under the existing API prefix.
+  - Implemented deterministic first-version routing for `new_plan`, `attach_to_existing_plan`, `reference_material`, `later_resource`, and `immediate_one_off`.
+  - Implemented route confidence, reason codes, one-question clarification, next-action contracts, and `createsActiveTasks=false` payloads.
+  - Implemented active `study_project` target selection for existing-plan attachments.
+  - Validated any new `existingPlanId` before intake creation, across attach and non-attach route outcomes.
+  - Preserved idempotent stored-item replay before retry-body validation so duplicate `clientRequestId` retries stay stable.
+  - Kept `canonicalRepoRole` separate from intake `recommendedRole` and filtered internal reason codes.
+  - Returned handoff states for `new_plan`, `draft_phase`, and `scheduled_work` without implementing downstream draft persistence, plan compilation, scheduling, or UI.
+  - Marked tasks `1.2`-`1.7`, `4.1`-`4.3`, and `4.7` complete.
+  - Wrote apply-group evidence at `openspec/add-initiate-implementation-control/evidence/introduce-study-intake-router/apply-groups/routing-contracts-and-confirmation.md`.
+- Verification:
+  - `cd assistant_backend && uv run pytest tests/test_study_intake_router.py`: 51 passed, 2 warnings.
+  - `cd assistant_backend && uv run pytest tests/test_study_plan_router.py tests/test_study_views_today.py`: 12 passed, 2 warnings.
+  - `cd assistant_backend && uv run pytest tests/test_integration.py -q`: 16 passed, 2 warnings.
+  - `openspec validate introduce-study-intake-router --strict`: valid.
+  - `openspec instructions apply --change introduce-study-intake-router --json`: 21/21 tasks complete.
+- Review:
+  - Initial re-review: CHANGES_REQUIRED for non-attach stale `existingPlanId` validation.
+  - Final re-review after TDD fix: APPROVED.
+- Manifest:
+  - Added `introduce-study-intake-router-apply-group-routing-contracts-and-confirmation`.
+- Protected unrelated dirty paths:
+  - `docs/agent-workflow.md`
+  - `openspec/changes/harden-add-initiate-automation-control/design.md`
+  - `openspec/changes/harden-add-initiate-automation-control/proposal.md`
+  - `openspec/changes/harden-add-initiate-automation-control/tasks.md`
+  - `openspec/changes/redesign-study-intake-planning/iteration-records/round-16-split-readiness-review.md`
+  - `openspec/changes/redesign-study-intake-planning/pre-split-readiness-audit.md`
+  - `openspec/changes/redesign-study-intake-planning/split-decision.md`
+  - `openspec/changes/redesign-study-intake-planning/tasks.md`
+- Next checkpoint: introduce-study-intake-router:apply:cross-change-contract-to-persist-intake-plan-drafts

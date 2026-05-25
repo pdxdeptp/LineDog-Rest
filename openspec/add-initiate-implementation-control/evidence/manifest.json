@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-05-25T05:03:10Z",
+  "updatedAt": "2026-05-25T05:56:51Z",
   "entries": [
     {
       "id": "introduce-study-intake-router-product-deepen-round-1",
@@ -510,6 +510,76 @@
         }
       ],
       "nextCheckpoint": "introduce-study-intake-router:apply:routing-contracts-and-confirmation"
+    },
+    {
+      "id": "introduce-study-intake-router-apply-group-routing-contracts-and-confirmation",
+      "timestamp": "2026-05-25T05:56:51Z",
+      "kind": "apply_group",
+      "changeId": "introduce-study-intake-router",
+      "checkpoint": "introduce-study-intake-router:apply:routing-contracts-and-confirmation",
+      "groupId": "routing-contracts-and-confirmation",
+      "result": "completed",
+      "commit": "5955c594c1da37fc090d185d0f5e20771b2af429",
+      "commands": [
+        {
+          "command": "cd assistant_backend && uv run pytest tests/test_study_intake_router.py",
+          "exitCode": 0,
+          "summary": "51 passed, 2 warnings"
+        },
+        {
+          "command": "cd assistant_backend && uv run pytest tests/test_study_plan_router.py tests/test_study_views_today.py",
+          "exitCode": 0,
+          "summary": "12 passed, 2 warnings"
+        },
+        {
+          "command": "cd assistant_backend && uv run pytest tests/test_integration.py -q",
+          "exitCode": 0,
+          "summary": "16 passed, 2 warnings"
+        },
+        {
+          "command": "openspec validate introduce-study-intake-router --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        },
+        {
+          "command": "openspec instructions apply --change introduce-study-intake-router --json",
+          "exitCode": 0,
+          "summary": "21/21 tasks complete"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/add-initiate-implementation-control/evidence/introduce-study-intake-router/apply-groups/routing-contracts-and-confirmation.md",
+          "sha256": "d48d9d8ab97a7f06da8ab6397a0e12b9ab4fe11a7c0344b023892e8d0c8c48d4",
+          "description": "Apply group evidence, TDD trace, verification, and review summary."
+        },
+        {
+          "path": "assistant_backend/src/main.py",
+          "sha256": "57833425ed07e7cdb63a68f3872a8dbc9cd12902135fb92536bb4fc21f20d55c",
+          "description": "FastAPI router registration for study intake endpoints."
+        },
+        {
+          "path": "assistant_backend/src/routers/study_intake.py",
+          "sha256": "8dca1fa2704794fa1cd23372440803a6f4135bc844f4638e87ee5f6d35d20bf5",
+          "description": "Study intake route and confirmation HTTP contracts."
+        },
+        {
+          "path": "assistant_backend/src/study_plan/intake.py",
+          "sha256": "4d2b74db4add0caa554c8d19338cb3ba889f4f473f1d0b7b796c57561f52f860",
+          "description": "Routing recommendation, confirmation, target validation, and idempotent replay helpers."
+        },
+        {
+          "path": "assistant_backend/tests/test_study_intake_router.py",
+          "sha256": "f84b987550bc70486a3652696a16e034f7de1fb1025b646d4ec5fc8ec34c0cd5",
+          "description": "TDD tests for routing roles, confidence, clarification, target selection, invalid targets, API contracts, and retry stability."
+        },
+        {
+          "path": "openspec/changes/introduce-study-intake-router/tasks.md",
+          "sha256": "ea8c31fcf315acd921006f1a367c12b9305ab03deaa46a37803fa81841f940b9",
+          "description": "OpenSpec tasks updated for all completed router apply tasks."
+        }
+      ],
+      "nextCheckpoint": "introduce-study-intake-router:apply:cross-change-contract-to-persist-intake-plan-drafts"
     }
   ]
 }
