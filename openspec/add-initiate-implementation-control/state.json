@@ -5,9 +5,9 @@
   "currentChangeIndex": 1,
   "currentChange": "persist-intake-plan-drafts",
   "currentStep": "apply",
-  "currentCheckpoint": "persist-intake-plan-drafts:apply:fallback-progress-and-final-verification",
+  "currentCheckpoint": "persist-intake-plan-drafts:apply:cross-change-contract-to-introduce-plan-compiler",
   "currentAttempt": 0,
-  "runCounter": 16,
+  "runCounter": 17,
   "maxRetriesPerCheckpoint": 2,
   "requiredProductDeepenRounds": 3,
   "requiresScopeDependencyCheck": true,
@@ -77,12 +77,13 @@
     "completedGroupIds": [
       "draft-schema-migration-and-defaults",
       "draft-package-versioning-and-entrypoints",
-      "activation-boundary-and-events"
+      "activation-boundary-and-events",
+      "fallback-progress-and-final-verification"
     ],
     "blockedGroupId": null,
     "taskGroupsFile": "openspec/add-initiate-implementation-control/evidence/persist-intake-plan-drafts/apply-task-groups.json",
-    "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/persist-intake-plan-drafts/apply-groups/activation-boundary-and-events.md",
-    "lastCommit": "ab1587b60b1fed5c13c9185f7473ebdb52a371eb"
+    "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/persist-intake-plan-drafts/apply-groups/fallback-progress-and-final-verification.md",
+    "lastCommit": "2e1ef56eedbf1bf40cccc79fdb09aea0c35dd28f"
   },
   "lock": {
     "path": "openspec/add-initiate-implementation-control/run.lock",
@@ -120,16 +121,17 @@
       "scopeDependencyCheckCompleted": true,
       "applyCompleted": false,
       "applyTaskGroups": {
-        "status": "planned",
+        "status": "completed",
         "taskGroupsFile": "openspec/add-initiate-implementation-control/evidence/persist-intake-plan-drafts/apply-task-groups.json",
         "completedGroupIds": [
           "draft-schema-migration-and-defaults",
           "draft-package-versioning-and-entrypoints",
-          "activation-boundary-and-events"
+          "activation-boundary-and-events",
+          "fallback-progress-and-final-verification"
         ],
         "currentGroupId": null,
-        "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/persist-intake-plan-drafts/apply-groups/activation-boundary-and-events.md",
-        "lastCommit": "ab1587b60b1fed5c13c9185f7473ebdb52a371eb"
+        "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/persist-intake-plan-drafts/apply-groups/fallback-progress-and-final-verification.md",
+        "lastCommit": "2e1ef56eedbf1bf40cccc79fdb09aea0c35dd28f"
       }
     },
     {
@@ -179,11 +181,11 @@
     }
   ],
   "lastRun": {
-    "completedAt": "2026-05-25T08:23:46Z",
-    "checkpoint": "persist-intake-plan-drafts:apply:activation-boundary-and-events",
+    "completedAt": "2026-05-25T08:26:11Z",
+    "checkpoint": "persist-intake-plan-drafts:apply:fallback-progress-and-final-verification",
     "result": "completed"
   },
-  "lastCompletedCheckpoint": "persist-intake-plan-drafts:apply:activation-boundary-and-events",
+  "lastCompletedCheckpoint": "persist-intake-plan-drafts:apply:fallback-progress-and-final-verification",
   "lastMigration": {
     "completedAt": "2026-05-25T03:56:29Z",
     "id": "require-three-product-deepen-rounds",
@@ -204,7 +206,7 @@
   "lastFailure": null,
   "lastVerification": {
     "command": "openspec validate persist-intake-plan-drafts --strict",
-    "result": "valid after activation-boundary-and-events apply group"
+    "result": "valid after fallback-progress-and-final-verification apply group; 35/35 tasks complete"
   },
   "blockedReason": null
 }

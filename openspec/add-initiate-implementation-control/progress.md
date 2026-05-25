@@ -5,7 +5,7 @@
 - Phase: active
 - Current change: persist-intake-plan-drafts
 - Current step: apply
-- Current checkpoint: persist-intake-plan-drafts:apply:fallback-progress-and-final-verification
+- Current checkpoint: persist-intake-plan-drafts:apply:cross-change-contract-to-introduce-plan-compiler
 - Required product-deepen rounds before apply: 3
 - Required checkpoint after product deepening: scope_dependency_check
 - Product-deepen scope guard: every round must read adjacent changes and record scope decisions
@@ -22,6 +22,7 @@ Completed apply groups for current change:
 - `draft-schema-migration-and-defaults`
 - `draft-package-versioning-and-entrypoints`
 - `activation-boundary-and-events`
+- `fallback-progress-and-final-verification`
 
 ## Run Log
 
@@ -618,3 +619,45 @@ Completed apply groups for current change:
 - Manifest:
   - Added `persist-intake-plan-drafts-apply-group-activation-boundary-and-events`.
 - Next checkpoint: persist-intake-plan-drafts:apply:fallback-progress-and-final-verification
+
+## Run 2026-05-25T08:26:11Z Apply Group fallback-progress-and-final-verification
+
+- Automation: add-initiate-changes
+- Checkpoint: persist-intake-plan-drafts:apply:fallback-progress-and-final-verification
+- Result: completed
+- Actions:
+  - Acquired `run.lock`.
+  - Read `state.json`, `runbook.md`, `progress.md`, `evidence/manifest.json`, `workspace-baseline.json`, and the current apply task group.
+  - Ran `git status --porcelain=v1` and protected unrelated dirty files.
+  - Triggered `openspec-apply-change`, `superpowers:subagent-driven-development`, `superpowers:test-driven-development`, `superpowers:receiving-code-review`, and `superpowers:verification-before-completion`.
+  - Delegated TDD implementation to a worker subagent with a bounded write set.
+  - Added fallback-progress persistence columns, idempotent fallback migration, `complete_task_fallback()`, and the fallback completion endpoint.
+  - Ensured fallback-only completion does not set full `completed_at` or full `actual_minutes`, does not update unit/resource completion counts, and does not emit full completion events.
+  - Fixed review findings so full completion clears `needs_followup`, fallback after full completion is a no-op, and repeated fallback preserves the first timestamp/minutes.
+  - Added lifecycle and completion tests for fallback-only, fallback-to-full, full-then-fallback, repeated fallback, and legacy fallback migration behavior.
+  - Wrote apply group evidence at `openspec/add-initiate-implementation-control/evidence/persist-intake-plan-drafts/apply-groups/fallback-progress-and-final-verification.md`.
+  - Marked OpenSpec tasks `3.1`, `3.2`, `3.3`, and `4.9` complete.
+  - Created implementation commit `2e1ef56eedbf1bf40cccc79fdb09aea0c35dd28f`.
+- Verification:
+  - `cd assistant_backend && uv run pytest tests/test_study_plan_lifecycle.py -k 'fallback'`: 1 passed, 42 deselected.
+  - `cd assistant_backend && uv run pytest tests/test_study_views_completion.py -k 'fallback or completion'`: 11 passed, 2 third-party warnings.
+  - `cd assistant_backend && uv run pytest tests/test_study_plan_lifecycle.py tests/test_study_plan_router.py tests/test_study_intake_router.py tests/test_study_views_today.py tests/test_integration.py`: 131 passed, 2 third-party warnings.
+  - `openspec validate persist-intake-plan-drafts --strict`: valid.
+  - `openspec instructions apply --change persist-intake-plan-drafts --json`: 35/35 tasks complete, state `all_done`.
+  - `git diff --check`: passed for implementation and task files.
+- Review:
+  - Initial spec compliance and code quality reviews found P1 issues around stale `needs_followup` state after full completion.
+  - Final review verdict: approved; no remaining P0/P1/P2 findings.
+  - P2 note deferred: positive-minute request validation for `actual_minutes`, because the existing full completion endpoint uses the same request model and changing it here would broaden this group.
+- Protected unrelated dirty paths:
+  - `docs/agent-workflow.md`
+  - `openspec/changes/harden-add-initiate-automation-control/design.md`
+  - `openspec/changes/harden-add-initiate-automation-control/proposal.md`
+  - `openspec/changes/harden-add-initiate-automation-control/tasks.md`
+  - `openspec/changes/redesign-study-intake-planning/iteration-records/round-16-split-readiness-review.md`
+  - `openspec/changes/redesign-study-intake-planning/pre-split-readiness-audit.md`
+  - `openspec/changes/redesign-study-intake-planning/split-decision.md`
+  - `openspec/changes/redesign-study-intake-planning/tasks.md`
+- Manifest:
+  - Added `persist-intake-plan-drafts-apply-group-fallback-progress-and-final-verification`.
+- Next checkpoint: persist-intake-plan-drafts:apply:cross-change-contract-to-introduce-plan-compiler

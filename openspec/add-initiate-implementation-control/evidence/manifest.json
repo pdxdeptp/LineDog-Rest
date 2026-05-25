@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-05-25T08:23:46Z",
+  "updatedAt": "2026-05-25T08:26:11Z",
   "entries": [
     {
       "id": "introduce-study-intake-router-product-deepen-round-1",
@@ -1169,6 +1169,108 @@
         }
       ],
       "nextCheckpoint": "persist-intake-plan-drafts:apply:fallback-progress-and-final-verification"
+    },
+    {
+      "id": "persist-intake-plan-drafts-apply-group-fallback-progress-and-final-verification",
+      "timestamp": "2026-05-25T08:26:11Z",
+      "kind": "apply_group",
+      "changeId": "persist-intake-plan-drafts",
+      "checkpoint": "persist-intake-plan-drafts:apply:fallback-progress-and-final-verification",
+      "groupId": "fallback-progress-and-final-verification",
+      "result": "completed",
+      "commit": "2e1ef56eedbf1bf40cccc79fdb09aea0c35dd28f",
+      "commands": [
+        {
+          "command": "cd assistant_backend && uv run pytest tests/test_study_plan_lifecycle.py -k 'fallback'",
+          "exitCode": 0,
+          "summary": "1 passed, 42 deselected"
+        },
+        {
+          "command": "cd assistant_backend && uv run pytest tests/test_study_views_completion.py -k 'fallback or completion'",
+          "exitCode": 0,
+          "summary": "11 passed, 2 third-party warnings"
+        },
+        {
+          "command": "cd assistant_backend && uv run pytest tests/test_study_plan_lifecycle.py tests/test_study_plan_router.py tests/test_study_intake_router.py tests/test_study_views_today.py tests/test_integration.py",
+          "exitCode": 0,
+          "summary": "131 passed, 2 third-party warnings"
+        },
+        {
+          "command": "openspec validate persist-intake-plan-drafts --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        },
+        {
+          "command": "openspec instructions apply --change persist-intake-plan-drafts --json",
+          "exitCode": 0,
+          "summary": "35/35 tasks complete; state all_done"
+        },
+        {
+          "command": "git diff --check -- assistant_backend/src/db/schema.py assistant_backend/src/db/init.py assistant_backend/src/db/queries.py assistant_backend/src/routers/tasks.py assistant_backend/tests/test_study_views_completion.py assistant_backend/tests/test_study_plan_lifecycle.py openspec/changes/persist-intake-plan-drafts/tasks.md",
+          "exitCode": 0,
+          "summary": "no whitespace errors"
+        }
+      ],
+      "reviews": [
+        {
+          "type": "spec_compliance",
+          "result": "changes_required_then_fixed",
+          "summary": "Initial P1 found stale needs_followup after full completion and fallback-after-full marking. TDD fixes cleared the state boundary."
+        },
+        {
+          "type": "code_quality",
+          "result": "changes_required_then_fixed",
+          "summary": "Initial P1 found misleading full/fallback API transitions. Final implementation makes full completion clear follow-up and makes fallback after full completion a no-op."
+        },
+        {
+          "type": "final_review",
+          "result": "approved",
+          "summary": "No remaining P0/P1/P2 findings after fallback-only, fallback-to-full, full-then-fallback, repeated fallback, and migration coverage."
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/add-initiate-implementation-control/evidence/persist-intake-plan-drafts/apply-groups/fallback-progress-and-final-verification.md",
+          "sha256": "195ed667f9a33d3aceabf6eaa9bca29bfa1ca6eff7c67723c174a140a977079c",
+          "description": "Apply group evidence, TDD trace, review iterations, verification, and deferred P2 note."
+        },
+        {
+          "path": "assistant_backend/src/db/schema.py",
+          "sha256": "2f74110e93a96b742996c4c8f057e5a4b2d2aa59f8d979ae759023c8f0f3aaf1",
+          "description": "Active task fallback progress columns."
+        },
+        {
+          "path": "assistant_backend/src/db/init.py",
+          "sha256": "35606e677ba6fb8f763a052203529af981a5bd899a6f35200f87fde6efd345d5",
+          "description": "Idempotent fallback progress column migration for existing task tables."
+        },
+        {
+          "path": "assistant_backend/src/db/queries.py",
+          "sha256": "1a9e02292050c7bf426fb5e231ea311889ac825bb818750468bf66995586253c",
+          "description": "Fallback completion helper and full-completion follow-up cleanup."
+        },
+        {
+          "path": "assistant_backend/src/routers/tasks.py",
+          "sha256": "e6b1516d5a6a2b290523c7dc8a2d9d135f488d53fa20abb05c9d6f93c42df1a8",
+          "description": "Fallback completion endpoint."
+        },
+        {
+          "path": "assistant_backend/tests/test_study_views_completion.py",
+          "sha256": "800dee91ad2b3bb9ec28ed992f8117622e7efe59e359e730139a19fd992a032e",
+          "description": "Fallback-only, fallback-to-full, full-then-fallback, repeated fallback, and migration tests."
+        },
+        {
+          "path": "assistant_backend/tests/test_study_plan_lifecycle.py",
+          "sha256": "09c0b24f0d8b26710a879160f3ddac456faf490124976fb318bba82dcc83fab4",
+          "description": "Lifecycle fallback migration regression for existing active task rows."
+        },
+        {
+          "path": "openspec/changes/persist-intake-plan-drafts/tasks.md",
+          "sha256": "3e8d4b1b58eeb3bed95aff0ef0ffc74ce39780ed574a373d407a3380a3f6e078",
+          "description": "OpenSpec tasks updated for completed fallback persistence and tests."
+        }
+      ],
+      "nextCheckpoint": "persist-intake-plan-drafts:apply:cross-change-contract-to-introduce-plan-compiler"
     }
   ]
 }
