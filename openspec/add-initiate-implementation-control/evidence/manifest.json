@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-05-25T12:28:41Z",
+  "updatedAt": "2026-05-25T12:38:42Z",
   "entries": [
     {
       "id": "introduce-study-intake-router-product-deepen-round-1",
@@ -2283,6 +2283,46 @@
         }
       ],
       "nextCheckpoint": "introduce-deadline-scheduler:apply:cross-change-contract-to-redesign-add-initiate-ui"
+    },
+    {
+      "id": "introduce-deadline-scheduler-to-redesign-add-initiate-ui-cross-change-contract",
+      "timestamp": "2026-05-25T12:38:42Z",
+      "kind": "cross_change_contract",
+      "changeId": "introduce-deadline-scheduler",
+      "checkpoint": "introduce-deadline-scheduler:apply:cross-change-contract-to-redesign-add-initiate-ui",
+      "fromChange": "introduce-deadline-scheduler",
+      "toChange": "redesign-add-initiate-ui",
+      "result": "completed",
+      "commands": [
+        {
+          "command": "openspec validate introduce-deadline-scheduler --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        },
+        {
+          "command": "openspec validate redesign-add-initiate-ui --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        },
+        {
+          "command": "openspec instructions apply --change introduce-deadline-scheduler --json",
+          "exitCode": 0,
+          "summary": "36/36 tasks complete; state all_done"
+        },
+        {
+          "command": "openspec status --change redesign-add-initiate-ui --json",
+          "exitCode": 0,
+          "summary": "proposal/design/specs/tasks artifacts present"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/add-initiate-implementation-control/evidence/cross-change-contracts/introduce-deadline-scheduler-to-redesign-add-initiate-ui.md",
+          "sha256": "84daae7ee808e49054fed5475b717ebf954f46efc7e2260d29f51b937a86c946",
+          "description": "Cross-change contract evidence for deadline-scheduler-to-Add-Initiate-UI handoff."
+        }
+      ],
+      "nextCheckpoint": "redesign-add-initiate-ui:product_deepen_round_1"
     }
   ]
 }

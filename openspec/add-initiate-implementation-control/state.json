@@ -2,12 +2,12 @@
   "schemaVersion": 1,
   "automationId": "add-initiate-changes",
   "phase": "active",
-  "currentChangeIndex": 3,
-  "currentChange": "introduce-deadline-scheduler",
-  "currentStep": "apply",
-  "currentCheckpoint": "introduce-deadline-scheduler:apply:cross-change-contract-to-redesign-add-initiate-ui",
+  "currentChangeIndex": 4,
+  "currentChange": "redesign-add-initiate-ui",
+  "currentStep": "product_deepen_round_1",
+  "currentCheckpoint": "redesign-add-initiate-ui:product_deepen_round_1",
   "currentAttempt": 0,
-  "runCounter": 32,
+  "runCounter": 33,
   "maxRetriesPerCheckpoint": 2,
   "requiredProductDeepenRounds": 3,
   "requiresScopeDependencyCheck": true,
@@ -40,12 +40,12 @@
     "schemaVersion": 1,
     "evidenceRoot": "openspec/add-initiate-implementation-control/evidence/cross-change-contracts",
     "lastCheck": {
-      "completedAt": "2026-05-25T10:49:11Z",
-      "fromChange": "introduce-plan-compiler",
-      "toChange": "introduce-deadline-scheduler",
-      "checkpoint": "introduce-plan-compiler:apply:cross-change-contract-to-introduce-deadline-scheduler",
+      "completedAt": "2026-05-25T12:38:42Z",
+      "fromChange": "introduce-deadline-scheduler",
+      "toChange": "redesign-add-initiate-ui",
+      "checkpoint": "introduce-deadline-scheduler:apply:cross-change-contract-to-redesign-add-initiate-ui",
       "result": "passed",
-      "evidenceFile": "openspec/add-initiate-implementation-control/evidence/cross-change-contracts/introduce-plan-compiler-to-introduce-deadline-scheduler.md"
+      "evidenceFile": "openspec/add-initiate-implementation-control/evidence/cross-change-contracts/introduce-deadline-scheduler-to-redesign-add-initiate-ui.md"
     },
     "requiredBeforeAdvancingChange": true,
     "changeOrder": [
@@ -71,17 +71,12 @@
   },
   "applyCursor": {
     "schemaVersion": 1,
-    "activeChange": "introduce-deadline-scheduler",
+    "activeChange": null,
     "currentGroupId": null,
-    "completedGroupIds": [
-      "scheduler-contract-preflight-and-capacity",
-      "placement-buffer-splitting-fallback-and-risk",
-      "infeasibility-options-and-recompute-effects",
-      "scheduler-dry-runs-final-verification"
-    ],
+    "completedGroupIds": [],
     "blockedGroupId": null,
-    "taskGroupsFile": "openspec/add-initiate-implementation-control/evidence/introduce-deadline-scheduler/apply-task-groups.json",
-    "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/introduce-deadline-scheduler/apply-groups/scheduler-dry-runs-final-verification.md",
+    "taskGroupsFile": null,
+    "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/cross-change-contracts/introduce-deadline-scheduler-to-redesign-add-initiate-ui.md",
     "lastCommit": "59533f970ae2f988c3edd504e3ae65e5b314edc4"
   },
   "lock": {
@@ -154,7 +149,7 @@
     },
     {
       "id": "introduce-deadline-scheduler",
-      "status": "in_progress",
+      "status": "completed",
       "productDeepenRoundsCompleted": 3,
       "scopeDependencyCheckCompleted": true,
       "applyCompleted": true,
@@ -174,7 +169,7 @@
     },
     {
       "id": "redesign-add-initiate-ui",
-      "status": "pending",
+      "status": "in_progress",
       "productDeepenRoundsCompleted": 0,
       "scopeDependencyCheckCompleted": false,
       "applyCompleted": false,
@@ -189,12 +184,12 @@
     }
   ],
   "lastRun": {
-    "startedAt": "2026-05-25T12:28:41Z",
-    "completedAt": "2026-05-25T12:28:41Z",
-    "checkpoint": "introduce-deadline-scheduler:apply:scheduler-dry-runs-final-verification",
+    "startedAt": "2026-05-25T12:38:42Z",
+    "completedAt": "2026-05-25T12:38:42Z",
+    "checkpoint": "introduce-deadline-scheduler:apply:cross-change-contract-to-redesign-add-initiate-ui",
     "result": "completed"
   },
-  "lastCompletedCheckpoint": "introduce-deadline-scheduler:apply:scheduler-dry-runs-final-verification",
+  "lastCompletedCheckpoint": "introduce-deadline-scheduler:apply:cross-change-contract-to-redesign-add-initiate-ui",
   "lastMigration": {
     "completedAt": "2026-05-25T03:56:29Z",
     "id": "require-three-product-deepen-rounds",
@@ -214,8 +209,8 @@
   },
   "lastFailure": null,
   "lastVerification": {
-    "command": "cd assistant_backend && uv run pytest tests/test_study_plan_scheduling.py -k 'dry_run or resume_packaging or easyagent_rebuild'; cd assistant_backend && uv run pytest tests/test_study_plan_scheduling.py; openspec validate introduce-deadline-scheduler --strict; openspec instructions apply --change introduce-deadline-scheduler --json; git diff --check -- assistant_backend/src/study_plan/scheduling.py assistant_backend/tests/test_study_plan_scheduling.py openspec/changes/introduce-deadline-scheduler/tasks.md",
-    "result": "targeted scheduler dry-run tests passed; full scheduler tests passed; OpenSpec valid; instructions apply reports 36/36 complete and all_done; diff check clean"
+    "command": "openspec validate introduce-deadline-scheduler --strict; openspec validate redesign-add-initiate-ui --strict; openspec instructions apply --change introduce-deadline-scheduler --json; openspec status --change redesign-add-initiate-ui --json",
+    "result": "scheduler and UI changes valid; scheduler instructions apply reports 36/36 complete and all_done; UI artifacts present"
   },
   "blockedReason": null
 }

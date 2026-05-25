@@ -3,9 +3,9 @@
 ## Current Status
 
 - Phase: active
-- Current change: introduce-deadline-scheduler
-- Current step: apply
-- Current checkpoint: introduce-deadline-scheduler:apply:cross-change-contract-to-redesign-add-initiate-ui
+- Current change: redesign-add-initiate-ui
+- Current step: product_deepen_round_1
+- Current checkpoint: redesign-add-initiate-ui:product_deepen_round_1
 - Required product-deepen rounds before apply: 3
 - Required checkpoint after product deepening: scope_dependency_check
 - Product-deepen scope guard: every round must read adjacent changes and record scope decisions
@@ -16,6 +16,13 @@
 - Evidence manifest: `openspec/add-initiate-implementation-control/evidence/manifest.json`
 - Failure log: `openspec/add-initiate-implementation-control/evidence/failures/failure-log.jsonl`
 - Apply recovery: `state.json.applyCursor` plus per-change apply task groups
+
+Completed changes:
+
+- `introduce-study-intake-router`
+- `persist-intake-plan-drafts`
+- `introduce-plan-compiler`
+- `introduce-deadline-scheduler`
 
 Completed apply groups for `persist-intake-plan-drafts`:
 
@@ -47,13 +54,25 @@ Completed apply groups for `introduce-deadline-scheduler`:
 - `infeasibility-options-and-recompute-effects`
 - `scheduler-dry-runs-final-verification`
 
-Remaining apply groups for `introduce-deadline-scheduler`:
+Product-deepen rounds completed for `redesign-add-initiate-ui`:
 
 - none
 
-Next required checkpoint for `introduce-deadline-scheduler`:
+Scope dependency check completed for `redesign-add-initiate-ui`: no
 
-- `cross-change-contract-to-redesign-add-initiate-ui`
+Apply planning completed for `redesign-add-initiate-ui`: no
+
+Completed apply groups for `redesign-add-initiate-ui`:
+
+- none
+
+Remaining apply groups for `redesign-add-initiate-ui`:
+
+- not planned yet
+
+Next required checkpoint for `redesign-add-initiate-ui`:
+
+- `product_deepen_round_1`
 
 ## Run Log
 
@@ -1200,3 +1219,26 @@ Next required checkpoint for `introduce-deadline-scheduler`:
 - Manifest:
   - Added `introduce-deadline-scheduler-apply-scheduler-dry-runs-final-verification`.
 - Next checkpoint: introduce-deadline-scheduler:apply:cross-change-contract-to-redesign-add-initiate-ui
+
+## Run 2026-05-25T12:38:42Z Cross-Change Contract introduce-deadline-scheduler to redesign-add-initiate-ui
+
+- Automation: add-initiate-changes
+- Checkpoint: introduce-deadline-scheduler:apply:cross-change-contract-to-redesign-add-initiate-ui
+- Result: completed
+- Actions:
+  - Acquired `run.lock`.
+  - Read `state.json`, `runbook.md`, `progress.md`, `evidence/manifest.json`, and `workspace-baseline.json`.
+  - Ran `git status --porcelain=v1` and protected unrelated dirty files.
+  - Read completed scheduler proposal, design, spec, tasks, apply group evidence, and downstream UI proposal, design, specs, and tasks.
+  - Wrote cross-change contract evidence at `openspec/add-initiate-implementation-control/evidence/cross-change-contracts/introduce-deadline-scheduler-to-redesign-add-initiate-ui.md`.
+  - Confirmed scheduler hands off review-only statuses, scheduled days, risk report, fallback metadata, canonical infeasibility options, and no-Today/no-activation boundary.
+  - Marked `introduce-deadline-scheduler` completed and advanced automation to `redesign-add-initiate-ui:product_deepen_round_1`.
+  - Protected unrelated dirty files and did not stage them.
+- Verification:
+  - `openspec validate introduce-deadline-scheduler --strict`: valid.
+  - `openspec validate redesign-add-initiate-ui --strict`: valid.
+  - `openspec instructions apply --change introduce-deadline-scheduler --json`: 36/36 complete, state all_done.
+  - `openspec status --change redesign-add-initiate-ui --json`: proposal, design, specs, and tasks all present.
+- Manifest:
+  - Added `introduce-deadline-scheduler-to-redesign-add-initiate-ui-cross-change-contract`.
+- Next checkpoint: redesign-add-initiate-ui:product_deepen_round_1
