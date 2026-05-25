@@ -4,10 +4,10 @@
   "phase": "active",
   "currentChangeIndex": 1,
   "currentChange": "persist-intake-plan-drafts",
-  "currentStep": "product_deepen_round_1",
-  "currentCheckpoint": "persist-intake-plan-drafts:product_deepen_round_1",
+  "currentStep": "scope_dependency_check",
+  "currentCheckpoint": "persist-intake-plan-drafts:scope_dependency_check",
   "currentAttempt": 0,
-  "runCounter": 10,
+  "runCounter": 11,
   "maxRetriesPerCheckpoint": 2,
   "requiredProductDeepenRounds": 3,
   "requiresScopeDependencyCheck": true,
@@ -112,7 +112,7 @@
     {
       "id": "persist-intake-plan-drafts",
       "status": "in_progress",
-      "productDeepenRoundsCompleted": 0,
+      "productDeepenRoundsCompleted": 3,
       "scopeDependencyCheckCompleted": false,
       "applyCompleted": false,
       "applyTaskGroups": {
@@ -171,11 +171,11 @@
     }
   ],
   "lastRun": {
-    "completedAt": "2026-05-25T06:00:40Z",
-    "checkpoint": "introduce-study-intake-router:apply:cross-change-contract-to-persist-intake-plan-drafts",
+    "completedAt": "2026-05-25T06:10:40Z",
+    "checkpoint": "persist-intake-plan-drafts:product_deepen_round_3",
     "result": "completed"
   },
-  "lastCompletedCheckpoint": "introduce-study-intake-router:apply:cross-change-contract-to-persist-intake-plan-drafts",
+  "lastCompletedCheckpoint": "persist-intake-plan-drafts:product_deepen_round_3",
   "lastMigration": {
     "completedAt": "2026-05-25T03:56:29Z",
     "id": "require-three-product-deepen-rounds",
@@ -195,8 +195,8 @@
   },
   "lastFailure": null,
   "lastVerification": {
-    "command": "openspec validate introduce-study-intake-router --strict && openspec validate persist-intake-plan-drafts --strict && openspec instructions apply --change introduce-study-intake-router --json && openspec status --change persist-intake-plan-drafts --json",
-    "result": "current and next changes valid; introduce-study-intake-router apply instructions show 21/21 tasks complete; persist-intake-plan-drafts artifacts are present; cross-change contract passed"
+    "command": "openspec validate persist-intake-plan-drafts --strict",
+    "result": "valid after product-deepen round 3"
   },
   "blockedReason": null
 }

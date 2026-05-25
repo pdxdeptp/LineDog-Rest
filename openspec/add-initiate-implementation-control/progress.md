@@ -4,8 +4,8 @@
 
 - Phase: active
 - Current change: persist-intake-plan-drafts
-- Current step: product_deepen_round_1
-- Current checkpoint: persist-intake-plan-drafts:product_deepen_round_1
+- Current step: scope_dependency_check
+- Current checkpoint: persist-intake-plan-drafts:scope_dependency_check
 - Required product-deepen rounds before apply: 3
 - Required checkpoint after product deepening: scope_dependency_check
 - Product-deepen scope guard: every round must read adjacent changes and record scope decisions
@@ -353,3 +353,76 @@
 - Manifest:
   - Added `introduce-study-intake-router-to-persist-intake-plan-drafts-cross-change-contract`.
 - Next checkpoint: persist-intake-plan-drafts:product_deepen_round_1
+
+## Run 2026-05-25T06:10:40Z Product Deepen Round 1
+
+- Automation: add-initiate-changes
+- Checkpoint: persist-intake-plan-drafts:product_deepen_round_1
+- Result: completed
+- Actions:
+  - Acquired `run.lock`.
+  - Ran `git status --porcelain=v1` and protected unrelated dirty files.
+  - Triggered `opsx-product-deepen`.
+  - Read current `persist-intake-plan-drafts` proposal, design, specs, and tasks.
+  - Read upstream `introduce-study-intake-router` and downstream `introduce-plan-compiler` artifacts.
+  - Added Round 1 review evidence at `openspec/changes/persist-intake-plan-drafts/review-records/product-deepen-round-1.md`.
+  - Clarified the concrete draft storage contract, intake linkage, snapshot versioning, assumption provenance, activation transaction boundary, and fallback completion boundary.
+  - Updated `design.md`, `learning-data-layer/spec.md`, `study-intake-planning/spec.md`, and `tasks.md`.
+- Scope decisions:
+  - In scope: draft headers linked to intake items, lifecycle status, assumptions/provenance, snapshot versions, activation guard/event, fallback progress, capacity default.
+  - Out of scope: intake routing, LLM task generation, deterministic scheduling, UI, smart-mode/adjustment behavior.
+  - Upstream dependency: router handoff is satisfied.
+  - Downstream contracts preserved: compiler owns phase/task generation and estimate normalization; scheduler owns final date placement.
+- Verification:
+  - `openspec validate persist-intake-plan-drafts --strict`: valid.
+- Manifest:
+  - Added `persist-intake-plan-drafts-product-deepen-round-1`.
+- Next checkpoint: persist-intake-plan-drafts:product_deepen_round_2
+
+## Run 2026-05-25T06:10:40Z Product Deepen Round 2
+
+- Automation: add-initiate-changes
+- Checkpoint: persist-intake-plan-drafts:product_deepen_round_2
+- Result: completed
+- Actions:
+  - Triggered `opsx-product-deepen`.
+  - Re-read current `persist-intake-plan-drafts` design and existing backend draft schema.
+  - Read upstream router and downstream compiler boundaries.
+  - Added Round 2 review evidence at `openspec/changes/persist-intake-plan-drafts/review-records/product-deepen-round-2.md`.
+  - Clarified idempotent migration/compatibility for existing `study_project_drafts` and `study_project_draft_tasks`.
+  - Added required data-layer entry points for draft shell creation, package saving, versioned edits, metadata updates, latest fetch, discard, activation, and fallback progress.
+  - Added allowed lifecycle transitions and invalid-transition failure behavior.
+  - Updated specs and tasks for migration, lifecycle transition, and storage-helper test coverage.
+- Scope decisions:
+  - In scope: migration/compatibility, helper entry points, allowed transitions, invalid-transition rejection.
+  - Out of scope: compiler generation, scheduler placement, UI, router changes.
+  - Upstream dependency: none blocking.
+  - Downstream contracts preserved: compiler writes packages through helpers; scheduler owns final placement.
+- Verification:
+  - `openspec validate persist-intake-plan-drafts --strict`: valid.
+- Manifest:
+  - Added `persist-intake-plan-drafts-product-deepen-round-2`.
+- Next checkpoint: persist-intake-plan-drafts:product_deepen_round_3
+
+## Run 2026-05-25T06:10:40Z Product Deepen Round 3
+
+- Automation: add-initiate-changes
+- Checkpoint: persist-intake-plan-drafts:product_deepen_round_3
+- Result: completed
+- Actions:
+  - Triggered `opsx-product-deepen`.
+  - Re-read current `persist-intake-plan-drafts` artifacts plus upstream router and downstream compiler/scheduler boundaries.
+  - Added Round 3 review evidence at `openspec/changes/persist-intake-plan-drafts/review-records/product-deepen-round-3.md`.
+  - Clarified `draft_kind` and `target_plan_id` for new-plan versus existing-plan phase/scheduled-work handoffs.
+  - Clarified existing-plan activation behavior, duplicate activation idempotency, and discard-after-activation rejection.
+  - Updated design, data-layer spec, and tasks for target-plan, duplicate-activation, and post-activation discard coverage.
+- Scope decisions:
+  - In scope: draft kind/target plan persistence, existing-plan activation target semantics, duplicate activation safety, post-activation discard rejection.
+  - Out of scope: UI target picking, router classification changes, compiler generation, scheduler placement, active-plan adjustment.
+  - Upstream dependency: router handoff facts are sufficient.
+  - Downstream contracts preserved: compiler/scheduler consume stable draft identity and schedule-ready data without owning active-resource semantics.
+- Verification:
+  - `openspec validate persist-intake-plan-drafts --strict`: valid.
+- Manifest:
+  - Added `persist-intake-plan-drafts-product-deepen-round-3`.
+- Next checkpoint: persist-intake-plan-drafts:scope_dependency_check

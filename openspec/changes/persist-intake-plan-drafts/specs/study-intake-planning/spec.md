@@ -18,6 +18,21 @@ The system SHALL model Add / Initiate as an explicit lifecycle from idle through
 - **THEN** the item can move through `anchor_review`, `compiling`, `needs_input`, `compile_failed`, `infeasible_review`, and `draft_review`
 - **AND** each state has a user-visible recovery path
 
+#### Scenario: Existing-plan scheduled work enters draft lifecycle
+- **WHEN** the user confirms `attach_to_existing_plan` with `draft_phase` or `scheduled_work`
+- **THEN** the item can enter the draft lifecycle with the selected existing plan as target
+- **AND** material-only attachments do not enter plan draft compilation
+
+#### Scenario: Draft states are persisted
+- **WHEN** an item enters `anchor_review`, `compiling`, `needs_input`, `compile_failed`, `infeasible_review`, `draft_review`, `activating`, `active_plan`, or `discarded`
+- **THEN** the system persists the lifecycle state on the draft or intake-draft relationship
+- **AND** draft states before `active_plan` remain excluded from active Today and Calendar facts
+
+#### Scenario: Invalid draft transition is recoverable
+- **WHEN** a requested lifecycle transition is invalid for the current draft state
+- **THEN** the system keeps the prior state unchanged
+- **AND** returns enough status/error information for a downstream review surface to show a recovery path
+
 #### Scenario: Activation uses latest draft version
 - **WHEN** the user activates a draft
 - **THEN** the item moves through `activating` to `active_plan`
@@ -28,8 +43,18 @@ The system SHALL model Add / Initiate as an explicit lifecycle from idle through
 - **THEN** the system creates no active tasks
 - **AND** the user can discard the intake item or store it as later/reference
 
+#### Scenario: Cancellation after activation is not draft discard
+- **WHEN** an item is already in `active_plan`
+- **THEN** draft discard is no longer available
+- **AND** later changes must use active-plan adjustment flows instead
+
 ### Requirement: Plan Compiler Data Contracts
 The system SHALL use versioned logical data contracts for plan compiler inputs, outputs, validation errors, and schedule risk reports.
+
+#### Scenario: Draft persistence stores compiler package shell
+- **WHEN** a downstream compiler stores or updates a draft package
+- **THEN** the data layer can persist schema version, draft id, draft version, intake id, status, summary, assumptions, review summary, and activation eligibility
+- **AND** missing-input or compile-failed packages do not require complete phases, tasks, schedule, or risk reports
 
 #### Scenario: Plan draft package is versioned
 - **WHEN** the compiler returns or updates a draft package

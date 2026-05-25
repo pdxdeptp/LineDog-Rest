@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-05-25T06:00:40Z",
+  "updatedAt": "2026-05-25T06:10:42Z",
   "entries": [
     {
       "id": "introduce-study-intake-router-product-deepen-round-1",
@@ -620,6 +620,135 @@
         }
       ],
       "nextCheckpoint": "persist-intake-plan-drafts:product_deepen_round_1"
+    },
+    {
+      "id": "persist-intake-plan-drafts-product-deepen-round-1",
+      "timestamp": "2026-05-25T06:10:40Z",
+      "kind": "checkpoint",
+      "changeId": "persist-intake-plan-drafts",
+      "checkpoint": "persist-intake-plan-drafts:product_deepen_round_1",
+      "result": "completed",
+      "commands": [
+        {
+          "command": "openspec validate persist-intake-plan-drafts --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/changes/persist-intake-plan-drafts/review-records/product-deepen-round-1.md",
+          "sha256": "143b3ed034e8d05614e997904891feb2550bb539754d004d6973fbf90abc1dfc",
+          "description": "Round 1 product deepening evidence for draft storage, versioning, activation, and fallback boundaries."
+        },
+        {
+          "path": "openspec/changes/persist-intake-plan-drafts/design.md",
+          "sha256": "0870611a4ac7e62830c7a1d869d022f2bf296ae6acdca5acf2e20ddc256f89cf",
+          "description": "Design clarified with concrete draft persistence contracts."
+        },
+        {
+          "path": "openspec/changes/persist-intake-plan-drafts/specs/learning-data-layer/spec.md",
+          "sha256": "bf346bc163ab8a23c353b2b5bdb8881554d70d5e94075347a61be78c1d92cc1a",
+          "description": "Data-layer spec clarified for draft headers, assumption provenance, activation rollback, and schedule readiness."
+        },
+        {
+          "path": "openspec/changes/persist-intake-plan-drafts/specs/study-intake-planning/spec.md",
+          "sha256": "8d108a0e3d6aedef426cb1e93c702bf8e117e6c980fb9678f1213e09d464788b",
+          "description": "Lifecycle and compiler package shell contracts clarified."
+        },
+        {
+          "path": "openspec/changes/persist-intake-plan-drafts/tasks.md",
+          "sha256": "3186fd1a7158b02554d700b28801df655a095a26587129f8656ba60141ece553",
+          "description": "Tasks expanded for explicit draft persistence, activation, fallback, and tests."
+        }
+      ],
+      "nextCheckpoint": "persist-intake-plan-drafts:product_deepen_round_2"
+    },
+    {
+      "id": "persist-intake-plan-drafts-product-deepen-round-2",
+      "timestamp": "2026-05-25T06:10:40Z",
+      "kind": "checkpoint",
+      "changeId": "persist-intake-plan-drafts",
+      "checkpoint": "persist-intake-plan-drafts:product_deepen_round_2",
+      "result": "completed",
+      "commands": [
+        {
+          "command": "openspec validate persist-intake-plan-drafts --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/changes/persist-intake-plan-drafts/review-records/product-deepen-round-2.md",
+          "sha256": "1cfe42a8ae07185021409a8866398f598bb48e2165484ada96b7e022bc94503f",
+          "description": "Round 2 product deepening evidence for migration, storage entry points, and lifecycle transitions."
+        },
+        {
+          "path": "openspec/changes/persist-intake-plan-drafts/design.md",
+          "sha256": "91ff04b55914ce6259741a96df29974fe7d30907d27718872362f5e405559f14",
+          "description": "Design clarified with migration compatibility and data-layer entry point contracts."
+        },
+        {
+          "path": "openspec/changes/persist-intake-plan-drafts/specs/learning-data-layer/spec.md",
+          "sha256": "cdf4b710de703c9af8d03a0f7aaf7dd7a64cf9b60f76813f92e79260b544a97d",
+          "description": "Data-layer spec clarified for migration and invalid transition safety."
+        },
+        {
+          "path": "openspec/changes/persist-intake-plan-drafts/specs/study-intake-planning/spec.md",
+          "sha256": "579aa55fdc57caec704a731efb5ffc88eede40bd710db27044a5432b5bf5bb11",
+          "description": "Lifecycle spec clarified for invalid transition recovery."
+        },
+        {
+          "path": "openspec/changes/persist-intake-plan-drafts/tasks.md",
+          "sha256": "765980cdc7375a2a4bc1c3a90b20a3439cf89798728a00c8cf3d9006ab6288c7",
+          "description": "Tasks expanded for migration, entry points, lifecycle, and tests."
+        }
+      ],
+      "nextCheckpoint": "persist-intake-plan-drafts:product_deepen_round_3"
+    },
+    {
+      "id": "persist-intake-plan-drafts-product-deepen-round-3",
+      "timestamp": "2026-05-25T06:10:40Z",
+      "kind": "checkpoint",
+      "changeId": "persist-intake-plan-drafts",
+      "checkpoint": "persist-intake-plan-drafts:product_deepen_round_3",
+      "result": "completed",
+      "commands": [
+        {
+          "command": "openspec validate persist-intake-plan-drafts --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/changes/persist-intake-plan-drafts/review-records/product-deepen-round-3.md",
+          "sha256": "0f203a2663a110d026046d27f98a973d10d512bcb68f1a9053a23956ecb0238e",
+          "description": "Round 3 product deepening evidence for existing-plan targets and activation idempotency."
+        },
+        {
+          "path": "openspec/changes/persist-intake-plan-drafts/design.md",
+          "sha256": "09cdd2372c96aade1b44f166558b095e1a032214b07b2711b195576639153d4e",
+          "description": "Design clarified with draft kind, target plan, duplicate activation, and discard-after-activation contracts."
+        },
+        {
+          "path": "openspec/changes/persist-intake-plan-drafts/specs/learning-data-layer/spec.md",
+          "sha256": "599420fa797fea2a5e292cfe405d933c615b679758a0bb8aec9f6097f724df46",
+          "description": "Data-layer spec clarified for target-plan persistence, existing-plan activation, duplicate activation, and post-activation discard rejection."
+        },
+        {
+          "path": "openspec/changes/persist-intake-plan-drafts/specs/study-intake-planning/spec.md",
+          "sha256": "97ba908519d6df318e9e23ae975c44daff1a748b7f2d4d371ce66bd0606fb337",
+          "description": "Lifecycle spec verified as preserving existing-plan handoff and post-activation adjustment boundaries."
+        },
+        {
+          "path": "openspec/changes/persist-intake-plan-drafts/tasks.md",
+          "sha256": "cb0fcd668f1e586078c6ce35315dfb02579032a848320153a2357f3d76508b84",
+          "description": "Tasks expanded for target-plan activation, duplicate activation, and discard-after-activation tests."
+        }
+      ],
+      "nextCheckpoint": "persist-intake-plan-drafts:scope_dependency_check"
     }
   ]
 }
