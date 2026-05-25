@@ -1,0 +1,96 @@
+{
+  "changeId": "introduce-plan-compiler",
+  "generatedAt": "2026-05-25T09:15:11Z",
+  "groups": [
+    {
+      "id": "envelope-archetype-and-depth-core",
+      "taskIds": [
+        "1.1",
+        "1.2",
+        "1.3",
+        "1.4",
+        "1.5",
+        "1.6",
+        "4.1",
+        "4.2",
+        "4.3",
+        "4.4",
+        "4.6"
+      ],
+      "description": "Implement core compiler contracts: PlanningEnvelope normalization, compiler result statuses, archetype/tie-breaker selection, scope boundary output, one-question ambiguity handling, and target-depth completion obligations.",
+      "targetFiles": [
+        "assistant_backend/src/study_plan/compiler.py",
+        "assistant_backend/src/study_plan/__init__.py",
+        "assistant_backend/tests/test_study_plan_compiler.py",
+        "assistant_backend/tests/test_study_plan_lifecycle.py"
+      ],
+      "testCommands": [
+        "cd assistant_backend && uv run pytest tests/test_study_plan_compiler.py -k 'envelope or status or archetype or tie_breaker or depth'",
+        "cd assistant_backend && uv run pytest tests/test_study_plan_lifecycle.py -k 'needs_input or compile_failed or package'",
+        "openspec validate introduce-plan-compiler --strict"
+      ],
+      "evidenceFile": "openspec/add-initiate-implementation-control/evidence/introduce-plan-compiler/apply-groups/envelope-archetype-and-depth-core.md",
+      "dependsOn": []
+    },
+    {
+      "id": "synopsis-llm-validation-and-repair",
+      "taskIds": [
+        "2.1",
+        "2.2",
+        "2.3",
+        "2.4",
+        "2.5",
+        "3.1",
+        "3.2",
+        "3.3",
+        "4.5",
+        "4.7",
+        "4.8",
+        "4.9"
+      ],
+      "description": "Implement source/goal synopsis, thin-source behavior, structured phase/task LLM contracts, deterministic no-date filtering, task quality gates, validation severities, and bounded repair that preserves user anchors and scope.",
+      "targetFiles": [
+        "assistant_backend/src/study_plan/compiler.py",
+        "assistant_backend/tests/test_study_plan_compiler.py"
+      ],
+      "testCommands": [
+        "cd assistant_backend && uv run pytest tests/test_study_plan_compiler.py -k 'synopsis or thin_source or llm_contract or validation or repair or forbidden_date'",
+        "openspec validate introduce-plan-compiler --strict"
+      ],
+      "evidenceFile": "openspec/add-initiate-implementation-control/evidence/introduce-plan-compiler/apply-groups/synopsis-llm-validation-and-repair.md",
+      "dependsOn": [
+        "envelope-archetype-and-depth-core"
+      ]
+    },
+    {
+      "id": "estimates-trace-fixtures-and-final-verification",
+      "taskIds": [
+        "3.4",
+        "3.5",
+        "3.6",
+        "3.7",
+        "4.10",
+        "4.11",
+        "4.12",
+        "4.13"
+      ],
+      "description": "Implement estimate normalization, outlier replacement, oversized split requirements, low-calibration thresholds, compiler trace/redaction, real-context fixtures, no-scheduler-output fixture assertions, and final OpenSpec task completion.",
+      "targetFiles": [
+        "assistant_backend/src/study_plan/compiler.py",
+        "assistant_backend/tests/test_study_plan_compiler.py",
+        "openspec/changes/introduce-plan-compiler/tasks.md"
+      ],
+      "testCommands": [
+        "cd assistant_backend && uv run pytest tests/test_study_plan_compiler.py -k 'estimate or low_calibration or trace or redaction or fixture or scheduled_dates'",
+        "cd assistant_backend && uv run pytest tests/test_study_plan_compiler.py",
+        "openspec validate introduce-plan-compiler --strict",
+        "openspec instructions apply --change introduce-plan-compiler --json"
+      ],
+      "evidenceFile": "openspec/add-initiate-implementation-control/evidence/introduce-plan-compiler/apply-groups/estimates-trace-fixtures-and-final-verification.md",
+      "dependsOn": [
+        "envelope-archetype-and-depth-core",
+        "synopsis-llm-validation-and-repair"
+      ]
+    }
+  ]
+}

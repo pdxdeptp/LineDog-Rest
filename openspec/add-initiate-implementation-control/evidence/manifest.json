@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-05-25T09:05:11Z",
+  "updatedAt": "2026-05-25T09:15:11Z",
   "entries": [
     {
       "id": "introduce-study-intake-router-product-deepen-round-1",
@@ -1466,6 +1466,49 @@
         }
       ],
       "nextCheckpoint": "introduce-plan-compiler:apply"
+    },
+    {
+      "id": "introduce-plan-compiler-apply-planning",
+      "timestamp": "2026-05-25T09:15:11Z",
+      "kind": "apply_planning",
+      "changeId": "introduce-plan-compiler",
+      "checkpoint": "introduce-plan-compiler:apply:planning",
+      "result": "completed",
+      "commands": [
+        {
+          "command": "jq empty openspec/add-initiate-implementation-control/evidence/introduce-plan-compiler/apply-task-groups.json",
+          "exitCode": 0,
+          "summary": "valid JSON"
+        },
+        {
+          "command": "openspec validate introduce-plan-compiler --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        },
+        {
+          "command": "openspec status --change introduce-plan-compiler --json",
+          "exitCode": 0,
+          "summary": "proposal/design/specs/tasks artifacts present"
+        },
+        {
+          "command": "openspec instructions apply --change introduce-plan-compiler --json",
+          "exitCode": 0,
+          "summary": "31/31 tasks pending; state ready"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/add-initiate-implementation-control/evidence/introduce-plan-compiler/apply-planning.md",
+          "sha256": "3ef27672c0dd25f5a4bc2090b5952b7b544e74bf8a4f17c1a88f26168d51152b",
+          "description": "Apply planning decision report."
+        },
+        {
+          "path": "openspec/add-initiate-implementation-control/evidence/introduce-plan-compiler/apply-task-groups.json",
+          "sha256": "2953831c73ee4568e53bb5b43e3e80c7ec75149c747bea8dc7efc379e00ad4cc",
+          "description": "Sequential apply task groups and recovery cursor source."
+        }
+      ],
+      "nextCheckpoint": "introduce-plan-compiler:apply:envelope-archetype-and-depth-core"
     }
   ]
 }

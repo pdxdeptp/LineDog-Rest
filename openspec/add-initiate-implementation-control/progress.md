@@ -5,7 +5,7 @@
 - Phase: active
 - Current change: introduce-plan-compiler
 - Current step: apply
-- Current checkpoint: introduce-plan-compiler:apply
+- Current checkpoint: introduce-plan-compiler:apply:envelope-archetype-and-depth-core
 - Required product-deepen rounds before apply: 3
 - Required checkpoint after product deepening: scope_dependency_check
 - Product-deepen scope guard: every round must read adjacent changes and record scope decisions
@@ -798,3 +798,32 @@ Completed apply groups for previous change `persist-intake-plan-drafts`:
 - Manifest:
   - Added `introduce-plan-compiler-scope-dependency-check`.
 - Next checkpoint: introduce-plan-compiler:apply
+
+## Run 2026-05-25T09:15:11Z Apply Planning introduce-plan-compiler
+
+- Automation: add-initiate-changes
+- Checkpoint: introduce-plan-compiler:apply:planning
+- Result: completed
+- Actions:
+  - Acquired `run.lock`.
+  - Read `state.json`, `runbook.md`, `progress.md`, `evidence/manifest.json`, and `workspace-baseline.json`.
+  - Ran `git status --porcelain=v1` and protected unrelated dirty files.
+  - Confirmed `changes[2].scopeDependencyCheckCompleted=true`.
+  - Read `introduce-plan-compiler` tasks/design plus existing backend study-plan module/test layout.
+  - Wrote `openspec/add-initiate-implementation-control/evidence/introduce-plan-compiler/apply-planning.md`.
+  - Wrote `openspec/add-initiate-implementation-control/evidence/introduce-plan-compiler/apply-task-groups.json`.
+  - Initialized `state.json.applyCursor` for this change.
+- Decision:
+  - GO. Apply must remain a backend compiler module slice and must not absorb deterministic scheduling, activation, UI, broad Obsidian sync, or deep GitHub crawling.
+- Planned sequential apply groups:
+  - `envelope-archetype-and-depth-core`
+  - `synopsis-llm-validation-and-repair`
+  - `estimates-trace-fixtures-and-final-verification`
+- Verification:
+  - `jq empty openspec/add-initiate-implementation-control/evidence/introduce-plan-compiler/apply-task-groups.json`: valid.
+  - `openspec validate introduce-plan-compiler --strict`: valid.
+  - `openspec status --change introduce-plan-compiler --json`: proposal/design/specs/tasks artifacts present.
+  - `openspec instructions apply --change introduce-plan-compiler --json`: 31/31 tasks pending, state ready.
+- Manifest:
+  - Added `introduce-plan-compiler-apply-planning`.
+- Next checkpoint: introduce-plan-compiler:apply:envelope-archetype-and-depth-core

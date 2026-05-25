@@ -5,9 +5,9 @@
   "currentChangeIndex": 2,
   "currentChange": "introduce-plan-compiler",
   "currentStep": "apply",
-  "currentCheckpoint": "introduce-plan-compiler:apply",
+  "currentCheckpoint": "introduce-plan-compiler:apply:envelope-archetype-and-depth-core",
   "currentAttempt": 0,
-  "runCounter": 20,
+  "runCounter": 21,
   "maxRetriesPerCheckpoint": 2,
   "requiredProductDeepenRounds": 3,
   "requiresScopeDependencyCheck": true,
@@ -71,12 +71,12 @@
   },
   "applyCursor": {
     "schemaVersion": 1,
-    "activeChange": null,
+    "activeChange": "introduce-plan-compiler",
     "currentGroupId": null,
     "currentGroupStartedAt": null,
     "completedGroupIds": [],
     "blockedGroupId": null,
-    "taskGroupsFile": null,
+    "taskGroupsFile": "openspec/add-initiate-implementation-control/evidence/introduce-plan-compiler/apply-task-groups.json",
     "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/persist-intake-plan-drafts/apply-groups/fallback-progress-and-final-verification.md",
     "lastCommit": "2e1ef56eedbf1bf40cccc79fdb09aea0c35dd28f"
   },
@@ -136,11 +136,11 @@
       "scopeDependencyCheckCompleted": true,
       "applyCompleted": false,
       "applyTaskGroups": {
-        "status": "not_planned",
-        "taskGroupsFile": null,
+        "status": "planned",
+        "taskGroupsFile": "openspec/add-initiate-implementation-control/evidence/introduce-plan-compiler/apply-task-groups.json",
         "completedGroupIds": [],
-        "currentGroupId": null,
-        "lastEvidenceFile": null,
+        "currentGroupId": "envelope-archetype-and-depth-core",
+        "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/introduce-plan-compiler/apply-planning.md",
         "lastCommit": null
       }
     },
@@ -176,11 +176,11 @@
     }
   ],
   "lastRun": {
-    "completedAt": "2026-05-25T09:05:11Z",
-    "checkpoint": "introduce-plan-compiler:scope_dependency_check",
+    "completedAt": "2026-05-25T09:15:11Z",
+    "checkpoint": "introduce-plan-compiler:apply:planning",
     "result": "completed"
   },
-  "lastCompletedCheckpoint": "introduce-plan-compiler:scope_dependency_check",
+  "lastCompletedCheckpoint": "introduce-plan-compiler:apply:planning",
   "lastMigration": {
     "completedAt": "2026-05-25T03:56:29Z",
     "id": "require-three-product-deepen-rounds",
@@ -200,8 +200,8 @@
   },
   "lastFailure": null,
   "lastVerification": {
-    "command": "openspec validate introduce-plan-compiler --strict && openspec validate persist-intake-plan-drafts --strict && openspec validate introduce-deadline-scheduler --strict && openspec status --change introduce-plan-compiler --json",
-    "result": "scope dependency check passed; current/upstream/downstream changes valid; introduce-plan-compiler artifacts present"
+    "command": "jq empty openspec/add-initiate-implementation-control/evidence/introduce-plan-compiler/apply-task-groups.json && openspec validate introduce-plan-compiler --strict && openspec status --change introduce-plan-compiler --json && openspec instructions apply --change introduce-plan-compiler --json",
+    "result": "apply planning complete; introduce-plan-compiler valid and ready with 31 pending tasks in three sequential apply groups"
   },
   "blockedReason": null
 }
