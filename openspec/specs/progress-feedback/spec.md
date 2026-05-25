@@ -3,9 +3,7 @@
 ## Purpose
 
 学习助手通过任务完成、资料进度、每日摘要、速度系数调整和周复盘数据向用户反馈学习进展。当前规格只记录已实现的反馈能力，不包含尚未实现的 Stats Tab、里程碑通知或成就系统。
-
 ## Requirements
-
 ### Requirement: 任务完成即时进度更新
 系统 SHALL 在用户完成任务后同步更新相关任务、学习单元和资料进度。
 
@@ -56,3 +54,21 @@
 #### Scenario: 周复盘读取调整
 - **WHEN** Weekly Review 聚合本周数据
 - **THEN** 系统读取本周 `speed_factor_changed` 事件并放入 week_stats
+
+### Requirement: 资料管理即时反馈
+系统 SHALL 在用户管理资料后立即刷新学习助手中的资料进度和今日状态。
+
+#### Scenario: 标记完成后的刷新
+- **WHEN** 前端完成资料标记完成请求
+- **THEN** `LearningAssistantViewModel` 重新拉取今日简报和资料列表
+- **AND** 完成后的资料不再作为 active 资料显示
+
+#### Scenario: 移出计划后的刷新
+- **WHEN** 前端完成资料归档请求
+- **THEN** `LearningAssistantViewModel` 重新拉取今日简报和资料列表
+- **AND** 被移出的资料不再作为 active 资料显示
+
+#### Scenario: 管理错误反馈
+- **WHEN** 资料管理请求失败
+- **THEN** 前端保留现有资料进度数据
+- **AND** 前端向用户显示该管理动作失败

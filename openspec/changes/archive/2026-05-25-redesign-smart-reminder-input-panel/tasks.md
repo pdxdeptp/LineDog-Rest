@@ -15,5 +15,5 @@
 ## 3. Verification
 
 - [x] 3.1 Run the relevant Swift/Xcode tests for smart reminder UI and window-manager behavior.
-- [ ] 3.2 Manually QA right-click open, global shortcut open, long Chinese text entry, outside-click draft preservation, Esc/cancel, submit success, and repeated open from the current project checkout.
-- [ ] 3.3 Manually QA right-bottom pet placement with a right-side Dock and confirm the smart reminder panel stays inside the visible screen area.
+- [x] 3.2 Manually QA right-click open, global shortcut open, long Chinese text entry, outside-click draft preservation, Esc/cancel, submit success, and repeated open from the current project checkout.
+- [x] 3.3 Manually QA right-bottom pet placement with a right-side Dock and confirm the smart reminder panel stays inside the visible screen area.

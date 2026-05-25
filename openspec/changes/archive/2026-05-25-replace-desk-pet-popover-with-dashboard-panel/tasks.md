@@ -39,5 +39,5 @@
 
 - [x] 6.1 Remove obsolete desk pet popover code paths, popover-specific comments, and popover-specific source tests.
 - [x] 6.2 Run the relevant Swift/Xcode tests for control panel presentation and learning assistant state behavior.
-- [ ] 6.3 Manually QA first open, repeat open, close/reopen, outside click, Esc, app deactivation, text input, backend starting, backend offline, and cached-content refresh from the desk pet entry.
+- [x] 6.3 Manually QA first open, repeat open, close/reopen, outside click, Esc, app deactivation, text input, backend starting, backend offline, and cached-content refresh from the desk pet entry.
 - [x] 6.4 Record any intentional visual differences from the old `NSPopover` dashboard, especially absence of arrow and any material/shadow changes. Implemented as a borderless clear `NSPanel` with AppKit shadow and no popover arrow; SwiftUI dashboard content continues to draw the visible surface.

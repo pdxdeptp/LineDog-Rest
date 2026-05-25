@@ -3,9 +3,7 @@
 ## Purpose
 
 MalDaze 菜单栏面板包含学习助手中栏。当前前端通过 SwiftUI 展示今日任务、资料进度、对话和添加资料入口，并通过 HTTP 调用本地 FastAPI 后端。
-
 ## Requirements
-
 ### Requirement: 三栏面板布局
 系统 SHALL 在 MalDaze 面板中渲染左栏、学习助手中栏和右栏。
 
@@ -15,7 +13,7 @@ MalDaze 菜单栏面板包含学习助手中栏。当前前端通过 SwiftUI 展
 - **AND** 中栏由 `AssistantPanelView` 渲染
 
 ### Requirement: 学习助手连接状态
-学习助手中栏 SHALL 区分后端启动中、服务不可用和后端就绪状态。
+学习助手中栏 SHALL 区分后端启动中、服务不可用和后端就绪状态，并 SHALL respect the user's configured assistant backend startup mode.
 
 #### Scenario: 后端启动中
 - **WHEN** `LearningAssistantViewModel.isConnecting=true`
@@ -32,6 +30,27 @@ MalDaze 菜单栏面板包含学习助手中栏。当前前端通过 SwiftUI 展
 - **WHEN** `BackendProcessManager` 发出 `backendDidBecomeReady` 通知
 - **THEN** ViewModel 结束 connecting 状态
 - **AND** 拉取首页所需的今日简报和资料状态
+
+#### Scenario: 用户选择懒启动后端
+- **GIVEN** 用户启用助手后端懒启动
+- **WHEN** 应用启动但用户尚未打开学习助手中栏
+- **THEN** 系统 MUST NOT spawn the local assistant backend process solely because the app launched
+
+#### Scenario: 用户选择随 App 启动后端
+- **GIVEN** 用户关闭助手后端懒启动
+- **WHEN** 应用启动完成
+- **THEN** 系统 SHALL request local assistant backend startup idempotently
+
+#### Scenario: 懒启动模式下打开助手后请求后端
+- **GIVEN** 用户启用助手后端懒启动
+- **WHEN** 学习助手中栏 ViewModel 被创建或开始加载首页数据
+- **THEN** 系统 SHALL request backend startup if it is not already ready or starting
+- **AND** the existing connecting, offline, and ready UI states SHALL remain accurate
+
+#### Scenario: 设置页展示启动策略
+- **WHEN** 用户打开设置页
+- **THEN** 系统 SHALL expose a persistent setting that controls whether the assistant backend starts lazily
+- **AND** the setting label or help text SHALL communicate the energy/latency trade-off
 
 ### Requirement: Tab 导航
 学习助手中栏 SHALL 以首页 dashboard 作为后端就绪后的默认入口，并 SHALL 使用底部固定导航提供首页、添加资料、资料进度和调整计划入口。
@@ -78,7 +97,7 @@ MalDaze 菜单栏面板包含学习助手中栏。当前前端通过 SwiftUI 展
 - **THEN** 视图显示今日暂无学习任务的空状态提示
 
 ### Requirement: 资料进度视图
-资料进度 Tab SHALL 展示 active 资料的进度概览。
+资料进度 Tab SHALL 展示 active 资料的进度概览，并 SHALL 提供可直接执行或进入既有计划调整流程的资料管理动作。
 
 #### Scenario: 拉取资料
 - **WHEN** 用户进入资料进度 Tab
@@ -87,6 +106,38 @@ MalDaze 菜单栏面板包含学习助手中栏。当前前端通过 SwiftUI 展
 #### Scenario: 资料卡片
 - **WHEN** resources 非空
 - **THEN** 每项显示资料标题、进度条、completed_units/total_units、累计投入时间、deadline 和 status badge
+- **AND** 每项提供资料管理动作入口
+
+#### Scenario: 打开资料链接
+- **WHEN** 某资料包含有效 `url`
+- **THEN** 资料卡片显示打开资料动作
+- **AND** 用户触发该动作时系统打开该 `url`
+
+#### Scenario: 无资料链接
+- **WHEN** 某资料没有有效 `url`
+- **THEN** 资料卡片不显示可点击的打开资料动作或显示不可用状态
+- **AND** 前端不伪造或猜测跳转 URL
+
+#### Scenario: 按资料调整计划
+- **WHEN** 用户在某资料卡片选择调整计划
+- **THEN** 中栏切换到调整计划视图
+- **AND** 对话输入框预填包含该资料标题的计划调整提示
+- **AND** 用户可编辑提示后再发送
+
+#### Scenario: 标记资料完成
+- **WHEN** 用户在某资料卡片确认标记完成
+- **THEN** 前端调用资料完成 API
+- **AND** 成功后重新拉取首页 dashboard 和资料列表
+
+#### Scenario: 移出当前计划
+- **WHEN** 用户在某资料卡片确认移出当前计划
+- **THEN** 前端调用资料归档 API
+- **AND** 成功后重新拉取首页 dashboard 和资料列表
+
+#### Scenario: 管理动作失败
+- **WHEN** 资料完成或归档 API 调用失败
+- **THEN** 资料进度视图显示明确失败反馈
+- **AND** 不从本地列表中移除该资料
 
 #### Scenario: 无资料
 - **WHEN** resources 为空
@@ -284,3 +335,45 @@ Swift 前端 SHALL 通过 `AssistantAPIClient` 调用本地后端。
 - **WHEN** 用户在 IngestionView 草稿卡片中点击"去设置 →"
 - **THEN** 中栏导航至 `LearningPreferencesView`
 - **AND** 用户返回后仍停留在添加资料页，草稿状态保留
+
+### Requirement: Dashboard Panel hosted learning assistant state
+学习助手中栏 SHALL support being hosted inside a long-lived desk pet Dashboard Panel.
+
+#### Scenario: Panel hidden
+- **WHEN** 用户关闭或隐藏 Dashboard Panel
+- **THEN** 学习助手本地 UI 状态保持可恢复
+- **AND** 已选择的学习助手 tab、可恢复草稿、任务展开状态和已加载 dashboard 数据不因 panel 隐藏而被主动清空
+
+#### Scenario: Panel reopened with loaded data
+- **WHEN** 用户重新打开 Dashboard Panel
+- **AND** 学习助手已有有效的本地 dashboard 数据
+- **THEN** 中栏立即显示该 dashboard 数据
+- **AND** 系统在后台刷新今日简报和资料状态
+
+#### Scenario: Background refresh feedback
+- **WHEN** Dashboard Panel 使用缓存内容并正在刷新
+- **THEN** 学习助手中栏显示非阻塞刷新反馈
+- **AND** 用户仍可查看已缓存内容
+
+#### Scenario: First open without loaded data
+- **WHEN** 用户首次打开 Dashboard Panel
+- **AND** 学习助手没有可展示的本地 dashboard 数据
+- **THEN** 中栏使用现有后端启动中、空数据库、任务列表或离线状态规则渲染
+
+### Requirement: Bottom navigation responsiveness
+The learning assistant bottom navigation SHALL switch selected tabs immediately and expose a reliable hit target for each visible item.
+
+#### Scenario: Immediate tab selection feedback
+- **WHEN** the backend is ready and the user clicks any bottom-navigation item
+- **THEN** the selected tab state changes before any destination-specific data refresh is required to complete
+- **AND** the clicked item renders selected visual feedback in the same UI update cycle
+
+#### Scenario: Full item hit target
+- **WHEN** the user clicks within the visible bounds of a bottom-navigation item, including padding around its icon or label
+- **THEN** the system treats the click as activation of that item
+- **AND** neighboring navigation items are not activated
+
+#### Scenario: Destination load does not block navigation
+- **WHEN** the destination tab starts an async refresh on entry
+- **THEN** the assistant still displays the destination tab immediately
+- **AND** loading feedback, if needed, is shown inside the destination content rather than delaying tab selection

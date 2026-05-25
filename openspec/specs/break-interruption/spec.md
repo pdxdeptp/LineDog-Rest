@@ -3,9 +3,7 @@
 ## Purpose
 
 MalDaze 在计时器进入休息阶段时展示桌宠打断体验。当前支持全屏霸屏休息和 PawPal 风格跑屏休息两种风格。
-
 ## Requirements
-
 ### Requirement: 休息入口路由
 系统 SHALL 根据 `breakInterruptStyle` 选择休息展示方式。
 
@@ -81,6 +79,7 @@ MalDaze 在计时器进入休息阶段时展示桌宠打断体验。当前支持
 - **WHEN** `presentBreakRun` 被调用
 - **THEN** 系统保存出发前常态窗口 frame
 - **AND** `PetStageView` 进入 breakRun display
+- **AND** 桌宠切换为 `.breakRunning`
 - **AND** `BreakRunController` 开始移动窗口
 - **AND** 显示屏幕左下角固定倒计时面板
 
@@ -108,7 +107,13 @@ MalDaze 在计时器进入休息阶段时展示桌宠打断体验。当前支持
 #### Scenario: 一分钟后遮罩
 - **WHEN** 跑屏时长超过 60 秒
 - **THEN** 系统在 60 秒后显示半透明遮罩
+- **AND** 遮罩显示在跑屏小狗当前所在的物理显示器上
 - **AND** 桌宠窗口升至 `.screenSaver` 层级，保持可点击
+
+#### Scenario: 遮罩不跟随焦点屏
+- **WHEN** 跑屏小狗在显示器 A 上运行
+- **AND** 当前鼠标位置、键盘焦点或 `NSScreen.main` 指向显示器 B
+- **THEN** 60 秒后的半透明遮罩显示在显示器 A 上
 
 #### Scenario: 倒计时更新
 - **WHEN** 跑屏进行中
@@ -139,3 +144,32 @@ MalDaze 在计时器进入休息阶段时展示桌宠打断体验。当前支持
 #### Scenario: 暂停计时
 - **WHEN** 用户停止计时
 - **THEN** 系统关闭当前休息窗口或跑屏状态
+
+### Requirement: 低唤醒自动休息调度
+自动休息调度 SHALL avoid sub-second polling while waiting for the next `:00` or `:30` anchor.
+
+#### Scenario: 等待下一锚点
+- **WHEN** `AutoTimerEngine` starts and the next half-hour anchor is in the future
+- **THEN** 系统 SHALL schedule a one-shot timer for that anchor
+- **AND** 系统 MUST NOT run a repeating 4 Hz polling timer during the waiting phase
+
+#### Scenario: 锚点到达
+- **WHEN** the scheduled anchor is reached
+- **THEN** `AutoTimerEngine` SHALL enter the scheduled rest phase
+- **AND** it SHALL emit `.resting` state for the configured rest duration
+
+#### Scenario: 休息倒计时
+- **WHEN** `AutoTimerEngine` is in scheduled rest
+- **THEN** it SHALL emit countdown updates only when the displayed whole-second remaining value changes
+
+### Requirement: 全屏休息低频刷新
+全屏休息 SHALL avoid continuous animation timer wakeups after the approach animation has completed.
+
+#### Scenario: 接近动画期间
+- **WHEN** 全屏休息的小狗正在从常态位置移动到屏幕中央
+- **THEN** 系统 SHALL update the rest visual animation at an interactive cadence
+
+#### Scenario: 接近动画完成后
+- **WHEN** 全屏休息的小狗已到达中央且背景变暗动画完成
+- **THEN** 系统 MUST NOT continue a high-frequency visual animation timer solely to refresh unchanged visuals
+- **AND** 倒计时 SHALL continue updating at whole-second granularity
