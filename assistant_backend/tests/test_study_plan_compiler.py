@@ -1,5 +1,7 @@
 """Plan compiler contract tests."""
 
+import json
+
 import pytest
 
 from src.study_plan.compiler import (
@@ -497,21 +499,24 @@ def test_validation_rejects_empty_phase_task_and_compile_outputs():
 def test_validation_default_tasks_cover_all_depth_obligations_without_scheduled_dates():
     result = compile_plan(
         _envelope(
-            source_type="github_repo",
-            source_roles={"github_repo": "clone_rebuild_target"},
+            source_type="documentation",
+            source_roles={"documentation": "main_learning_object"},
             source_facts={
-                "repo_name": "easyagent",
-                "languages": ["Python"],
-                "entry_points": ["main.py"],
+                "course_title": "Agent architecture notes",
+                "module_headings": ["map", "trace", "modify", "explain"],
             },
-            target_output="rebuild easyagent and explain the call flow",
+            target_output="understand the selected source architecture",
             target_depth="source_understanding",
-            material_refs=[{"id": "repo", "kind": "github_repo"}],
+            source_url=None,
+            raw_input_summary="selected source architecture notes",
+            material_refs=[{"id": "source-docs", "kind": "documentation"}],
         )
     )
 
     obligations = result["depth_obligations"]["essential_evidence"]
-    assert [task["depth_obligation"] for task in result["tasks"]] == obligations
+    task_obligations = [task["depth_obligation"] for task in result["tasks"]]
+    assert task_obligations == obligations
+    assert len(task_obligations) == len(set(task_obligations))
     assert all("date" not in key for task in result["tasks"] for key in task)
 
 
@@ -534,6 +539,7 @@ def test_validation_project_packaging_default_tasks_follow_archetype_not_depth_p
         "Inventory project evidence",
         "Draft impact-first bullet variants",
         "Draft project story",
+        "Find rehearsal gaps",
         "Revise packaging artifact",
     ]
     assert "Build demo artifact" not in titles
@@ -1357,3 +1363,473 @@ def test_repair_payload_cannot_modify_unfailed_tasks():
     assert "repair_modified_unfailed_task" in {
         error["code"] for error in result["validation_errors"]
     }
+
+
+def _valid_phase():
+    return {
+        "id": "phase-1",
+        "title": "Estimate phase",
+        "purpose": "Normalize task estimates.",
+        "essential": True,
+        "effort_range": {"min": 45, "max": 120},
+        "completion_evidence": ["normalized estimates"],
+        "milestones": ["estimates checked"],
+        "assumptions": [],
+    }
+
+
+def _estimated_task(task_id, work_type, minutes, *, order=1, split_points=None):
+    return {
+        "id": task_id,
+        "phase_id": "phase-1",
+        "order": order,
+        "work_type": work_type,
+        "classification": "essential",
+        "action_title": f"Produce {task_id} artifact",
+        "concrete_output": f"{task_id} artifact",
+        "completion_criteria": [f"{task_id} artifact exists"],
+        "estimated_minutes": minutes,
+        "estimate_confidence": "low",
+        "dependencies": [],
+        "material_refs": ["repo"],
+        "normal_mode": "produce the artifact",
+        "fallback_mode": "write a smaller artifact",
+        "split_points": split_points or [],
+        "depth_obligation": "demo",
+        "assumptions": [],
+    }
+
+
+def test_estimate_normalization_prioritizes_user_source_history_defaults_and_llm_outliers():
+    envelope = _envelope(
+        material_refs=[{"id": "repo", "kind": "github_repo"}],
+        user_estimate_overrides={"task-user": 35, "setup": 40},
+        known_effort_facts={
+            "task_estimates": {"task-source": 75},
+            "user_speed_factor": 0.5,
+        },
+        source_facts={"repo_name": "easyagent", "languages": ["Python"], "files": 8},
+    )
+    tasks = [
+        _estimated_task("task-user", "setup", 170, order=1),
+        _estimated_task("task-source", "source_trace", 400, order=2),
+        _estimated_task("task-history", "build", 100, order=3),
+        _estimated_task("task-default", "practice", None, order=4),
+        _estimated_task("task-llm", "custom_research", 95, order=5),
+    ]
+
+    result = compile_structured_candidates(envelope, [_valid_phase()], tasks)
+
+    assert result["status"] == "draft_review"
+    assert [
+        (task["id"], task["estimated_minutes"], task["estimate_source"], task["estimate_confidence"])
+        for task in result["tasks"]
+    ] == [
+        ("task-user", 35, "user_override", "high"),
+        ("task-source", 75, "source_fact", "high"),
+        ("task-history", 50, "user_history", "medium"),
+        ("task-default", 60, "default", "medium"),
+        ("task-llm", 48, "user_history", "medium"),
+    ]
+    decisions = {
+        decision["task_id"]: decision for decision in result["trace"]["estimate_decisions"]
+    }
+    assert decisions["task-source"]["raw_minutes"] == 400
+    assert "llm_outlier_replaced" in decisions["task-source"]["reasons"]
+    assert decisions["task-default"]["default_range"] == [45, 75]
+
+    llm_only = compile_structured_candidates(
+        _envelope(
+            material_refs=[{"id": "repo", "kind": "github_repo"}],
+            user_estimate_overrides={},
+            known_effort_facts={},
+            source_facts={"repo_name": "easyagent", "languages": ["Python"], "files": 8},
+        ),
+        [_valid_phase()],
+        [_estimated_task("task-llm-only", "custom_research", 95)],
+    )
+    assert llm_only["tasks"][0]["estimate_source"] == "llm_suggestion"
+    assert llm_only["tasks"][0]["estimated_minutes"] == 95
+
+
+def test_estimate_validation_raises_tiny_estimates_and_blocks_oversized_tasks_without_split_points():
+    envelope = _envelope(material_refs=[{"id": "repo", "kind": "github_repo"}])
+    tiny = _estimated_task("task-tiny", "custom_research", 5, order=1)
+    oversized = _estimated_task("task-big", "custom_research", 150, order=2)
+    split = _estimated_task(
+        "task-split",
+        "custom_research",
+        150,
+        order=3,
+        split_points=[{"label": "after baseline"}],
+    )
+
+    result = compile_structured_candidates(envelope, [_valid_phase()], [tiny, oversized, split])
+
+    assert result["status"] == "compile_failed"
+    assert "oversized_task_missing_split" in {
+        error["code"] for error in result["validation_errors"]
+    }
+    decisions = {
+        decision["task_id"]: decision for decision in result["trace"]["estimate_decisions"]
+    }
+    assert decisions["task-tiny"]["normalized_minutes"] == 45
+    assert decisions["task-tiny"]["selected_source"] == "default"
+    assert "llm_outlier_replaced" in decisions["task-tiny"]["reasons"]
+    assert decisions["task-split"]["normalized_minutes"] == 150
+    assert "oversized_with_split" in decisions["task-split"]["reasons"]
+
+
+def test_estimate_normalization_ignores_bool_estimates_and_uses_plain_source_duration():
+    result = compile_structured_candidates(
+        _envelope(
+            material_refs=[{"id": "repo", "kind": "github_repo"}],
+            user_estimate_overrides={"task-user-bool": True},
+            source_facts={
+                "repo_name": "easyagent",
+                "languages": ["Python"],
+                "duration_minutes": 80,
+                "task_estimates": {"task-source-bool": False},
+            },
+            known_effort_facts={},
+        ),
+        [_valid_phase()],
+        [
+            _estimated_task("task-raw-bool", "setup", True, order=1),
+            _estimated_task("task-user-bool", "source_trace", 50, order=2),
+            _estimated_task("task-source-bool", "source_trace", 55, order=3),
+            _estimated_task("task-plain-duration", "custom_research", None, order=4),
+        ],
+    )
+
+    assert result["status"] == "draft_review"
+    decisions = {
+        decision["task_id"]: decision for decision in result["trace"]["estimate_decisions"]
+    }
+    assert decisions["task-raw-bool"]["selected_source"] == "default"
+    assert decisions["task-raw-bool"]["normalized_minutes"] == 68
+    assert "invalid_bool_estimate_ignored" in decisions["task-raw-bool"]["reasons"]
+    assert decisions["task-user-bool"]["selected_source"] == "default"
+    assert decisions["task-source-bool"]["selected_source"] == "default"
+    assert decisions["task-plain-duration"]["selected_source"] == "source_fact"
+    assert decisions["task-plain-duration"]["normalized_minutes"] == 80
+
+
+def test_low_calibration_thresholds_include_low_minutes_default_only_thin_source_and_conflicts():
+    low_minutes_result = compile_structured_candidates(
+        _envelope(material_refs=[{"id": "repo", "kind": "github_repo"}], source_facts={}),
+        [_valid_phase()],
+        [
+            _estimated_task("task-low", "custom_research", 95, order=1),
+            _estimated_task("task-high", "setup", None, order=2),
+        ],
+    )
+    assert low_minutes_result["low_calibration"] is True
+    assert "low_confidence_essential_minutes" in low_minutes_result["trace"]["low_calibration_reasons"]
+
+    default_only_result = compile_structured_candidates(
+        _envelope(
+            material_refs=[{"id": "repo", "kind": "github_repo"}],
+            source_facts={},
+            user_estimate_overrides={},
+        ),
+        [_valid_phase()],
+        [
+            _estimated_task("task-1", "orientation", None, order=1),
+            _estimated_task("task-2", "setup", None, order=2),
+            _estimated_task("task-3", "practice", None, order=3),
+        ],
+    )
+    assert "essential_default_only_count" in default_only_result["trace"]["low_calibration_reasons"]
+
+    compile_result = compile_plan(
+        _envelope(
+            source_type="github_repo",
+            source_roles={"github_repo": "clone_rebuild_target"},
+            source_facts={"repo_name": "easyagent"},
+            target_output="rebuild easyagent",
+            target_depth="source_understanding",
+            missing_or_assumed_facts=[
+                {"field": "deadline_conflict", "assumption": "Use rough scope only"}
+            ],
+        )
+    )
+    assert compile_result["low_calibration"] is True
+    assert "thin_source" in compile_result["trace"]["low_calibration_reasons"]
+    assert "conflicting_anchor_assumption" in compile_result["trace"]["low_calibration_reasons"]
+
+    non_conflicting = compile_plan(
+        _envelope(
+            source_type="github_repo",
+            source_roles={"github_repo": "clone_rebuild_target"},
+            source_facts={"repo_name": "easyagent", "languages": ["Python"]},
+            target_output="rebuild easyagent",
+            target_depth="source_understanding",
+            missing_or_assumed_facts=[
+                {"field": "note_anchor", "assumption": "Anchor examples to README wording"}
+            ],
+        )
+    )
+    assert "conflicting_anchor_assumption" not in non_conflicting["trace"]["low_calibration_reasons"]
+
+
+def test_needs_input_trace_redacts_sensitive_provenance_and_goal_text():
+    secret_goal = "resume bullets for SECRET_PROJECT_ALPHA"
+    result = compile_plan(
+        _envelope(
+            target_depth=None,
+            target_output=secret_goal,
+            provenance={
+                "prompt_log": "SECRET_PROMPT_FOR_NEEDS_INPUT",
+                "validation_error": "SECRET_VALIDATION_ERROR",
+            },
+        )
+    )
+
+    trace_blob = json.dumps(result["trace"], ensure_ascii=False)
+    assert result["status"] == "needs_input"
+    assert "SECRET_PROMPT_FOR_NEEDS_INPUT" not in trace_blob
+    assert "SECRET_VALIDATION_ERROR" not in trace_blob
+    assert "SECRET_PROJECT_ALPHA" not in trace_blob
+
+
+def test_trace_records_scope_validation_task_gates_estimates_and_redacts_sensitive_content():
+    secret_resume = "SECRET_RESUME_TEXT_SHOULD_NOT_LEAK"
+    secret_repo = "SECRET_PRIVATE_REPO_DESCRIPTION_SHOULD_NOT_LEAK"
+    secret_note = "SECRET_OBSIDIAN_SNIPPET_SHOULD_NOT_LEAK"
+    secret_prompt = "SECRET_PROMPT_LOG_SHOULD_NOT_LEAK"
+    result = compile_plan(
+        _envelope(
+            source_type="obsidian_note",
+            source_url=None,
+            source_roles={"note": "supporting_material"},
+            source_facts={
+                "note_title": "Private prep notes",
+                "resume_text": secret_resume,
+                "description": secret_repo,
+                "snippet_summary": secret_note,
+            },
+            raw_input_summary="private interview prep",
+            target_output="resume bullets and project story for SECRET_PROJECT_BETA",
+            target_depth="project_level_output",
+            provenance={
+                "target_output": "user_provided",
+                "prompt_log": secret_prompt,
+                "validation_error": "raw error with " + secret_note,
+            },
+            material_refs=[
+                {"id": "selected-note", "kind": "obsidian_note", "included": True},
+                {"id": "unselected-note", "kind": "obsidian_note", "included": False},
+            ],
+        )
+    )
+
+    trace = result["trace"]
+    assert trace["selected_archetype"] == "project_packaging"
+    assert "resume_articulation" in trace["selected_modifiers"]
+    assert trace["source_scope_boundary"]["included_material_refs"] == ["selected-note"]
+    assert trace["source_scope_boundary"]["excluded_material_refs"] == ["unselected-note"]
+    assert trace["source_scope_boundary"]["external_context_used"] is False
+    assert trace["validation"]["status"] == "passed"
+    assert trace["task_quality_gates"]["accepted_task_ids"]
+    assert trace["estimate_decisions"]
+    assert trace["calibration"]["low_calibration"] == result["low_calibration"]
+    trace_blob = json.dumps(trace, ensure_ascii=False)
+    for secret in [
+        secret_resume,
+        secret_repo,
+        secret_note,
+        secret_prompt,
+        "SECRET_PROJECT_BETA",
+    ]:
+        assert secret not in trace_blob
+
+
+def test_real_context_fixtures_compile_expected_unscheduled_task_shapes():
+    fixtures = [
+        (
+            _envelope(
+                source_type="documentation",
+                source_url="https://example.com/AgentGuide",
+                source_roles={"documentation": "main_learning_object"},
+                source_facts={"course_title": "AgentGuide", "module_headings": ["tools", "memory"]},
+                target_output="AgentGuide working tool-calling demo and interview notes",
+                target_depth="interview_ready",
+                material_refs=[{"id": "agentguide", "kind": "docs"}],
+            ),
+            "finite_learning_project",
+            {
+                "tasks": [
+                    "Map AgentGuide orientation",
+                    "Run AgentGuide example",
+                    "Build small tool-calling demo",
+                    "Draft 6-bullet agent-loop explanation",
+                ],
+                "phases": [
+                    ("AgentGuide orientation", "source map", "setup notes"),
+                    ("Guided reproduction", "run the guide example", "runnable guide example"),
+                    ("Small tool-calling demo", "build a small demo", "tool-calling demo"),
+                    ("Interview notes review", "explain the agent loop", "6-bullet"),
+                ],
+            },
+        ),
+        (
+            _envelope(
+                source_type="github_repo",
+                source_url="https://github.com/example/easyagent",
+                source_roles={"github_repo": "clone_rebuild_target"},
+                source_facts={"repo_name": "easyagent", "languages": ["Python"]},
+                target_output="easyagent rebuild with source-understanding notes",
+                target_depth="source_understanding",
+                material_refs=[{"id": "easyagent-repo", "kind": "github_repo"}],
+            ),
+            "rebuild_or_clone",
+            {
+                "tasks": [
+                    "Create source map",
+                    "Capture quickstart baseline notes",
+                    "Trace call flow",
+                    "Build runnable minimal loop",
+                    "Modify one behavior",
+                    "Explain architecture tradeoffs",
+                ],
+                "phases": [
+                    ("Inspect and run baseline", "inspect the selected source", "baseline notes"),
+                    ("Trace minimal loop", "trace the minimal loop", "call-flow trace"),
+                    ("Rebuild minimal loop", "rebuild the minimal loop", "runnable minimal loop"),
+                    ("Add one modification", "add one modification", "modification evidence"),
+                    ("Prepare explanation", "prepare the architecture explanation", "tradeoff explanation"),
+                ],
+            },
+        ),
+        (
+            _envelope(
+                source_type="problem_set",
+                source_url=None,
+                source_roles={},
+                source_facts={"problem_set": "LeetCode Hot 100"},
+                target_output="LeetCode Hot 100 and 灵茶山 recurring practice",
+                target_depth="interview_ready",
+                material_refs=[{"id": "leetcode-hot-100", "kind": "problem_set"}],
+            ),
+            "recurring_practice",
+            {
+                "tasks": [
+                    "Run diagnostic practice set",
+                    "Complete focused practice block",
+                    "Tag mistakes and patterns",
+                    "Create spaced redo checkpoint",
+                    "Run checkpoint mock set",
+                    "Draft recall sheet",
+                ],
+                "phases": [
+                    ("Diagnostic", "find starting level", "diagnostic"),
+                    ("Daily practice cadence", "solve focused blocks", "practice cadence"),
+                    ("Mistake tagging", "tag mistakes", "mistake tags"),
+                    ("Spaced redo", "redo missed problems", "redo checkpoint"),
+                    ("Checkpoint mock set", "run mock sets", "mock set"),
+                ],
+            },
+        ),
+        (
+            _envelope(
+                source_type="notes",
+                source_url=None,
+                source_roles={"notes": "main_learning_object"},
+                source_facts={"note_title": "agent/backend interview prep", "snippet_count": 4},
+                target_output="agent and backend interview prep",
+                target_depth="interview_ready",
+                material_refs=[{"id": "interview-notes", "kind": "notes"}],
+            ),
+            "topic_review_cycle",
+            {
+                "tasks": [
+                    "Draft answer batch",
+                    "Attach project-linked examples",
+                    "Run mock explanation",
+                    "Write gap notes",
+                    "Schedule spaced review prompts",
+                ],
+                "phases": [
+                    ("Topic inventory", "turn topics into answer prompts", "topic inventory"),
+                    ("Active recall notes", "write active recall notes", "active recall notes"),
+                    ("Project-linked examples", "connect answers to project evidence", "project-linked examples"),
+                    ("Mock explanation", "explain aloud and capture gaps", "mock explanation"),
+                    ("Spaced review", "review gaps later", "spaced review"),
+                ],
+            },
+        ),
+        (
+            _envelope(
+                source_type="text_goal",
+                source_url=None,
+                source_roles={},
+                source_facts={"project_name": "assistant backend"},
+                target_output="resume bullets and project packaging",
+                target_depth="project_level_output",
+                material_refs=[{"id": "resume-project", "kind": "project_note"}],
+            ),
+            "project_packaging",
+            {
+                "tasks": [
+                    "Inventory project evidence",
+                    "Draft impact-first bullet variants",
+                    "Draft project story",
+                    "Find rehearsal gaps",
+                    "Revise packaging artifact",
+                ],
+                "phases": [
+                    ("Evidence inventory", "collect proof points", "evidence inventory"),
+                    ("Bullet rewrite", "rewrite resume bullets", "bullet variants"),
+                    ("Project story", "draft project story", "project story"),
+                    ("Rehearsal", "rehearse and find gaps", "gap notes"),
+                    ("Revision", "revise packaging", "revised artifact"),
+                ],
+            },
+        ),
+    ]
+
+    for envelope, archetype, expected in fixtures:
+        result = compile_plan(envelope)
+
+        assert result["status"] == "draft_review"
+        assert result["scope_boundary"]["primary_archetype"] == archetype
+        assert [task["action_title"] for task in result["tasks"]] == expected["tasks"]
+        assert [phase["title"] for phase in result["phases"]] == [
+            title for title, _purpose, _evidence in expected["phases"]
+        ]
+        for phase, (_title, purpose_text, evidence_text) in zip(
+            result["phases"], expected["phases"]
+        ):
+            assert purpose_text in phase["purpose"].lower()
+            assert any(
+                evidence_text in str(evidence).lower()
+                for evidence in phase["completion_evidence"]
+            )
+        _assert_no_scheduler_owned_output(result)
+
+
+def _assert_no_scheduler_owned_output(result):
+    forbidden_keys = {
+        "scheduled_date",
+        "final_dates",
+        "capacity_gap_minutes",
+        "capacity_gap",
+        "buffer_erosion",
+        "overloaded_dates",
+        "overloaded_date",
+    }
+    forbidden_values = {"infeasible_review"}
+
+    def walk(value):
+        if isinstance(value, dict):
+            for key, nested in value.items():
+                assert key not in forbidden_keys
+                walk(nested)
+        elif isinstance(value, list):
+            for nested in value:
+                walk(nested)
+        else:
+            assert value not in forbidden_values
+
+    walk(result)

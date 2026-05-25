@@ -20,10 +20,10 @@
 - [x] 3.1 Implement schema validation and task quality gates.
 - [x] 3.2 Implement validation severity classification for blocking, repairable, and warning failures.
 - [x] 3.3 Implement bounded repair loop that fixes only cited failures and preserves user anchors, target depth, source role, selected plan, and no-date constraints.
-- [ ] 3.4 Implement estimate normalization source priority and v1 work-type defaults.
-- [ ] 3.5 Implement estimate outlier replacement, confidence assignment, oversized split requirements, and low-calibration threshold.
-- [ ] 3.6 Implement compiler trace records for envelope, validation, repair, task gates, estimates, and calibration.
-- [ ] 3.7 Implement sensitive-content boundaries for LLM prompts, trace records, validation errors, and prompt logs.
+- [x] 3.4 Implement estimate normalization source priority and v1 work-type defaults.
+- [x] 3.5 Implement estimate outlier replacement, confidence assignment, oversized split requirements, and low-calibration threshold.
+- [x] 3.6 Implement compiler trace records for envelope, validation, repair, task gates, estimates, and calibration.
+- [x] 3.7 Implement sensitive-content boundaries for LLM prompts, trace records, validation errors, and prompt logs.
 
 ## 4. Tests
 
@@ -36,7 +36,7 @@
 - [x] 4.7 Add LLM contract tests for phase/task schema validation and forbidden date fields.
 - [x] 4.8 Add repair tests proving repair cannot change user anchors or expand scope.
 - [x] 4.9 Add bounded repair failure tests.
-- [ ] 4.10 Add estimate-normalization tests for user estimates, source facts, defaults, LLM outliers, oversized tasks, and low calibration thresholds.
-- [ ] 4.11 Add dry-run compiler tests for AgentGuide, easyagent, LeetCode, interview prep, and resume/project packaging before scheduling.
-- [ ] 4.12 Add privacy/redaction tests proving private notes, resume text, repo descriptions, and prompt logs are bounded or summarized in trace.
-- [ ] 4.13 Add fixture tests proving real-context compiler outputs contain no scheduled dates, capacity-gap math, buffer erosion, overloaded dates, or compiler-owned `infeasible_review`.
+- [x] 4.10 Add estimate-normalization tests for user estimates, source facts, defaults, LLM outliers, oversized tasks, and low calibration thresholds.
+- [x] 4.11 Add dry-run compiler tests for AgentGuide, easyagent, LeetCode, interview prep, and resume/project packaging before scheduling.
+- [x] 4.12 Add privacy/redaction tests proving private notes, resume text, repo descriptions, and prompt logs are bounded or summarized in trace.
+- [x] 4.13 Add fixture tests proving real-context compiler outputs contain no scheduled dates, capacity-gap math, buffer erosion, overloaded dates, or compiler-owned `infeasible_review`.

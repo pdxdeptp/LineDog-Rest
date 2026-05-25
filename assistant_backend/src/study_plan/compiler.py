@@ -62,6 +62,45 @@ ESTIMATE_CONFIDENCE = frozenset({"high", "medium", "low"})
 VAGUE_ACTIONS = frozenset(
     {"learn langgraph", "understand agent memory", "work on resume", "study repo"}
 )
+WORK_TYPE_DEFAULT_RANGES: dict[str, tuple[int, int]] = {
+    "orientation": (30, 45),
+    "source_map": (30, 45),
+    "setup": (45, 90),
+    "quickstart": (45, 90),
+    "source_trace": (45, 90),
+    "architecture": (45, 90),
+    "build": (60, 120),
+    "rebuild": (60, 120),
+    "integration": (60, 120),
+    "practice": (45, 75),
+    "redo": (30, 45),
+    "review": (30, 45),
+    "active_recall": (30, 45),
+    "interview": (45, 75),
+    "answer_batch": (45, 75),
+    "mock_explanation": (45, 75),
+    "writeup": (45, 75),
+    "resume": (45, 75),
+    "project_story": (45, 75),
+    "polish": (30, 60),
+    "revision": (30, 60),
+}
+SENSITIVE_TRACE_KEYS = frozenset(
+    {
+        "description",
+        "private_notes",
+        "prompt_log",
+        "prompt_logs",
+        "raw_prompt",
+        "repo_description",
+        "resume_text",
+        "goal_summary",
+        "source_summary",
+        "snippet",
+        "snippet_summary",
+        "validation_error",
+    }
+)
 
 
 @dataclass
@@ -170,6 +209,9 @@ def compile_plan(envelope: dict[str, Any]) -> dict[str, Any]:
     )
     if _thin_source_reason(normalized, boundary):
         low_calibration_reasons.append("thin_source")
+    if _conflicting_anchor_assumption(normalized):
+        low_calibration_reasons.append("conflicting_anchor_assumption")
+    low_calibration_reasons = _dedupe(low_calibration_reasons)
 
     result = CompilerResult(
         status="draft_review",
@@ -183,11 +225,23 @@ def compile_plan(envelope: dict[str, Any]) -> dict[str, Any]:
         or bool(low_calibration_reasons),
         trace={
             **_trace(normalized, boundary),
-            "synopsis": synopsis,
+            "synopsis": _sanitize_for_trace(synopsis),
             "validation": candidate_result.get("trace", {}).get("validation", {}),
             "repair_attempt_count": candidate_result.get("trace", {}).get(
                 "repair_attempt_count", 0
             ),
+            "repair": candidate_result.get("trace", {}).get("repair", {}),
+            "task_quality_gates": candidate_result.get("trace", {}).get(
+                "task_quality_gates", {}
+            ),
+            "estimate_decisions": candidate_result.get("trace", {}).get(
+                "estimate_decisions", []
+            ),
+            "calibration": {
+                **candidate_result.get("trace", {}).get("calibration", {}),
+                "low_calibration": boundary["selection_confidence"] == "low"
+                or bool(low_calibration_reasons),
+            },
             "low_calibration_reasons": low_calibration_reasons,
         },
     )
@@ -400,6 +454,15 @@ def validate_task_candidates(
             task_errors.append(
                 _validation_error("invalid_estimate", "blocking", "estimated_minutes", index)
             )
+        elif (
+            sanitized.get("estimated_minutes") > 120
+            and not _has_oversized_task_handling(sanitized)
+        ):
+            task_errors.append(
+                _validation_error(
+                    "oversized_task_missing_split", "blocking", "split_points", index
+                )
+            )
         if _is_vague_task(sanitized):
             task_errors.append(
                 _validation_error("vague_task", "blocking", "action_title", index)
@@ -469,44 +532,74 @@ def compile_structured_candidates(
     repair_attempt_count = 0
     all_errors: list[dict[str, Any]] = []
     prior_repair_errors: list[dict[str, Any]] = []
+    last_estimate_decisions: list[dict[str, Any]] = []
+    last_calibration: dict[str, Any] = {
+        "low_calibration": False,
+        "low_calibration_reasons": [],
+    }
+    last_task_quality_gates: dict[str, Any] = {}
 
     for attempt in range(0, 3):
+        estimate_result = _normalize_task_estimates(
+            normalized, package.get("tasks") or [], boundary
+        )
+        normalized_tasks = estimate_result["tasks"]
+        last_estimate_decisions = estimate_result["decisions"]
         phase_validation = validate_phase_candidates(package.get("phases") or [])
         task_validation = validate_task_candidates(
-            package.get("tasks") or [],
+            normalized_tasks,
             phases=phase_validation["accepted"],
             included_material_refs=included_refs,
             target_depth=normalized.get("target_depth"),
+        )
+        last_task_quality_gates = _task_quality_gate_trace(task_validation)
+        last_calibration = _calibration_trace(
+            normalized, boundary, normalized_tasks, estimate_result["decisions"]
         )
         errors = prior_repair_errors + phase_validation["errors"] + task_validation["errors"]
         all_errors = errors
         blocking = [error for error in errors if error["severity"] == "blocking"]
         if not blocking:
+            low_reasons = _dedupe(
+                [
+                    "validation_warning"
+                    for error in errors
+                    if error["severity"] == "warning"
+                ]
+                + last_calibration["low_calibration_reasons"]
+            )
             return CompilerResult(
                 status="draft_review",
                 phases=phase_validation["accepted"],
                 tasks=task_validation["accepted"],
-                low_calibration=any(error["severity"] == "warning" for error in errors),
+                low_calibration=bool(low_reasons),
                 scope_boundary=boundary,
                 depth_obligations=target_depth_obligations(normalized.get("target_depth")),
                 validation_errors=errors,
                 trace={
                     **_trace(normalized, boundary),
-                    "validation": {"errors": errors},
+                    "validation": {
+                        "status": "passed",
+                        "errors": _sanitize_for_trace(errors),
+                    },
+                    "task_quality_gates": last_task_quality_gates,
+                    "estimate_decisions": last_estimate_decisions,
+                    "calibration": {
+                        **last_calibration,
+                        "low_calibration": bool(low_reasons),
+                        "low_calibration_reasons": low_reasons,
+                    },
                     "repair_attempt_count": repair_attempt_count,
+                    "repair": {"attempt_count": repair_attempt_count},
                     "preserved_anchors": preserved,
-                    "low_calibration_reasons": [
-                        "validation_warning"
-                        for error in errors
-                        if error["severity"] == "warning"
-                    ],
+                    "low_calibration_reasons": low_reasons,
                 },
             ).to_dict()
         if repair_fn is None or attempt == 2:
             break
         repair_attempt_count += 1
         repair_payload = _repair_payload(
-            package=package,
+            package={"phases": package.get("phases") or [], "tasks": normalized_tasks},
             phase_validation=phase_validation,
             task_validation=task_validation,
             errors=errors,
@@ -544,8 +637,15 @@ def compile_structured_candidates(
         depth_obligations=target_depth_obligations(normalized.get("target_depth")),
         trace={
             **_trace(normalized, boundary),
-            "validation": {"errors": all_errors},
+            "validation": {
+                "status": "failed",
+                "errors": _sanitize_for_trace(all_errors),
+            },
+            "task_quality_gates": last_task_quality_gates,
+            "estimate_decisions": last_estimate_decisions,
+            "calibration": last_calibration,
             "repair_attempt_count": repair_attempt_count,
+            "repair": {"attempt_count": repair_attempt_count},
             "preserved_anchors": preserved,
         },
     ).to_dict()
@@ -724,6 +824,17 @@ def _choose_primary(
         rationale.append("source_role beats URL shape")
         return "finite_learning_project"
 
+    if "finite_learning_project" in candidates and _has_any(
+        target_output,
+        "working demo",
+        "tool-calling demo",
+        "guide example",
+        "working example",
+    ):
+        rationale.append("target_output")
+        rationale.append("target_output keeps finite source as main learning object")
+        return "finite_learning_project"
+
     if depth == "interview_ready":
         rationale.append("target_depth")
         rationale.append("target_depth beats generic learning wording")
@@ -823,45 +934,74 @@ def _default_phase_candidates(
     synopsis: dict[str, Any],
 ) -> list[dict[str, Any]]:
     archetype = boundary.get("primary_archetype") or "finite_learning_project"
-    phase_shapes = {
-        "rebuild_or_clone": [
-            ("phase-1", "Inspect baseline", "Map the selected source and runnable path."),
-            ("phase-2", "Rebuild minimal path", "Create a small verified reproduction."),
-        ],
-        "recurring_practice": [
-            ("phase-1", "Diagnostic", "Find starting level and recurring cadence."),
-            ("phase-2", "Practice loop", "Solve, tag misses, and schedule redos."),
-        ],
-        "topic_review_cycle": [
-            ("phase-1", "Active recall inventory", "Turn topics into answerable prompts."),
-            ("phase-2", "Mock explanation", "Explain with gaps and review evidence."),
-        ],
-        "project_packaging": [
-            ("phase-1", "Evidence inventory", "Collect proof points for the story."),
-            ("phase-2", "Rewrite and rehearse", "Produce revised bullets or narrative."),
-        ],
-        "existing_project_phase": [
-            ("phase-1", "Attach bounded phase", "Fit the new work to the selected plan context."),
-        ],
-        "finite_learning_project": [
-            ("phase-1", "Orient source", "Map useful material for the target output."),
-            ("phase-2", "Produce usable output", "Build the requested evidence artifact."),
-        ],
-    }
+    phase_shapes = _phase_shapes_for_archetype(archetype, envelope)
     return [
         {
-            "id": phase_id,
+            "id": f"phase-{index}",
             "title": title,
             "purpose": purpose,
             "essential": True,
             "effort_range": {"min": 45, "max": 90},
-            "completion_evidence": [synopsis["goal_summary"]],
+            "completion_evidence": [evidence],
             "milestones": [title],
             "assumptions": [],
         }
-        for phase_id, title, purpose in phase_shapes.get(
-            archetype, phase_shapes["finite_learning_project"]
-        )
+        for index, (title, purpose, evidence) in enumerate(phase_shapes, start=1)
+    ]
+
+
+def _phase_shapes_for_archetype(
+    archetype: str, envelope: dict[str, Any]
+) -> list[tuple[str, str, str]]:
+    text = _text(envelope)
+    if archetype == "finite_learning_project" and _has_any(
+        text, "agentguide", "agent guide"
+    ):
+        return [
+            ("AgentGuide orientation", "Create a source map and setup notes.", "setup notes and source map"),
+            ("Guided reproduction", "Run the guide example from selected facts.", "runnable guide example"),
+            ("Small tool-calling demo", "Build a small demo with one tool call.", "tool-calling demo"),
+            ("Interview notes review", "Explain the agent loop for review.", "6-bullet agent-loop explanation"),
+        ]
+    if archetype == "rebuild_or_clone":
+        return [
+            ("Inspect and run baseline", "Inspect the selected source and run baseline.", "baseline notes"),
+            ("Trace minimal loop", "Trace the minimal loop through the selected source.", "call-flow trace"),
+            ("Rebuild minimal loop", "Rebuild the minimal loop as a small runnable path.", "runnable minimal loop"),
+            ("Add one modification", "Add one modification to the rebuilt path.", "modification evidence"),
+            ("Prepare explanation", "Prepare the architecture explanation and tradeoffs.", "tradeoff explanation"),
+        ]
+    if archetype == "recurring_practice":
+        return [
+            ("Diagnostic", "Find starting level for the practice cadence.", "diagnostic practice result"),
+            ("Daily practice cadence", "Solve focused blocks within the practice cadence.", "practice cadence evidence"),
+            ("Mistake tagging", "Tag mistakes and patterns after practice.", "mistake tags"),
+            ("Spaced redo", "Redo missed problems on a spaced review loop.", "redo checkpoint"),
+            ("Checkpoint mock set", "Run mock sets and capture checkpoint recall.", "mock set evidence"),
+        ]
+    if archetype == "topic_review_cycle":
+        return [
+            ("Topic inventory", "Turn topics into answer prompts.", "topic inventory"),
+            ("Active recall notes", "Write active recall notes for the selected topics.", "active recall notes"),
+            ("Project-linked examples", "Connect answers to project evidence.", "project-linked examples"),
+            ("Mock explanation", "Explain aloud and capture gaps.", "mock explanation"),
+            ("Spaced review", "Review gaps later with active recall.", "spaced review prompts"),
+        ]
+    if archetype == "project_packaging":
+        return [
+            ("Evidence inventory", "Collect proof points for the selected story.", "evidence inventory"),
+            ("Bullet rewrite", "Rewrite resume bullets into impact-first variants.", "bullet variants"),
+            ("Project story", "Draft project story from selected evidence.", "project story draft"),
+            ("Rehearsal", "Rehearse and find gaps in the project explanation.", "gap notes"),
+            ("Revision", "Revise packaging into the final artifact.", "revised artifact"),
+        ]
+    if archetype == "existing_project_phase":
+        return [
+            ("Attach bounded phase", "Fit the new work to the selected plan context.", "bounded phase evidence"),
+        ]
+    return [
+        ("Orient source", "Map useful material for the target output.", "source map"),
+        ("Produce usable output", "Build the requested evidence artifact.", "usable output artifact"),
     ]
 
 
@@ -876,7 +1016,9 @@ def _default_task_candidates(
     if not refs:
         refs = ["submitted-item"]
     archetype = boundary.get("primary_archetype") or "finite_learning_project"
-    outputs = _archetype_task_outputs(archetype, obligations["essential_evidence"])
+    outputs = _archetype_task_outputs(
+        archetype, obligations["essential_evidence"], envelope
+    )
     tasks = []
     for index, output in enumerate(outputs, start=1):
         evidence = output["depth_obligation"]
@@ -909,24 +1051,118 @@ def _default_task_candidates(
 
 
 def _archetype_task_outputs(
-    archetype: str, essential_evidence: list[str]
+    archetype: str, essential_evidence: list[str], envelope: dict[str, Any]
 ) -> list[dict[str, str]]:
+    text = _text(envelope)
+    if archetype == "finite_learning_project" and _has_any(
+        text, "agentguide", "agent guide"
+    ):
+        evidence = _evidence_picker(essential_evidence)
+        return [
+            {
+                "depth_obligation": evidence("recall sheet", 0),
+                "action_title": "Map AgentGuide orientation",
+                "concrete_output": "setup notes and AgentGuide source map",
+                "completion_criteria": "setup notes identify the guide path and first runnable example",
+                "work_type": "orientation",
+                "normal_mode": "map the guide and capture setup notes",
+                "fallback_mode": "write a shorter orientation note from selected guide facts",
+            },
+            {
+                "depth_obligation": evidence("project-linked answers", 1),
+                "action_title": "Run AgentGuide example",
+                "concrete_output": "runnable guide example notes",
+                "completion_criteria": "example run or failure notes include command and observed output",
+                "work_type": "setup",
+                "normal_mode": "run the smallest guide example",
+                "fallback_mode": "record setup blockers and expected command",
+            },
+            {
+                "depth_obligation": evidence("mock explanation", 2),
+                "action_title": "Build small tool-calling demo",
+                "concrete_output": "small tool-calling demo artifact",
+                "completion_criteria": "demo has one tool call and observable output",
+                "work_type": "build",
+                "normal_mode": "build a small tool-calling demo",
+                "fallback_mode": "write pseudocode and a runbook for the demo",
+            },
+            {
+                "depth_obligation": evidence("redo/review evidence", 3),
+                "action_title": "Draft 6-bullet agent-loop explanation",
+                "concrete_output": "6-bullet agent-loop explanation",
+                "completion_criteria": "six bullets explain loop, tools, state, failure mode, and demo link",
+                "work_type": "interview",
+                "normal_mode": "draft interview notes from the demo",
+                "fallback_mode": "draft four bullets and one open question",
+            },
+        ]
+
+    if archetype == "rebuild_or_clone":
+        evidence = _evidence_picker(essential_evidence)
+        return [
+            {
+                "depth_obligation": evidence("architecture map", 0),
+                "action_title": "Create source map",
+                "concrete_output": "source map note",
+                "completion_criteria": "source map names entry points and core components",
+                "work_type": "source_map",
+            },
+            {
+                "depth_obligation": evidence("architecture map", 0),
+                "action_title": "Capture quickstart baseline notes",
+                "concrete_output": "quickstart or baseline notes",
+                "completion_criteria": "baseline notes include setup path or blocker",
+                "work_type": "setup",
+            },
+            {
+                "depth_obligation": evidence("key path trace", 1),
+                "action_title": "Trace call flow",
+                "concrete_output": "call-flow trace note",
+                "completion_criteria": "trace names entry point and one handoff",
+                "work_type": "source_trace",
+            },
+            {
+                "depth_obligation": evidence("modification point", 2),
+                "action_title": "Build runnable minimal loop",
+                "concrete_output": "runnable minimal loop",
+                "completion_criteria": "minimal loop runs or has reproducible blocker notes",
+                "work_type": "build",
+            },
+            {
+                "depth_obligation": evidence("modification point", 2),
+                "action_title": "Modify one behavior",
+                "concrete_output": "one modification note or patch",
+                "completion_criteria": "modification point and expected behavior are documented",
+                "work_type": "build",
+            },
+            {
+                "depth_obligation": evidence("tradeoff explanation", 3),
+                "action_title": "Explain architecture tradeoffs",
+                "concrete_output": "architecture tradeoff explanation",
+                "completion_criteria": "explanation covers two components and one tradeoff",
+                "work_type": "source_trace",
+            },
+        ]
+
     packaging_titles = [
         "Inventory project evidence",
         "Draft impact-first bullet variants",
         "Draft project story",
+        "Find rehearsal gaps",
         "Revise packaging artifact",
     ]
     packaging_outputs = [
         "evidence inventory for selected project",
         "three impact-first resume bullet variants",
         "portfolio project story draft",
+        "rehearsal gap notes",
         "revised packaging artifact",
     ]
     if archetype == "project_packaging":
+        evidence = _evidence_picker(essential_evidence)
         return [
             {
-                "depth_obligation": evidence,
+                "depth_obligation": evidence("project artifact", index),
                 "action_title": packaging_titles[index],
                 "concrete_output": packaging_outputs[index],
                 "completion_criteria": f"{packaging_outputs[index]} exists",
@@ -934,25 +1170,55 @@ def _archetype_task_outputs(
                 "normal_mode": f"create {packaging_outputs[index]}",
                 "fallback_mode": f"draft a smaller {packaging_outputs[index]}",
             }
-            for index, evidence in enumerate(essential_evidence)
+            for index in range(len(packaging_titles))
         ]
 
     if archetype == "recurring_practice":
+        evidence = _evidence_picker(essential_evidence)
         titles = [
             "Run diagnostic practice set",
             "Complete focused practice block",
             "Tag mistakes and patterns",
-            "Create redo checkpoint",
+            "Create spaced redo checkpoint",
+            "Run checkpoint mock set",
+            "Draft recall sheet",
         ]
         return [
             {
-                "depth_obligation": evidence,
+                "depth_obligation": evidence("redo/review evidence", index),
                 "action_title": titles[index] if index < len(titles) else f"Practice {evidence}",
-                "concrete_output": f"{evidence} practice evidence",
-                "completion_criteria": f"{evidence} practice evidence exists",
-                "work_type": "practice",
+                "concrete_output": f"{titles[index].lower()} evidence",
+                "completion_criteria": f"{titles[index].lower()} evidence exists",
+                "work_type": "practice" if index in {0, 1, 4} else "review",
             }
-            for index, evidence in enumerate(essential_evidence)
+            for index in range(len(titles))
+        ]
+
+    if archetype == "topic_review_cycle":
+        evidence = _evidence_picker(essential_evidence)
+        titles = [
+            "Draft answer batch",
+            "Attach project-linked examples",
+            "Run mock explanation",
+            "Write gap notes",
+            "Schedule spaced review prompts",
+        ]
+        obligations = [
+            "recall sheet",
+            "project-linked answers",
+            "mock explanation",
+            "redo/review evidence",
+            "redo/review evidence",
+        ]
+        return [
+            {
+                "depth_obligation": evidence(obligations[index], index),
+                "action_title": titles[index],
+                "concrete_output": f"{titles[index].lower()} artifact",
+                "completion_criteria": f"{titles[index].lower()} artifact exists",
+                "work_type": "interview" if index < 3 else "review",
+            }
+            for index in range(len(titles))
         ]
 
     return [
@@ -977,6 +1243,19 @@ def _work_type_for_evidence(evidence: str) -> str:
     if "resume" in evidence or "writeup" in evidence:
         return "writeup"
     return "orientation"
+
+
+def _evidence_picker(essential_evidence: list[str]):
+    available = list(essential_evidence)
+
+    def pick(preferred: str, index: int) -> str:
+        if preferred in available:
+            return preferred
+        if available:
+            return available[min(index, len(available) - 1)]
+        return preferred
+
+    return pick
 
 
 def _action_title_for_evidence(evidence: str) -> str:
@@ -1027,7 +1306,314 @@ def _has_value(value: Any) -> bool:
 
 
 def _valid_estimate(value: Any) -> bool:
-    return isinstance(value, int) and 10 <= value <= 180
+    return _is_int_estimate(value) and 10 <= value <= 180
+
+
+def _has_oversized_task_handling(task: dict[str, Any]) -> bool:
+    return bool(
+        task.get("split_points")
+        or task.get("multi_session_milestone")
+        or task.get("blocking_validation")
+    )
+
+
+def _normalize_task_estimates(
+    envelope: dict[str, Any],
+    tasks: list[dict[str, Any]],
+    boundary: dict[str, Any],
+) -> dict[str, Any]:
+    normalized_tasks = []
+    decisions = []
+    for task in tasks:
+        normalized_task = dict(task)
+        decision = _estimate_decision(envelope, normalized_task, boundary)
+        normalized_task["estimated_minutes"] = decision["normalized_minutes"]
+        normalized_task["estimate_confidence"] = decision["confidence"]
+        normalized_task["estimate_source"] = decision["selected_source"]
+        normalized_task["estimate_decision_reasons"] = list(decision["reasons"])
+        if decision.get("default_range"):
+            normalized_task["estimate_default_range"] = list(decision["default_range"])
+        normalized_tasks.append(normalized_task)
+        decisions.append(decision)
+    return {"tasks": normalized_tasks, "decisions": decisions}
+
+
+def _estimate_decision(
+    envelope: dict[str, Any],
+    task: dict[str, Any],
+    boundary: dict[str, Any],
+) -> dict[str, Any]:
+    raw_minutes = task.get("estimated_minutes")
+    raw_int = raw_minutes if _is_int_estimate(raw_minutes) else None
+    reasons: list[str] = []
+    if isinstance(raw_minutes, bool):
+        reasons.append("invalid_bool_estimate_ignored")
+    if raw_int is None:
+        reasons.append("missing_llm_estimate")
+    elif raw_int < 15 or raw_int > 180:
+        reasons.append("llm_outlier_replaced")
+
+    selected_minutes: int | None = None
+    selected_source = "llm_suggestion"
+    confidence = "low"
+    default_range: tuple[int, int] | None = None
+
+    user_minutes = _lookup_estimate_mapping(
+        envelope.get("user_estimate_overrides") or {}, task
+    )
+    if user_minutes is not None:
+        selected_minutes = user_minutes
+        selected_source = "user_override"
+        confidence = "high"
+    else:
+        source_minutes = _source_fact_estimate(envelope, task)
+        if source_minutes is not None:
+            selected_minutes = source_minutes
+            selected_source = "source_fact"
+            confidence = "high"
+        else:
+            speed_factor = _speed_factor(envelope)
+            if speed_factor is not None and _llm_estimate_usable(raw_int):
+                selected_minutes = max(1, round(raw_int * speed_factor))
+                selected_source = "user_history"
+                confidence = "medium"
+                reasons.append("user_speed_factor_applied")
+            else:
+                default_range = _default_range_for_task(task)
+                if default_range is not None:
+                    selected_minutes = _default_minutes(default_range)
+                    selected_source = "default"
+                    confidence = (
+                        "medium"
+                        if envelope.get("source_context", {}).get("source_facts")
+                        else "low"
+                    )
+                    reasons.append("v1_work_type_default")
+                elif _llm_estimate_usable(raw_int):
+                    selected_minutes = raw_int
+                    selected_source = "llm_suggestion"
+                    confidence = "low"
+                else:
+                    selected_minutes = 45
+                    selected_source = "default"
+                    confidence = "low"
+                    default_range = (30, 60)
+                    reasons.append("generic_default")
+
+    if selected_minutes < 10:
+        selected_minutes = 10
+        confidence = "low"
+        reasons.append("raised_to_minimum")
+    if selected_minutes > 180:
+        fallback_range = _default_range_for_task(task) or (45, 75)
+        selected_minutes = _default_minutes(fallback_range)
+        selected_source = "default"
+        confidence = "low"
+        default_range = fallback_range
+        reasons.append("clamped_to_default_ceiling")
+    if selected_minutes > 120:
+        reasons.append(
+            "oversized_with_split"
+            if _has_oversized_task_handling(task)
+            else "oversized_requires_split"
+        )
+
+    return {
+        "task_id": task.get("id"),
+        "work_type": task.get("work_type"),
+        "raw_minutes": raw_minutes,
+        "normalized_minutes": selected_minutes,
+        "selected_source": selected_source,
+        "confidence": confidence,
+        "default_range": list(default_range) if default_range else None,
+        "reasons": _dedupe(reasons),
+    }
+
+
+def _lookup_estimate_mapping(mapping: dict[str, Any], task: dict[str, Any]) -> int | None:
+    keys = [
+        task.get("id"),
+        task.get("work_type"),
+        _slug(task.get("action_title")),
+    ]
+    for key in keys:
+        if key is None:
+            continue
+        value = mapping.get(str(key))
+        if isinstance(value, dict):
+            value = value.get("minutes") or value.get("estimated_minutes")
+        if _is_int_estimate(value):
+            return value
+    return None
+
+
+def _source_fact_estimate(envelope: dict[str, Any], task: dict[str, Any]) -> int | None:
+    known = envelope.get("known_effort_facts") or {}
+    source_facts = envelope.get("source_context", {}).get("source_facts") or {}
+    for container in (known, source_facts):
+        for field in (
+            "task_estimates",
+            "work_type_minutes",
+            "source_estimates",
+            "duration_minutes",
+        ):
+            value = container.get(field)
+            if isinstance(value, dict):
+                minutes = _lookup_estimate_mapping(value, task)
+                if minutes is not None:
+                    return minutes
+            elif (
+                field == "duration_minutes"
+                and _is_int_estimate(value)
+                and _default_range_for_task(task) is None
+            ):
+                return value
+    return None
+
+
+def _speed_factor(envelope: dict[str, Any]) -> float | None:
+    known = envelope.get("known_effort_facts") or {}
+    factor = known.get("user_speed_factor") or known.get("speed_factor")
+    if isinstance(factor, (int, float)) and not isinstance(factor, bool) and factor > 0:
+        return float(factor)
+    return None
+
+
+def _llm_estimate_usable(value: int | None) -> bool:
+    return _is_int_estimate(value) and 15 <= value <= 180
+
+
+def _is_int_estimate(value: Any) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool)
+
+
+def _default_range_for_task(task: dict[str, Any]) -> tuple[int, int] | None:
+    text = " ".join(
+        str(task.get(field) or "")
+        for field in ("work_type", "action_title", "concrete_output", "depth_obligation")
+    ).lower().replace("_", " ")
+    for key, estimate_range in WORK_TYPE_DEFAULT_RANGES.items():
+        if _has_phrase(text, key.replace("_", " ")):
+            return estimate_range
+    if "source map" in text:
+        return WORK_TYPE_DEFAULT_RANGES["source_map"]
+    if "quickstart" in text:
+        return WORK_TYPE_DEFAULT_RANGES["quickstart"]
+    if "mock" in text:
+        return WORK_TYPE_DEFAULT_RANGES["mock_explanation"]
+    if "story" in text:
+        return WORK_TYPE_DEFAULT_RANGES["project_story"]
+    return None
+
+
+def _default_minutes(estimate_range: tuple[int, int]) -> int:
+    low, high = estimate_range
+    return round((low + high) / 2)
+
+
+def _calibration_trace(
+    envelope: dict[str, Any],
+    boundary: dict[str, Any],
+    tasks: list[dict[str, Any]],
+    decisions: list[dict[str, Any]],
+) -> dict[str, Any]:
+    essential_tasks = [
+        task for task in tasks if task.get("classification") == "essential"
+    ]
+    essential_total = sum(
+        task.get("estimated_minutes") or 0 for task in essential_tasks
+    )
+    low_total = sum(
+        task.get("estimated_minutes") or 0
+        for task in essential_tasks
+        if task.get("estimate_confidence") == "low"
+    )
+    default_only_count = sum(
+        1
+        for task in essential_tasks
+        if task.get("estimate_source") == "default"
+    )
+    reasons = []
+    if essential_total and low_total / essential_total >= 0.3:
+        reasons.append("low_confidence_essential_minutes")
+    if default_only_count >= 3:
+        reasons.append("essential_default_only_count")
+    thin_source = _thin_source_reason(envelope, boundary)
+    if thin_source:
+        reasons.append(thin_source)
+    if _conflicting_anchor_assumption(envelope):
+        reasons.append("conflicting_anchor_assumption")
+    return {
+        "low_calibration": bool(reasons),
+        "low_calibration_reasons": _dedupe(reasons),
+        "essential_estimated_minutes": essential_total,
+        "low_confidence_essential_minutes": low_total,
+        "essential_default_only_count": default_only_count,
+        "estimate_source_counts": _estimate_source_counts(decisions),
+    }
+
+
+def _estimate_source_counts(decisions: list[dict[str, Any]]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for decision in decisions:
+        source = str(decision.get("selected_source") or "unknown")
+        counts[source] = counts.get(source, 0) + 1
+    return counts
+
+
+def _task_quality_gate_trace(task_validation: dict[str, Any]) -> dict[str, Any]:
+    errors = task_validation.get("errors") or []
+    return {
+        "accepted_task_ids": [
+            task.get("id") for task in task_validation.get("accepted") or []
+        ],
+        "error_codes": _dedupe([error.get("code") for error in errors]),
+        "blocking_error_codes": _dedupe(
+            [
+                error.get("code")
+                for error in errors
+                if error.get("severity") == "blocking"
+            ]
+        ),
+    }
+
+
+def _conflicting_anchor_assumption(envelope: dict[str, Any]) -> bool:
+    for fact in envelope.get("missing_or_assumed_facts") or []:
+        if not isinstance(fact, dict):
+            continue
+        field = str(fact.get("field") or fact.get("key") or "").lower()
+        category = str(fact.get("category") or fact.get("type") or "").lower()
+        explicit = {field, category}
+        if explicit & {
+            "anchor_conflict",
+            "conflicting_anchor",
+            "deadline_conflict",
+            "capacity_conflict",
+            "scope_anchor_conflict",
+        }:
+            return True
+        if "conflict" in field and any(
+            anchor in field for anchor in ("anchor", "deadline", "capacity", "scope")
+        ):
+            return True
+        if "conflict" in category and any(
+            anchor in category for anchor in ("anchor", "deadline", "capacity", "scope")
+        ):
+            return True
+    return False
+
+
+def _dedupe(values: list[Any]) -> list[Any]:
+    deduped = []
+    for value in values:
+        if value and value not in deduped:
+            deduped.append(value)
+    return deduped
+
+
+def _slug(value: Any) -> str:
+    return re.sub(r"[^a-z0-9]+", "_", str(value or "").strip().lower()).strip("_")
 
 
 def _is_vague_task(task: dict[str, Any]) -> bool:
@@ -1390,11 +1976,53 @@ def _empty_scope_boundary() -> dict[str, Any]:
 
 
 def _trace(envelope: dict[str, Any], boundary: dict[str, Any]) -> dict[str, Any]:
+    source = envelope.get("source_context", {})
     return {
-        "envelope_provenance": dict(envelope.get("provenance") or {}),
+        "envelope_provenance": _sanitize_for_trace(envelope.get("provenance") or {}),
+        "target_output_summary": _summarize_sensitive(envelope.get("target_output")),
         "selected_archetype": boundary.get("primary_archetype"),
+        "selected_modifiers": list(boundary.get("secondary_modifiers") or []),
         "selection_rationale": list(boundary.get("selection_rationale") or []),
+        "source_scope_boundary": {
+            "source_type": source.get("source_type"),
+            "source_roles": _sanitize_for_trace(source.get("source_roles") or {}),
+            "included_material_refs": list(boundary.get("included_material_refs") or []),
+            "excluded_material_refs": list(boundary.get("excluded_material_refs") or []),
+            "external_context_used": False,
+            "boundary_rule": "submitted_item_selected_refs_and_shallow_facts_only",
+        },
     }
+
+
+def _sanitize_for_trace(value: Any, key: str | None = None) -> Any:
+    if isinstance(value, dict):
+        sanitized = {}
+        for nested_key, nested_value in value.items():
+            if str(nested_key) in SENSITIVE_TRACE_KEYS:
+                sanitized[nested_key] = _summarize_sensitive(nested_value)
+            else:
+                sanitized[nested_key] = _sanitize_for_trace(
+                    nested_value, str(nested_key)
+                )
+        return sanitized
+    if isinstance(value, list):
+        return [_sanitize_for_trace(item, key) for item in value]
+    if isinstance(value, str):
+        if key in SENSITIVE_TRACE_KEYS or len(value) > 180:
+            return _summarize_sensitive(value)
+        return value
+    return value
+
+
+def _summarize_sensitive(value: Any) -> str:
+    if isinstance(value, str):
+        word_count = len(value.split())
+        return f"[redacted {word_count} words]"
+    if isinstance(value, list):
+        return f"[redacted list:{len(value)}]"
+    if isinstance(value, dict):
+        return f"[redacted object:{len(value)}]"
+    return "[redacted]"
 
 
 def _text(envelope: dict[str, Any]) -> str:
@@ -1445,7 +2073,10 @@ def _target_depth_needs_input(envelope: dict[str, Any], state: str) -> dict[str,
         recovery_actions=[recovery_action],
         assumptions=envelope["missing_or_assumed_facts"],
         trace={
-            "envelope_provenance": dict(envelope.get("provenance") or {}),
+            "envelope_provenance": _sanitize_for_trace(
+                envelope.get("provenance") or {}
+            ),
+            "target_output_summary": _summarize_sensitive(envelope.get("target_output")),
             "target_depth_state": state,
             "target_depth_value": envelope.get("target_depth"),
         },
