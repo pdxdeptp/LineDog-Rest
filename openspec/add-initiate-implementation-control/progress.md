@@ -5,7 +5,7 @@
 - Phase: active
 - Current change: persist-intake-plan-drafts
 - Current step: apply
-- Current checkpoint: persist-intake-plan-drafts:apply:draft-schema-migration-and-defaults
+- Current checkpoint: persist-intake-plan-drafts:apply:draft-package-versioning-and-entrypoints
 - Required product-deepen rounds before apply: 3
 - Required checkpoint after product deepening: scope_dependency_check
 - Product-deepen scope guard: every round must read adjacent changes and record scope decisions
@@ -16,6 +16,10 @@
 - Evidence manifest: `openspec/add-initiate-implementation-control/evidence/manifest.json`
 - Failure log: `openspec/add-initiate-implementation-control/evidence/failures/failure-log.jsonl`
 - Apply recovery: `state.json.applyCursor` plus per-change apply task groups
+
+Completed apply groups for current change:
+
+- `draft-schema-migration-and-defaults`
 
 ## Run Log
 
@@ -492,3 +496,39 @@
   - Created safe checkpoint commit `c33c1653476c50e0a10766fbc37873bc940635a4`.
   - Wrote commit evidence at `openspec/add-initiate-implementation-control/evidence/commits/persist-intake-plan-drafts-pre-apply.md`.
 - Next checkpoint: persist-intake-plan-drafts:apply:draft-schema-migration-and-defaults
+
+## Run 2026-05-25T06:44:10Z Apply Group draft-schema-migration-and-defaults
+
+- Automation: add-initiate-changes
+- Checkpoint: persist-intake-plan-drafts:apply:draft-schema-migration-and-defaults
+- Result: completed
+- Actions:
+  - Acquired `run.lock`.
+  - Read `state.json`, `runbook.md`, `progress.md`, `evidence/manifest.json`, `workspace-baseline.json`, apply planning, and current task-group evidence source.
+  - Ran `git status --porcelain=v1` and protected unrelated dirty files.
+  - Triggered `openspec-apply-change`, `superpowers:subagent-driven-development`, and `superpowers:test-driven-development`.
+  - Delegated implementation to a worker subagent with a bounded write set for this apply group.
+  - Added RED tests for intake-linked draft shells, legacy draft migration/idempotency, router default draft columns, and both 60-minute capacity defaults.
+  - Implemented additive draft header/task schema columns, idempotent startup migration, intake-linked draft shell reuse, and `reduced_capacity_min` legacy migration.
+  - Wrote apply group evidence at `openspec/add-initiate-implementation-control/evidence/persist-intake-plan-drafts/apply-groups/draft-schema-migration-and-defaults.md`.
+  - Marked OpenSpec tasks `1.1`, `1.2`, `1.7`, `3.4`, `4.1`, `4.8`, and `4.10` complete.
+  - Created implementation commit `d521f5440a84274e3ef90dfa4e0e38b708be2e9f`.
+- Verification:
+  - `cd assistant_backend && uv run pytest tests/test_study_plan_lifecycle.py -k 'draft or migration or active_daily_tasks'`: 7 passed.
+  - `cd assistant_backend && uv run pytest tests/test_integration.py -k 'daily_capacity_min'`: 1 passed.
+  - `cd assistant_backend && uv run pytest tests/test_study_plan_router.py -k 'start_endpoint or clarification_without_active_resources'`: 1 passed, 2 third-party warnings.
+  - `openspec validate persist-intake-plan-drafts --strict`: valid.
+  - `openspec instructions apply --change persist-intake-plan-drafts --json`: 7/35 tasks complete.
+  - `git diff --check`: passed for the apply-group file set.
+- Protected unrelated dirty paths:
+  - `docs/agent-workflow.md`
+  - `openspec/changes/harden-add-initiate-automation-control/design.md`
+  - `openspec/changes/harden-add-initiate-automation-control/proposal.md`
+  - `openspec/changes/harden-add-initiate-automation-control/tasks.md`
+  - `openspec/changes/redesign-study-intake-planning/iteration-records/round-16-split-readiness-review.md`
+  - `openspec/changes/redesign-study-intake-planning/pre-split-readiness-audit.md`
+  - `openspec/changes/redesign-study-intake-planning/split-decision.md`
+  - `openspec/changes/redesign-study-intake-planning/tasks.md`
+- Manifest:
+  - Added `persist-intake-plan-drafts-apply-group-draft-schema-migration-and-defaults`.
+- Next checkpoint: persist-intake-plan-drafts:apply:draft-package-versioning-and-entrypoints

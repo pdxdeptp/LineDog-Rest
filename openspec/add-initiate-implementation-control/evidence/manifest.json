@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-05-25T06:34:11Z",
+  "updatedAt": "2026-05-25T06:56:39Z",
   "entries": [
     {
       "id": "introduce-study-intake-router-product-deepen-round-1",
@@ -890,6 +890,91 @@
         }
       ],
       "nextCheckpoint": "persist-intake-plan-drafts:apply:draft-schema-migration-and-defaults"
+    },
+    {
+      "id": "persist-intake-plan-drafts-apply-group-draft-schema-migration-and-defaults",
+      "timestamp": "2026-05-25T06:56:39Z",
+      "kind": "apply_group",
+      "changeId": "persist-intake-plan-drafts",
+      "checkpoint": "persist-intake-plan-drafts:apply:draft-schema-migration-and-defaults",
+      "groupId": "draft-schema-migration-and-defaults",
+      "result": "completed",
+      "commit": "d521f5440a84274e3ef90dfa4e0e38b708be2e9f",
+      "commands": [
+        {
+          "command": "cd assistant_backend && uv run pytest tests/test_study_plan_lifecycle.py -k 'draft or migration or active_daily_tasks'",
+          "exitCode": 0,
+          "summary": "7 passed"
+        },
+        {
+          "command": "cd assistant_backend && uv run pytest tests/test_integration.py -k 'daily_capacity_min'",
+          "exitCode": 0,
+          "summary": "1 passed, 15 deselected"
+        },
+        {
+          "command": "cd assistant_backend && uv run pytest tests/test_study_plan_router.py -k 'start_endpoint or clarification_without_active_resources'",
+          "exitCode": 0,
+          "summary": "1 passed, 8 deselected, 2 third-party warnings"
+        },
+        {
+          "command": "openspec validate persist-intake-plan-drafts --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        },
+        {
+          "command": "openspec instructions apply --change persist-intake-plan-drafts --json",
+          "exitCode": 0,
+          "summary": "7/35 tasks complete"
+        },
+        {
+          "command": "git diff --check -- assistant_backend/src/db/schema.py assistant_backend/src/db/init.py assistant_backend/src/study_plan/lifecycle.py assistant_backend/tests/test_study_plan_lifecycle.py assistant_backend/tests/test_study_plan_router.py assistant_backend/tests/test_integration.py",
+          "exitCode": 0,
+          "summary": "no whitespace errors"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/add-initiate-implementation-control/evidence/persist-intake-plan-drafts/apply-groups/draft-schema-migration-and-defaults.md",
+          "sha256": "c13a4ebe77fa928c6d01e9c9eb1eee069cae9f7d4473fb8c5c5c7edf69355468",
+          "description": "Apply group evidence, TDD trace, verification, and review summary."
+        },
+        {
+          "path": "assistant_backend/src/db/schema.py",
+          "sha256": "853f9fba076f43cc39d6844419e5839ec32ee47298c4c70fa4aa0183a6d2c8d7",
+          "description": "Draft header/task persistence contract columns."
+        },
+        {
+          "path": "assistant_backend/src/db/init.py",
+          "sha256": "a33c86f6359b79550c2c64190620a24c130feea1f7a43d2a0a24ec851aed5448",
+          "description": "Idempotent legacy draft storage migration and 60-minute capacity default migration."
+        },
+        {
+          "path": "assistant_backend/src/study_plan/lifecycle.py",
+          "sha256": "d3902f2ae03fe0e9120aff0f042ea80aa50f1ab27d1e16744bcd39e24e36d1c2",
+          "description": "Intake-linked draft shell creation and idempotent review-draft reuse."
+        },
+        {
+          "path": "assistant_backend/tests/test_study_plan_lifecycle.py",
+          "sha256": "255dfea9fa14bea2a94bd377d1f6408060d99edc80a182f68d572bb11a53ddcb",
+          "description": "TDD tests for draft/active separation and legacy draft migration idempotency."
+        },
+        {
+          "path": "assistant_backend/tests/test_study_plan_router.py",
+          "sha256": "5d46f9ca4e3568ca919e2fa65ba67be936c6d2fbd0e694c23a2835ec8fbb9a8b",
+          "description": "Router regression asserting default draft contract fields."
+        },
+        {
+          "path": "assistant_backend/tests/test_integration.py",
+          "sha256": "8592d3c03e22b8551043f1d4e9b65873f50d375cb01895e4f2b528a10ab0a025",
+          "description": "Capacity default regression for daily and reduced capacity."
+        },
+        {
+          "path": "openspec/changes/persist-intake-plan-drafts/tasks.md",
+          "sha256": "462cf839037ac9a406e278b645f9e5742af397654506013ab68bc6603eeea3ae",
+          "description": "OpenSpec tasks updated for completed draft schema, migration, separation, and default tasks."
+        }
+      ],
+      "nextCheckpoint": "persist-intake-plan-drafts:apply:draft-package-versioning-and-entrypoints"
     }
   ]
 }

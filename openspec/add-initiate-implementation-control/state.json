@@ -5,9 +5,9 @@
   "currentChangeIndex": 1,
   "currentChange": "persist-intake-plan-drafts",
   "currentStep": "apply",
-  "currentCheckpoint": "persist-intake-plan-drafts:apply:draft-schema-migration-and-defaults",
+  "currentCheckpoint": "persist-intake-plan-drafts:apply:draft-package-versioning-and-entrypoints",
   "currentAttempt": 0,
-  "runCounter": 13,
+  "runCounter": 14,
   "maxRetriesPerCheckpoint": 2,
   "requiredProductDeepenRounds": 3,
   "requiresScopeDependencyCheck": true,
@@ -74,11 +74,13 @@
     "activeChange": "persist-intake-plan-drafts",
     "currentGroupId": null,
     "currentGroupStartedAt": null,
-    "completedGroupIds": [],
+    "completedGroupIds": [
+      "draft-schema-migration-and-defaults"
+    ],
     "blockedGroupId": null,
     "taskGroupsFile": "openspec/add-initiate-implementation-control/evidence/persist-intake-plan-drafts/apply-task-groups.json",
-    "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/persist-intake-plan-drafts/apply-planning.md",
-    "lastCommit": null
+    "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/persist-intake-plan-drafts/apply-groups/draft-schema-migration-and-defaults.md",
+    "lastCommit": "d521f5440a84274e3ef90dfa4e0e38b708be2e9f"
   },
   "lock": {
     "path": "openspec/add-initiate-implementation-control/run.lock",
@@ -118,10 +120,12 @@
       "applyTaskGroups": {
         "status": "planned",
         "taskGroupsFile": "openspec/add-initiate-implementation-control/evidence/persist-intake-plan-drafts/apply-task-groups.json",
-        "completedGroupIds": [],
+        "completedGroupIds": [
+          "draft-schema-migration-and-defaults"
+        ],
         "currentGroupId": null,
-        "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/persist-intake-plan-drafts/apply-planning.md",
-        "lastCommit": null
+        "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/persist-intake-plan-drafts/apply-groups/draft-schema-migration-and-defaults.md",
+        "lastCommit": "d521f5440a84274e3ef90dfa4e0e38b708be2e9f"
       }
     },
     {
@@ -171,11 +175,11 @@
     }
   ],
   "lastRun": {
-    "completedAt": "2026-05-25T06:34:10Z",
-    "checkpoint": "persist-intake-plan-drafts:apply:planning",
+    "completedAt": "2026-05-25T06:56:39Z",
+    "checkpoint": "persist-intake-plan-drafts:apply:draft-schema-migration-and-defaults",
     "result": "completed"
   },
-  "lastCompletedCheckpoint": "persist-intake-plan-drafts:apply:planning",
+  "lastCompletedCheckpoint": "persist-intake-plan-drafts:apply:draft-schema-migration-and-defaults",
   "lastMigration": {
     "completedAt": "2026-05-25T03:56:29Z",
     "id": "require-three-product-deepen-rounds",
@@ -196,7 +200,7 @@
   "lastFailure": null,
   "lastVerification": {
     "command": "openspec validate persist-intake-plan-drafts --strict",
-    "result": "valid after apply planning"
+    "result": "valid after draft-schema-migration-and-defaults apply group"
   },
   "blockedReason": null
 }
