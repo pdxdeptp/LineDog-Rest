@@ -5,7 +5,7 @@
 - Phase: active
 - Current change: introduce-deadline-scheduler
 - Current step: apply
-- Current checkpoint: introduce-deadline-scheduler:apply:infeasibility-options-and-recompute-effects
+- Current checkpoint: introduce-deadline-scheduler:apply:scheduler-dry-runs-final-verification
 - Required product-deepen rounds before apply: 3
 - Required checkpoint after product deepening: scope_dependency_check
 - Product-deepen scope guard: every round must read adjacent changes and record scope decisions
@@ -44,10 +44,10 @@ Completed apply groups for `introduce-deadline-scheduler`:
 
 - `scheduler-contract-preflight-and-capacity`
 - `placement-buffer-splitting-fallback-and-risk`
+- `infeasibility-options-and-recompute-effects`
 
 Remaining apply groups for `introduce-deadline-scheduler`:
 
-- `infeasibility-options-and-recompute-effects`
 - `scheduler-dry-runs-final-verification`
 
 ## Run Log
@@ -1139,3 +1139,30 @@ Remaining apply groups for `introduce-deadline-scheduler`:
 - Manifest:
   - Added `introduce-deadline-scheduler-apply-placement-buffer-splitting-fallback-and-risk`.
 - Next checkpoint: introduce-deadline-scheduler:apply:infeasibility-options-and-recompute-effects
+
+## Run 2026-05-25T12:17:11Z Apply Group introduce-deadline-scheduler infeasibility-options-and-recompute-effects
+
+- Automation: add-initiate-changes
+- Checkpoint: introduce-deadline-scheduler:apply:infeasibility-options-and-recompute-effects
+- Result: completed
+- Actions:
+  - Triggered `openspec-apply-change`, `superpowers:subagent-driven-development`, and `superpowers:test-driven-development`.
+  - Wrote failing scheduler option tests first, verified RED failures, then implemented canonical option mapping and deterministic option effects.
+  - Added `apply_schedule_option` for review recomputation, storage state, and compiler recomputation handoffs without creating active tasks or Today actions.
+  - Implemented `accept_crunch` as selected-date usable-capacity scheduling and kept it distinct from visible accepted overload.
+  - Implemented reduce-scope optional/stretch removal, lower-depth handoff, answer-one-question handoff, and hard-deadline exclusion for `accept_late_finish`.
+  - Marked tasks 3.1-3.7 and 4.9-4.11 complete.
+  - Wrote apply group evidence at `openspec/add-initiate-implementation-control/evidence/introduce-deadline-scheduler/apply-groups/infeasibility-options-and-recompute-effects.md`.
+  - Created implementation commit `38242e79df7c23f6d545c5635904f46f1ee9c6e3`.
+  - Protected unrelated dirty files and did not stage them.
+- Verification:
+  - `cd assistant_backend && uv run pytest tests/test_study_plan_scheduling.py -k 'option or recompute or crunch or overload or reduce_scope or lower_depth or hard_deadline or late_finish'`: 11 passed, 22 deselected.
+  - `cd assistant_backend && uv run pytest tests/test_study_plan_scheduling.py`: 33 passed.
+  - `openspec validate introduce-deadline-scheduler --strict`: valid.
+  - `openspec instructions apply --change introduce-deadline-scheduler --json`: 35/36 complete, 1 remaining.
+  - `git diff --check -- assistant_backend/src/study_plan/scheduling.py assistant_backend/tests/test_study_plan_scheduling.py openspec/changes/introduce-deadline-scheduler/tasks.md openspec/add-initiate-implementation-control/evidence/introduce-deadline-scheduler/apply-groups/infeasibility-options-and-recompute-effects.md`: no whitespace errors.
+  - Spec compliance final review: approved.
+  - Code quality final review: approved.
+- Manifest:
+  - Added `introduce-deadline-scheduler-apply-infeasibility-options-and-recompute-effects`.
+- Next checkpoint: introduce-deadline-scheduler:apply:scheduler-dry-runs-final-verification

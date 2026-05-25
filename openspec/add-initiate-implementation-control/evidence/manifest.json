@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-05-25T11:47:41Z",
+  "updatedAt": "2026-05-25T12:17:11Z",
   "entries": [
     {
       "id": "introduce-study-intake-router-product-deepen-round-1",
@@ -2163,6 +2163,66 @@
         }
       ],
       "nextCheckpoint": "introduce-deadline-scheduler:apply:infeasibility-options-and-recompute-effects"
+    },
+    {
+      "id": "introduce-deadline-scheduler-apply-infeasibility-options-and-recompute-effects",
+      "timestamp": "2026-05-25T12:17:11Z",
+      "kind": "apply_group",
+      "changeId": "introduce-deadline-scheduler",
+      "checkpoint": "introduce-deadline-scheduler:apply:infeasibility-options-and-recompute-effects",
+      "groupId": "infeasibility-options-and-recompute-effects",
+      "result": "completed",
+      "commit": "38242e79df7c23f6d545c5635904f46f1ee9c6e3",
+      "commands": [
+        {
+          "command": "cd assistant_backend && uv run pytest tests/test_study_plan_scheduling.py -k 'option or recompute or crunch or overload or reduce_scope or lower_depth or hard_deadline or late_finish'",
+          "exitCode": 0,
+          "summary": "11 passed, 22 deselected"
+        },
+        {
+          "command": "cd assistant_backend && uv run pytest tests/test_study_plan_scheduling.py",
+          "exitCode": 0,
+          "summary": "33 passed"
+        },
+        {
+          "command": "openspec validate introduce-deadline-scheduler --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        },
+        {
+          "command": "openspec instructions apply --change introduce-deadline-scheduler --json",
+          "exitCode": 0,
+          "summary": "35/36 tasks complete, 1 remaining"
+        },
+        {
+          "command": "git diff --check -- assistant_backend/src/study_plan/scheduling.py assistant_backend/tests/test_study_plan_scheduling.py openspec/changes/introduce-deadline-scheduler/tasks.md openspec/add-initiate-implementation-control/evidence/introduce-deadline-scheduler/apply-groups/infeasibility-options-and-recompute-effects.md",
+          "exitCode": 0,
+          "summary": "no whitespace errors"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/add-initiate-implementation-control/evidence/introduce-deadline-scheduler/apply-groups/infeasibility-options-and-recompute-effects.md",
+          "sha256": "757976df0a01bbae8c4c580c89120081758f66a1684e12f34b2c430e1c1da9ec",
+          "description": "Apply group evidence, TDD record, review summary, verification, and next checkpoint."
+        },
+        {
+          "path": "assistant_backend/src/study_plan/scheduling.py",
+          "sha256": "3663bdc3b7d3714271ffd4a39b68c84096ff8c77ce955fe40060d89be3f35dc1",
+          "description": "Scheduler infeasibility option mapping and option-effect implementation."
+        },
+        {
+          "path": "assistant_backend/tests/test_study_plan_scheduling.py",
+          "sha256": "31243a567dad5ce5d561b53f831887dab48c8907ab1638852e055a355f4110fd",
+          "description": "Scheduler TDD tests for option mapping, recompute/storage handoffs, crunch/overload, reduce scope, and hard-deadline guardrails."
+        },
+        {
+          "path": "openspec/changes/introduce-deadline-scheduler/tasks.md",
+          "sha256": "030607830de77223a2d96424a88c6f73970a79fe5476a6489c030789436b5c79",
+          "description": "Completed infeasibility option and recompute-effect tasks for this apply group."
+        }
+      ],
+      "nextCheckpoint": "introduce-deadline-scheduler:apply:scheduler-dry-runs-final-verification"
     }
   ]
 }
