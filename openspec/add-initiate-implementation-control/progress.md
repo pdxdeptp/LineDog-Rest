@@ -3,9 +3,9 @@
 ## Current Status
 
 - Phase: active
-- Current change: introduce-plan-compiler
-- Current step: apply
-- Current checkpoint: introduce-plan-compiler:apply:cross-change-contract-to-introduce-deadline-scheduler
+- Current change: introduce-deadline-scheduler
+- Current step: product_deepen_round_1
+- Current checkpoint: introduce-deadline-scheduler:product_deepen_round_1
 - Required product-deepen rounds before apply: 3
 - Required checkpoint after product deepening: scope_dependency_check
 - Product-deepen scope guard: every round must read adjacent changes and record scope decisions
@@ -17,14 +17,14 @@
 - Failure log: `openspec/add-initiate-implementation-control/evidence/failures/failure-log.jsonl`
 - Apply recovery: `state.json.applyCursor` plus per-change apply task groups
 
-Completed apply groups for previous change `persist-intake-plan-drafts`:
+Completed apply groups for `persist-intake-plan-drafts`:
 
 - `draft-schema-migration-and-defaults`
 - `draft-package-versioning-and-entrypoints`
 - `activation-boundary-and-events`
 - `fallback-progress-and-final-verification`
 
-Completed apply groups for current change `introduce-plan-compiler`:
+Completed apply groups for `introduce-plan-compiler`:
 
 - `envelope-archetype-and-depth-core`
 - `synopsis-llm-validation-and-repair`
@@ -925,3 +925,28 @@ Completed apply groups for current change `introduce-plan-compiler`:
 - Manifest:
   - Added `introduce-plan-compiler-apply-group-estimates-trace-fixtures-and-final-verification`.
 - Next checkpoint: introduce-plan-compiler:apply:cross-change-contract-to-introduce-deadline-scheduler
+
+## Run 2026-05-25T10:49:11Z Cross-Change Contract introduce-plan-compiler to introduce-deadline-scheduler
+
+- Automation: add-initiate-changes
+- Checkpoint: introduce-plan-compiler:apply:cross-change-contract-to-introduce-deadline-scheduler
+- Result: completed
+- Actions:
+  - Acquired `run.lock`.
+  - Read `state.json`, `runbook.md`, `progress.md`, `evidence/manifest.json`, and `workspace-baseline.json`.
+  - Ran `git status --porcelain=v1` and protected unrelated dirty files without staging them.
+  - Read completed `introduce-plan-compiler` design/spec/tasks/evidence and downstream `introduce-deadline-scheduler` design/spec/tasks.
+  - Wrote cross-change evidence at `openspec/add-initiate-implementation-control/evidence/cross-change-contracts/introduce-plan-compiler-to-introduce-deadline-scheduler.md`.
+  - Marked `introduce-plan-compiler` completed and advanced to `introduce-deadline-scheduler:product_deepen_round_1`.
+- Contract decisions:
+  - Compiler hands off unscheduled phases, executable task candidates, estimates, confidence/calibration, split points, fallback modes, material refs, and trace.
+  - Scheduler owns date placement, capacity math, buffer reservation/erosion, infeasible review, canonical option effects, and activation-safe review output.
+  - Scheduler must consume compiler candidates rather than recompile source material or invent tasks.
+- Verification:
+  - `openspec validate introduce-plan-compiler --strict`: valid.
+  - `openspec validate introduce-deadline-scheduler --strict`: valid.
+  - `openspec instructions apply --change introduce-plan-compiler --json`: 31/31 tasks complete, state all_done.
+  - `openspec status --change introduce-deadline-scheduler --json`: proposal/design/specs/tasks artifacts present.
+- Manifest:
+  - Added `introduce-plan-compiler-to-introduce-deadline-scheduler-cross-change-contract`.
+- Next checkpoint: introduce-deadline-scheduler:product_deepen_round_1

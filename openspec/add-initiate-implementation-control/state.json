@@ -2,12 +2,12 @@
   "schemaVersion": 1,
   "automationId": "add-initiate-changes",
   "phase": "active",
-  "currentChangeIndex": 2,
-  "currentChange": "introduce-plan-compiler",
-  "currentStep": "apply",
-  "currentCheckpoint": "introduce-plan-compiler:apply:cross-change-contract-to-introduce-deadline-scheduler",
+  "currentChangeIndex": 3,
+  "currentChange": "introduce-deadline-scheduler",
+  "currentStep": "product_deepen_round_1",
+  "currentCheckpoint": "introduce-deadline-scheduler:product_deepen_round_1",
   "currentAttempt": 0,
-  "runCounter": 24,
+  "runCounter": 25,
   "maxRetriesPerCheckpoint": 2,
   "requiredProductDeepenRounds": 3,
   "requiresScopeDependencyCheck": true,
@@ -40,12 +40,12 @@
     "schemaVersion": 1,
     "evidenceRoot": "openspec/add-initiate-implementation-control/evidence/cross-change-contracts",
     "lastCheck": {
-      "completedAt": "2026-05-25T08:44:41Z",
-      "fromChange": "persist-intake-plan-drafts",
-      "toChange": "introduce-plan-compiler",
-      "checkpoint": "persist-intake-plan-drafts:apply:cross-change-contract-to-introduce-plan-compiler",
+      "completedAt": "2026-05-25T10:49:11Z",
+      "fromChange": "introduce-plan-compiler",
+      "toChange": "introduce-deadline-scheduler",
+      "checkpoint": "introduce-plan-compiler:apply:cross-change-contract-to-introduce-deadline-scheduler",
       "result": "passed",
-      "evidenceFile": "openspec/add-initiate-implementation-control/evidence/cross-change-contracts/persist-intake-plan-drafts-to-introduce-plan-compiler.md"
+      "evidenceFile": "openspec/add-initiate-implementation-control/evidence/cross-change-contracts/introduce-plan-compiler-to-introduce-deadline-scheduler.md"
     },
     "requiredBeforeAdvancingChange": true,
     "changeOrder": [
@@ -71,16 +71,12 @@
   },
   "applyCursor": {
     "schemaVersion": 1,
-    "activeChange": "introduce-plan-compiler",
+    "activeChange": null,
     "currentGroupId": null,
     "currentGroupStartedAt": null,
-    "completedGroupIds": [
-      "envelope-archetype-and-depth-core",
-      "synopsis-llm-validation-and-repair",
-      "estimates-trace-fixtures-and-final-verification"
-    ],
+    "completedGroupIds": [],
     "blockedGroupId": null,
-    "taskGroupsFile": "openspec/add-initiate-implementation-control/evidence/introduce-plan-compiler/apply-task-groups.json",
+    "taskGroupsFile": null,
     "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/introduce-plan-compiler/apply-groups/estimates-trace-fixtures-and-final-verification.md",
     "lastCommit": "e320594ddb161d3c9b743777ab16c756694500a1"
   },
@@ -135,10 +131,10 @@
     },
     {
       "id": "introduce-plan-compiler",
-      "status": "in_progress",
+      "status": "completed",
       "productDeepenRoundsCompleted": 3,
       "scopeDependencyCheckCompleted": true,
-      "applyCompleted": false,
+      "applyCompleted": true,
       "applyTaskGroups": {
         "status": "completed",
         "taskGroupsFile": "openspec/add-initiate-implementation-control/evidence/introduce-plan-compiler/apply-task-groups.json",
@@ -154,7 +150,7 @@
     },
     {
       "id": "introduce-deadline-scheduler",
-      "status": "pending",
+      "status": "in_progress",
       "productDeepenRoundsCompleted": 0,
       "scopeDependencyCheckCompleted": false,
       "applyCompleted": false,
@@ -184,11 +180,11 @@
     }
   ],
   "lastRun": {
-    "completedAt": "2026-05-25T10:46:08Z",
-    "checkpoint": "introduce-plan-compiler:apply:estimates-trace-fixtures-and-final-verification",
+    "completedAt": "2026-05-25T10:49:11Z",
+    "checkpoint": "introduce-plan-compiler:apply:cross-change-contract-to-introduce-deadline-scheduler",
     "result": "completed"
   },
-  "lastCompletedCheckpoint": "introduce-plan-compiler:apply:estimates-trace-fixtures-and-final-verification",
+  "lastCompletedCheckpoint": "introduce-plan-compiler:apply:cross-change-contract-to-introduce-deadline-scheduler",
   "lastMigration": {
     "completedAt": "2026-05-25T03:56:29Z",
     "id": "require-three-product-deepen-rounds",
@@ -208,8 +204,8 @@
   },
   "lastFailure": null,
   "lastVerification": {
-    "command": "cd assistant_backend && uv run pytest tests/test_study_plan_compiler.py -k 'fixture or scheduled_dates' && cd assistant_backend && uv run pytest tests/test_study_plan_compiler.py -k 'estimate or low_calibration or trace or redaction or fixture or scheduled_dates' && cd assistant_backend && uv run pytest tests/test_study_plan_compiler.py && openspec validate introduce-plan-compiler --strict && openspec instructions apply --change introduce-plan-compiler --json",
-    "result": "2 fixture/scheduled-date tests passed; 10 estimate/trace/redaction/fixture tests passed; 52 compiler tests passed; OpenSpec valid; apply progress 31/31 complete; state all_done"
+    "command": "openspec validate introduce-plan-compiler --strict && openspec validate introduce-deadline-scheduler --strict && openspec instructions apply --change introduce-plan-compiler --json && openspec status --change introduce-deadline-scheduler --json",
+    "result": "compiler valid; deadline scheduler valid; compiler apply progress 31/31 complete state all_done; scheduler artifacts present"
   },
   "blockedReason": null
 }
