@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-05-25T10:59:11Z",
+  "updatedAt": "2026-05-25T11:09:11Z",
   "entries": [
     {
       "id": "introduce-study-intake-router-product-deepen-round-1",
@@ -1883,6 +1883,64 @@
         }
       ],
       "nextCheckpoint": "introduce-deadline-scheduler:scope_dependency_check"
+    },
+    {
+      "id": "introduce-deadline-scheduler-scope-dependency-check",
+      "timestamp": "2026-05-25T11:09:11Z",
+      "kind": "scope_dependency_check",
+      "changeId": "introduce-deadline-scheduler",
+      "checkpoint": "introduce-deadline-scheduler:scope_dependency_check",
+      "result": "completed",
+      "commands": [
+        {
+          "command": "openspec validate introduce-plan-compiler --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        },
+        {
+          "command": "openspec validate introduce-deadline-scheduler --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        },
+        {
+          "command": "openspec validate redesign-add-initiate-ui --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        },
+        {
+          "command": "openspec status --change introduce-deadline-scheduler --json",
+          "exitCode": 0,
+          "summary": "proposal/design/specs/tasks artifacts present"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/add-initiate-implementation-control/evidence/scope-dependency/introduce-deadline-scheduler.md",
+          "sha256": "80904d75f5466e1397d1d8e2b9e31204359b0a462f2c0fc533c1dd157c1b1dfa",
+          "description": "Scope dependency check evidence for scheduler boundary with compiler upstream and UI downstream."
+        },
+        {
+          "path": "openspec/changes/introduce-deadline-scheduler/design.md",
+          "sha256": "e325bc68b9c73741dff65a593251728a6adfbe07b0db651604868190167a1f5d",
+          "description": "Scheduler design with scope-check wording consistency fixes for buffer and crunch/buffer-risk option effects."
+        },
+        {
+          "path": "openspec/changes/introduce-deadline-scheduler/review-records/product-deepen-round-1.md",
+          "sha256": "c98bb0ceda9b1caeeb6c2098be9440a3dd3274325cc73efd9c41f7a58f5f3bb9",
+          "description": "Round 1 scope-aware product deepening evidence verified during scope dependency check."
+        },
+        {
+          "path": "openspec/changes/introduce-deadline-scheduler/review-records/product-deepen-round-2.md",
+          "sha256": "179b5ee1778c60eafc6e21c9e74fb004abb045517cc768deb87693ed9e34bb5f",
+          "description": "Round 2 scope-aware product deepening evidence verified during scope dependency check."
+        },
+        {
+          "path": "openspec/changes/introduce-deadline-scheduler/review-records/product-deepen-round-3.md",
+          "sha256": "d28acd457ed8da4c55b74c47c03bb5e68a85e30bc9077cc225a8dfc1922bb66c",
+          "description": "Round 3 scope-aware product deepening evidence verified during scope dependency check."
+        }
+      ],
+      "nextCheckpoint": "introduce-deadline-scheduler:apply"
     }
   ]
 }

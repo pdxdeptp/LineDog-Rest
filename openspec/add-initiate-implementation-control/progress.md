@@ -4,8 +4,8 @@
 
 - Phase: active
 - Current change: introduce-deadline-scheduler
-- Current step: scope_dependency_check
-- Current checkpoint: introduce-deadline-scheduler:scope_dependency_check
+- Current step: apply
+- Current checkpoint: introduce-deadline-scheduler:apply
 - Required product-deepen rounds before apply: 3
 - Required checkpoint after product deepening: scope_dependency_check
 - Product-deepen scope guard: every round must read adjacent changes and record scope decisions
@@ -35,6 +35,8 @@ Product-deepen rounds completed for `introduce-deadline-scheduler`:
 - round 1
 - round 2
 - round 3
+
+Scope dependency check completed for `introduce-deadline-scheduler`: yes
 
 ## Run Log
 
@@ -1006,3 +1008,27 @@ Product-deepen rounds completed for `introduce-deadline-scheduler`:
 - Manifest:
   - Added `introduce-deadline-scheduler-product-deepen-round-3`.
 - Next checkpoint: introduce-deadline-scheduler:scope_dependency_check
+
+## Run 2026-05-25T11:09:11Z Scope Dependency Check introduce-deadline-scheduler
+
+- Automation: add-initiate-changes
+- Checkpoint: introduce-deadline-scheduler:scope_dependency_check
+- Result: completed
+- Actions:
+  - Acquired `run.lock`.
+  - Read `state.json`, `runbook.md`, `progress.md`, `evidence/manifest.json`, and `workspace-baseline.json`.
+  - Ran `git status --porcelain=v1` and protected unrelated dirty files without staging them.
+  - Read scheduler proposal/design/spec/tasks and all three product-deepen records.
+  - Read upstream `introduce-plan-compiler` artifacts and downstream `redesign-add-initiate-ui` artifacts.
+  - Verified all three product-deepen records include scope decisions and adjacent-change contracts.
+  - Fixed two wording inconsistencies in scheduler `design.md`: deterministic buffer formula and crunch/buffer-risk option effect wording.
+  - Wrote scope dependency evidence at `openspec/add-initiate-implementation-control/evidence/scope-dependency/introduce-deadline-scheduler.md`.
+  - Marked scheduler scope dependency check complete and advanced to `introduce-deadline-scheduler:apply`.
+- Verification:
+  - `openspec validate introduce-plan-compiler --strict`: valid.
+  - `openspec validate introduce-deadline-scheduler --strict`: valid.
+  - `openspec validate redesign-add-initiate-ui --strict`: valid.
+  - `openspec status --change introduce-deadline-scheduler --json`: proposal/design/specs/tasks artifacts present.
+- Manifest:
+  - Added `introduce-deadline-scheduler-scope-dependency-check`.
+- Next checkpoint: introduce-deadline-scheduler:apply

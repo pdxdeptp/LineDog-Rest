@@ -145,7 +145,7 @@ Rest days and unavailable days have zero normal placement capacity. They may onl
 3. Compute usable capacity and planning budget for each remaining date.
 4. Reserve buffer near deadline:
    - 1 usable day when the plan has at least 3 usable days;
-   - about 20% of usable days, clamped to 1-5 days, for longer plans.
+   - `ceil(usable_days * 0.2)` usable days, clamped to 1-5 days, for longer plans.
 5. Split tasks above the normal planning budget only at approved split points or multi-session boundaries.
 6. Place essential work in dependency order.
 7. Place optional/stretch work only after essential work fits.
@@ -250,8 +250,8 @@ For hard deadlines, `accept_late_finish` is not available.
 
 - `extend_deadline`: update deadline and rerun scheduler.
 - `increase_capacity`: update capacity and rerun scheduler.
-- `accept_crunch`: raise/remove budget cap for selected dates and rerun scheduler.
-- `accept_buffer_risk`: keep buffer erosion visible and allow activation only after explicit confirmation.
+- `accept_crunch`: raise selected dates up to 100% of usable capacity and rerun scheduler.
+- `accept_buffer_risk`: keep buffer erosion visible and return a review version that downstream activation can confirm explicitly.
 - `rebalance`: rerun scheduler with same scope/depth/deadline/capacity and different distribution.
 - `accept_overload`: keep overload visible and allow activation only after explicit confirmation.
 - `edit_estimates`: keep task structure and rerun scheduler after estimate edits.

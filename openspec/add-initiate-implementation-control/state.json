@@ -4,10 +4,10 @@
   "phase": "active",
   "currentChangeIndex": 3,
   "currentChange": "introduce-deadline-scheduler",
-  "currentStep": "scope_dependency_check",
-  "currentCheckpoint": "introduce-deadline-scheduler:scope_dependency_check",
+  "currentStep": "apply",
+  "currentCheckpoint": "introduce-deadline-scheduler:apply",
   "currentAttempt": 0,
-  "runCounter": 26,
+  "runCounter": 27,
   "maxRetriesPerCheckpoint": 2,
   "requiredProductDeepenRounds": 3,
   "requiresScopeDependencyCheck": true,
@@ -62,11 +62,11 @@
     "requiredAfterProductDeepening": true,
     "requiredBeforeApply": true,
     "lastCheck": {
-      "completedAt": "2026-05-25T09:05:11Z",
-      "changeId": "introduce-plan-compiler",
-      "checkpoint": "introduce-plan-compiler:scope_dependency_check",
+      "completedAt": "2026-05-25T11:09:11Z",
+      "changeId": "introduce-deadline-scheduler",
+      "checkpoint": "introduce-deadline-scheduler:scope_dependency_check",
       "result": "passed",
-      "evidenceFile": "openspec/add-initiate-implementation-control/evidence/scope-dependency/introduce-plan-compiler.md"
+      "evidenceFile": "openspec/add-initiate-implementation-control/evidence/scope-dependency/introduce-deadline-scheduler.md"
     }
   },
   "applyCursor": {
@@ -152,7 +152,7 @@
       "id": "introduce-deadline-scheduler",
       "status": "in_progress",
       "productDeepenRoundsCompleted": 3,
-      "scopeDependencyCheckCompleted": false,
+      "scopeDependencyCheckCompleted": true,
       "applyCompleted": false,
       "applyTaskGroups": {
         "status": "not_planned",
@@ -180,11 +180,11 @@
     }
   ],
   "lastRun": {
-    "completedAt": "2026-05-25T10:59:11Z",
-    "checkpoint": "introduce-deadline-scheduler:product_deepen_round_3",
+    "completedAt": "2026-05-25T11:09:11Z",
+    "checkpoint": "introduce-deadline-scheduler:scope_dependency_check",
     "result": "completed"
   },
-  "lastCompletedCheckpoint": "introduce-deadline-scheduler:product_deepen_round_3",
+  "lastCompletedCheckpoint": "introduce-deadline-scheduler:scope_dependency_check",
   "lastMigration": {
     "completedAt": "2026-05-25T03:56:29Z",
     "id": "require-three-product-deepen-rounds",
@@ -204,8 +204,8 @@
   },
   "lastFailure": null,
   "lastVerification": {
-    "command": "openspec validate introduce-deadline-scheduler --strict",
-    "result": "valid after product-deepen round 3 preflight clarification; next checkpoint scope_dependency_check"
+    "command": "openspec validate introduce-plan-compiler --strict && openspec validate introduce-deadline-scheduler --strict && openspec validate redesign-add-initiate-ui --strict && openspec status --change introduce-deadline-scheduler --json",
+    "result": "upstream compiler valid; deadline scheduler valid; downstream UI valid; scheduler proposal/design/specs/tasks present"
   },
   "blockedReason": null
 }
