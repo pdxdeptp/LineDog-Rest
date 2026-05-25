@@ -5,9 +5,9 @@
   "currentChangeIndex": 2,
   "currentChange": "introduce-plan-compiler",
   "currentStep": "apply",
-  "currentCheckpoint": "introduce-plan-compiler:apply:estimates-trace-fixtures-and-final-verification",
+  "currentCheckpoint": "introduce-plan-compiler:apply:cross-change-contract-to-introduce-deadline-scheduler",
   "currentAttempt": 0,
-  "runCounter": 23,
+  "runCounter": 24,
   "maxRetriesPerCheckpoint": 2,
   "requiredProductDeepenRounds": 3,
   "requiresScopeDependencyCheck": true,
@@ -72,16 +72,17 @@
   "applyCursor": {
     "schemaVersion": 1,
     "activeChange": "introduce-plan-compiler",
-    "currentGroupId": "estimates-trace-fixtures-and-final-verification",
+    "currentGroupId": null,
     "currentGroupStartedAt": null,
     "completedGroupIds": [
       "envelope-archetype-and-depth-core",
-      "synopsis-llm-validation-and-repair"
+      "synopsis-llm-validation-and-repair",
+      "estimates-trace-fixtures-and-final-verification"
     ],
     "blockedGroupId": null,
     "taskGroupsFile": "openspec/add-initiate-implementation-control/evidence/introduce-plan-compiler/apply-task-groups.json",
-    "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/introduce-plan-compiler/apply-groups/synopsis-llm-validation-and-repair.md",
-    "lastCommit": "c98dc6f023aab50bf5b009981090abc4aee81574"
+    "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/introduce-plan-compiler/apply-groups/estimates-trace-fixtures-and-final-verification.md",
+    "lastCommit": "e320594ddb161d3c9b743777ab16c756694500a1"
   },
   "lock": {
     "path": "openspec/add-initiate-implementation-control/run.lock",
@@ -139,15 +140,16 @@
       "scopeDependencyCheckCompleted": true,
       "applyCompleted": false,
       "applyTaskGroups": {
-        "status": "in_progress",
+        "status": "completed",
         "taskGroupsFile": "openspec/add-initiate-implementation-control/evidence/introduce-plan-compiler/apply-task-groups.json",
         "completedGroupIds": [
           "envelope-archetype-and-depth-core",
-          "synopsis-llm-validation-and-repair"
+          "synopsis-llm-validation-and-repair",
+          "estimates-trace-fixtures-and-final-verification"
         ],
-        "currentGroupId": "estimates-trace-fixtures-and-final-verification",
-        "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/introduce-plan-compiler/apply-groups/synopsis-llm-validation-and-repair.md",
-        "lastCommit": "c98dc6f023aab50bf5b009981090abc4aee81574"
+        "currentGroupId": null,
+        "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/introduce-plan-compiler/apply-groups/estimates-trace-fixtures-and-final-verification.md",
+        "lastCommit": "e320594ddb161d3c9b743777ab16c756694500a1"
       }
     },
     {
@@ -182,11 +184,11 @@
     }
   ],
   "lastRun": {
-    "completedAt": "2026-05-25T10:17:12Z",
-    "checkpoint": "introduce-plan-compiler:apply:synopsis-llm-validation-and-repair",
+    "completedAt": "2026-05-25T10:46:08Z",
+    "checkpoint": "introduce-plan-compiler:apply:estimates-trace-fixtures-and-final-verification",
     "result": "completed"
   },
-  "lastCompletedCheckpoint": "introduce-plan-compiler:apply:synopsis-llm-validation-and-repair",
+  "lastCompletedCheckpoint": "introduce-plan-compiler:apply:estimates-trace-fixtures-and-final-verification",
   "lastMigration": {
     "completedAt": "2026-05-25T03:56:29Z",
     "id": "require-three-product-deepen-rounds",
@@ -206,8 +208,8 @@
   },
   "lastFailure": null,
   "lastVerification": {
-    "command": "cd assistant_backend && uv run pytest tests/test_study_plan_compiler.py -k 'synopsis or thin_source or llm_contract or validation or repair or forbidden_date' && cd assistant_backend && uv run pytest tests/test_study_plan_compiler.py -k 'envelope or status or archetype or tie_breaker or depth' && openspec validate introduce-plan-compiler --strict && openspec instructions apply --change introduce-plan-compiler --json",
-    "result": "22 synopsis/validation/repair compiler tests passed; 25 envelope/archetype/depth regression tests passed; OpenSpec valid; apply progress 23/31 complete"
+    "command": "cd assistant_backend && uv run pytest tests/test_study_plan_compiler.py -k 'fixture or scheduled_dates' && cd assistant_backend && uv run pytest tests/test_study_plan_compiler.py -k 'estimate or low_calibration or trace or redaction or fixture or scheduled_dates' && cd assistant_backend && uv run pytest tests/test_study_plan_compiler.py && openspec validate introduce-plan-compiler --strict && openspec instructions apply --change introduce-plan-compiler --json",
+    "result": "2 fixture/scheduled-date tests passed; 10 estimate/trace/redaction/fixture tests passed; 52 compiler tests passed; OpenSpec valid; apply progress 31/31 complete; state all_done"
   },
   "blockedReason": null
 }

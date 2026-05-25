@@ -5,7 +5,7 @@
 - Phase: active
 - Current change: introduce-plan-compiler
 - Current step: apply
-- Current checkpoint: introduce-plan-compiler:apply:estimates-trace-fixtures-and-final-verification
+- Current checkpoint: introduce-plan-compiler:apply:cross-change-contract-to-introduce-deadline-scheduler
 - Required product-deepen rounds before apply: 3
 - Required checkpoint after product deepening: scope_dependency_check
 - Product-deepen scope guard: every round must read adjacent changes and record scope decisions
@@ -28,6 +28,7 @@ Completed apply groups for current change `introduce-plan-compiler`:
 
 - `envelope-archetype-and-depth-core`
 - `synopsis-llm-validation-and-repair`
+- `estimates-trace-fixtures-and-final-verification`
 
 ## Run Log
 
@@ -894,3 +895,33 @@ Completed apply groups for current change `introduce-plan-compiler`:
 - Manifest:
   - Added `introduce-plan-compiler-apply-group-synopsis-llm-validation-and-repair`.
 - Next checkpoint: introduce-plan-compiler:apply:estimates-trace-fixtures-and-final-verification
+
+## Run 2026-05-25T10:46:08Z Apply Group introduce-plan-compiler estimates-trace-fixtures-and-final-verification
+
+- Automation: add-initiate-changes
+- Checkpoint: introduce-plan-compiler:apply:estimates-trace-fixtures-and-final-verification
+- Result: completed
+- Actions:
+  - Acquired `run.lock`.
+  - Read `state.json`, `runbook.md`, `progress.md`, `evidence/manifest.json`, and `workspace-baseline.json`.
+  - Ran `git status --porcelain=v1` and protected unrelated dirty files.
+  - Triggered `openspec-apply-change`, `superpowers:subagent-driven-development`, and `superpowers:test-driven-development`.
+  - Implemented estimate normalization, estimate confidence, outlier replacement, oversized split validation, low-calibration thresholds, compiler trace facts, sensitive trace redaction, and real-context unscheduled fixtures.
+  - Tightened real-context phase shapes for AgentGuide, easyagent, LeetCode / 灵茶山, interview prep, and resume/project packaging.
+  - Updated `openspec/changes/introduce-plan-compiler/tasks.md` for tasks 3.4-3.7 and 4.10-4.13.
+  - Wrote evidence at `openspec/add-initiate-implementation-control/evidence/introduce-plan-compiler/apply-groups/estimates-trace-fixtures-and-final-verification.md`.
+- Reviews:
+  - Spec compliance required fixes around low-end LLM outliers, fixture phase shapes, goal-summary redaction, and design-minimum phase decomposition; final re-review passed.
+  - Code quality required fixes around needs_input trace redaction, boolean estimate coercion, source duration facts, conflict-assumption false positives, and depth-obligation coverage; final re-review passed.
+- Verification:
+  - `cd assistant_backend && uv run pytest tests/test_study_plan_compiler.py -k 'fixture or scheduled_dates'`: 2 passed, 50 deselected.
+  - `cd assistant_backend && uv run pytest tests/test_study_plan_compiler.py -k 'estimate or low_calibration or trace or redaction or fixture or scheduled_dates'`: 10 passed, 42 deselected.
+  - `cd assistant_backend && uv run pytest tests/test_study_plan_compiler.py`: 52 passed.
+  - `openspec validate introduce-plan-compiler --strict`: valid.
+  - `openspec instructions apply --change introduce-plan-compiler --json`: 31/31 tasks complete, state all_done.
+  - `git diff --check -- assistant_backend/src/study_plan/compiler.py assistant_backend/tests/test_study_plan_compiler.py openspec/changes/introduce-plan-compiler/tasks.md`: no whitespace errors.
+- Commit:
+  - Implementation commit: `e320594ddb161d3c9b743777ab16c756694500a1`.
+- Manifest:
+  - Added `introduce-plan-compiler-apply-group-estimates-trace-fixtures-and-final-verification`.
+- Next checkpoint: introduce-plan-compiler:apply:cross-change-contract-to-introduce-deadline-scheduler

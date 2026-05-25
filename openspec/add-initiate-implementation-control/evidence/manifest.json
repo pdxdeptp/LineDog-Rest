@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-05-25T10:17:12Z",
+  "updatedAt": "2026-05-25T10:46:08Z",
   "entries": [
     {
       "id": "introduce-study-intake-router-product-deepen-round-1",
@@ -1682,6 +1682,83 @@
         }
       ],
       "nextCheckpoint": "introduce-plan-compiler:apply:estimates-trace-fixtures-and-final-verification"
+    },
+    {
+      "id": "introduce-plan-compiler-apply-group-estimates-trace-fixtures-and-final-verification",
+      "timestamp": "2026-05-25T10:46:08Z",
+      "kind": "apply_group",
+      "changeId": "introduce-plan-compiler",
+      "checkpoint": "introduce-plan-compiler:apply:estimates-trace-fixtures-and-final-verification",
+      "groupId": "estimates-trace-fixtures-and-final-verification",
+      "result": "completed",
+      "commit": "e320594ddb161d3c9b743777ab16c756694500a1",
+      "commands": [
+        {
+          "command": "cd assistant_backend && uv run pytest tests/test_study_plan_compiler.py -k 'fixture or scheduled_dates'",
+          "exitCode": 0,
+          "summary": "2 passed, 50 deselected"
+        },
+        {
+          "command": "cd assistant_backend && uv run pytest tests/test_study_plan_compiler.py -k 'estimate or low_calibration or trace or redaction or fixture or scheduled_dates'",
+          "exitCode": 0,
+          "summary": "10 passed, 42 deselected"
+        },
+        {
+          "command": "cd assistant_backend && uv run pytest tests/test_study_plan_compiler.py",
+          "exitCode": 0,
+          "summary": "52 passed"
+        },
+        {
+          "command": "openspec validate introduce-plan-compiler --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        },
+        {
+          "command": "openspec instructions apply --change introduce-plan-compiler --json",
+          "exitCode": 0,
+          "summary": "31/31 tasks complete; state all_done"
+        },
+        {
+          "command": "git diff --check -- assistant_backend/src/study_plan/compiler.py assistant_backend/tests/test_study_plan_compiler.py openspec/changes/introduce-plan-compiler/tasks.md",
+          "exitCode": 0,
+          "summary": "no whitespace errors"
+        }
+      ],
+      "reviews": [
+        {
+          "type": "spec_compliance",
+          "result": "changes_required_then_fixed",
+          "summary": "Fixed low-end LLM outlier replacement, real-context fixture phase shapes, goal-summary redaction, and design-minimum phase decomposition; final re-review passed."
+        },
+        {
+          "type": "code_quality",
+          "result": "changes_required_then_fixed",
+          "summary": "Fixed needs_input trace redaction, boolean estimate coercion, plain source duration facts, conflict-assumption false positives, and depth-obligation test coverage; final re-review passed."
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/add-initiate-implementation-control/evidence/introduce-plan-compiler/apply-groups/estimates-trace-fixtures-and-final-verification.md",
+          "sha256": "9d1ad757ddfbf245a5d9f70ce339d8150df162d56ae98aa9840457ca60f3da9a",
+          "description": "Apply group evidence, TDD record, review iterations, verification, and next checkpoint."
+        },
+        {
+          "path": "assistant_backend/src/study_plan/compiler.py",
+          "sha256": "d58648af813f8bb39fe2fea3ab31780ecf46ad341c4860a0ed4fd627d2a860f1",
+          "description": "Plan compiler estimate normalization, calibration, trace/redaction, and real-context fixture phase/task shapes."
+        },
+        {
+          "path": "assistant_backend/tests/test_study_plan_compiler.py",
+          "sha256": "f69e2fb09a29d8f9f2661776aaf880b5dad5f96a165cbf2606e8ab3a145d19c8",
+          "description": "TDD coverage for estimates, low calibration, trace redaction, real-context fixtures, and unscheduled output boundaries."
+        },
+        {
+          "path": "openspec/changes/introduce-plan-compiler/tasks.md",
+          "sha256": "53d9573283c5678655ee8f64437dc1d6044226936f7ccf9291b6ddd6e736e830",
+          "description": "OpenSpec tasks updated for completed estimate/trace/fixture final group."
+        }
+      ],
+      "nextCheckpoint": "introduce-plan-compiler:apply:cross-change-contract-to-introduce-deadline-scheduler"
     }
   ]
 }
