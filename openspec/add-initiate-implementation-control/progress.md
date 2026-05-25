@@ -3,9 +3,9 @@
 ## Current Status
 
 - Phase: active
-- Current change: introduce-study-intake-router
-- Current step: apply
-- Current checkpoint: introduce-study-intake-router:apply:cross-change-contract-to-persist-intake-plan-drafts
+- Current change: persist-intake-plan-drafts
+- Current step: product_deepen_round_1
+- Current checkpoint: persist-intake-plan-drafts:product_deepen_round_1
 - Required product-deepen rounds before apply: 3
 - Required checkpoint after product deepening: scope_dependency_check
 - Product-deepen scope guard: every round must read adjacent changes and record scope decisions
@@ -317,3 +317,39 @@
   - `openspec/changes/redesign-study-intake-planning/split-decision.md`
   - `openspec/changes/redesign-study-intake-planning/tasks.md`
 - Next checkpoint: introduce-study-intake-router:apply:cross-change-contract-to-persist-intake-plan-drafts
+
+## Run 2026-05-25T06:00:40Z
+
+- Automation: add-initiate-changes
+- Checkpoint: introduce-study-intake-router:apply:cross-change-contract-to-persist-intake-plan-drafts
+- Result: completed
+- Actions:
+  - Acquired `run.lock`.
+  - Read `state.json`, `runbook.md`, `progress.md`, `evidence/manifest.json`, and `workspace-baseline.json`.
+  - Ran `git status --porcelain=v1`.
+  - Protected unrelated dirty files without editing or staging them.
+  - Read completed `introduce-study-intake-router` proposal, design, specs, tasks, and apply evidence.
+  - Read downstream `persist-intake-plan-drafts` proposal, design, specs, and tasks.
+  - Checked handoff payloads, persisted entities, enum/state contracts, active-task boundaries, and downstream responsibility boundaries.
+  - Wrote cross-change contract evidence at `openspec/add-initiate-implementation-control/evidence/cross-change-contracts/introduce-study-intake-router-to-persist-intake-plan-drafts.md`.
+  - Marked `introduce-study-intake-router` completed and advanced to `persist-intake-plan-drafts`.
+- Verification:
+  - `openspec validate introduce-study-intake-router --strict`: valid.
+  - `openspec validate persist-intake-plan-drafts --strict`: valid.
+  - `openspec instructions apply --change introduce-study-intake-router --json`: 21/21 tasks complete.
+  - `openspec status --change persist-intake-plan-drafts --json`: artifacts present.
+- Contract result:
+  - Passed. Router provides durable intake anchors, `awaiting_anchor_review` handoff, active-task exclusion, role/attachment enums, and non-plan storage.
+  - Draft persistence remains responsible for draft versions, assumptions, stale activation guards, activation events, fallback completion, and capacity-default regression.
+- Protected unrelated dirty paths:
+  - `docs/agent-workflow.md`
+  - `openspec/changes/harden-add-initiate-automation-control/design.md`
+  - `openspec/changes/harden-add-initiate-automation-control/proposal.md`
+  - `openspec/changes/harden-add-initiate-automation-control/tasks.md`
+  - `openspec/changes/redesign-study-intake-planning/iteration-records/round-16-split-readiness-review.md`
+  - `openspec/changes/redesign-study-intake-planning/pre-split-readiness-audit.md`
+  - `openspec/changes/redesign-study-intake-planning/split-decision.md`
+  - `openspec/changes/redesign-study-intake-planning/tasks.md`
+- Manifest:
+  - Added `introduce-study-intake-router-to-persist-intake-plan-drafts-cross-change-contract`.
+- Next checkpoint: persist-intake-plan-drafts:product_deepen_round_1

@@ -2,12 +2,12 @@
   "schemaVersion": 1,
   "automationId": "add-initiate-changes",
   "phase": "active",
-  "currentChangeIndex": 0,
-  "currentChange": "introduce-study-intake-router",
-  "currentStep": "apply",
-  "currentCheckpoint": "introduce-study-intake-router:apply:cross-change-contract-to-persist-intake-plan-drafts",
+  "currentChangeIndex": 1,
+  "currentChange": "persist-intake-plan-drafts",
+  "currentStep": "product_deepen_round_1",
+  "currentCheckpoint": "persist-intake-plan-drafts:product_deepen_round_1",
   "currentAttempt": 0,
-  "runCounter": 9,
+  "runCounter": 10,
   "maxRetriesPerCheckpoint": 2,
   "requiredProductDeepenRounds": 3,
   "requiresScopeDependencyCheck": true,
@@ -39,7 +39,14 @@
   "crossChangeContracts": {
     "schemaVersion": 1,
     "evidenceRoot": "openspec/add-initiate-implementation-control/evidence/cross-change-contracts",
-    "lastCheck": null,
+    "lastCheck": {
+      "completedAt": "2026-05-25T06:00:40Z",
+      "fromChange": "introduce-study-intake-router",
+      "toChange": "persist-intake-plan-drafts",
+      "checkpoint": "introduce-study-intake-router:apply:cross-change-contract-to-persist-intake-plan-drafts",
+      "result": "passed",
+      "evidenceFile": "openspec/add-initiate-implementation-control/evidence/cross-change-contracts/introduce-study-intake-router-to-persist-intake-plan-drafts.md"
+    },
     "requiredBeforeAdvancingChange": true,
     "changeOrder": [
       "introduce-study-intake-router",
@@ -64,16 +71,12 @@
   },
   "applyCursor": {
     "schemaVersion": 1,
-    "activeChange": "introduce-study-intake-router",
+    "activeChange": null,
     "currentGroupId": null,
     "currentGroupStartedAt": null,
-    "completedGroupIds": [
-      "intake-data-and-idempotency",
-      "source-preview-and-github-roles",
-      "routing-contracts-and-confirmation"
-    ],
+    "completedGroupIds": [],
     "blockedGroupId": null,
-    "taskGroupsFile": "openspec/add-initiate-implementation-control/evidence/introduce-study-intake-router/apply-task-groups.json",
+    "taskGroupsFile": null,
     "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/introduce-study-intake-router/apply-groups/routing-contracts-and-confirmation.md",
     "lastCommit": "5955c594c1da37fc090d185d0f5e20771b2af429"
   },
@@ -89,12 +92,12 @@
   "changes": [
     {
       "id": "introduce-study-intake-router",
-      "status": "in_progress",
+      "status": "completed",
       "productDeepenRoundsCompleted": 3,
       "scopeDependencyCheckCompleted": true,
-      "applyCompleted": false,
+      "applyCompleted": true,
       "applyTaskGroups": {
-        "status": "groups_completed_pending_cross_change_contract",
+        "status": "completed",
         "taskGroupsFile": "openspec/add-initiate-implementation-control/evidence/introduce-study-intake-router/apply-task-groups.json",
         "completedGroupIds": [
           "intake-data-and-idempotency",
@@ -108,7 +111,7 @@
     },
     {
       "id": "persist-intake-plan-drafts",
-      "status": "pending",
+      "status": "in_progress",
       "productDeepenRoundsCompleted": 0,
       "scopeDependencyCheckCompleted": false,
       "applyCompleted": false,
@@ -168,11 +171,11 @@
     }
   ],
   "lastRun": {
-    "completedAt": "2026-05-25T05:56:51Z",
-    "checkpoint": "introduce-study-intake-router:apply:routing-contracts-and-confirmation",
+    "completedAt": "2026-05-25T06:00:40Z",
+    "checkpoint": "introduce-study-intake-router:apply:cross-change-contract-to-persist-intake-plan-drafts",
     "result": "completed"
   },
-  "lastCompletedCheckpoint": "introduce-study-intake-router:apply:routing-contracts-and-confirmation",
+  "lastCompletedCheckpoint": "introduce-study-intake-router:apply:cross-change-contract-to-persist-intake-plan-drafts",
   "lastMigration": {
     "completedAt": "2026-05-25T03:56:29Z",
     "id": "require-three-product-deepen-rounds",
@@ -192,8 +195,8 @@
   },
   "lastFailure": null,
   "lastVerification": {
-    "command": "cd assistant_backend && uv run pytest tests/test_study_intake_router.py && cd assistant_backend && uv run pytest tests/test_study_plan_router.py tests/test_study_views_today.py && cd assistant_backend && uv run pytest tests/test_integration.py -q && openspec validate introduce-study-intake-router --strict && openspec instructions apply --change introduce-study-intake-router --json",
-    "result": "intake router tests passed 51/51 with 2 warnings; study plan/today regression passed 12/12 with 2 warnings; integration passed 16/16 with 2 warnings; OpenSpec valid; apply instructions show 21/21 tasks complete; final review APPROVED"
+    "command": "openspec validate introduce-study-intake-router --strict && openspec validate persist-intake-plan-drafts --strict && openspec instructions apply --change introduce-study-intake-router --json && openspec status --change persist-intake-plan-drafts --json",
+    "result": "current and next changes valid; introduce-study-intake-router apply instructions show 21/21 tasks complete; persist-intake-plan-drafts artifacts are present; cross-change contract passed"
   },
   "blockedReason": null
 }

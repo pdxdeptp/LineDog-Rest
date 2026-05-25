@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-05-25T05:56:51Z",
+  "updatedAt": "2026-05-25T06:00:40Z",
   "entries": [
     {
       "id": "introduce-study-intake-router-product-deepen-round-1",
@@ -580,6 +580,46 @@
         }
       ],
       "nextCheckpoint": "introduce-study-intake-router:apply:cross-change-contract-to-persist-intake-plan-drafts"
+    },
+    {
+      "id": "introduce-study-intake-router-to-persist-intake-plan-drafts-cross-change-contract",
+      "timestamp": "2026-05-25T06:00:40Z",
+      "kind": "cross_change_contract",
+      "changeId": "introduce-study-intake-router",
+      "checkpoint": "introduce-study-intake-router:apply:cross-change-contract-to-persist-intake-plan-drafts",
+      "fromChange": "introduce-study-intake-router",
+      "toChange": "persist-intake-plan-drafts",
+      "result": "completed",
+      "commands": [
+        {
+          "command": "openspec validate introduce-study-intake-router --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        },
+        {
+          "command": "openspec validate persist-intake-plan-drafts --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        },
+        {
+          "command": "openspec instructions apply --change introduce-study-intake-router --json",
+          "exitCode": 0,
+          "summary": "21/21 tasks complete"
+        },
+        {
+          "command": "openspec status --change persist-intake-plan-drafts --json",
+          "exitCode": 0,
+          "summary": "proposal/design/specs/tasks artifacts present"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/add-initiate-implementation-control/evidence/cross-change-contracts/introduce-study-intake-router-to-persist-intake-plan-drafts.md",
+          "sha256": "6dc152e978a97c5ec8cca1f5e3d7eae57f8f538bca27422ab762ede63d7cb92f",
+          "description": "Cross-change contract evidence for router-to-draft-persistence handoff."
+        }
+      ],
+      "nextCheckpoint": "persist-intake-plan-drafts:product_deepen_round_1"
     }
   ]
 }
