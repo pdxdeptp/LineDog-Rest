@@ -1032,6 +1032,275 @@ def test_scheduler_capacity_gap_excludes_unaccepted_reserved_buffer():
     assert review["risk_report"]["buffer_erosion"] is True
 
 
+def test_scheduler_option_mapping_includes_canonical_choices_and_hard_deadline_guard():
+    scheduling = _scheduling_module()
+
+    review = scheduling.schedule_draft_review(
+        _compiler_package(
+            deadline_type="hard",
+            tasks=[
+                {
+                    "id": "fit",
+                    "phase_id": "phase-1",
+                    "title": "Fits with conflict",
+                    "estimated_minutes": 60,
+                    "classification": "essential",
+                    "estimate_confidence": "low",
+                },
+                {
+                    "id": "oversized",
+                    "phase_id": "phase-1",
+                    "title": "Too large",
+                    "estimated_minutes": 120,
+                    "classification": "essential",
+                    "estimate_confidence": "rough",
+                },
+                {
+                    "id": "stretch",
+                    "phase_id": "phase-1",
+                    "title": "Stretch",
+                    "estimated_minutes": 60,
+                    "classification": "stretch",
+                    "estimate_confidence": "high",
+                },
+            ],
+        ),
+        start_date="2026-06-01",
+        deadline="2026-06-01",
+        daily_capacity_min=100,
+        existing_active_load={"2026-06-01": 20},
+        rest_weekdays=[],
+    )
+
+    option_ids = review["risk_report"]["canonical_infeasibility_option_ids"]
+    assert option_ids == [
+        "reduce_scope",
+        "lower_depth",
+        "extend_deadline",
+        "increase_capacity",
+        "accept_crunch",
+        "answer_one_question",
+        "edit_estimates",
+        "accept_rough_draft",
+        "store_for_later",
+    ]
+    assert "accept_late_finish" not in option_ids
+    assert [option["id"] for option in review["infeasibility_options"]] == option_ids
+    option_facts = {
+        fact
+        for option in review["infeasibility_options"]
+        for fact in option["facts"]
+    }
+    assert option_facts >= {
+        "capacity_gap",
+        "expected_late",
+        "low_calibration",
+    }
+
+
+def test_scheduler_late_finish_option_is_only_available_for_soft_deadline():
+    scheduling = _scheduling_module()
+    package = _compiler_package(
+        tasks=[
+            {
+                "id": "oversized",
+                "phase_id": "phase-1",
+                "title": "Too large",
+                "estimated_minutes": 120,
+                "classification": "essential",
+            }
+        ]
+    )
+
+    hard = scheduling.schedule_draft_review(
+        _compiler_package(**package, deadline_type="hard"),
+        start_date="2026-06-01",
+        deadline="2026-06-01",
+        daily_capacity_min=100,
+        rest_weekdays=[],
+    )
+    soft = scheduling.schedule_draft_review(
+        _compiler_package(**package, deadline_type="soft"),
+        start_date="2026-06-01",
+        deadline="2026-06-01",
+        daily_capacity_min=100,
+        rest_weekdays=[],
+    )
+
+    assert "accept_late_finish" not in hard["risk_report"]["canonical_infeasibility_option_ids"]
+    assert "accept_late_finish" in soft["risk_report"]["canonical_infeasibility_option_ids"]
+
+
+def test_scheduler_option_effects_return_review_or_storage_not_activation():
+    scheduling = _scheduling_module()
+    package = _compiler_package(
+        start_date="2026-06-01",
+        deadline="2026-06-01",
+        daily_capacity_min=100,
+        rest_weekdays=[],
+        tasks=[
+            {
+                "id": "heavy",
+                "phase_id": "phase-1",
+                "title": "Heavy essential",
+                "estimated_minutes": 90,
+                "classification": "essential",
+            }
+        ],
+    )
+
+    increased = scheduling.apply_schedule_option(
+        package,
+        "increase_capacity",
+        new_daily_capacity_min=120,
+    )
+    stored = scheduling.apply_schedule_option(package, "store_for_later")
+
+    assert increased["status"] == "draft_review"
+    assert increased["option_effect"]["id"] == "increase_capacity"
+    assert increased["option_effect"]["effect_type"] == "review_recompute"
+    assert "active_tasks" not in increased
+    assert "today_actions" not in increased
+    assert stored == {
+        "schema_version": 1,
+        "draft_id": 42,
+        "status": "stored_for_later",
+        "active_tasks": [],
+        "today_actions": [],
+        "option_effect": {
+            "id": "store_for_later",
+            "effect_type": "storage_state",
+        },
+    }
+
+
+def test_scheduler_reduce_scope_option_reruns_without_optional_or_stretch_work():
+    scheduling = _scheduling_module()
+    package = _compiler_package(
+        start_date="2026-06-01",
+        deadline="2026-06-01",
+        daily_capacity_min=100,
+        rest_weekdays=[],
+        tasks=[
+            {
+                "id": "essential",
+                "phase_id": "phase-1",
+                "title": "Essential",
+                "estimated_minutes": 70,
+                "classification": "essential",
+                "depth_evidence": {"target_depth": "project"},
+            },
+            {
+                "id": "optional",
+                "phase_id": "phase-1",
+                "title": "Optional",
+                "estimated_minutes": 70,
+                "classification": "optional",
+            },
+            {
+                "id": "stretch",
+                "phase_id": "phase-1",
+                "title": "Stretch",
+                "estimated_minutes": 30,
+                "classification": "stretch",
+            },
+        ],
+    )
+
+    reduced = scheduling.apply_schedule_option(package, "reduce_scope")
+
+    assert [item["task_id"] for day in reduced["scheduled_days"] for item in day["items"]] == [
+        "essential"
+    ]
+    assert reduced["unscheduled_tasks"] == []
+    assert reduced["option_effect"]["removed_task_ids"] == ["optional", "stretch"]
+    assert reduced["option_effect"]["preserved_essential_task_ids"] == ["essential"]
+    assert reduced["option_effect"]["before"]["optional_unscheduled_minutes"] == 100
+    assert reduced["option_effect"]["after"]["optional_unscheduled_minutes"] == 0
+
+
+def test_scheduler_lower_depth_and_answer_one_question_options_return_compiler_handoffs():
+    scheduling = _scheduling_module()
+    package = _compiler_package(
+        start_date="2026-06-01",
+        deadline="2026-06-01",
+        daily_capacity_min=100,
+        rest_weekdays=[],
+        tasks=[
+            {
+                "id": "rough",
+                "phase_id": "phase-1",
+                "title": "Rough work",
+                "estimated_minutes": 120,
+                "classification": "essential",
+                "estimate_confidence": "rough",
+            }
+        ],
+    )
+
+    lower_depth = scheduling.apply_schedule_option(
+        package,
+        "lower_depth",
+        requested_depth="can_use",
+    )
+    answer_question = scheduling.apply_schedule_option(
+        package,
+        "answer_one_question",
+        question_id="estimate_confidence",
+    )
+
+    assert lower_depth["status"] == "compiler_recompute_required"
+    assert lower_depth["compiler_recompute_required"]["reason"] == "lower_depth"
+    assert lower_depth["compiler_recompute_required"]["requested_target_depth"] == "can_use"
+    assert lower_depth["compiler_recompute_required"]["current_fit_facts"]["capacity_gap_minutes"] == 40
+    assert lower_depth["compiler_recompute_required"]["removed_evidence_preview"] == []
+    assert answer_question["status"] == "compiler_recompute_required"
+    assert answer_question["compiler_recompute_required"]["reason"] == "answer_one_question"
+    assert answer_question["compiler_recompute_required"]["question_id"] == "estimate_confidence"
+
+
+def test_scheduler_crunch_versus_overload_option_recompute_semantics():
+    scheduling = _scheduling_module()
+    package = _compiler_package(
+        start_date="2026-06-01",
+        deadline="2026-06-01",
+        daily_capacity_min=100,
+        rest_weekdays=[],
+        tasks=[
+            {
+                "id": "heavy",
+                "phase_id": "phase-1",
+                "title": "Heavy essential",
+                "estimated_minutes": 90,
+                "classification": "essential",
+            }
+        ],
+    )
+
+    crunch = scheduling.apply_schedule_option(
+        package,
+        "accept_crunch",
+        selected_dates=["2026-06-01"],
+    )
+    overload = scheduling.apply_schedule_option(
+        {
+            **package,
+            "existing_active_load": {"2026-06-01": 20},
+        },
+        "accept_overload",
+        selected_dates=["2026-06-01"],
+    )
+
+    assert crunch["status"] == "draft_review"
+    assert crunch["scheduled_days"][0]["planned_minutes"] == 90
+    assert crunch["scheduled_days"][0]["load_state"] == "over_budget"
+    assert crunch["risk_report"]["overloaded_dates"] == []
+    assert overload["status"] == "draft_review"
+    assert overload["scheduled_days"][0]["planned_minutes"] == 90
+    assert overload["scheduled_days"][0]["load_state"] == "over_capacity"
+    assert overload["risk_report"]["overloaded_dates"] == ["2026-06-01"]
+
+
 def test_initial_schedule_is_deterministic_and_skips_default_saturday_rest_day():
     scheduling = _scheduling_module()
     tasks = [

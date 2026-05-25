@@ -14,6 +14,7 @@ DEFAULT_BUFFER_POLICY = "standard_reservation"
 DEFAULT_LOAD_SHAPE = "balanced"
 ACCEPT_BUFFER_RISK = "accept_buffer_risk"
 ACCEPT_OVERLOAD = "accept_overload"
+ACCEPT_CRUNCH = "accept_crunch"
 
 
 def _coerce_date(value: date | str) -> date:
@@ -233,6 +234,287 @@ def _estimate_confidence_summary(tasks: list[Mapping[str, Any]]) -> dict[str, in
     return summary
 
 
+def _has_optional_or_stretch(tasks: list[Mapping[str, Any]]) -> bool:
+    return any(_task_classification(task) in {"optional", "stretch"} for task in tasks)
+
+
+def _essential_task_ids(tasks: list[Mapping[str, Any]]) -> list[str]:
+    return [
+        _task_id(task, index)
+        for index, task in enumerate(tasks)
+        if _is_essential(task)
+    ]
+
+
+def _option(
+    option_id: str,
+    *,
+    fact: str,
+    effect_type: str,
+    unavailable_reason: str | None = None,
+) -> dict[str, Any]:
+    option = {
+        "id": option_id,
+        "fact": fact,
+        "facts": [fact],
+        "effect_type": effect_type,
+    }
+    if unavailable_reason:
+        option["unavailable_reason"] = unavailable_reason
+    return option
+
+
+def _append_option(
+    options: list[dict[str, Any]],
+    option_ids: set[str],
+    option_id: str,
+    *,
+    fact: str,
+    effect_type: str,
+    unavailable_reason: str | None = None,
+) -> None:
+    if option_id in option_ids:
+        existing = next(option for option in options if option["id"] == option_id)
+        if fact not in existing["facts"]:
+            existing["facts"].append(fact)
+        return
+    option_ids.add(option_id)
+    options.append(
+        _option(
+            option_id,
+            fact=fact,
+            effect_type=effect_type,
+            unavailable_reason=unavailable_reason,
+        )
+    )
+
+
+def _build_infeasibility_options(
+    risk_report: Mapping[str, Any],
+    *,
+    tasks: list[Mapping[str, Any]],
+    deadline_type: str,
+) -> list[dict[str, Any]]:
+    options: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    can_reduce_scope = _has_optional_or_stretch(tasks)
+    normalized_deadline_type = deadline_type.lower()
+
+    if risk_report.get("capacity_gap_minutes", 0) > 0:
+        if can_reduce_scope:
+            _append_option(
+                options,
+                seen,
+                "reduce_scope",
+                fact="capacity_gap",
+                effect_type="review_recompute",
+            )
+        _append_option(
+            options,
+            seen,
+            "lower_depth",
+            fact="capacity_gap",
+            effect_type="compiler_recompute_required",
+        )
+        _append_option(
+            options,
+            seen,
+            "extend_deadline",
+            fact="capacity_gap",
+            effect_type="review_recompute",
+        )
+        _append_option(
+            options,
+            seen,
+            "increase_capacity",
+            fact="capacity_gap",
+            effect_type="review_recompute",
+        )
+        _append_option(
+            options,
+            seen,
+            "accept_crunch",
+            fact="capacity_gap",
+            effect_type="review_recompute",
+        )
+
+    if risk_report.get("buffer_erosion"):
+        _append_option(
+            options,
+            seen,
+            "accept_buffer_risk",
+            fact="buffer_erosion",
+            effect_type="review_recompute",
+        )
+        if can_reduce_scope:
+            _append_option(
+                options,
+                seen,
+                "reduce_scope",
+                fact="buffer_erosion",
+                effect_type="review_recompute",
+            )
+        _append_option(
+            options,
+            seen,
+            "extend_deadline",
+            fact="buffer_erosion",
+            effect_type="review_recompute",
+        )
+        _append_option(
+            options,
+            seen,
+            "increase_capacity",
+            fact="buffer_erosion",
+            effect_type="review_recompute",
+        )
+
+    if risk_report.get("overloaded_dates"):
+        _append_option(
+            options,
+            seen,
+            "rebalance",
+            fact="overloaded_dates",
+            effect_type="review_recompute",
+        )
+        _append_option(
+            options,
+            seen,
+            "increase_capacity",
+            fact="overloaded_dates",
+            effect_type="review_recompute",
+        )
+        if can_reduce_scope:
+            _append_option(
+                options,
+                seen,
+                "reduce_scope",
+                fact="overloaded_dates",
+                effect_type="review_recompute",
+            )
+        _append_option(
+            options,
+            seen,
+            "accept_overload",
+            fact="overloaded_dates",
+            effect_type="review_recompute",
+        )
+
+    if risk_report.get("expected_late_tasks"):
+        _append_option(
+            options,
+            seen,
+            "extend_deadline",
+            fact="expected_late",
+            effect_type="review_recompute",
+        )
+        if can_reduce_scope:
+            _append_option(
+                options,
+                seen,
+                "reduce_scope",
+                fact="expected_late",
+                effect_type="review_recompute",
+            )
+        _append_option(
+            options,
+            seen,
+            "lower_depth",
+            fact="expected_late",
+            effect_type="compiler_recompute_required",
+        )
+        if normalized_deadline_type != "hard":
+            _append_option(
+                options,
+                seen,
+                "accept_late_finish",
+                fact="expected_late",
+                effect_type="review_recompute",
+            )
+
+    confidence = risk_report.get("estimate_confidence_summary") or {}
+    if confidence.get("low", 0) > 0 or confidence.get("rough", 0) > 0:
+        _append_option(
+            options,
+            seen,
+            "answer_one_question",
+            fact="low_calibration",
+            effect_type="compiler_recompute_required",
+        )
+        _append_option(
+            options,
+            seen,
+            "edit_estimates",
+            fact="low_calibration",
+            effect_type="review_recompute",
+        )
+        _append_option(
+            options,
+            seen,
+            "accept_rough_draft",
+            fact="low_calibration",
+            effect_type="review_recompute",
+        )
+        _append_option(
+            options,
+            seen,
+            "store_for_later",
+            fact="low_calibration",
+            effect_type="storage_state",
+        )
+
+    return options
+
+
+def _with_option_effect(
+    review: dict[str, Any],
+    option_id: str,
+    *,
+    effect_type: str = "review_recompute",
+    extra: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    review["option_effect"] = {
+        "id": option_id,
+        "effect_type": effect_type,
+        **dict(extra or {}),
+    }
+    return review
+
+
+def _package_with(
+    compiler_package: Mapping[str, Any],
+    **updates: Any,
+) -> dict[str, Any]:
+    package = deepcopy(dict(compiler_package))
+    for key, value in updates.items():
+        if value is not None:
+            package[key] = value
+    return package
+
+
+def _selected_date_strings(values: list[date | str] | set[date | str] | None) -> list[str]:
+    dates = []
+    for value in values or []:
+        parsed = _try_coerce_date(value)
+        if parsed is not None:
+            dates.append(parsed.isoformat())
+    return dates
+
+
+def _review_fit_facts(review: Mapping[str, Any]) -> dict[str, Any]:
+    risk_report = review.get("risk_report") or {}
+    return {
+        "fits_as_written": risk_report.get("fits_as_written", False),
+        "capacity_gap_minutes": risk_report.get("capacity_gap_minutes", 0),
+        "optional_unscheduled_minutes": risk_report.get(
+            "optional_unscheduled_minutes", 0
+        ),
+        "expected_late_tasks": list(risk_report.get("expected_late_tasks") or []),
+        "overloaded_dates": list(risk_report.get("overloaded_dates") or []),
+        "buffer_erosion": bool(risk_report.get("buffer_erosion", False)),
+    }
+
+
 def _normal_session(
     task: Mapping[str, Any],
     *,
@@ -353,6 +635,7 @@ def schedule_draft_review(
     load_shape: str | None = None,
     accepted_risk_ids: list[str] | set[str] | frozenset[str] | None = None,
     accepted_overload_dates: list[date | str] | set[date | str] | None = None,
+    accepted_crunch_dates: list[date | str] | set[date | str] | None = None,
 ) -> dict[str, Any]:
     """Return a pure scheduled review package for compiler-ready task candidates."""
 
@@ -403,6 +686,13 @@ def schedule_draft_review(
         if accepted_overload_dates is not None
         else compiler_package.get("accepted_overload_dates")
         or compiler_package.get("acceptedOverloadDates")
+        or []
+    )
+    raw_accepted_crunch_dates = (
+        accepted_crunch_dates
+        if accepted_crunch_dates is not None
+        else compiler_package.get("accepted_crunch_dates")
+        or compiler_package.get("acceptedCrunchDates")
         or []
     )
     raw_deadline = deadline if deadline is not None else compiler_package.get("deadline")
@@ -567,6 +857,7 @@ def schedule_draft_review(
         accepted_risks.intersection({ACCEPT_BUFFER_RISK, "buffer_erosion"})
     )
     accepted_overload = ACCEPT_OVERLOAD in accepted_risks
+    accepted_crunch = ACCEPT_CRUNCH in accepted_risks
 
     if raw_deadline is None:
         return needs_input(
@@ -589,6 +880,16 @@ def schedule_draft_review(
         overload_day = _try_coerce_date(raw_overload_day)
         if overload_day is not None:
             accepted_overload_date_set.add(overload_day)
+
+    accepted_crunch_date_set: set[date] = set()
+    try:
+        accepted_crunch_iter = iter(raw_accepted_crunch_dates)
+    except TypeError:
+        accepted_crunch_iter = iter(())
+    for raw_crunch_day in accepted_crunch_iter:
+        crunch_day = _try_coerce_date(raw_crunch_day)
+        if crunch_day is not None:
+            accepted_crunch_date_set.add(crunch_day)
 
     tasks = list(compiler_package.get("tasks") or [])
     if not tasks:
@@ -701,14 +1002,19 @@ def schedule_draft_review(
 
     ordered_task_entries = dependency_ordered_entries(task_entries)
 
+    def schedulable_budget(day_review: Mapping[str, Any]) -> int:
+        if accepted_crunch and day_review["date"] in accepted_crunch_date_set:
+            return int(day_review["usable_capacity_min"])
+        return int(day_review["planning_budget_min"])
+
     max_planning_budget = max(
-        [day["planning_budget_min"] for day in scheduled_days]
+        [schedulable_budget(day) for day in scheduled_days]
         or [0]
     )
     placed_task_dates: dict[str, date] = {}
 
     def effective_budget(day_review: Mapping[str, Any]) -> int:
-        budget = int(day_review["planning_budget_min"])
+        budget = schedulable_budget(day_review)
         if (
             resolved_load_shape == "light_start"
             and day_review["date"] == next(
@@ -743,7 +1049,7 @@ def schedule_draft_review(
                 and day_review["date"] in accepted_overload_date_set
                 and day_review["raw_capacity_min"] > 0
             )
-        if day_review["planning_budget_min"] <= 0:
+        if effective_budget(day_review) <= 0:
             return False
         provisional_minutes = (trial_planned or {}).get(day_review["date"], 0)
         return (
@@ -941,7 +1247,7 @@ def schedule_draft_review(
         if _is_essential(task)
     )
     available_minutes = sum(
-        day["planning_budget_min"]
+        schedulable_budget(day)
         for day in scheduled_days
         if accepted_buffer_erosion or not day["reserved_buffer"]
     )
@@ -993,7 +1299,7 @@ def schedule_draft_review(
     )
     review["scheduled_days"] = scheduled_days
     review["unscheduled_tasks"] = unscheduled_tasks
-    review["risk_report"] = _risk_report(
+    risk_report = _risk_report(
         fits=status == "draft_review",
         capacity_gap_minutes=essential_gap,
         optional_unscheduled_minutes=optional_unscheduled_minutes,
@@ -1004,7 +1310,221 @@ def schedule_draft_review(
         estimate_confidence_summary=_estimate_confidence_summary(tasks),
         existing_load_conflicts=existing_load_conflicts,
     )
+    infeasibility_options = _build_infeasibility_options(
+        risk_report,
+        tasks=tasks,
+        deadline_type=resolved_deadline_type,
+    )
+    risk_report["canonical_infeasibility_option_ids"] = [
+        option["id"] for option in infeasibility_options
+    ]
+    review["risk_report"] = risk_report
+    review["infeasibility_options"] = infeasibility_options
     return review
+
+
+def apply_schedule_option(
+    compiler_package: Mapping[str, Any],
+    option_id: str,
+    *,
+    today: date | str | None = None,
+    new_deadline: date | str | None = None,
+    new_daily_capacity_min: int | None = None,
+    selected_dates: list[date | str] | set[date | str] | None = None,
+    requested_depth: str | None = None,
+    question_id: str | None = None,
+    estimate_edits: Mapping[str, int] | None = None,
+    load_shape: str | None = None,
+) -> dict[str, Any]:
+    """Apply a scheduler option as a deterministic review/storage/recompute result."""
+
+    package = deepcopy(dict(compiler_package))
+    selected_date_strings = _selected_date_strings(selected_dates)
+
+    def current_review() -> dict[str, Any]:
+        return schedule_draft_review(package, today=today)
+
+    def rerun(
+        *,
+        updated_package: Mapping[str, Any] | None = None,
+        effect_extra: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        rerun_package = dict(updated_package or package)
+        review = schedule_draft_review(rerun_package, today=today)
+        return _with_option_effect(review, option_id, extra=effect_extra)
+
+    if option_id == "store_for_later":
+        return {
+            "schema_version": int(package.get("schema_version") or 1),
+            "draft_id": package.get("draft_id"),
+            "status": "stored_for_later",
+            "active_tasks": [],
+            "today_actions": [],
+            "option_effect": {
+                "id": "store_for_later",
+                "effect_type": "storage_state",
+            },
+        }
+
+    if option_id == "extend_deadline":
+        return rerun(
+            updated_package=_package_with(package, deadline=new_deadline),
+            effect_extra={"new_deadline": new_deadline},
+        )
+
+    if option_id == "increase_capacity":
+        return rerun(
+            updated_package=_package_with(
+                package,
+                daily_capacity_min=new_daily_capacity_min,
+            ),
+            effect_extra={"new_daily_capacity_min": new_daily_capacity_min},
+        )
+
+    if option_id == "accept_crunch":
+        accepted_risks = {
+            str(risk_id)
+            for risk_id in package.get("accepted_risk_ids")
+            or package.get("accepted_risks")
+            or []
+        }
+        accepted_risks.add(ACCEPT_CRUNCH)
+        return rerun(
+            updated_package=_package_with(
+                package,
+                accepted_risk_ids=sorted(accepted_risks),
+                accepted_crunch_dates=selected_date_strings,
+            ),
+            effect_extra={"selected_dates": selected_date_strings},
+        )
+
+    if option_id == "accept_overload":
+        accepted_risks = {
+            str(risk_id)
+            for risk_id in package.get("accepted_risk_ids")
+            or package.get("accepted_risks")
+            or []
+        }
+        accepted_risks.add(ACCEPT_OVERLOAD)
+        return rerun(
+            updated_package=_package_with(
+                package,
+                accepted_risk_ids=sorted(accepted_risks),
+                accepted_overload_dates=selected_date_strings,
+            ),
+            effect_extra={"selected_dates": selected_date_strings},
+        )
+
+    if option_id == "accept_buffer_risk":
+        accepted_risks = {
+            str(risk_id)
+            for risk_id in package.get("accepted_risk_ids")
+            or package.get("accepted_risks")
+            or []
+        }
+        accepted_risks.add(ACCEPT_BUFFER_RISK)
+        return rerun(
+            updated_package=_package_with(
+                package,
+                accepted_risk_ids=sorted(accepted_risks),
+            )
+        )
+
+    if option_id == "rebalance":
+        return rerun(
+            updated_package=_package_with(
+                package,
+                load_shape=load_shape or "front_loaded",
+            )
+        )
+
+    if option_id == "edit_estimates":
+        edited_tasks = []
+        estimate_edits = estimate_edits or {}
+        for index, task in enumerate(package.get("tasks") or []):
+            task_copy = deepcopy(dict(task))
+            task_id = _task_id(task_copy, index)
+            if task_id in estimate_edits:
+                task_copy["estimated_minutes"] = int(estimate_edits[task_id])
+            edited_tasks.append(task_copy)
+        return rerun(updated_package=_package_with(package, tasks=edited_tasks))
+
+    if option_id == "reduce_scope":
+        before = current_review()
+        kept_tasks = []
+        removed_task_ids = []
+        for index, task in enumerate(package.get("tasks") or []):
+            task_copy = deepcopy(dict(task))
+            task_id = _task_id(task_copy, index)
+            if _task_classification(task_copy) in {"optional", "stretch"}:
+                removed_task_ids.append(task_id)
+            else:
+                kept_tasks.append(task_copy)
+        reduced_review = rerun(
+            updated_package=_package_with(package, tasks=kept_tasks),
+            effect_extra={
+                "removed_task_ids": removed_task_ids,
+                "preserved_essential_task_ids": _essential_task_ids(kept_tasks),
+                "before": _review_fit_facts(before),
+            },
+        )
+        reduced_review["option_effect"]["after"] = _review_fit_facts(reduced_review)
+        return reduced_review
+
+    if option_id in {"lower_depth", "answer_one_question"}:
+        review = current_review()
+        handoff: dict[str, Any] = {
+            "reason": option_id,
+            "current_fit_facts": _review_fit_facts(review),
+            "removed_evidence_preview": [],
+        }
+        if option_id == "lower_depth":
+            handoff["requested_target_depth"] = requested_depth
+        else:
+            handoff["question_id"] = question_id
+        return {
+            "schema_version": int(package.get("schema_version") or 1),
+            "draft_id": package.get("draft_id"),
+            "status": "compiler_recompute_required",
+            "compiler_recompute_required": handoff,
+            "option_effect": {
+                "id": option_id,
+                "effect_type": "compiler_recompute_required",
+            },
+        }
+
+    if option_id == "accept_rough_draft":
+        return rerun(effect_extra={"activation_allowed_after_confirmation": True})
+
+    if option_id == "accept_late_finish":
+        review = current_review()
+        if str(package.get("deadline_type") or "").lower() == "hard":
+            return {
+                "schema_version": int(package.get("schema_version") or 1),
+                "draft_id": package.get("draft_id"),
+                "status": "option_unavailable",
+                "option_effect": {
+                    "id": "accept_late_finish",
+                    "effect_type": "unavailable",
+                    "reason": "hard_deadline",
+                },
+            }
+        return _with_option_effect(
+            review,
+            option_id,
+            extra={"accepted_late_finish": True},
+        )
+
+    return {
+        "schema_version": int(package.get("schema_version") or 1),
+        "draft_id": package.get("draft_id"),
+        "status": "option_unavailable",
+        "option_effect": {
+            "id": option_id,
+            "effect_type": "unavailable",
+            "reason": "unknown_option",
+        },
+    }
 
 
 def _next_non_rest_day(day: date, rest_weekdays: set[int]) -> date:

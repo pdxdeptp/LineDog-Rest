@@ -23,13 +23,13 @@
 
 ## 3. Infeasibility Options
 
-- [ ] 3.1 Implement fact-to-option mapping for capacity gap, buffer erosion, overload, expected late, and low calibration.
-- [ ] 3.2 Implement deterministic option effects for deadline, capacity, crunch, buffer risk, rebalance, overload, estimate edits, rough draft, late finish, and storage as review recomputation or storage results, not activation.
-- [ ] 3.3 Implement `accept_crunch` as raising selected dates to at most 100% usable capacity and `accept_overload` as explicit over-usable-capacity placement with overloaded dates still visible.
-- [ ] 3.4 Implement reduce-scope availability, eligible optional/stretch removal, and before/after fit math while preserving essential depth evidence.
-- [ ] 3.5 Implement lower-depth recomputation handoff with requested depth, current fit facts, removed-evidence preview, and before/after fit math placeholder.
-- [ ] 3.6 Implement answer-one-question recomputation handoff for low-calibration scheduler options.
-- [ ] 3.7 Ensure hard deadlines never expose `accept_late_finish`.
+- [x] 3.1 Implement fact-to-option mapping for capacity gap, buffer erosion, overload, expected late, and low calibration.
+- [x] 3.2 Implement deterministic option effects for deadline, capacity, crunch, buffer risk, rebalance, overload, estimate edits, rough draft, late finish, and storage as review recomputation or storage results, not activation.
+- [x] 3.3 Implement `accept_crunch` as raising selected dates to at most 100% usable capacity and `accept_overload` as explicit over-usable-capacity placement with overloaded dates still visible.
+- [x] 3.4 Implement reduce-scope availability, eligible optional/stretch removal, and before/after fit math while preserving essential depth evidence.
+- [x] 3.5 Implement lower-depth recomputation handoff with requested depth, current fit facts, removed-evidence preview, and before/after fit math placeholder.
+- [x] 3.6 Implement answer-one-question recomputation handoff for low-calibration scheduler options.
+- [x] 3.7 Ensure hard deadlines never expose `accept_late_finish`.
 
 ## 4. Tests
 
@@ -41,7 +41,7 @@
 - [x] 4.6 Add continuation-session and unsplittable-task tests proving parent identity and dependency context are preserved.
 - [x] 4.7 Add fallback-mode tests proving fallback metadata does not count as normal task completion.
 - [x] 4.8 Add risk-report tests for essential capacity gap, optional unscheduled minutes, overload, expected late, buffer erosion, rough estimates, and existing-load conflicts.
-- [ ] 4.9 Add infeasibility option mapping and option-effect tests proving effects return new review/storage/recompute states rather than activation.
-- [ ] 4.10 Add crunch-versus-overload tests proving crunch stays within usable capacity and overload remains visible.
-- [ ] 4.11 Add hard-deadline tests excluding `accept_late_finish`.
+- [x] 4.9 Add infeasibility option mapping and option-effect tests proving effects return new review/storage/recompute states rather than activation.
+- [x] 4.10 Add crunch-versus-overload tests proving crunch stays within usable capacity and overload remains visible.
+- [x] 4.11 Add hard-deadline tests excluding `accept_late_finish`.
 - [ ] 4.12 Add end-to-end dry-run tests for feasible resume packaging and infeasible easyagent rebuild.
