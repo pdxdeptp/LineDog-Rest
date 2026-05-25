@@ -5,9 +5,9 @@
   "currentChangeIndex": 4,
   "currentChange": "redesign-add-initiate-ui",
   "currentStep": "apply",
-  "currentCheckpoint": "redesign-add-initiate-ui:apply:noise-boundaries-and-active-refresh",
+  "currentCheckpoint": "redesign-add-initiate-ui:apply:real-context-qa-and-final-verification",
   "currentAttempt": 0,
-  "runCounter": 40,
+  "runCounter": 41,
   "maxRetriesPerCheckpoint": 2,
   "requiredProductDeepenRounds": 3,
   "requiresScopeDependencyCheck": true,
@@ -78,12 +78,13 @@
       "session-adapter-and-api-contract",
       "entry-role-and-attachment-review",
       "anchor-state-machine-and-recovery",
-      "draft-review-options-and-activation"
+      "draft-review-options-and-activation",
+      "noise-boundaries-and-active-refresh"
     ],
     "blockedGroupId": null,
     "taskGroupsFile": "openspec/add-initiate-implementation-control/evidence/redesign-add-initiate-ui/apply-task-groups.json",
-    "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/redesign-add-initiate-ui/apply-groups/draft-review-options-and-activation.md",
-    "lastCommit": "cd16e13a2370376815c1aa680e65f546e324047e"
+    "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/redesign-add-initiate-ui/apply-groups/noise-boundaries-and-active-refresh.md",
+    "lastCommit": "e566fd4dc5c6b79ccbff9995e40047364e61b4e7"
   },
   "lock": {
     "path": "openspec/add-initiate-implementation-control/run.lock",
@@ -186,20 +187,21 @@
           "session-adapter-and-api-contract",
           "entry-role-and-attachment-review",
           "anchor-state-machine-and-recovery",
-          "draft-review-options-and-activation"
+          "draft-review-options-and-activation",
+          "noise-boundaries-and-active-refresh"
         ],
-        "currentGroupId": "noise-boundaries-and-active-refresh",
-        "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/redesign-add-initiate-ui/apply-groups/draft-review-options-and-activation.md",
-        "lastCommit": "cd16e13a2370376815c1aa680e65f546e324047e"
+        "currentGroupId": "real-context-qa-and-final-verification",
+        "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/redesign-add-initiate-ui/apply-groups/noise-boundaries-and-active-refresh.md",
+        "lastCommit": "e566fd4dc5c6b79ccbff9995e40047364e61b4e7"
       }
     }
   ],
   "lastRun": {
-    "completedAt": "2026-05-25T16:35:21Z",
-    "checkpoint": "redesign-add-initiate-ui:apply:draft-review-options-and-activation",
+    "completedAt": "2026-05-25T17:13:27Z",
+    "checkpoint": "redesign-add-initiate-ui:apply:noise-boundaries-and-active-refresh",
     "result": "completed"
   },
-  "lastCompletedCheckpoint": "redesign-add-initiate-ui:apply:draft-review-options-and-activation",
+  "lastCompletedCheckpoint": "redesign-add-initiate-ui:apply:noise-boundaries-and-active-refresh",
   "lastMigration": {
     "completedAt": "2026-05-25T03:56:29Z",
     "id": "require-three-product-deepen-rounds",
@@ -219,8 +221,8 @@
   },
   "lastFailure": null,
   "lastVerification": {
-    "command": "xcodebuild test -project MalDaze.xcodeproj -scheme MalDaze -parallel-testing-enabled NO -only-testing:MalDazeTests/LearningAssistantViewModelTests -only-testing:MalDazeTests/LearningAssistantUISourceTests -quiet; openspec validate redesign-add-initiate-ui --strict; git diff --check -- MalDaze/LearningAssistant/AssistantPanelView.swift MalDaze/LearningAssistant/LearningAssistantViewModel.swift MalDazeTests/LearningAssistantTests.swift",
-    "result": "draft review/options/activation group verified; Swift focused tests passed, OpenSpec valid, diff check clean"
+    "command": "cd assistant_backend && uv run pytest tests/test_study_add_initiate_adapter.py tests/test_study_views_today.py tests/test_study_views_calendar.py tests/test_study_smart_mode_proposals.py -k 'add_initiate or draft or non_plan or material or smart or today or calendar'; xcodebuild test -project MalDaze.xcodeproj -scheme MalDaze -parallel-testing-enabled NO -only-testing:MalDazeTests/LearningAssistantViewModelTests -only-testing:MalDazeTests/LearningAssistantUISourceTests -quiet; openspec validate redesign-add-initiate-ui --strict; git diff --check -- assistant_backend/tests/test_study_add_initiate_adapter.py assistant_backend/tests/test_study_views_today.py assistant_backend/tests/test_study_views_calendar.py assistant_backend/tests/test_study_smart_mode_proposals.py MalDaze/LearningAssistant/LearningAssistantViewModel.swift MalDaze/LearningAssistant/AssistantPanelView.swift MalDazeTests/LearningAssistantTests.swift",
+    "result": "noise-boundaries-and-active-refresh verified; backend tests passed, focused Swift tests passed, OpenSpec valid, diff check clean"
   },
   "blockedReason": null
 }

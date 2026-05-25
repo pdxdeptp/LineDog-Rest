@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-05-25T16:35:21Z",
+  "updatedAt": "2026-05-25T17:13:27Z",
   "entries": [
     {
       "id": "introduce-study-intake-router-product-deepen-round-1",
@@ -2765,6 +2765,75 @@
       ],
       "commit": "cd16e13a2370376815c1aa680e65f546e324047e",
       "nextCheckpoint": "redesign-add-initiate-ui:apply:noise-boundaries-and-active-refresh"
+    },
+    {
+      "id": "redesign-add-initiate-ui-apply-noise-boundaries-and-active-refresh",
+      "timestamp": "2026-05-25T17:13:27Z",
+      "kind": "apply_group",
+      "changeId": "redesign-add-initiate-ui",
+      "checkpoint": "redesign-add-initiate-ui:apply:noise-boundaries-and-active-refresh",
+      "result": "completed",
+      "commands": [
+        {
+          "command": "cd assistant_backend && uv run pytest tests/test_study_add_initiate_adapter.py tests/test_study_views_today.py tests/test_study_views_calendar.py tests/test_study_smart_mode_proposals.py -k 'add_initiate or draft or non_plan or material or smart or today or calendar'",
+          "exitCode": 0,
+          "summary": "46 passed, 2 warnings"
+        },
+        {
+          "command": "xcodebuild test -project MalDaze.xcodeproj -scheme MalDaze -parallel-testing-enabled NO -only-testing:MalDazeTests/LearningAssistantViewModelTests -only-testing:MalDazeTests/LearningAssistantUISourceTests -quiet",
+          "exitCode": 0,
+          "summary": "focused Swift ViewModel/UI source tests passed"
+        },
+        {
+          "command": "openspec validate redesign-add-initiate-ui --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        },
+        {
+          "command": "git diff --check -- assistant_backend/tests/test_study_add_initiate_adapter.py assistant_backend/tests/test_study_views_today.py assistant_backend/tests/test_study_views_calendar.py assistant_backend/tests/test_study_smart_mode_proposals.py MalDaze/LearningAssistant/LearningAssistantViewModel.swift MalDaze/LearningAssistant/AssistantPanelView.swift MalDazeTests/LearningAssistantTests.swift",
+          "exitCode": 0,
+          "summary": "no whitespace errors"
+        },
+        {
+          "command": "git commit -m \"Enforce Add Initiate no-noise boundaries\"",
+          "exitCode": 0,
+          "summary": "e566fd4dc5c6b79ccbff9995e40047364e61b4e7"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/add-initiate-implementation-control/evidence/redesign-add-initiate-ui/apply-groups/noise-boundaries-and-active-refresh.md",
+          "sha256": "544fa74934bcd60be0999ae798357e9a0c1f5655de797497b2a8ec675df4955c",
+          "description": "Apply group evidence for Add / Initiate no-noise boundaries and active refresh behavior."
+        },
+        {
+          "path": "assistant_backend/tests/test_study_views_today.py",
+          "sha256": "a5b389dac93818d28e5b759228c887e58d4d3fba8b90f522d17d102f49f0de21",
+          "description": "Backend Today view test coverage for Add / Initiate draft silence before activation and active visibility after activation."
+        },
+        {
+          "path": "assistant_backend/tests/test_study_views_calendar.py",
+          "sha256": "2384b6f03afc796dec402626d4087522703c470e81c9eb13475ef011f2a74721",
+          "description": "Backend Calendar view test coverage for Add / Initiate draft silence before activation and active visibility after activation."
+        },
+        {
+          "path": "assistant_backend/tests/test_study_smart_mode_proposals.py",
+          "sha256": "a195d1544698df918daac71432d937250651ea4b5a599cfcfeccd49c3a734a49",
+          "description": "Backend smart-mode proposal tests for stored references and material-only Add / Initiate inputs staying silent."
+        },
+        {
+          "path": "MalDaze/LearningAssistant/LearningAssistantViewModel.swift",
+          "sha256": "a41e692ca76ee9933dfbf3410fcd011df6e2916f8dc34abe55d91284ccf411ab",
+          "description": "ViewModel activation refresh gate and stale activation success/error guards."
+        },
+        {
+          "path": "MalDazeTests/LearningAssistantTests.swift",
+          "sha256": "4303b05b1a2ac8713772c471ae17e2c0dc65651ff0f3f594ea44e38816e68cef",
+          "description": "Swift ViewModel/UI-source tests for quiet states, activation refresh, and stale activation responses."
+        }
+      ],
+      "commit": "e566fd4dc5c6b79ccbff9995e40047364e61b4e7",
+      "nextCheckpoint": "redesign-add-initiate-ui:apply:real-context-qa-and-final-verification"
     }
   ]
 }

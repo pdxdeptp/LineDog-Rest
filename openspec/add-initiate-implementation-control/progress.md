@@ -5,7 +5,7 @@
 - Phase: active
 - Current change: redesign-add-initiate-ui
 - Current step: apply
-- Current checkpoint: redesign-add-initiate-ui:apply:noise-boundaries-and-active-refresh
+- Current checkpoint: redesign-add-initiate-ui:apply:real-context-qa-and-final-verification
 - Required product-deepen rounds before apply: 3
 - Required checkpoint after product deepening: scope_dependency_check
 - Product-deepen scope guard: every round must read adjacent changes and record scope decisions
@@ -70,15 +70,15 @@ Completed apply groups for `redesign-add-initiate-ui`:
 - `entry-role-and-attachment-review`
 - `anchor-state-machine-and-recovery`
 - `draft-review-options-and-activation`
+- `noise-boundaries-and-active-refresh`
 
 Remaining apply groups for `redesign-add-initiate-ui`:
 
-- `noise-boundaries-and-active-refresh`
 - `real-context-qa-and-final-verification`
 
 Next required checkpoint for `redesign-add-initiate-ui`:
 
-- `apply:noise-boundaries-and-active-refresh`
+- `apply:real-context-qa-and-final-verification`
 
 ## Run Log
 
@@ -1456,3 +1456,28 @@ Next required checkpoint for `redesign-add-initiate-ui`:
 - Manifest:
   - Added `redesign-add-initiate-ui-apply-draft-review-options-and-activation`.
 - Next checkpoint: redesign-add-initiate-ui:apply:noise-boundaries-and-active-refresh
+
+## Run 2026-05-25T17:13:27Z
+
+- Automation: add-initiate-changes
+- Checkpoint: redesign-add-initiate-ui:apply:noise-boundaries-and-active-refresh
+- Result: completed
+- Actions:
+  - Followed the apply chain: openspec-apply-change -> superpowers:subagent-driven-development -> per-task superpowers:test-driven-development.
+  - Added backend verification tests for Today, active Calendar, and smart-mode proposal silence around Add / Initiate draft/reference/material-only states.
+  - Added Swift ViewModel/UI-source tests for quiet processing/terminal states, activation success refresh, stale activation success, and stale activation thrown-error handling.
+  - Updated the ViewModel so active surfaces refresh only for task-creating activation success and stale activation success/error responses cannot overwrite an edited flow.
+  - Wrote apply group evidence at `openspec/add-initiate-implementation-control/evidence/redesign-add-initiate-ui/apply-groups/noise-boundaries-and-active-refresh.md`.
+  - Created implementation commit `e566fd4dc5c6b79ccbff9995e40047364e61b4e7`.
+- Reviews:
+  - Spec compliance review: APPROVED.
+  - Code quality review 1: CHANGES_REQUESTED for stale activation thrown-error handling.
+  - Code quality review 2: APPROVED after the TDD stale-error fix.
+- Verification:
+  - Backend Add / Initiate no-noise tests: 46 passed, 2 warnings.
+  - Focused Swift ViewModel/UI source tests: passed.
+  - `openspec validate redesign-add-initiate-ui --strict`: valid.
+  - `git diff --check` for current apply target files: clean.
+- Manifest:
+  - Added `redesign-add-initiate-ui-apply-noise-boundaries-and-active-refresh`.
+- Next checkpoint: redesign-add-initiate-ui:apply:real-context-qa-and-final-verification
