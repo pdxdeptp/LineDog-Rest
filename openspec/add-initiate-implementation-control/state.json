@@ -5,9 +5,9 @@
   "currentChangeIndex": 3,
   "currentChange": "introduce-deadline-scheduler",
   "currentStep": "apply",
-  "currentCheckpoint": "introduce-deadline-scheduler:apply",
+  "currentCheckpoint": "introduce-deadline-scheduler:apply:scheduler-contract-preflight-and-capacity",
   "currentAttempt": 0,
-  "runCounter": 27,
+  "runCounter": 28,
   "maxRetriesPerCheckpoint": 2,
   "requiredProductDeepenRounds": 3,
   "requiresScopeDependencyCheck": true,
@@ -71,12 +71,12 @@
   },
   "applyCursor": {
     "schemaVersion": 1,
-    "activeChange": null,
+    "activeChange": "introduce-deadline-scheduler",
     "currentGroupId": null,
     "currentGroupStartedAt": null,
     "completedGroupIds": [],
     "blockedGroupId": null,
-    "taskGroupsFile": null,
+    "taskGroupsFile": "openspec/add-initiate-implementation-control/evidence/introduce-deadline-scheduler/apply-task-groups.json",
     "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/introduce-plan-compiler/apply-groups/estimates-trace-fixtures-and-final-verification.md",
     "lastCommit": "e320594ddb161d3c9b743777ab16c756694500a1"
   },
@@ -155,11 +155,11 @@
       "scopeDependencyCheckCompleted": true,
       "applyCompleted": false,
       "applyTaskGroups": {
-        "status": "not_planned",
-        "taskGroupsFile": null,
+        "status": "planned",
+        "taskGroupsFile": "openspec/add-initiate-implementation-control/evidence/introduce-deadline-scheduler/apply-task-groups.json",
         "completedGroupIds": [],
-        "currentGroupId": null,
-        "lastEvidenceFile": null,
+        "currentGroupId": "scheduler-contract-preflight-and-capacity",
+        "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/introduce-deadline-scheduler/apply-planning.md",
         "lastCommit": null
       }
     },
@@ -180,11 +180,11 @@
     }
   ],
   "lastRun": {
-    "completedAt": "2026-05-25T11:09:11Z",
-    "checkpoint": "introduce-deadline-scheduler:scope_dependency_check",
+    "completedAt": "2026-05-25T11:19:11Z",
+    "checkpoint": "introduce-deadline-scheduler:apply:planning",
     "result": "completed"
   },
-  "lastCompletedCheckpoint": "introduce-deadline-scheduler:scope_dependency_check",
+  "lastCompletedCheckpoint": "introduce-deadline-scheduler:apply:planning",
   "lastMigration": {
     "completedAt": "2026-05-25T03:56:29Z",
     "id": "require-three-product-deepen-rounds",
@@ -204,8 +204,8 @@
   },
   "lastFailure": null,
   "lastVerification": {
-    "command": "openspec validate introduce-plan-compiler --strict && openspec validate introduce-deadline-scheduler --strict && openspec validate redesign-add-initiate-ui --strict && openspec status --change introduce-deadline-scheduler --json",
-    "result": "upstream compiler valid; deadline scheduler valid; downstream UI valid; scheduler proposal/design/specs/tasks present"
+    "command": "jq empty state/manifest/apply-task-groups; openspec validate introduce-deadline-scheduler --strict; openspec status --change introduce-deadline-scheduler --json; openspec instructions apply --change introduce-deadline-scheduler --json",
+    "result": "apply planning valid; scheduler OpenSpec valid; apply instructions ready with 36 pending tasks"
   },
   "blockedReason": null
 }

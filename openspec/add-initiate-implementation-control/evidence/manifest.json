@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-05-25T11:09:11Z",
+  "updatedAt": "2026-05-25T11:19:11Z",
   "entries": [
     {
       "id": "introduce-study-intake-router-product-deepen-round-1",
@@ -1941,6 +1941,59 @@
         }
       ],
       "nextCheckpoint": "introduce-deadline-scheduler:apply"
+    },
+    {
+      "id": "introduce-deadline-scheduler-apply-planning",
+      "timestamp": "2026-05-25T11:19:11Z",
+      "kind": "apply_planning",
+      "changeId": "introduce-deadline-scheduler",
+      "checkpoint": "introduce-deadline-scheduler:apply:planning",
+      "result": "completed",
+      "commands": [
+        {
+          "command": "jq empty openspec/add-initiate-implementation-control/state.json",
+          "exitCode": 0,
+          "summary": "valid JSON"
+        },
+        {
+          "command": "jq empty openspec/add-initiate-implementation-control/evidence/manifest.json",
+          "exitCode": 0,
+          "summary": "valid JSON"
+        },
+        {
+          "command": "jq empty openspec/add-initiate-implementation-control/evidence/introduce-deadline-scheduler/apply-task-groups.json",
+          "exitCode": 0,
+          "summary": "valid JSON"
+        },
+        {
+          "command": "openspec validate introduce-deadline-scheduler --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        },
+        {
+          "command": "openspec status --change introduce-deadline-scheduler --json",
+          "exitCode": 0,
+          "summary": "proposal/design/specs/tasks artifacts present"
+        },
+        {
+          "command": "openspec instructions apply --change introduce-deadline-scheduler --json",
+          "exitCode": 0,
+          "summary": "36 pending tasks, state ready"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/add-initiate-implementation-control/evidence/introduce-deadline-scheduler/apply-planning.md",
+          "sha256": "c5eda0f0f9764fe0529b2d69e36c96143840681903399bde07f8ea40f714b95d",
+          "description": "Scheduler apply planning evidence with scope, dispatch, target files, and protected dirty-path notes."
+        },
+        {
+          "path": "openspec/add-initiate-implementation-control/evidence/introduce-deadline-scheduler/apply-task-groups.json",
+          "sha256": "06dfae621d884b02bb5b56af9a2eee98635bb2f900ebeccfc75c1b89df4c550e",
+          "description": "Scheduler apply task groups used by applyCursor recovery."
+        }
+      ],
+      "nextCheckpoint": "introduce-deadline-scheduler:apply:scheduler-contract-preflight-and-capacity"
     }
   ]
 }

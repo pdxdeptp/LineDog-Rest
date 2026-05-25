@@ -5,7 +5,7 @@
 - Phase: active
 - Current change: introduce-deadline-scheduler
 - Current step: apply
-- Current checkpoint: introduce-deadline-scheduler:apply
+- Current checkpoint: introduce-deadline-scheduler:apply:scheduler-contract-preflight-and-capacity
 - Required product-deepen rounds before apply: 3
 - Required checkpoint after product deepening: scope_dependency_check
 - Product-deepen scope guard: every round must read adjacent changes and record scope decisions
@@ -37,6 +37,15 @@ Product-deepen rounds completed for `introduce-deadline-scheduler`:
 - round 3
 
 Scope dependency check completed for `introduce-deadline-scheduler`: yes
+
+Apply planning completed for `introduce-deadline-scheduler`: yes
+
+Planned apply groups for `introduce-deadline-scheduler`:
+
+- `scheduler-contract-preflight-and-capacity`
+- `placement-buffer-splitting-fallback-and-risk`
+- `infeasibility-options-and-recompute-effects`
+- `scheduler-dry-runs-final-verification`
 
 ## Run Log
 
@@ -1032,3 +1041,26 @@ Scope dependency check completed for `introduce-deadline-scheduler`: yes
 - Manifest:
   - Added `introduce-deadline-scheduler-scope-dependency-check`.
 - Next checkpoint: introduce-deadline-scheduler:apply
+
+## Run 2026-05-25T11:19:11Z Apply Planning introduce-deadline-scheduler
+
+- Automation: add-initiate-changes
+- Checkpoint: introduce-deadline-scheduler:apply:planning
+- Result: completed
+- Actions:
+  - Triggered `openspec-apply-change` for apply context, but stopped before implementation as required by the apply planning preflight.
+  - Read scheduler OpenSpec proposal, design, spec, and tasks through apply instructions.
+  - Wrote `openspec/add-initiate-implementation-control/evidence/introduce-deadline-scheduler/apply-planning.md`.
+  - Wrote `openspec/add-initiate-implementation-control/evidence/introduce-deadline-scheduler/apply-task-groups.json` with four sequential task groups.
+  - Initialized `state.json.applyCursor` and scheduler per-change apply task-group state.
+  - Protected unrelated dirty files and did not stage or edit them.
+- Verification:
+  - `jq empty openspec/add-initiate-implementation-control/state.json`: valid.
+  - `jq empty openspec/add-initiate-implementation-control/evidence/manifest.json`: valid.
+  - `jq empty openspec/add-initiate-implementation-control/evidence/introduce-deadline-scheduler/apply-task-groups.json`: valid.
+  - `openspec validate introduce-deadline-scheduler --strict`: valid.
+  - `openspec status --change introduce-deadline-scheduler --json`: proposal/design/specs/tasks artifacts present.
+  - `openspec instructions apply --change introduce-deadline-scheduler --json`: 36 pending tasks, state ready.
+- Manifest:
+  - Added `introduce-deadline-scheduler-apply-planning`.
+- Next checkpoint: introduce-deadline-scheduler:apply:scheduler-contract-preflight-and-capacity

@@ -1,0 +1,119 @@
+{
+  "changeId": "introduce-deadline-scheduler",
+  "generatedAt": "2026-05-25T11:19:11Z",
+  "groups": [
+    {
+      "id": "scheduler-contract-preflight-and-capacity",
+      "taskIds": [
+        "1.1",
+        "1.2",
+        "1.3",
+        "1.4",
+        "1.5",
+        "1.11",
+        "4.1",
+        "4.2",
+        "4.3"
+      ],
+      "description": "Implement scheduler input gate, ScheduledDraftReview output shape, scheduler needs_input/draft_review/infeasible_review status derivation, safe preflight defaults, inclusive date windows, basic usable capacity, and tests for those contracts.",
+      "targetFiles": [
+        "assistant_backend/src/study_plan/scheduling.py",
+        "assistant_backend/src/study_plan/__init__.py",
+        "assistant_backend/tests/test_study_plan_scheduling.py"
+      ],
+      "testCommands": [
+        "cd assistant_backend && uv run pytest tests/test_study_plan_scheduling.py -k 'input_gate or output_shape or preflight or inclusive or capacity or default'",
+        "openspec validate introduce-deadline-scheduler --strict"
+      ],
+      "evidenceFile": "openspec/add-initiate-implementation-control/evidence/introduce-deadline-scheduler/apply-groups/scheduler-contract-preflight-and-capacity.md",
+      "dependsOn": []
+    },
+    {
+      "id": "placement-buffer-splitting-fallback-and-risk",
+      "taskIds": [
+        "1.6",
+        "1.7",
+        "1.8",
+        "1.9",
+        "1.10",
+        "2.1",
+        "2.2",
+        "2.3",
+        "2.4",
+        "2.5",
+        "2.6",
+        "4.4",
+        "4.5",
+        "4.6",
+        "4.7",
+        "4.8"
+      ],
+      "description": "Implement planning-budget cap, deterministic buffer reservation/erosion, balanced/front-loaded/light-start placement, essential-before-optional/dependency preservation, continuation sessions, fallback metadata, no active-task side effects, and risk report facts.",
+      "targetFiles": [
+        "assistant_backend/src/study_plan/scheduling.py",
+        "assistant_backend/tests/test_study_plan_scheduling.py"
+      ],
+      "testCommands": [
+        "cd assistant_backend && uv run pytest tests/test_study_plan_scheduling.py -k 'buffer or load_shape or continuation or fallback or risk or optional or dependency or active_task'",
+        "openspec validate introduce-deadline-scheduler --strict"
+      ],
+      "evidenceFile": "openspec/add-initiate-implementation-control/evidence/introduce-deadline-scheduler/apply-groups/placement-buffer-splitting-fallback-and-risk.md",
+      "dependsOn": [
+        "scheduler-contract-preflight-and-capacity"
+      ]
+    },
+    {
+      "id": "infeasibility-options-and-recompute-effects",
+      "taskIds": [
+        "3.1",
+        "3.2",
+        "3.3",
+        "3.4",
+        "3.5",
+        "3.6",
+        "3.7",
+        "4.9",
+        "4.10",
+        "4.11"
+      ],
+      "description": "Implement fact-to-option mapping, deterministic option effects as review recomputation/storage/compiler-handoff results, crunch versus overload semantics, reduce-scope availability, lower-depth and answer-one-question handoffs, and hard-deadline option guardrails.",
+      "targetFiles": [
+        "assistant_backend/src/study_plan/scheduling.py",
+        "assistant_backend/tests/test_study_plan_scheduling.py"
+      ],
+      "testCommands": [
+        "cd assistant_backend && uv run pytest tests/test_study_plan_scheduling.py -k 'option or recompute or crunch or overload or reduce_scope or lower_depth or hard_deadline or late_finish'",
+        "openspec validate introduce-deadline-scheduler --strict"
+      ],
+      "evidenceFile": "openspec/add-initiate-implementation-control/evidence/introduce-deadline-scheduler/apply-groups/infeasibility-options-and-recompute-effects.md",
+      "dependsOn": [
+        "scheduler-contract-preflight-and-capacity",
+        "placement-buffer-splitting-fallback-and-risk"
+      ]
+    },
+    {
+      "id": "scheduler-dry-runs-final-verification",
+      "taskIds": [
+        "4.12"
+      ],
+      "description": "Add real-context feasible resume packaging and infeasible easyagent rebuild dry-run tests, run full scheduler verification, run strict OpenSpec validation, and mark the change tasks complete.",
+      "targetFiles": [
+        "assistant_backend/src/study_plan/scheduling.py",
+        "assistant_backend/tests/test_study_plan_scheduling.py",
+        "openspec/changes/introduce-deadline-scheduler/tasks.md"
+      ],
+      "testCommands": [
+        "cd assistant_backend && uv run pytest tests/test_study_plan_scheduling.py",
+        "openspec validate introduce-deadline-scheduler --strict",
+        "openspec instructions apply --change introduce-deadline-scheduler --json"
+      ],
+      "evidenceFile": "openspec/add-initiate-implementation-control/evidence/introduce-deadline-scheduler/apply-groups/scheduler-dry-runs-final-verification.md",
+      "dependsOn": [
+        "scheduler-contract-preflight-and-capacity",
+        "placement-buffer-splitting-fallback-and-risk",
+        "infeasibility-options-and-recompute-effects"
+      ]
+    }
+  ]
+}
+
