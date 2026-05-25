@@ -5,7 +5,7 @@
 - Phase: active
 - Current change: introduce-deadline-scheduler
 - Current step: apply
-- Current checkpoint: introduce-deadline-scheduler:apply:placement-buffer-splitting-fallback-and-risk
+- Current checkpoint: introduce-deadline-scheduler:apply:infeasibility-options-and-recompute-effects
 - Required product-deepen rounds before apply: 3
 - Required checkpoint after product deepening: scope_dependency_check
 - Product-deepen scope guard: every round must read adjacent changes and record scope decisions
@@ -43,10 +43,10 @@ Apply planning completed for `introduce-deadline-scheduler`: yes
 Completed apply groups for `introduce-deadline-scheduler`:
 
 - `scheduler-contract-preflight-and-capacity`
+- `placement-buffer-splitting-fallback-and-risk`
 
 Remaining apply groups for `introduce-deadline-scheduler`:
 
-- `placement-buffer-splitting-fallback-and-risk`
 - `infeasibility-options-and-recompute-effects`
 - `scheduler-dry-runs-final-verification`
 
@@ -1112,3 +1112,30 @@ Remaining apply groups for `introduce-deadline-scheduler`:
 - Manifest:
   - Added `introduce-deadline-scheduler-apply-scheduler-contract-preflight-and-capacity`.
 - Next checkpoint: introduce-deadline-scheduler:apply:placement-buffer-splitting-fallback-and-risk
+
+## Run 2026-05-25T11:47:41Z Apply Group introduce-deadline-scheduler placement-buffer-splitting-fallback-and-risk
+
+- Automation: add-initiate-changes
+- Checkpoint: introduce-deadline-scheduler:apply:placement-buffer-splitting-fallback-and-risk
+- Result: completed
+- Actions:
+  - Triggered `openspec-apply-change`, `superpowers:subagent-driven-development`, and `superpowers:test-driven-development`.
+  - Wrote failing scheduler tests first, verified RED failures, then implemented placement budget, buffer, load-shape, split-session, fallback, overload, and risk-report behavior.
+  - Fixed spec-review P1 findings around split-session date capacity, split estimate conservation, and buffer capacity-gap math.
+  - Fixed code-quality P1 findings around dependency reordering, overload facts, and zero-usable accepted overload.
+  - Fixed lower-risk findings around trial buffer rollback, fallback metadata aliasing, and numeric continuation-session visible notes.
+  - Marked tasks 1.6-1.10, 2.1-2.6, and 4.4-4.8 complete.
+  - Wrote apply group evidence at `openspec/add-initiate-implementation-control/evidence/introduce-deadline-scheduler/apply-groups/placement-buffer-splitting-fallback-and-risk.md`.
+  - Created implementation commit `19293e38a7a8a5fb0c93101d6ef97f771a0bbd31`.
+  - Protected unrelated dirty files and did not stage them.
+- Verification:
+  - `cd assistant_backend && uv run pytest tests/test_study_plan_scheduling.py -k 'buffer or load_shape or continuation or fallback or risk or optional or dependency or active_task or overloaded or existing_load_consumes_all_usable_capacity'`: 13 passed, 14 deselected.
+  - `cd assistant_backend && uv run pytest tests/test_study_plan_scheduling.py`: 27 passed.
+  - `openspec validate introduce-deadline-scheduler --strict`: valid.
+  - `openspec instructions apply --change introduce-deadline-scheduler --json`: 25/36 complete, 11 remaining.
+  - `git diff --check -- assistant_backend/src/study_plan/scheduling.py assistant_backend/tests/test_study_plan_scheduling.py`: no whitespace errors.
+  - Spec compliance final review: approved.
+  - Code quality final review: approved.
+- Manifest:
+  - Added `introduce-deadline-scheduler-apply-placement-buffer-splitting-fallback-and-risk`.
+- Next checkpoint: introduce-deadline-scheduler:apply:infeasibility-options-and-recompute-effects

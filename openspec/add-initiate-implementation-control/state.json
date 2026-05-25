@@ -5,9 +5,9 @@
   "currentChangeIndex": 3,
   "currentChange": "introduce-deadline-scheduler",
   "currentStep": "apply",
-  "currentCheckpoint": "introduce-deadline-scheduler:apply:placement-buffer-splitting-fallback-and-risk",
+  "currentCheckpoint": "introduce-deadline-scheduler:apply:infeasibility-options-and-recompute-effects",
   "currentAttempt": 0,
-  "runCounter": 29,
+  "runCounter": 30,
   "maxRetriesPerCheckpoint": 2,
   "requiredProductDeepenRounds": 3,
   "requiresScopeDependencyCheck": true,
@@ -75,12 +75,13 @@
     "currentGroupId": null,
     "currentGroupStartedAt": null,
     "completedGroupIds": [
-      "scheduler-contract-preflight-and-capacity"
+      "scheduler-contract-preflight-and-capacity",
+      "placement-buffer-splitting-fallback-and-risk"
     ],
     "blockedGroupId": null,
     "taskGroupsFile": "openspec/add-initiate-implementation-control/evidence/introduce-deadline-scheduler/apply-task-groups.json",
-    "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/introduce-deadline-scheduler/apply-groups/scheduler-contract-preflight-and-capacity.md",
-    "lastCommit": "42bb64b0bb5d5bf3e6187d19d584907a8074d8cc"
+    "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/introduce-deadline-scheduler/apply-groups/placement-buffer-splitting-fallback-and-risk.md",
+    "lastCommit": "19293e38a7a8a5fb0c93101d6ef97f771a0bbd31"
   },
   "lock": {
     "path": "openspec/add-initiate-implementation-control/run.lock",
@@ -160,11 +161,12 @@
         "status": "in_progress",
         "taskGroupsFile": "openspec/add-initiate-implementation-control/evidence/introduce-deadline-scheduler/apply-task-groups.json",
         "completedGroupIds": [
-          "scheduler-contract-preflight-and-capacity"
+          "scheduler-contract-preflight-and-capacity",
+          "placement-buffer-splitting-fallback-and-risk"
         ],
-        "currentGroupId": "placement-buffer-splitting-fallback-and-risk",
-        "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/introduce-deadline-scheduler/apply-groups/scheduler-contract-preflight-and-capacity.md",
-        "lastCommit": "42bb64b0bb5d5bf3e6187d19d584907a8074d8cc"
+        "currentGroupId": "infeasibility-options-and-recompute-effects",
+        "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/introduce-deadline-scheduler/apply-groups/placement-buffer-splitting-fallback-and-risk.md",
+        "lastCommit": "19293e38a7a8a5fb0c93101d6ef97f771a0bbd31"
       }
     },
     {
@@ -184,11 +186,11 @@
     }
   ],
   "lastRun": {
-    "completedAt": "2026-05-25T11:29:11Z",
-    "checkpoint": "introduce-deadline-scheduler:apply:scheduler-contract-preflight-and-capacity",
+    "completedAt": "2026-05-25T11:47:41Z",
+    "checkpoint": "introduce-deadline-scheduler:apply:placement-buffer-splitting-fallback-and-risk",
     "result": "completed"
   },
-  "lastCompletedCheckpoint": "introduce-deadline-scheduler:apply:scheduler-contract-preflight-and-capacity",
+  "lastCompletedCheckpoint": "introduce-deadline-scheduler:apply:placement-buffer-splitting-fallback-and-risk",
   "lastMigration": {
     "completedAt": "2026-05-25T03:56:29Z",
     "id": "require-three-product-deepen-rounds",
@@ -208,8 +210,8 @@
   },
   "lastFailure": null,
   "lastVerification": {
-    "command": "cd assistant_backend && uv run pytest tests/test_study_plan_scheduling.py -k 'input_gate or output_shape or preflight or inclusive or capacity or default'; cd assistant_backend && uv run pytest tests/test_study_plan_scheduling.py; openspec validate introduce-deadline-scheduler --strict; openspec instructions apply --change introduce-deadline-scheduler --json",
-    "result": "targeted scheduler tests passed; full scheduler tests passed; OpenSpec valid; 9/36 tasks complete"
+    "command": "cd assistant_backend && uv run pytest tests/test_study_plan_scheduling.py -k 'buffer or load_shape or continuation or fallback or risk or optional or dependency or active_task or overloaded or existing_load_consumes_all_usable_capacity'; cd assistant_backend && uv run pytest tests/test_study_plan_scheduling.py; openspec validate introduce-deadline-scheduler --strict; openspec instructions apply --change introduce-deadline-scheduler --json; git diff --check -- assistant_backend/src/study_plan/scheduling.py assistant_backend/tests/test_study_plan_scheduling.py",
+    "result": "targeted scheduler tests passed; full scheduler tests passed; OpenSpec valid; instructions apply reports 25/36 complete; diff check clean"
   },
   "blockedReason": null
 }

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-05-25T11:29:11Z",
+  "updatedAt": "2026-05-25T11:47:41Z",
   "entries": [
     {
       "id": "introduce-study-intake-router-product-deepen-round-1",
@@ -2103,6 +2103,66 @@
         }
       ],
       "nextCheckpoint": "introduce-deadline-scheduler:apply:placement-buffer-splitting-fallback-and-risk"
+    },
+    {
+      "id": "introduce-deadline-scheduler-apply-placement-buffer-splitting-fallback-and-risk",
+      "timestamp": "2026-05-25T11:47:41Z",
+      "kind": "apply_group",
+      "changeId": "introduce-deadline-scheduler",
+      "checkpoint": "introduce-deadline-scheduler:apply:placement-buffer-splitting-fallback-and-risk",
+      "groupId": "placement-buffer-splitting-fallback-and-risk",
+      "result": "completed",
+      "commit": "19293e38a7a8a5fb0c93101d6ef97f771a0bbd31",
+      "commands": [
+        {
+          "command": "cd assistant_backend && uv run pytest tests/test_study_plan_scheduling.py -k 'buffer or load_shape or continuation or fallback or risk or optional or dependency or active_task or overloaded or existing_load_consumes_all_usable_capacity'",
+          "exitCode": 0,
+          "summary": "13 passed, 14 deselected"
+        },
+        {
+          "command": "cd assistant_backend && uv run pytest tests/test_study_plan_scheduling.py",
+          "exitCode": 0,
+          "summary": "27 passed"
+        },
+        {
+          "command": "openspec validate introduce-deadline-scheduler --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        },
+        {
+          "command": "openspec instructions apply --change introduce-deadline-scheduler --json",
+          "exitCode": 0,
+          "summary": "25/36 tasks complete, 11 remaining"
+        },
+        {
+          "command": "git diff --check -- assistant_backend/src/study_plan/scheduling.py assistant_backend/tests/test_study_plan_scheduling.py",
+          "exitCode": 0,
+          "summary": "no whitespace errors"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/add-initiate-implementation-control/evidence/introduce-deadline-scheduler/apply-groups/placement-buffer-splitting-fallback-and-risk.md",
+          "sha256": "eb270c798994f0c49146f4e37e8aaa2e95661d9b0ed7641248cb139805d78d2d",
+          "description": "Apply group evidence, TDD record, review iterations, verification, and next checkpoint."
+        },
+        {
+          "path": "assistant_backend/src/study_plan/scheduling.py",
+          "sha256": "fb965d9607555c37e6fe36344cfbc5fc864882527c5435fe9845f3a6ac109529",
+          "description": "Scheduler placement, buffer, splitting, fallback, overload, and risk facts implementation."
+        },
+        {
+          "path": "assistant_backend/tests/test_study_plan_scheduling.py",
+          "sha256": "f79e2d667af812b3726f8241c9ea572b885f6ab61b8568fcc21e757d679a1bd1",
+          "description": "Scheduler TDD tests for load shapes, buffer, splits, fallback, overload, and risk facts."
+        },
+        {
+          "path": "openspec/changes/introduce-deadline-scheduler/tasks.md",
+          "sha256": "ea7eeabff857d0ccd24dc87f5548cd5e67597a8a67213dd3ecf46d242346e4fc",
+          "description": "Completed placement/buffer/splitting/fallback/risk tasks for this apply group."
+        }
+      ],
+      "nextCheckpoint": "introduce-deadline-scheduler:apply:infeasibility-options-and-recompute-effects"
     }
   ]
 }
