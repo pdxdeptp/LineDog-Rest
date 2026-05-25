@@ -2,12 +2,12 @@
   "schemaVersion": 1,
   "automationId": "add-initiate-changes",
   "phase": "active",
-  "currentChangeIndex": 1,
-  "currentChange": "persist-intake-plan-drafts",
-  "currentStep": "apply",
-  "currentCheckpoint": "persist-intake-plan-drafts:apply:cross-change-contract-to-introduce-plan-compiler",
+  "currentChangeIndex": 2,
+  "currentChange": "introduce-plan-compiler",
+  "currentStep": "product_deepen_round_1",
+  "currentCheckpoint": "introduce-plan-compiler:product_deepen_round_1",
   "currentAttempt": 0,
-  "runCounter": 17,
+  "runCounter": 18,
   "maxRetriesPerCheckpoint": 2,
   "requiredProductDeepenRounds": 3,
   "requiresScopeDependencyCheck": true,
@@ -40,12 +40,12 @@
     "schemaVersion": 1,
     "evidenceRoot": "openspec/add-initiate-implementation-control/evidence/cross-change-contracts",
     "lastCheck": {
-      "completedAt": "2026-05-25T06:00:40Z",
-      "fromChange": "introduce-study-intake-router",
-      "toChange": "persist-intake-plan-drafts",
-      "checkpoint": "introduce-study-intake-router:apply:cross-change-contract-to-persist-intake-plan-drafts",
+      "completedAt": "2026-05-25T08:44:41Z",
+      "fromChange": "persist-intake-plan-drafts",
+      "toChange": "introduce-plan-compiler",
+      "checkpoint": "persist-intake-plan-drafts:apply:cross-change-contract-to-introduce-plan-compiler",
       "result": "passed",
-      "evidenceFile": "openspec/add-initiate-implementation-control/evidence/cross-change-contracts/introduce-study-intake-router-to-persist-intake-plan-drafts.md"
+      "evidenceFile": "openspec/add-initiate-implementation-control/evidence/cross-change-contracts/persist-intake-plan-drafts-to-introduce-plan-compiler.md"
     },
     "requiredBeforeAdvancingChange": true,
     "changeOrder": [
@@ -71,17 +71,12 @@
   },
   "applyCursor": {
     "schemaVersion": 1,
-    "activeChange": "persist-intake-plan-drafts",
+    "activeChange": null,
     "currentGroupId": null,
     "currentGroupStartedAt": null,
-    "completedGroupIds": [
-      "draft-schema-migration-and-defaults",
-      "draft-package-versioning-and-entrypoints",
-      "activation-boundary-and-events",
-      "fallback-progress-and-final-verification"
-    ],
+    "completedGroupIds": [],
     "blockedGroupId": null,
-    "taskGroupsFile": "openspec/add-initiate-implementation-control/evidence/persist-intake-plan-drafts/apply-task-groups.json",
+    "taskGroupsFile": null,
     "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/persist-intake-plan-drafts/apply-groups/fallback-progress-and-final-verification.md",
     "lastCommit": "2e1ef56eedbf1bf40cccc79fdb09aea0c35dd28f"
   },
@@ -116,10 +111,10 @@
     },
     {
       "id": "persist-intake-plan-drafts",
-      "status": "in_progress",
+      "status": "completed",
       "productDeepenRoundsCompleted": 3,
       "scopeDependencyCheckCompleted": true,
-      "applyCompleted": false,
+      "applyCompleted": true,
       "applyTaskGroups": {
         "status": "completed",
         "taskGroupsFile": "openspec/add-initiate-implementation-control/evidence/persist-intake-plan-drafts/apply-task-groups.json",
@@ -136,7 +131,7 @@
     },
     {
       "id": "introduce-plan-compiler",
-      "status": "pending",
+      "status": "in_progress",
       "productDeepenRoundsCompleted": 0,
       "scopeDependencyCheckCompleted": false,
       "applyCompleted": false,
@@ -181,11 +176,11 @@
     }
   ],
   "lastRun": {
-    "completedAt": "2026-05-25T08:26:11Z",
-    "checkpoint": "persist-intake-plan-drafts:apply:fallback-progress-and-final-verification",
+    "completedAt": "2026-05-25T08:44:41Z",
+    "checkpoint": "persist-intake-plan-drafts:apply:cross-change-contract-to-introduce-plan-compiler",
     "result": "completed"
   },
-  "lastCompletedCheckpoint": "persist-intake-plan-drafts:apply:fallback-progress-and-final-verification",
+  "lastCompletedCheckpoint": "persist-intake-plan-drafts:apply:cross-change-contract-to-introduce-plan-compiler",
   "lastMigration": {
     "completedAt": "2026-05-25T03:56:29Z",
     "id": "require-three-product-deepen-rounds",
@@ -205,8 +200,8 @@
   },
   "lastFailure": null,
   "lastVerification": {
-    "command": "openspec validate persist-intake-plan-drafts --strict",
-    "result": "valid after fallback-progress-and-final-verification apply group; 35/35 tasks complete"
+    "command": "openspec validate persist-intake-plan-drafts --strict && openspec validate introduce-plan-compiler --strict && openspec instructions apply --change persist-intake-plan-drafts --json && openspec status --change introduce-plan-compiler --json",
+    "result": "current and next changes valid; persist-intake-plan-drafts apply instructions show 35/35 tasks complete; introduce-plan-compiler artifacts are present; cross-change contract passed"
   },
   "blockedReason": null
 }

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-05-25T08:26:11Z",
+  "updatedAt": "2026-05-25T08:44:41Z",
   "entries": [
     {
       "id": "introduce-study-intake-router-product-deepen-round-1",
@@ -1271,6 +1271,46 @@
         }
       ],
       "nextCheckpoint": "persist-intake-plan-drafts:apply:cross-change-contract-to-introduce-plan-compiler"
+    },
+    {
+      "id": "persist-intake-plan-drafts-to-introduce-plan-compiler-cross-change-contract",
+      "timestamp": "2026-05-25T08:44:41Z",
+      "kind": "cross_change_contract",
+      "changeId": "persist-intake-plan-drafts",
+      "checkpoint": "persist-intake-plan-drafts:apply:cross-change-contract-to-introduce-plan-compiler",
+      "fromChange": "persist-intake-plan-drafts",
+      "toChange": "introduce-plan-compiler",
+      "result": "completed",
+      "commands": [
+        {
+          "command": "openspec validate persist-intake-plan-drafts --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        },
+        {
+          "command": "openspec validate introduce-plan-compiler --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        },
+        {
+          "command": "openspec instructions apply --change persist-intake-plan-drafts --json",
+          "exitCode": 0,
+          "summary": "35/35 tasks complete; state all_done"
+        },
+        {
+          "command": "openspec status --change introduce-plan-compiler --json",
+          "exitCode": 0,
+          "summary": "proposal/design/specs/tasks artifacts present"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/add-initiate-implementation-control/evidence/cross-change-contracts/persist-intake-plan-drafts-to-introduce-plan-compiler.md",
+          "sha256": "5cbffe50961f0dba06cd4c8ab0bb9d794f6b4d883b4fdc5fba695675a6bfcc67",
+          "description": "Cross-change contract evidence for draft-persistence-to-plan-compiler handoff."
+        }
+      ],
+      "nextCheckpoint": "introduce-plan-compiler:product_deepen_round_1"
     }
   ]
 }

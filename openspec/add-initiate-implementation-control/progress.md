@@ -3,9 +3,9 @@
 ## Current Status
 
 - Phase: active
-- Current change: persist-intake-plan-drafts
-- Current step: apply
-- Current checkpoint: persist-intake-plan-drafts:apply:cross-change-contract-to-introduce-plan-compiler
+- Current change: introduce-plan-compiler
+- Current step: product_deepen_round_1
+- Current checkpoint: introduce-plan-compiler:product_deepen_round_1
 - Required product-deepen rounds before apply: 3
 - Required checkpoint after product deepening: scope_dependency_check
 - Product-deepen scope guard: every round must read adjacent changes and record scope decisions
@@ -17,7 +17,7 @@
 - Failure log: `openspec/add-initiate-implementation-control/evidence/failures/failure-log.jsonl`
 - Apply recovery: `state.json.applyCursor` plus per-change apply task groups
 
-Completed apply groups for current change:
+Completed apply groups for previous change `persist-intake-plan-drafts`:
 
 - `draft-schema-migration-and-defaults`
 - `draft-package-versioning-and-entrypoints`
@@ -661,3 +661,43 @@ Completed apply groups for current change:
 - Manifest:
   - Added `persist-intake-plan-drafts-apply-group-fallback-progress-and-final-verification`.
 - Next checkpoint: persist-intake-plan-drafts:apply:cross-change-contract-to-introduce-plan-compiler
+
+## Run 2026-05-25T08:44:41Z Cross-Change Contract persist-intake-plan-drafts -> introduce-plan-compiler
+
+- Automation: add-initiate-changes
+- Checkpoint: persist-intake-plan-drafts:apply:cross-change-contract-to-introduce-plan-compiler
+- Result: completed
+- Actions:
+  - Acquired `run.lock`.
+  - Read `state.json`, `runbook.md`, `progress.md`, `evidence/manifest.json`, and `workspace-baseline.json`.
+  - Ran `git status --porcelain=v1`.
+  - Protected unrelated dirty files without editing or staging them.
+  - Read completed `persist-intake-plan-drafts` proposal, design, specs, tasks, and apply evidence.
+  - Read downstream `introduce-plan-compiler` proposal, design, specs, and tasks.
+  - Checked draft shell handoff, planning assumptions/provenance, compiler package persistence, activation boundary, fallback-progress boundary, downstream responsibilities, and deferred contract risks.
+  - Wrote cross-change contract evidence at `openspec/add-initiate-implementation-control/evidence/cross-change-contracts/persist-intake-plan-drafts-to-introduce-plan-compiler.md`.
+  - Marked `persist-intake-plan-drafts` completed and advanced to `introduce-plan-compiler`.
+- Verification:
+  - `openspec validate persist-intake-plan-drafts --strict`: valid.
+  - `openspec validate introduce-plan-compiler --strict`: valid.
+  - `openspec instructions apply --change persist-intake-plan-drafts --json`: 35/35 tasks complete, state `all_done`.
+  - `openspec status --change introduce-plan-compiler --json`: proposal/design/specs/tasks artifacts present.
+- Contract result:
+  - Passed. Draft persistence provides draft shells, draft kinds/target plans, assumptions/provenance storage, compiler package shells, versioning, activation guards/events, and fallback progress semantics.
+  - Plan Compiler remains responsible for PlanningEnvelope construction, source/goal synopsis, archetype and depth semantics, LLM contracts, validation/repair, estimates, calibration, and compiler trace.
+- Handoff risks:
+  - Source summaries are not precomputed; the compiler must build synopsis from intake raw input, source URL, metadata, source roles, and shallow source facts.
+  - Legacy drafts may contain unknown/incomplete assumptions and must become low-calibration or `needs_input`.
+  - Final schedule dates remain owned by the downstream scheduler.
+- Protected unrelated dirty paths:
+  - `docs/agent-workflow.md`
+  - `openspec/changes/harden-add-initiate-automation-control/design.md`
+  - `openspec/changes/harden-add-initiate-automation-control/proposal.md`
+  - `openspec/changes/harden-add-initiate-automation-control/tasks.md`
+  - `openspec/changes/redesign-study-intake-planning/iteration-records/round-16-split-readiness-review.md`
+  - `openspec/changes/redesign-study-intake-planning/pre-split-readiness-audit.md`
+  - `openspec/changes/redesign-study-intake-planning/split-decision.md`
+  - `openspec/changes/redesign-study-intake-planning/tasks.md`
+- Manifest:
+  - Added `persist-intake-plan-drafts-to-introduce-plan-compiler-cross-change-contract`.
+- Next checkpoint: introduce-plan-compiler:product_deepen_round_1
