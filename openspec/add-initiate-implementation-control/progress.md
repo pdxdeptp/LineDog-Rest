@@ -488,4 +488,7 @@
   - `openspec validate persist-intake-plan-drafts --strict`: valid.
 - Manifest:
   - Added `persist-intake-plan-drafts-apply-planning`.
+- Pre-apply checkpoint:
+  - Created safe checkpoint commit `c33c1653476c50e0a10766fbc37873bc940635a4`.
+  - Wrote commit evidence at `openspec/add-initiate-implementation-control/evidence/commits/persist-intake-plan-drafts-pre-apply.md`.
 - Next checkpoint: persist-intake-plan-drafts:apply:draft-schema-migration-and-defaults

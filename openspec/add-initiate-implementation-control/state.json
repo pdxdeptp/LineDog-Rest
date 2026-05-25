@@ -7,7 +7,7 @@
   "currentStep": "apply",
   "currentCheckpoint": "persist-intake-plan-drafts:apply:draft-schema-migration-and-defaults",
   "currentAttempt": 0,
-  "runCounter": 12,
+  "runCounter": 13,
   "maxRetriesPerCheckpoint": 2,
   "requiredProductDeepenRounds": 3,
   "requiresScopeDependencyCheck": true,
@@ -29,12 +29,12 @@
     "checkpointRequiredBeforeApply": true,
     "commitEvidenceRoot": "openspec/add-initiate-implementation-control/evidence/commits",
     "lastCheckpointCommit": {
-      "completedAt": "2026-05-25T04:44:45Z",
-      "changeId": "introduce-study-intake-router",
-      "commit": "4a5f6d43bdcc79ca9efea62d29dca707a103bdbb",
-      "evidenceFile": "openspec/add-initiate-implementation-control/evidence/commits/introduce-study-intake-router-pre-apply.md"
+      "completedAt": "2026-05-25T06:34:10Z",
+      "changeId": "persist-intake-plan-drafts",
+      "commit": "c33c1653476c50e0a10766fbc37873bc940635a4",
+      "evidenceFile": "openspec/add-initiate-implementation-control/evidence/commits/persist-intake-plan-drafts-pre-apply.md"
     },
-    "pendingCommitReason": "persist-intake-plan-drafts apply planning generated task groups; create a safe pre-apply checkpoint commit before implementation starts."
+    "pendingCommitReason": null
   },
   "crossChangeContracts": {
     "schemaVersion": 1,

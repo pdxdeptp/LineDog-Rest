@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-05-25T06:34:10Z",
+  "updatedAt": "2026-05-25T06:34:11Z",
   "entries": [
     {
       "id": "introduce-study-intake-router-product-deepen-round-1",
@@ -843,6 +843,50 @@
           "path": "openspec/add-initiate-implementation-control/evidence/persist-intake-plan-drafts/apply-task-groups.json",
           "sha256": "498860d3e9db74681dd9da85113790bc93586cce6e0f8efbd57a1586f4dc49eb",
           "description": "Sequential apply task groups and recovery cursor source."
+        }
+      ],
+      "nextCheckpoint": "persist-intake-plan-drafts:apply:draft-schema-migration-and-defaults"
+    },
+    {
+      "id": "persist-intake-plan-drafts-pre-apply-checkpoint-commit",
+      "timestamp": "2026-05-25T06:34:10Z",
+      "kind": "pre_apply_commit",
+      "changeId": "persist-intake-plan-drafts",
+      "checkpoint": "persist-intake-plan-drafts:apply:draft-schema-migration-and-defaults",
+      "result": "completed",
+      "commit": "c33c1653476c50e0a10766fbc37873bc940635a4",
+      "commands": [
+        {
+          "command": "jq empty openspec/add-initiate-implementation-control/state.json",
+          "exitCode": 0,
+          "summary": "valid JSON"
+        },
+        {
+          "command": "jq empty openspec/add-initiate-implementation-control/evidence/manifest.json",
+          "exitCode": 0,
+          "summary": "valid JSON"
+        },
+        {
+          "command": "jq empty openspec/add-initiate-implementation-control/evidence/persist-intake-plan-drafts/apply-task-groups.json",
+          "exitCode": 0,
+          "summary": "valid JSON"
+        },
+        {
+          "command": "openspec validate persist-intake-plan-drafts --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        },
+        {
+          "command": "git commit -m \"Prepare draft persistence apply\"",
+          "exitCode": 0,
+          "summary": "created pre-apply checkpoint commit c33c165"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/add-initiate-implementation-control/evidence/commits/persist-intake-plan-drafts-pre-apply.md",
+          "sha256": "b7d39211c58d00b3fcc596554b24b9a6dec5358603a25ca73a4897c189a97845",
+          "description": "Pre-apply checkpoint commit evidence."
         }
       ],
       "nextCheckpoint": "persist-intake-plan-drafts:apply:draft-schema-migration-and-defaults"
