@@ -1,6 +1,6 @@
 # Apply Task Groups Evidence Schema
 
-Each change must create `evidence/<change>/apply-task-groups.json` during apply-readiness, before any apply implementation starts.
+Each change must create `evidence/<change>/apply-task-groups.json` during apply planning, before any apply implementation starts.
 
 Required JSON shape:
 

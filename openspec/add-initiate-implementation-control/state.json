@@ -4,12 +4,20 @@
   "phase": "active",
   "currentChangeIndex": 0,
   "currentChange": "introduce-study-intake-router",
-  "currentStep": "product_deepen_round_3",
-  "currentCheckpoint": "introduce-study-intake-router:product_deepen_round_3",
+  "currentStep": "apply",
+  "currentCheckpoint": "introduce-study-intake-router:apply:intake-data-and-idempotency",
   "currentAttempt": 0,
-  "runCounter": 2,
+  "runCounter": 6,
   "maxRetriesPerCheckpoint": 2,
   "requiredProductDeepenRounds": 3,
+  "requiresScopeDependencyCheck": true,
+  "productDeepenScopeGuard": {
+    "schemaVersion": 1,
+    "requiredEveryRound": true,
+    "readAdjacentChanges": true,
+    "recordInRoundEvidence": true,
+    "lastUpdatedAt": "2026-05-25T04:15:36Z"
+  },
   "stateFile": "openspec/add-initiate-implementation-control/state.json",
   "progressFile": "openspec/add-initiate-implementation-control/progress.md",
   "runbookFile": "openspec/add-initiate-implementation-control/runbook.md",
@@ -36,15 +44,28 @@
       "redesign-add-initiate-ui"
     ]
   },
+  "scopeDependencyCheck": {
+    "schemaVersion": 1,
+    "evidenceRoot": "openspec/add-initiate-implementation-control/evidence/scope-dependency",
+    "requiredAfterProductDeepening": true,
+    "requiredBeforeApply": true,
+    "lastCheck": {
+      "completedAt": "2026-05-25T04:22:26Z",
+      "changeId": "introduce-study-intake-router",
+      "checkpoint": "introduce-study-intake-router:scope_dependency_check",
+      "result": "passed",
+      "evidenceFile": "openspec/add-initiate-implementation-control/evidence/scope-dependency/introduce-study-intake-router.md"
+    }
+  },
   "applyCursor": {
     "schemaVersion": 1,
-    "activeChange": null,
+    "activeChange": "introduce-study-intake-router",
     "currentGroupId": null,
     "currentGroupStartedAt": null,
     "completedGroupIds": [],
     "blockedGroupId": null,
-    "taskGroupsFile": null,
-    "lastEvidenceFile": null,
+    "taskGroupsFile": "openspec/add-initiate-implementation-control/evidence/introduce-study-intake-router/apply-task-groups.json",
+    "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/introduce-study-intake-router/apply-planning.md",
     "lastCommit": null
   },
   "lock": {
@@ -60,15 +81,15 @@
     {
       "id": "introduce-study-intake-router",
       "status": "in_progress",
-      "productDeepenRoundsCompleted": 2,
-      "applyReadinessCompleted": false,
+      "productDeepenRoundsCompleted": 3,
+      "scopeDependencyCheckCompleted": true,
       "applyCompleted": false,
       "applyTaskGroups": {
-        "status": "not_planned",
-        "taskGroupsFile": null,
+        "status": "planned",
+        "taskGroupsFile": "openspec/add-initiate-implementation-control/evidence/introduce-study-intake-router/apply-task-groups.json",
         "completedGroupIds": [],
         "currentGroupId": null,
-        "lastEvidenceFile": null,
+        "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/introduce-study-intake-router/apply-planning.md",
         "lastCommit": null
       }
     },
@@ -76,7 +97,7 @@
       "id": "persist-intake-plan-drafts",
       "status": "pending",
       "productDeepenRoundsCompleted": 0,
-      "applyReadinessCompleted": false,
+      "scopeDependencyCheckCompleted": false,
       "applyCompleted": false,
       "applyTaskGroups": {
         "status": "not_planned",
@@ -91,7 +112,7 @@
       "id": "introduce-plan-compiler",
       "status": "pending",
       "productDeepenRoundsCompleted": 0,
-      "applyReadinessCompleted": false,
+      "scopeDependencyCheckCompleted": false,
       "applyCompleted": false,
       "applyTaskGroups": {
         "status": "not_planned",
@@ -106,7 +127,7 @@
       "id": "introduce-deadline-scheduler",
       "status": "pending",
       "productDeepenRoundsCompleted": 0,
-      "applyReadinessCompleted": false,
+      "scopeDependencyCheckCompleted": false,
       "applyCompleted": false,
       "applyTaskGroups": {
         "status": "not_planned",
@@ -121,7 +142,7 @@
       "id": "redesign-add-initiate-ui",
       "status": "pending",
       "productDeepenRoundsCompleted": 0,
-      "applyReadinessCompleted": false,
+      "scopeDependencyCheckCompleted": false,
       "applyCompleted": false,
       "applyTaskGroups": {
         "status": "not_planned",
@@ -134,17 +155,22 @@
     }
   ],
   "lastRun": {
-    "completedAt": "2026-05-25T03:47:18.301Z",
-    "checkpoint": "introduce-study-intake-router:product_deepen_round_2",
-    "result": "completed"
+    "completedAt": "2026-05-25T04:38:40Z",
+    "checkpoint": "introduce-study-intake-router:apply:intake-data-and-idempotency",
+    "result": "policy_corrected_resume"
   },
-  "lastCompletedCheckpoint": "introduce-study-intake-router:product_deepen_round_2",
+  "lastCompletedCheckpoint": "introduce-study-intake-router:apply:planning",
   "lastMigration": {
     "completedAt": "2026-05-25T03:56:29Z",
     "id": "require-three-product-deepen-rounds",
-    "fromCheckpoint": "introduce-study-intake-router:apply_readiness",
+    "fromCheckpoint": "introduce-study-intake-router:former_pre_apply_gate",
     "toCheckpoint": "introduce-study-intake-router:product_deepen_round_3",
-    "reason": "Automation now requires three product-deepen rounds before apply-readiness. Round 1 and 2 evidence remains valid; round 3 is the next required checkpoint."
+    "reason": "Automation now requires three product-deepen rounds before apply. Round 1 and 2 evidence remains valid; round 3 is the next required checkpoint."
+  },
+  "lastControlChange": {
+    "completedAt": "2026-05-25T04:38:40Z",
+    "id": "narrow-dirty-workspace-blocking-rule",
+    "reason": "Unrelated dirty files should be protected but should not block a path-scoped apply group."
   },
   "lastWorkspaceBaseline": {
     "capturedAt": "2026-05-25T03:56:29Z",
@@ -153,8 +179,8 @@
   },
   "lastFailure": null,
   "lastVerification": {
-    "command": "openspec validate introduce-study-intake-router --strict && openspec status --change introduce-study-intake-router",
-    "result": "valid; 4/4 artifacts complete"
+    "command": "openspec validate introduce-study-intake-router --strict && openspec status --change introduce-study-intake-router --json && jq empty apply-task-groups.json",
+    "result": "valid; current change ready; apply task groups JSON valid"
   },
   "blockedReason": null
 }

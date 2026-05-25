@@ -1,0 +1,85 @@
+{
+  "changeId": "introduce-study-intake-router",
+  "generatedAt": "2026-05-25T04:28:10Z",
+  "groups": [
+    {
+      "id": "intake-data-and-idempotency",
+      "taskIds": [
+        "1.1",
+        "3.1",
+        "3.2",
+        "3.3",
+        "4.5",
+        "4.6"
+      ],
+      "description": "Persist intake items and non-plan outcomes outside active resources/tasks, with idempotent clientRequestId handling and Today-exclusion tests.",
+      "targetFiles": [
+        "assistant_backend/src/db/schema.py",
+        "assistant_backend/src/db/queries.py",
+        "assistant_backend/src/study_plan/intake.py",
+        "assistant_backend/tests/test_study_intake_router.py"
+      ],
+      "testCommands": [
+        "cd assistant_backend && uv run pytest tests/test_study_intake_router.py -k 'idempotency or non_plan or today_exclusion'"
+      ],
+      "evidenceFile": "openspec/add-initiate-implementation-control/evidence/introduce-study-intake-router/apply-groups/intake-data-and-idempotency.md",
+      "dependsOn": []
+    },
+    {
+      "id": "source-preview-and-github-roles",
+      "taskIds": [
+        "2.1",
+        "2.2",
+        "2.3",
+        "2.4",
+        "4.4"
+      ],
+      "description": "Add Add / Initiate-safe source preview and GitHub role metadata without writing active resources, units, or fabricated structure.",
+      "targetFiles": [
+        "assistant_backend/src/handlers/models.py",
+        "assistant_backend/src/handlers/github_handler.py",
+        "assistant_backend/src/study_plan/intake_preview.py",
+        "assistant_backend/tests/test_study_intake_router.py"
+      ],
+      "testCommands": [
+        "cd assistant_backend && uv run pytest tests/test_study_intake_router.py -k 'github or preview or fabricated'"
+      ],
+      "evidenceFile": "openspec/add-initiate-implementation-control/evidence/introduce-study-intake-router/apply-groups/source-preview-and-github-roles.md",
+      "dependsOn": [
+        "intake-data-and-idempotency"
+      ]
+    },
+    {
+      "id": "routing-contracts-and-confirmation",
+      "taskIds": [
+        "1.2",
+        "1.3",
+        "1.4",
+        "1.5",
+        "1.6",
+        "1.7",
+        "4.1",
+        "4.2",
+        "4.3",
+        "4.7"
+      ],
+      "description": "Expose the route/confirmation contracts, role recommendation, confidence, one-question clarification, existing-plan target selection, and repo-role separation.",
+      "targetFiles": [
+        "assistant_backend/src/main.py",
+        "assistant_backend/src/routers/study_intake.py",
+        "assistant_backend/src/study_plan/intake.py",
+        "assistant_backend/src/study_plan/intake_preview.py",
+        "assistant_backend/tests/test_study_intake_router.py"
+      ],
+      "testCommands": [
+        "cd assistant_backend && uv run pytest tests/test_study_intake_router.py",
+        "cd assistant_backend && uv run pytest tests/test_study_plan_router.py tests/test_study_views_today.py"
+      ],
+      "evidenceFile": "openspec/add-initiate-implementation-control/evidence/introduce-study-intake-router/apply-groups/routing-contracts-and-confirmation.md",
+      "dependsOn": [
+        "intake-data-and-idempotency",
+        "source-preview-and-github-roles"
+      ]
+    }
+  ]
+}

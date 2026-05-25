@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-05-25T04:01:51Z",
+  "updatedAt": "2026-05-25T04:38:40Z",
   "entries": [
     {
       "id": "introduce-study-intake-router-product-deepen-round-1",
@@ -19,8 +19,8 @@
       "artifacts": [
         {
           "path": "openspec/changes/introduce-study-intake-router/review-records/product-deepen-round-1.md",
-          "sha256": "b14c7de4d68be5963802f6c85298e542430bc76d3fca15a948dfc1d7651ca259",
-          "description": "Round 1 product deepening evidence."
+          "sha256": "dac7e1a9c44e7b253791794b1169cb765bbfcaf77fe5721d9f4e3e1dabc83d8b",
+          "description": "Round 1 product deepening evidence with 2026-05-25 scope decisions addendum."
         }
       ],
       "nextCheckpoint": "introduce-study-intake-router:product_deepen_round_2"
@@ -47,11 +47,11 @@
       "artifacts": [
         {
           "path": "openspec/changes/introduce-study-intake-router/review-records/product-deepen-round-2.md",
-          "sha256": "69c4fd434992ff3b4a02934e120887cb72c48750d25161735aa5f7cdcc87cc9a",
-          "description": "Round 2 product deepening evidence."
+          "sha256": "114e83d32ebecadecff9d532ef22e7913c563efc4d11cfbc9a1afb055235cc0c",
+          "description": "Round 2 product deepening evidence with 2026-05-25 scope decisions addendum."
         }
       ],
-      "nextCheckpoint": "introduce-study-intake-router:apply_readiness"
+      "nextCheckpoint": "introduce-study-intake-router:product_deepen_round_3"
     },
     {
       "id": "require-three-product-deepen-rounds",
@@ -75,6 +75,267 @@
         }
       ],
       "nextCheckpoint": "introduce-study-intake-router:product_deepen_round_3"
+    },
+    {
+      "id": "add-scope-dependency-check",
+      "timestamp": "2026-05-25T04:13:17Z",
+      "kind": "migration",
+      "changeId": null,
+      "checkpoint": null,
+      "result": "completed",
+      "commands": [
+        {
+          "command": "control-plane update",
+          "exitCode": 0,
+          "summary": "added scope_dependency_check between product_deepen_round_3 and apply"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/add-initiate-implementation-control/runbook.md",
+          "sha256": null,
+          "description": "Runbook state machine updated with scope dependency check."
+        },
+        {
+          "path": "openspec/add-initiate-implementation-control/state.json",
+          "sha256": null,
+          "description": "State updated with scope dependency check flags."
+        }
+      ],
+      "nextCheckpoint": "introduce-study-intake-router:product_deepen_round_3"
+    },
+    {
+      "id": "make-product-deepening-scope-aware",
+      "timestamp": "2026-05-25T04:15:36Z",
+      "kind": "migration",
+      "changeId": null,
+      "checkpoint": null,
+      "result": "completed",
+      "commands": [
+        {
+          "command": "control-plane update",
+          "exitCode": 0,
+          "summary": "required every product-deepen round to consider adjacent change scope"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/add-initiate-implementation-control/runbook.md",
+          "sha256": null,
+          "description": "Product deepening rules now require scope guard decisions every round."
+        },
+        {
+          "path": "openspec/add-initiate-implementation-control/state.json",
+          "sha256": null,
+          "description": "State records productDeepenScopeGuard policy."
+        }
+      ],
+      "nextCheckpoint": "introduce-study-intake-router:product_deepen_round_3"
+    },
+    {
+      "id": "introduce-study-intake-router-product-deepen-round-3",
+      "timestamp": "2026-05-25T04:19:16Z",
+      "kind": "checkpoint",
+      "changeId": "introduce-study-intake-router",
+      "checkpoint": "introduce-study-intake-router:product_deepen_round_3",
+      "result": "completed",
+      "commands": [
+        {
+          "command": "openspec validate introduce-study-intake-router --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        },
+        {
+          "command": "openspec status --change introduce-study-intake-router",
+          "exitCode": 0,
+          "summary": "4/4 artifacts complete"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/changes/introduce-study-intake-router/review-records/product-deepen-round-3.md",
+          "sha256": "6d4a93f8019e42c1a62072c8afa82f55fc84ce1f06d1d4736537ffb082556444",
+          "description": "Round 3 scope-aware product deepening evidence."
+        }
+      ],
+      "nextCheckpoint": "introduce-study-intake-router:scope_dependency_check"
+    },
+    {
+      "id": "introduce-study-intake-router-scope-dependency-check",
+      "timestamp": "2026-05-25T04:22:26Z",
+      "kind": "scope_dependency_check",
+      "changeId": "introduce-study-intake-router",
+      "checkpoint": "introduce-study-intake-router:scope_dependency_check",
+      "result": "completed",
+      "commands": [
+        {
+          "command": "openspec validate introduce-study-intake-router --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        },
+        {
+          "command": "openspec validate persist-intake-plan-drafts --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        },
+        {
+          "command": "openspec status --change introduce-study-intake-router",
+          "exitCode": 0,
+          "summary": "4/4 artifacts complete"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/add-initiate-implementation-control/evidence/scope-dependency/introduce-study-intake-router.md",
+          "sha256": "707cf939aa058bca32ab63ddc795e7b2b1823aa4430ce922a613dd5bc65f1ef1",
+          "description": "Scope dependency check evidence for router-to-draft-persistence boundary."
+        },
+        {
+          "path": "openspec/changes/introduce-study-intake-router/review-records/product-deepen-round-1.md",
+          "sha256": "dac7e1a9c44e7b253791794b1169cb765bbfcaf77fe5721d9f4e3e1dabc83d8b",
+          "description": "Round 1 evidence updated with explicit scope decisions addendum."
+        },
+        {
+          "path": "openspec/changes/introduce-study-intake-router/review-records/product-deepen-round-2.md",
+          "sha256": "114e83d32ebecadecff9d532ef22e7913c563efc4d11cfbc9a1afb055235cc0c",
+          "description": "Round 2 evidence updated with explicit scope decisions addendum."
+        },
+        {
+          "path": "openspec/changes/introduce-study-intake-router/review-records/product-deepen-round-3.md",
+          "sha256": "6d4a93f8019e42c1a62072c8afa82f55fc84ce1f06d1d4736537ffb082556444",
+          "description": "Round 3 scope-aware product deepening evidence verified during scope dependency check."
+        }
+      ],
+      "nextCheckpoint": "introduce-study-intake-router:apply:planning"
+    },
+    {
+      "id": "introduce-study-intake-router-apply-planning",
+      "timestamp": "2026-05-25T04:28:10Z",
+      "kind": "apply_planning",
+      "changeId": "introduce-study-intake-router",
+      "checkpoint": "introduce-study-intake-router:apply:planning",
+      "result": "completed",
+      "decision": "GO",
+      "commands": [
+        {
+          "command": "openspec validate introduce-study-intake-router --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        },
+        {
+          "command": "openspec status --change introduce-study-intake-router --json",
+          "exitCode": 0,
+          "summary": "ready; proposal/design/specs/tasks complete"
+        },
+        {
+          "command": "openspec instructions apply --change introduce-study-intake-router --json",
+          "exitCode": 0,
+          "summary": "apply context available; 21 pending tasks"
+        },
+        {
+          "command": "jq empty openspec/add-initiate-implementation-control/evidence/introduce-study-intake-router/apply-task-groups.json",
+          "exitCode": 0,
+          "summary": "valid JSON"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/add-initiate-implementation-control/evidence/introduce-study-intake-router/apply-planning.md",
+          "sha256": "cec30e8e0f9183f319c8a54fe10d0c516aa3891731a982b4d09ca9715799f60f",
+          "description": "Apply planning decision report."
+        },
+        {
+          "path": "openspec/add-initiate-implementation-control/evidence/introduce-study-intake-router/apply-task-groups.json",
+          "sha256": "689af53dab1fc9536e2a71c201d23dbd2fac70a8a9fd5dc509aefaafc6cca90e",
+          "description": "Sequential apply task groups and recovery cursor source."
+        }
+      ],
+      "nextCheckpoint": "introduce-study-intake-router:apply:intake-data-and-idempotency"
+    },
+    {
+      "id": "remove-standalone-pre-apply-checkpoint",
+      "timestamp": "2026-05-25T04:35:14Z",
+      "kind": "migration",
+      "changeId": null,
+      "checkpoint": null,
+      "result": "completed",
+      "commands": [
+        {
+          "command": "control-plane update",
+          "exitCode": 0,
+          "summary": "merged former standalone pre-apply gate into apply planning"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/add-initiate-implementation-control/runbook.md",
+          "sha256": null,
+          "description": "Runbook state machine now moves from scope dependency check directly to apply."
+        },
+        {
+          "path": "openspec/add-initiate-implementation-control/state.json",
+          "sha256": null,
+          "description": "State no longer tracks a separate pre-apply gate flag."
+        }
+      ],
+      "nextCheckpoint": "introduce-study-intake-router:apply:intake-data-and-idempotency"
+    },
+    {
+      "id": "introduce-study-intake-router-apply-intake-data-and-idempotency-blocked-overlapping-user-changes",
+      "timestamp": "2026-05-25T04:38:40Z",
+      "kind": "failure",
+      "changeId": "introduce-study-intake-router",
+      "checkpoint": "introduce-study-intake-router:apply:intake-data-and-idempotency",
+      "result": "blocked",
+      "category": "overlapping_user_changes",
+      "commands": [
+        {
+          "command": "git status --porcelain=v1",
+          "exitCode": 0,
+          "summary": "found dirty path outside workspace-baseline.json: docs/agent-workflow.md"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/add-initiate-implementation-control/evidence/failures/2026-05-25T043840Z-overlapping-user-changes.md",
+          "sha256": "d4508031bcca893fffa0648208a0980b20b164c29bbf7f9b827d173831a87ac5",
+          "description": "Blocking failure evidence for dirty path outside workspace baseline."
+        },
+        {
+          "path": "openspec/add-initiate-implementation-control/evidence/failures/failure-log.jsonl",
+          "sha256": "f3461325ba6f0669b2288ffdca4a45454049772e8251e9796bf44e380f56a2ab",
+          "description": "Structured failure log with overlapping_user_changes entry."
+        }
+      ],
+      "nextCheckpoint": "introduce-study-intake-router:apply:intake-data-and-idempotency"
+    },
+    {
+      "id": "narrow-dirty-workspace-blocking-rule",
+      "timestamp": "2026-05-25T04:38:40Z",
+      "kind": "policy_update",
+      "changeId": null,
+      "checkpoint": "introduce-study-intake-router:apply:intake-data-and-idempotency",
+      "result": "completed",
+      "commands": [
+        {
+          "command": "control-plane update",
+          "exitCode": 0,
+          "summary": "unrelated dirty files are protected_unrelated_dirty, not automatic blocking overlaps"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/add-initiate-implementation-control/evidence/policy-updates/2026-05-25T043840Z-dirty-workspace-policy.md",
+          "sha256": "7b8d843ff8a9afb38804ea2291cd0262e3f4494429edf1e00e5cc5dbdc3793d7",
+          "description": "Policy evidence narrowing dirty-workspace blocking rules."
+        },
+        {
+          "path": "openspec/add-initiate-implementation-control/runbook.md",
+          "sha256": "adb516d756fee2b21334183719e9350e2e04afb7bc5c66555ee1b9dc9dfd5691",
+          "description": "Runbook updated with protected_unrelated_dirty classification."
+        }
+      ],
+      "nextCheckpoint": "introduce-study-intake-router:apply:intake-data-and-idempotency"
     }
   ]
 }

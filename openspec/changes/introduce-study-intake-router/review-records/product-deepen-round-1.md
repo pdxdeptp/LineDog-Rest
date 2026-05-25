@@ -77,3 +77,32 @@ Modification: Treated as coherence-critical for this child change and added expl
 ## Result
 
 Round 1 found and fixed the missing router contract, idempotency, attachment-target, and repo-role separation details. The change remains scoped to routing and non-plan safety.
+
+## Scope Decisions Addendum
+
+Added during the 2026-05-25 scope dependency audit after the automation policy began requiring explicit scope decisions in every product-deepen record. This addendum records the boundary already implied by Round 1; it does not change the original product findings.
+
+### In Scope
+
+- Idempotent intake item creation and route result contracts.
+- Role recommendation, confidence, reason codes, and one-question clarification.
+- Existing active-plan target and attachment-mode resolution.
+- Source preview and GitHub role metadata used only for routing.
+- Non-plan storage outcomes that do not create active tasks.
+
+### Out Of Scope
+
+- Plan draft persistence, draft versioning, and activation events.
+- Phase/task generation and deadline scheduling.
+- Draft review UI or post-activation adjustment behavior.
+- Deep GitHub/source analysis beyond shallow preview facts.
+
+### Deferred Upstream Dependencies
+
+- None. This is the first child change in the Add / Initiate chain.
+
+### Downstream Contracts Preserved
+
+- `intakeItemId`, `clientRequestId`, `confirmedRole`, `attachmentMode`, optional `existingPlanId`, `canonicalRepoRole`, and `materialRole`.
+- `createsActiveTasks=false` for router outcomes.
+- Draft persistence, draft discovery, and activation remain owned by downstream changes.

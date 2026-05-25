@@ -49,7 +49,7 @@ The router may use:
 - raw text and source type;
 - URL or GitHub preview metadata;
 - shallow source synopsis;
-- known active/draft plan titles when available;
+- known active plan titles, and draft plan titles only when a downstream draft-persistence surface already exists;
 - user-provided wording such as "later", "reference", "rebuild", "for interview", or "add to current project";
 - existing plan selection when the user explicitly chooses one.
 
@@ -125,6 +125,8 @@ If the router recommends `attach_to_existing_plan` but no existing plan target i
 - with no candidate, ask whether to store as reference/later or create a new plan instead.
 
 The router should not proceed to scheduled-work handoff until both `existingPlanId` and `attachmentMode` are confirmed.
+
+This router change must not implement draft-plan persistence or draft-plan discovery on its own. It may use active plans that already exist in the current system. Draft plan candidates are a downstream integration point owned by `persist-intake-plan-drafts`.
 
 ## GitHub Preview
 

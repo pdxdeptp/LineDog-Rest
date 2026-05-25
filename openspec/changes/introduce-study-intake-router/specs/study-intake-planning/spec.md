@@ -32,7 +32,7 @@ The system SHALL route every submitted learning or project item into a proposed 
 - **AND** the system does not create active daily tasks before the user confirms a plan draft
 
 #### Scenario: Item is proposed as existing-plan work
-- **WHEN** the user submits an item that appears to be a phase, task, or material for an existing active or draft plan
+- **WHEN** the user submits an item that appears to be a phase, task, or material for an existing active plan or an available downstream draft-plan surface
 - **THEN** the system proposes `attach_to_existing_plan`
 - **AND** it explains whether the item would be material-only, a draft phase, or scheduled work
 
@@ -50,7 +50,7 @@ The system SHALL route every submitted learning or project item into a proposed 
 The system SHALL represent existing-plan support as an attachment mode under `attach_to_existing_plan`.
 
 #### Scenario: Existing plan support stores attachment mode
-- **WHEN** an intake item is confirmed as belonging to an existing active or draft plan
+- **WHEN** an intake item is confirmed as belonging to an existing active plan or an available downstream draft-plan surface
 - **THEN** the system records `attach_to_existing_plan` plus `material_only`, `draft_phase`, or `scheduled_work`
 - **AND** user-facing supporting material is represented as `material_only` rather than a separate competing machine role
 

@@ -18,11 +18,11 @@ The learning data layer SHALL persist submitted intake items separately from act
 - **THEN** the data layer either discards it or stores it as later/reference according to the user's choice
 - **AND** it remains excluded from active Today facts
 
-### Requirement: Role-Based Learning Entities
-The learning data layer SHALL distinguish planned projects, phases, executable tasks, supporting materials, reference materials, and later resources.
+### Requirement: Role-Based Intake Relationships
+The learning data layer SHALL distinguish intake items, supporting materials, reference materials, later resources, and active executable-task eligibility without requiring draft-plan persistence in this router change.
 
 #### Scenario: Supporting material attaches to a plan
-- **WHEN** the user attaches material to an active or draft plan as support
+- **WHEN** the user attaches material to an active plan or an available downstream draft-plan surface as support
 - **THEN** the system records the relationship between the material and the plan
 - **AND** the material does not become executable work by default
 
