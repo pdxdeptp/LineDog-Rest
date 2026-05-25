@@ -4,10 +4,10 @@
   "phase": "active",
   "currentChangeIndex": 4,
   "currentChange": "redesign-add-initiate-ui",
-  "currentStep": "scope_dependency_check",
-  "currentCheckpoint": "redesign-add-initiate-ui:scope_dependency_check",
+  "currentStep": "apply",
+  "currentCheckpoint": "redesign-add-initiate-ui:apply",
   "currentAttempt": 0,
-  "runCounter": 34,
+  "runCounter": 35,
   "maxRetriesPerCheckpoint": 2,
   "requiredProductDeepenRounds": 3,
   "requiresScopeDependencyCheck": true,
@@ -62,11 +62,11 @@
     "requiredAfterProductDeepening": true,
     "requiredBeforeApply": true,
     "lastCheck": {
-      "completedAt": "2026-05-25T11:09:11Z",
-      "changeId": "introduce-deadline-scheduler",
-      "checkpoint": "introduce-deadline-scheduler:scope_dependency_check",
+      "completedAt": "2026-05-25T13:00:12Z",
+      "changeId": "redesign-add-initiate-ui",
+      "checkpoint": "redesign-add-initiate-ui:scope_dependency_check",
       "result": "passed",
-      "evidenceFile": "openspec/add-initiate-implementation-control/evidence/scope-dependency/introduce-deadline-scheduler.md"
+      "evidenceFile": "openspec/add-initiate-implementation-control/evidence/scope-dependency/redesign-add-initiate-ui.md"
     }
   },
   "applyCursor": {
@@ -171,7 +171,7 @@
       "id": "redesign-add-initiate-ui",
       "status": "in_progress",
       "productDeepenRoundsCompleted": 3,
-      "scopeDependencyCheckCompleted": false,
+      "scopeDependencyCheckCompleted": true,
       "applyCompleted": false,
       "applyTaskGroups": {
         "status": "not_planned",
@@ -184,12 +184,12 @@
     }
   ],
   "lastRun": {
-    "startedAt": "2026-05-25T12:48:42Z",
-    "completedAt": "2026-05-25T12:48:42Z",
-    "checkpoint": "redesign-add-initiate-ui:product_deepen_round_3",
+    "startedAt": "2026-05-25T13:00:12Z",
+    "completedAt": "2026-05-25T13:00:12Z",
+    "checkpoint": "redesign-add-initiate-ui:scope_dependency_check",
     "result": "completed"
   },
-  "lastCompletedCheckpoint": "redesign-add-initiate-ui:product_deepen_round_3",
+  "lastCompletedCheckpoint": "redesign-add-initiate-ui:scope_dependency_check",
   "lastMigration": {
     "completedAt": "2026-05-25T03:56:29Z",
     "id": "require-three-product-deepen-rounds",
@@ -209,8 +209,17 @@
   },
   "lastFailure": null,
   "lastVerification": {
-    "command": "openspec validate redesign-add-initiate-ui --strict",
-    "result": "valid after round 3 product deepening"
+    "commands": [
+      {
+        "command": "openspec validate redesign-add-initiate-ui --strict",
+        "result": "valid"
+      },
+      {
+        "command": "openspec validate introduce-deadline-scheduler --strict",
+        "result": "valid"
+      }
+    ],
+    "result": "valid after scope dependency check"
   },
   "blockedReason": null
 }

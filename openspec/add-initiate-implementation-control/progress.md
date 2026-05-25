@@ -4,8 +4,8 @@
 
 - Phase: active
 - Current change: redesign-add-initiate-ui
-- Current step: scope_dependency_check
-- Current checkpoint: redesign-add-initiate-ui:scope_dependency_check
+- Current step: apply
+- Current checkpoint: redesign-add-initiate-ui:apply
 - Required product-deepen rounds before apply: 3
 - Required checkpoint after product deepening: scope_dependency_check
 - Product-deepen scope guard: every round must read adjacent changes and record scope decisions
@@ -60,7 +60,7 @@ Product-deepen rounds completed for `redesign-add-initiate-ui`:
 - round 2
 - round 3
 
-Scope dependency check completed for `redesign-add-initiate-ui`: no
+Scope dependency check completed for `redesign-add-initiate-ui`: yes
 
 Apply planning completed for `redesign-add-initiate-ui`: no
 
@@ -74,7 +74,7 @@ Remaining apply groups for `redesign-add-initiate-ui`:
 
 Next required checkpoint for `redesign-add-initiate-ui`:
 
-- `scope_dependency_check`
+- `apply`
 
 ## Run Log
 
@@ -1303,3 +1303,21 @@ Next required checkpoint for `redesign-add-initiate-ui`:
 - Manifest:
   - Added `redesign-add-initiate-ui-product-deepen-round-3`.
 - Next checkpoint: redesign-add-initiate-ui:scope_dependency_check
+
+## Run 2026-05-25T13:00:12Z
+
+- Automation: add-initiate-changes
+- Checkpoint: redesign-add-initiate-ui:scope_dependency_check
+- Result: completed
+- Actions:
+  - Read `redesign-add-initiate-ui` proposal, design, specs, tasks, and all three product-deepen records.
+  - Read upstream `introduce-deadline-scheduler` design/spec and the scheduler-to-UI cross-change contract.
+  - Verified all three product-deepen records contain explicit scope decisions.
+  - Confirmed the UI change keeps router, compiler, scheduler, draft persistence, and activation logic out of scope except for a thin orchestration/progress adapter.
+  - Added `evidence/scope-dependency/redesign-add-initiate-ui.md`.
+- Verification:
+  - `openspec validate redesign-add-initiate-ui --strict`: valid.
+  - `openspec validate introduce-deadline-scheduler --strict`: valid.
+- Manifest:
+  - Added `redesign-add-initiate-ui-scope-dependency-check`.
+- Next checkpoint: redesign-add-initiate-ui:apply

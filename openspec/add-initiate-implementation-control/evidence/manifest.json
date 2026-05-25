@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-05-25T12:48:42Z",
+  "updatedAt": "2026-05-25T13:00:12Z",
   "entries": [
     {
       "id": "introduce-study-intake-router-product-deepen-round-1",
@@ -2467,6 +2467,34 @@
         }
       ],
       "nextCheckpoint": "redesign-add-initiate-ui:scope_dependency_check"
+    },
+    {
+      "id": "redesign-add-initiate-ui-scope-dependency-check",
+      "timestamp": "2026-05-25T13:00:12Z",
+      "kind": "scope_dependency_check",
+      "changeId": "redesign-add-initiate-ui",
+      "checkpoint": "redesign-add-initiate-ui:scope_dependency_check",
+      "result": "completed",
+      "commands": [
+        {
+          "command": "openspec validate redesign-add-initiate-ui --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        },
+        {
+          "command": "openspec validate introduce-deadline-scheduler --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/add-initiate-implementation-control/evidence/scope-dependency/redesign-add-initiate-ui.md",
+          "sha256": "0b5d458395c7301888c165ebeecf04a65ba9472fc438371962a8e454309aec39",
+          "description": "Scope dependency check evidence for the final Add / Initiate UI change."
+        }
+      ],
+      "nextCheckpoint": "redesign-add-initiate-ui:apply"
     }
   ]
 }
