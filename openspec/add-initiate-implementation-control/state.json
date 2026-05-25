@@ -5,9 +5,9 @@
   "currentChangeIndex": 3,
   "currentChange": "introduce-deadline-scheduler",
   "currentStep": "apply",
-  "currentCheckpoint": "introduce-deadline-scheduler:apply:scheduler-contract-preflight-and-capacity",
+  "currentCheckpoint": "introduce-deadline-scheduler:apply:placement-buffer-splitting-fallback-and-risk",
   "currentAttempt": 0,
-  "runCounter": 28,
+  "runCounter": 29,
   "maxRetriesPerCheckpoint": 2,
   "requiredProductDeepenRounds": 3,
   "requiresScopeDependencyCheck": true,
@@ -74,11 +74,13 @@
     "activeChange": "introduce-deadline-scheduler",
     "currentGroupId": null,
     "currentGroupStartedAt": null,
-    "completedGroupIds": [],
+    "completedGroupIds": [
+      "scheduler-contract-preflight-and-capacity"
+    ],
     "blockedGroupId": null,
     "taskGroupsFile": "openspec/add-initiate-implementation-control/evidence/introduce-deadline-scheduler/apply-task-groups.json",
-    "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/introduce-plan-compiler/apply-groups/estimates-trace-fixtures-and-final-verification.md",
-    "lastCommit": "e320594ddb161d3c9b743777ab16c756694500a1"
+    "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/introduce-deadline-scheduler/apply-groups/scheduler-contract-preflight-and-capacity.md",
+    "lastCommit": "42bb64b0bb5d5bf3e6187d19d584907a8074d8cc"
   },
   "lock": {
     "path": "openspec/add-initiate-implementation-control/run.lock",
@@ -155,12 +157,14 @@
       "scopeDependencyCheckCompleted": true,
       "applyCompleted": false,
       "applyTaskGroups": {
-        "status": "planned",
+        "status": "in_progress",
         "taskGroupsFile": "openspec/add-initiate-implementation-control/evidence/introduce-deadline-scheduler/apply-task-groups.json",
-        "completedGroupIds": [],
-        "currentGroupId": "scheduler-contract-preflight-and-capacity",
-        "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/introduce-deadline-scheduler/apply-planning.md",
-        "lastCommit": null
+        "completedGroupIds": [
+          "scheduler-contract-preflight-and-capacity"
+        ],
+        "currentGroupId": "placement-buffer-splitting-fallback-and-risk",
+        "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/introduce-deadline-scheduler/apply-groups/scheduler-contract-preflight-and-capacity.md",
+        "lastCommit": "42bb64b0bb5d5bf3e6187d19d584907a8074d8cc"
       }
     },
     {
@@ -180,11 +184,11 @@
     }
   ],
   "lastRun": {
-    "completedAt": "2026-05-25T11:19:11Z",
-    "checkpoint": "introduce-deadline-scheduler:apply:pre_apply_checkpoint_commit",
+    "completedAt": "2026-05-25T11:29:11Z",
+    "checkpoint": "introduce-deadline-scheduler:apply:scheduler-contract-preflight-and-capacity",
     "result": "completed"
   },
-  "lastCompletedCheckpoint": "introduce-deadline-scheduler:apply:pre_apply_checkpoint_commit",
+  "lastCompletedCheckpoint": "introduce-deadline-scheduler:apply:scheduler-contract-preflight-and-capacity",
   "lastMigration": {
     "completedAt": "2026-05-25T03:56:29Z",
     "id": "require-three-product-deepen-rounds",
@@ -204,8 +208,8 @@
   },
   "lastFailure": null,
   "lastVerification": {
-    "command": "git commit -m \"Prepare deadline scheduler apply\"; jq empty state/manifest/apply-task-groups; openspec validate introduce-deadline-scheduler --strict",
-    "result": "pre-apply checkpoint commit created and recorded; scheduler OpenSpec remains valid"
+    "command": "cd assistant_backend && uv run pytest tests/test_study_plan_scheduling.py -k 'input_gate or output_shape or preflight or inclusive or capacity or default'; cd assistant_backend && uv run pytest tests/test_study_plan_scheduling.py; openspec validate introduce-deadline-scheduler --strict; openspec instructions apply --change introduce-deadline-scheduler --json",
+    "result": "targeted scheduler tests passed; full scheduler tests passed; OpenSpec valid; 9/36 tasks complete"
   },
   "blockedReason": null
 }

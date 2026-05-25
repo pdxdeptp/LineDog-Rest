@@ -5,7 +5,7 @@
 - Phase: active
 - Current change: introduce-deadline-scheduler
 - Current step: apply
-- Current checkpoint: introduce-deadline-scheduler:apply:scheduler-contract-preflight-and-capacity
+- Current checkpoint: introduce-deadline-scheduler:apply:placement-buffer-splitting-fallback-and-risk
 - Required product-deepen rounds before apply: 3
 - Required checkpoint after product deepening: scope_dependency_check
 - Product-deepen scope guard: every round must read adjacent changes and record scope decisions
@@ -40,9 +40,12 @@ Scope dependency check completed for `introduce-deadline-scheduler`: yes
 
 Apply planning completed for `introduce-deadline-scheduler`: yes
 
-Planned apply groups for `introduce-deadline-scheduler`:
+Completed apply groups for `introduce-deadline-scheduler`:
 
 - `scheduler-contract-preflight-and-capacity`
+
+Remaining apply groups for `introduce-deadline-scheduler`:
+
 - `placement-buffer-splitting-fallback-and-risk`
 - `infeasibility-options-and-recompute-effects`
 - `scheduler-dry-runs-final-verification`
@@ -1084,3 +1087,28 @@ Planned apply groups for `introduce-deadline-scheduler`:
 - Manifest:
   - Added `introduce-deadline-scheduler-pre-apply-checkpoint-commit`.
 - Next checkpoint: introduce-deadline-scheduler:apply:scheduler-contract-preflight-and-capacity
+
+## Run 2026-05-25T11:29:11Z Apply Group introduce-deadline-scheduler scheduler-contract-preflight-and-capacity
+
+- Automation: add-initiate-changes
+- Checkpoint: introduce-deadline-scheduler:apply:scheduler-contract-preflight-and-capacity
+- Result: completed
+- Actions:
+  - Triggered `openspec-apply-change`, `superpowers:subagent-driven-development`, and `superpowers:test-driven-development`.
+  - Wrote failing scheduler tests first, verified RED failures, then implemented minimal scheduler contract/preflight/capacity behavior.
+  - Fixed spec-review findings around pass-through, visible assumptions, invalid date recovery, optional risk reporting, and capacity-gap math.
+  - Fixed code-quality findings around package anchor merge, essential-first placement, compiler assumption preservation, invalid container inputs, and deadline-before-start risk math.
+  - Marked tasks 1.1-1.5, 1.11, and 4.1-4.3 complete.
+  - Wrote apply group evidence at `openspec/add-initiate-implementation-control/evidence/introduce-deadline-scheduler/apply-groups/scheduler-contract-preflight-and-capacity.md`.
+  - Created implementation commit `42bb64b0bb5d5bf3e6187d19d584907a8074d8cc`.
+  - Protected unrelated dirty files and did not stage them.
+- Verification:
+  - `cd assistant_backend && uv run pytest tests/test_study_plan_scheduling.py -k 'input_gate or output_shape or preflight or inclusive or capacity or default'`: 11 passed, 3 deselected.
+  - `cd assistant_backend && uv run pytest tests/test_study_plan_scheduling.py`: 14 passed.
+  - `openspec validate introduce-deadline-scheduler --strict`: valid.
+  - `openspec instructions apply --change introduce-deadline-scheduler --json`: 9/36 complete, 27 remaining.
+  - Spec compliance re-review: approved.
+  - Code quality re-review: approved.
+- Manifest:
+  - Added `introduce-deadline-scheduler-apply-scheduler-contract-preflight-and-capacity`.
+- Next checkpoint: introduce-deadline-scheduler:apply:placement-buffer-splitting-fallback-and-risk

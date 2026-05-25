@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-05-25T11:19:11Z",
+  "updatedAt": "2026-05-25T11:29:11Z",
   "entries": [
     {
       "id": "introduce-study-intake-router-product-deepen-round-1",
@@ -2038,6 +2038,71 @@
         }
       ],
       "nextCheckpoint": "introduce-deadline-scheduler:apply:scheduler-contract-preflight-and-capacity"
+    },
+    {
+      "id": "introduce-deadline-scheduler-apply-scheduler-contract-preflight-and-capacity",
+      "timestamp": "2026-05-25T11:29:11Z",
+      "kind": "apply_group",
+      "changeId": "introduce-deadline-scheduler",
+      "checkpoint": "introduce-deadline-scheduler:apply:scheduler-contract-preflight-and-capacity",
+      "groupId": "scheduler-contract-preflight-and-capacity",
+      "result": "completed",
+      "commit": "42bb64b0bb5d5bf3e6187d19d584907a8074d8cc",
+      "commands": [
+        {
+          "command": "cd assistant_backend && uv run pytest tests/test_study_plan_scheduling.py -k 'input_gate or output_shape or preflight or inclusive or capacity or default'",
+          "exitCode": 0,
+          "summary": "11 passed, 3 deselected"
+        },
+        {
+          "command": "cd assistant_backend && uv run pytest tests/test_study_plan_scheduling.py",
+          "exitCode": 0,
+          "summary": "14 passed"
+        },
+        {
+          "command": "openspec validate introduce-deadline-scheduler --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        },
+        {
+          "command": "openspec instructions apply --change introduce-deadline-scheduler --json",
+          "exitCode": 0,
+          "summary": "9/36 tasks complete, 27 remaining"
+        },
+        {
+          "command": "git diff --check -- assistant_backend/src/study_plan/scheduling.py assistant_backend/src/study_plan/__init__.py assistant_backend/tests/test_study_plan_scheduling.py openspec/changes/introduce-deadline-scheduler/tasks.md",
+          "exitCode": 0,
+          "summary": "no whitespace errors"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/add-initiate-implementation-control/evidence/introduce-deadline-scheduler/apply-groups/scheduler-contract-preflight-and-capacity.md",
+          "sha256": "a875af8b3586dea383348e905ccafa9a1cff76c2f50278a9794460e4ec0b91f4",
+          "description": "Apply group evidence, TDD record, review iterations, verification, and next checkpoint."
+        },
+        {
+          "path": "assistant_backend/src/study_plan/scheduling.py",
+          "sha256": "c90e4877224200733246ab04c94404aea08d5823cc13a166db96a16c0e6f0b69",
+          "description": "Scheduler contract/preflight/capacity implementation."
+        },
+        {
+          "path": "assistant_backend/src/study_plan/__init__.py",
+          "sha256": "a053ba3e29c9050a70072acc353e08cab575f550a0f45d5b80faa5911d867b4e",
+          "description": "Study plan helper export for schedule_draft_review."
+        },
+        {
+          "path": "assistant_backend/tests/test_study_plan_scheduling.py",
+          "sha256": "f8ce9b7496283dd83b3ad199a6916a8bc4ff26294d313593fa33faa96472f4af",
+          "description": "Scheduler TDD tests for input gate, output shape, preflight, inclusive window, and capacity."
+        },
+        {
+          "path": "openspec/changes/introduce-deadline-scheduler/tasks.md",
+          "sha256": "5a41cf7542b959ace105f145bfb68164935096a01c602812beeb8310ec02448e",
+          "description": "Completed scheduler contract/preflight/capacity tasks."
+        }
+      ],
+      "nextCheckpoint": "introduce-deadline-scheduler:apply:placement-buffer-splitting-fallback-and-risk"
     }
   ]
 }
