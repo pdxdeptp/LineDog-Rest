@@ -5,7 +5,7 @@
 - Phase: active
 - Current change: redesign-add-initiate-ui
 - Current step: apply
-- Current checkpoint: redesign-add-initiate-ui:apply
+- Current checkpoint: redesign-add-initiate-ui:apply:session-adapter-and-api-contract
 - Required product-deepen rounds before apply: 3
 - Required checkpoint after product deepening: scope_dependency_check
 - Product-deepen scope guard: every round must read adjacent changes and record scope decisions
@@ -62,7 +62,7 @@ Product-deepen rounds completed for `redesign-add-initiate-ui`:
 
 Scope dependency check completed for `redesign-add-initiate-ui`: yes
 
-Apply planning completed for `redesign-add-initiate-ui`: no
+Apply planning completed for `redesign-add-initiate-ui`: yes
 
 Completed apply groups for `redesign-add-initiate-ui`:
 
@@ -70,11 +70,16 @@ Completed apply groups for `redesign-add-initiate-ui`:
 
 Remaining apply groups for `redesign-add-initiate-ui`:
 
-- not planned yet
+- `session-adapter-and-api-contract`
+- `entry-role-and-attachment-review`
+- `anchor-state-machine-and-recovery`
+- `draft-review-options-and-activation`
+- `noise-boundaries-and-active-refresh`
+- `real-context-qa-and-final-verification`
 
 Next required checkpoint for `redesign-add-initiate-ui`:
 
-- `apply`
+- `apply:session-adapter-and-api-contract`
 
 ## Run Log
 
@@ -1321,3 +1326,23 @@ Next required checkpoint for `redesign-add-initiate-ui`:
 - Manifest:
   - Added `redesign-add-initiate-ui-scope-dependency-check`.
 - Next checkpoint: redesign-add-initiate-ui:apply
+
+## Run 2026-05-25T13:06:50Z
+
+- Automation: add-initiate-changes
+- Checkpoint: redesign-add-initiate-ui:apply:planning
+- Result: completed
+- Actions:
+  - Ran `openspec-apply-change` preflight for `redesign-add-initiate-ui` without implementation code.
+  - Confirmed OpenSpec status is ready and apply instructions list 31 pending tasks.
+  - Wrote `evidence/redesign-add-initiate-ui/apply-planning.md`.
+  - Generated `evidence/redesign-add-initiate-ui/apply-task-groups.json` with six sequential groups.
+  - Initialized `state.json.applyCursor` and the change-level apply task group cursor.
+- Verification:
+  - `jq empty openspec/add-initiate-implementation-control/evidence/redesign-add-initiate-ui/apply-task-groups.json`: valid.
+  - `openspec validate redesign-add-initiate-ui --strict`: valid.
+  - `openspec status --change redesign-add-initiate-ui --json`: artifacts complete.
+  - `openspec instructions apply --change redesign-add-initiate-ui --json`: ready, 31 pending tasks.
+- Manifest:
+  - Added `redesign-add-initiate-ui-apply-planning`.
+- Next checkpoint: redesign-add-initiate-ui:apply:session-adapter-and-api-contract

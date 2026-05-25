@@ -1,0 +1,180 @@
+{
+  "changeId": "redesign-add-initiate-ui",
+  "generatedAt": "2026-05-25T13:06:50Z",
+  "groups": [
+    {
+      "id": "session-adapter-and-api-contract",
+      "taskIds": [
+        "0.1",
+        "0.2",
+        "0.3",
+        "0.4",
+        "1.3"
+      ],
+      "description": "Add the typed Add / Initiate session contract across backend adapter and Swift API client, including session identity, progress/review states, role and anchor requests, option effects, activation result, terminal storage states, stale-event identity, and legacy URL ingestion compatibility guardrails. This group must only wrap completed router, draft, compiler, scheduler, and activation helpers; it must not add core planning algorithms.",
+      "targetFiles": [
+        "assistant_backend/src/routers/study_intake.py",
+        "assistant_backend/src/study_plan/add_initiate.py",
+        "assistant_backend/src/study_plan/intake.py",
+        "assistant_backend/src/study_plan/lifecycle.py",
+        "assistant_backend/tests/test_study_add_initiate_adapter.py",
+        "assistant_backend/tests/test_study_intake_router.py",
+        "MalDaze/LearningAssistant/AssistantAPIClient.swift",
+        "MalDaze/LearningAssistant/AssistantAPIClientProtocol.swift",
+        "MalDazeTests/LearningAssistantTests.swift"
+      ],
+      "testCommands": [
+        "cd assistant_backend && uv run pytest tests/test_study_add_initiate_adapter.py tests/test_study_intake_router.py -k 'add_initiate or session or adapter or progress or legacy'",
+        "xcodebuild test -project MalDaze.xcodeproj -scheme MalDaze -only-testing:MalDazeTests/AssistantModelDecodingTests -quiet",
+        "openspec validate redesign-add-initiate-ui --strict"
+      ],
+      "evidenceFile": "openspec/add-initiate-implementation-control/evidence/redesign-add-initiate-ui/apply-groups/session-adapter-and-api-contract.md",
+      "dependsOn": []
+    },
+    {
+      "id": "entry-role-and-attachment-review",
+      "taskIds": [
+        "1.1",
+        "1.2",
+        "2.1",
+        "2.2"
+      ],
+      "description": "Rename the Add surface to Add / Initiate, support the first-version item input types, render role confirmation with reason/confidence/switching, and render existing-plan attachment choices for material_only, draft_phase, and scheduled_work without creating active tasks.",
+      "targetFiles": [
+        "MalDaze/LearningAssistant/AssistantPanelView.swift",
+        "MalDaze/LearningAssistant/LearningAssistantViewModel.swift",
+        "MalDaze/LearningAssistant/AssistantAPIClient.swift",
+        "MalDaze/LearningAssistant/AssistantAPIClientProtocol.swift",
+        "MalDazeTests/LearningAssistantTests.swift"
+      ],
+      "testCommands": [
+        "xcodebuild test -project MalDaze.xcodeproj -scheme MalDaze -parallel-testing-enabled NO -only-testing:MalDazeTests/LearningAssistantViewModelTests -only-testing:MalDazeTests/LearningAssistantUISourceTests -quiet",
+        "openspec validate redesign-add-initiate-ui --strict"
+      ],
+      "evidenceFile": "openspec/add-initiate-implementation-control/evidence/redesign-add-initiate-ui/apply-groups/entry-role-and-attachment-review.md",
+      "dependsOn": [
+        "session-adapter-and-api-contract"
+      ]
+    },
+    {
+      "id": "anchor-state-machine-and-recovery",
+      "taskIds": [
+        "2.3",
+        "2.4",
+        "2.5",
+        "2.6"
+      ],
+      "description": "Implement the Add / Initiate ViewModel state machine, anchor confirmation, needs_input, compile_failed, infeasible_review, draft_review, activation_failed, cancel/storage states, one-primary-action rule, retry preservation, option-effect progress identity, and stale session/draft-version response rejection.",
+      "targetFiles": [
+        "MalDaze/LearningAssistant/LearningAssistantViewModel.swift",
+        "MalDaze/LearningAssistant/AssistantPanelView.swift",
+        "MalDaze/LearningAssistant/AssistantAPIClient.swift",
+        "MalDaze/LearningAssistant/AssistantAPIClientProtocol.swift",
+        "MalDazeTests/LearningAssistantTests.swift"
+      ],
+      "testCommands": [
+        "xcodebuild test -project MalDaze.xcodeproj -scheme MalDaze -parallel-testing-enabled NO -only-testing:MalDazeTests/LearningAssistantViewModelTests -quiet",
+        "openspec validate redesign-add-initiate-ui --strict"
+      ],
+      "evidenceFile": "openspec/add-initiate-implementation-control/evidence/redesign-add-initiate-ui/apply-groups/anchor-state-machine-and-recovery.md",
+      "dependsOn": [
+        "session-adapter-and-api-contract",
+        "entry-role-and-attachment-review"
+      ]
+    },
+    {
+      "id": "draft-review-options-and-activation",
+      "taskIds": [
+        "3.1",
+        "3.2",
+        "3.3",
+        "3.4",
+        "3.5",
+        "3.6",
+        "3.7",
+        "3.8"
+      ],
+      "description": "Build summary-first draft review, first-week schedule rendering, explicit expansion controls, fallback-as-metadata rendering, canonical infeasibility option labels, hard-deadline option guardrails, option-effect results, activation, stale-draft, retry, edit, cancel, and activation-failure UI paths.",
+      "targetFiles": [
+        "MalDaze/LearningAssistant/AssistantPanelView.swift",
+        "MalDaze/LearningAssistant/LearningAssistantViewModel.swift",
+        "MalDaze/LearningAssistant/AssistantAPIClient.swift",
+        "MalDaze/LearningAssistant/AssistantAPIClientProtocol.swift",
+        "MalDazeTests/LearningAssistantTests.swift"
+      ],
+      "testCommands": [
+        "xcodebuild test -project MalDaze.xcodeproj -scheme MalDaze -parallel-testing-enabled NO -only-testing:MalDazeTests/LearningAssistantViewModelTests -only-testing:MalDazeTests/LearningAssistantUISourceTests -quiet",
+        "openspec validate redesign-add-initiate-ui --strict"
+      ],
+      "evidenceFile": "openspec/add-initiate-implementation-control/evidence/redesign-add-initiate-ui/apply-groups/draft-review-options-and-activation.md",
+      "dependsOn": [
+        "anchor-state-machine-and-recovery"
+      ]
+    },
+    {
+      "id": "noise-boundaries-and-active-refresh",
+      "taskIds": [
+        "4.1",
+        "4.2",
+        "4.3",
+        "4.4",
+        "4.5"
+      ],
+      "description": "Verify and implement the no-noise boundary: unconfirmed drafts, stored references, later resources, material-only attachments, processing states, option effects, cancellations, and activation failures must not refresh or populate Today, active Calendar, deadline-risk prompts, smart-mode proposals, or reminders; activation success is the only active-work refresh path.",
+      "targetFiles": [
+        "assistant_backend/tests/test_study_add_initiate_adapter.py",
+        "assistant_backend/tests/test_study_views_today.py",
+        "assistant_backend/tests/test_study_views_calendar.py",
+        "assistant_backend/tests/test_study_smart_mode_proposals.py",
+        "MalDaze/LearningAssistant/LearningAssistantViewModel.swift",
+        "MalDaze/LearningAssistant/AssistantPanelView.swift",
+        "MalDazeTests/LearningAssistantTests.swift"
+      ],
+      "testCommands": [
+        "cd assistant_backend && uv run pytest tests/test_study_add_initiate_adapter.py tests/test_study_views_today.py tests/test_study_views_calendar.py tests/test_study_smart_mode_proposals.py -k 'add_initiate or draft or non_plan or material or smart or today or calendar'",
+        "xcodebuild test -project MalDaze.xcodeproj -scheme MalDaze -parallel-testing-enabled NO -only-testing:MalDazeTests/LearningAssistantViewModelTests -only-testing:MalDazeTests/LearningAssistantUISourceTests -quiet",
+        "openspec validate redesign-add-initiate-ui --strict"
+      ],
+      "evidenceFile": "openspec/add-initiate-implementation-control/evidence/redesign-add-initiate-ui/apply-groups/noise-boundaries-and-active-refresh.md",
+      "dependsOn": [
+        "draft-review-options-and-activation"
+      ]
+    },
+    {
+      "id": "real-context-qa-and-final-verification",
+      "taskIds": [
+        "5.1",
+        "5.2",
+        "5.3",
+        "5.4",
+        "5.5"
+      ],
+      "description": "Complete remaining ViewModel/UI/progress tests, add or update real-context fixtures for AgentGuide, easyagent repo rebuild, LeetCode cadence, interview prep, resume/project rewrite, and MalDaze existing-project material flows, manually verify quiet states and legacy URL compatibility, run full focused backend/Swift verification, and mark OpenSpec tasks complete.",
+      "targetFiles": [
+        "assistant_backend/tests/test_study_add_initiate_adapter.py",
+        "assistant_backend/tests/test_study_intake_router.py",
+        "assistant_backend/tests/test_study_plan_lifecycle.py",
+        "assistant_backend/tests/test_study_plan_scheduling.py",
+        "assistant_backend/tests/test_study_views_today.py",
+        "assistant_backend/tests/test_study_views_calendar.py",
+        "assistant_backend/tests/test_study_smart_mode_proposals.py",
+        "MalDaze/LearningAssistant/AssistantAPIClient.swift",
+        "MalDaze/LearningAssistant/AssistantAPIClientProtocol.swift",
+        "MalDaze/LearningAssistant/LearningAssistantViewModel.swift",
+        "MalDaze/LearningAssistant/AssistantPanelView.swift",
+        "MalDazeTests/LearningAssistantTests.swift",
+        "openspec/changes/redesign-add-initiate-ui/tasks.md"
+      ],
+      "testCommands": [
+        "cd assistant_backend && uv run pytest tests/test_study_add_initiate_adapter.py tests/test_study_intake_router.py tests/test_study_plan_lifecycle.py tests/test_study_plan_scheduling.py tests/test_study_views_today.py tests/test_study_views_calendar.py tests/test_study_smart_mode_proposals.py",
+        "xcodebuild test -project MalDaze.xcodeproj -scheme MalDaze -parallel-testing-enabled NO -only-testing:MalDazeTests/AssistantModelDecodingTests -only-testing:MalDazeTests/LearningAssistantViewModelTests -only-testing:MalDazeTests/LearningAssistantUISourceTests -quiet",
+        "openspec validate redesign-add-initiate-ui --strict",
+        "openspec instructions apply --change redesign-add-initiate-ui --json"
+      ],
+      "evidenceFile": "openspec/add-initiate-implementation-control/evidence/redesign-add-initiate-ui/apply-groups/real-context-qa-and-final-verification.md",
+      "dependsOn": [
+        "noise-boundaries-and-active-refresh"
+      ]
+    }
+  ]
+}

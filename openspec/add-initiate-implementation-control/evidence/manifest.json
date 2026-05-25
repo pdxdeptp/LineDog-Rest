@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-05-25T13:00:12Z",
+  "updatedAt": "2026-05-25T13:06:50Z",
   "entries": [
     {
       "id": "introduce-study-intake-router-product-deepen-round-1",
@@ -2495,6 +2495,49 @@
         }
       ],
       "nextCheckpoint": "redesign-add-initiate-ui:apply"
+    },
+    {
+      "id": "redesign-add-initiate-ui-apply-planning",
+      "timestamp": "2026-05-25T13:06:50Z",
+      "kind": "apply_planning",
+      "changeId": "redesign-add-initiate-ui",
+      "checkpoint": "redesign-add-initiate-ui:apply:planning",
+      "result": "completed",
+      "commands": [
+        {
+          "command": "jq empty openspec/add-initiate-implementation-control/evidence/redesign-add-initiate-ui/apply-task-groups.json",
+          "exitCode": 0,
+          "summary": "valid JSON"
+        },
+        {
+          "command": "openspec validate redesign-add-initiate-ui --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        },
+        {
+          "command": "openspec status --change redesign-add-initiate-ui --json",
+          "exitCode": 0,
+          "summary": "artifacts complete"
+        },
+        {
+          "command": "openspec instructions apply --change redesign-add-initiate-ui --json",
+          "exitCode": 0,
+          "summary": "31 pending tasks"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/add-initiate-implementation-control/evidence/redesign-add-initiate-ui/apply-planning.md",
+          "sha256": "2df967aadd5411dd22b0c6db5fbf9cc933ab21544b31ce87ddc40c451f9b0f8d",
+          "description": "Apply planning evidence and dispatch boundary for the Add / Initiate UI change."
+        },
+        {
+          "path": "openspec/add-initiate-implementation-control/evidence/redesign-add-initiate-ui/apply-task-groups.json",
+          "sha256": "b2d28999c43ad3eb515d350221f430e7bd2dd2778130ce0726bb4529cd152f9a",
+          "description": "Sequential apply task groups for the Add / Initiate UI change."
+        }
+      ],
+      "nextCheckpoint": "redesign-add-initiate-ui:apply:session-adapter-and-api-contract"
     }
   ]
 }

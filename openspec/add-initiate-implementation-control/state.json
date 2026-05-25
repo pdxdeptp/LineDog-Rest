@@ -5,9 +5,9 @@
   "currentChangeIndex": 4,
   "currentChange": "redesign-add-initiate-ui",
   "currentStep": "apply",
-  "currentCheckpoint": "redesign-add-initiate-ui:apply",
+  "currentCheckpoint": "redesign-add-initiate-ui:apply:session-adapter-and-api-contract",
   "currentAttempt": 0,
-  "runCounter": 35,
+  "runCounter": 36,
   "maxRetriesPerCheckpoint": 2,
   "requiredProductDeepenRounds": 3,
   "requiresScopeDependencyCheck": true,
@@ -71,11 +71,12 @@
   },
   "applyCursor": {
     "schemaVersion": 1,
-    "activeChange": null,
+    "activeChange": "redesign-add-initiate-ui",
     "currentGroupId": null,
+    "currentGroupStartedAt": null,
     "completedGroupIds": [],
     "blockedGroupId": null,
-    "taskGroupsFile": null,
+    "taskGroupsFile": "openspec/add-initiate-implementation-control/evidence/redesign-add-initiate-ui/apply-task-groups.json",
     "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/cross-change-contracts/introduce-deadline-scheduler-to-redesign-add-initiate-ui.md",
     "lastCommit": "59533f970ae2f988c3edd504e3ae65e5b314edc4"
   },
@@ -174,22 +175,21 @@
       "scopeDependencyCheckCompleted": true,
       "applyCompleted": false,
       "applyTaskGroups": {
-        "status": "not_planned",
-        "taskGroupsFile": null,
+        "status": "planned",
+        "taskGroupsFile": "openspec/add-initiate-implementation-control/evidence/redesign-add-initiate-ui/apply-task-groups.json",
         "completedGroupIds": [],
-        "currentGroupId": null,
-        "lastEvidenceFile": null,
+        "currentGroupId": "session-adapter-and-api-contract",
+        "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/redesign-add-initiate-ui/apply-planning.md",
         "lastCommit": null
       }
     }
   ],
   "lastRun": {
-    "startedAt": "2026-05-25T13:00:12Z",
-    "completedAt": "2026-05-25T13:00:12Z",
-    "checkpoint": "redesign-add-initiate-ui:scope_dependency_check",
+    "completedAt": "2026-05-25T13:06:50Z",
+    "checkpoint": "redesign-add-initiate-ui:apply:planning",
     "result": "completed"
   },
-  "lastCompletedCheckpoint": "redesign-add-initiate-ui:scope_dependency_check",
+  "lastCompletedCheckpoint": "redesign-add-initiate-ui:apply:planning",
   "lastMigration": {
     "completedAt": "2026-05-25T03:56:29Z",
     "id": "require-three-product-deepen-rounds",
@@ -209,17 +209,8 @@
   },
   "lastFailure": null,
   "lastVerification": {
-    "commands": [
-      {
-        "command": "openspec validate redesign-add-initiate-ui --strict",
-        "result": "valid"
-      },
-      {
-        "command": "openspec validate introduce-deadline-scheduler --strict",
-        "result": "valid"
-      }
-    ],
-    "result": "valid after scope dependency check"
+    "command": "jq empty state/manifest/apply-task-groups; openspec validate redesign-add-initiate-ui --strict; openspec status --change redesign-add-initiate-ui --json; openspec instructions apply --change redesign-add-initiate-ui --json",
+    "result": "apply planning valid; UI OpenSpec valid; apply instructions ready with 31 pending tasks"
   },
   "blockedReason": null
 }
