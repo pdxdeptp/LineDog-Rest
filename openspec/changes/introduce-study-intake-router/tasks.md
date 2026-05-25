@@ -10,10 +10,10 @@
 
 ## 2. Source Preview
 
-- [ ] 2.1 Refactor material preview so Add / Initiate preview does not write active resources, units, or tasks.
-- [ ] 2.2 Add shallow GitHub preview with title, description, README outline, topics, coarse directory signals, and fetch-failure fallback.
-- [ ] 2.3 Add canonical repo role signals: `main_learning_object`, `reference_source`, `clone_rebuild_target`, `project_material`, and `later_reading`.
-- [ ] 2.4 Ensure unavailable repo/source facts remain unknown and do not become fabricated units.
+- [x] 2.1 Refactor material preview so Add / Initiate preview does not write active resources, units, or tasks.
+- [x] 2.2 Add shallow GitHub preview with title, description, README outline, topics, coarse directory signals, and fetch-failure fallback.
+- [x] 2.3 Add canonical repo role signals: `main_learning_object`, `reference_source`, `clone_rebuild_target`, `project_material`, and `later_reading`.
+- [x] 2.4 Ensure unavailable repo/source facts remain unknown and do not become fabricated units.
 
 ## 3. Non-Plan Outcomes
 
@@ -26,7 +26,7 @@
 - [ ] 4.1 Add router tests for all supported first-version input types.
 - [ ] 4.2 Add role tests for new plan, existing-plan attachment, reference, later, and one-off outcomes.
 - [ ] 4.3 Add one-question clarification tests for ambiguous role cases.
-- [ ] 4.4 Add GitHub preview tests for successful metadata, fetch failure, and no fabricated structure.
+- [x] 4.4 Add GitHub preview tests for successful metadata, fetch failure, and no fabricated structure.
 - [x] 4.5 Add Today-exclusion tests proving intake items and non-plan outcomes do not create active tasks.
 - [x] 4.6 Add idempotency tests proving repeated client request ids do not duplicate pending objects.
 - [ ] 4.7 Add existing-plan target-selection tests proving scheduled-work handoff requires target plan and attachment mode confirmation.

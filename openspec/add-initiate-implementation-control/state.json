@@ -5,9 +5,9 @@
   "currentChangeIndex": 0,
   "currentChange": "introduce-study-intake-router",
   "currentStep": "apply",
-  "currentCheckpoint": "introduce-study-intake-router:apply:source-preview-and-github-roles",
+  "currentCheckpoint": "introduce-study-intake-router:apply:routing-contracts-and-confirmation",
   "currentAttempt": 0,
-  "runCounter": 7,
+  "runCounter": 8,
   "maxRetriesPerCheckpoint": 2,
   "requiredProductDeepenRounds": 3,
   "requiresScopeDependencyCheck": true,
@@ -68,12 +68,13 @@
     "currentGroupId": null,
     "currentGroupStartedAt": null,
     "completedGroupIds": [
-      "intake-data-and-idempotency"
+      "intake-data-and-idempotency",
+      "source-preview-and-github-roles"
     ],
     "blockedGroupId": null,
     "taskGroupsFile": "openspec/add-initiate-implementation-control/evidence/introduce-study-intake-router/apply-task-groups.json",
-    "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/introduce-study-intake-router/apply-groups/intake-data-and-idempotency.md",
-    "lastCommit": "08104306ceb192cb60fab92e91d9f4a650d4951a"
+    "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/introduce-study-intake-router/apply-groups/source-preview-and-github-roles.md",
+    "lastCommit": "4bff7cf5847dd9de6d6965dc9612e04f5831b410"
   },
   "lock": {
     "path": "openspec/add-initiate-implementation-control/run.lock",
@@ -95,11 +96,12 @@
         "status": "planned",
         "taskGroupsFile": "openspec/add-initiate-implementation-control/evidence/introduce-study-intake-router/apply-task-groups.json",
         "completedGroupIds": [
-          "intake-data-and-idempotency"
+          "intake-data-and-idempotency",
+          "source-preview-and-github-roles"
         ],
         "currentGroupId": null,
-        "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/introduce-study-intake-router/apply-groups/intake-data-and-idempotency.md",
-        "lastCommit": "08104306ceb192cb60fab92e91d9f4a650d4951a"
+        "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/introduce-study-intake-router/apply-groups/source-preview-and-github-roles.md",
+        "lastCommit": "4bff7cf5847dd9de6d6965dc9612e04f5831b410"
       }
     },
     {
@@ -164,11 +166,11 @@
     }
   ],
   "lastRun": {
-    "completedAt": "2026-05-25T04:44:45Z",
-    "checkpoint": "introduce-study-intake-router:apply:intake-data-and-idempotency",
+    "completedAt": "2026-05-25T05:03:10Z",
+    "checkpoint": "introduce-study-intake-router:apply:source-preview-and-github-roles",
     "result": "completed"
   },
-  "lastCompletedCheckpoint": "introduce-study-intake-router:apply:intake-data-and-idempotency",
+  "lastCompletedCheckpoint": "introduce-study-intake-router:apply:source-preview-and-github-roles",
   "lastMigration": {
     "completedAt": "2026-05-25T03:56:29Z",
     "id": "require-three-product-deepen-rounds",
@@ -188,8 +190,8 @@
   },
   "lastFailure": null,
   "lastVerification": {
-    "command": "cd assistant_backend && uv run pytest tests/test_study_intake_router.py && cd assistant_backend && uv run pytest tests/test_study_plan_router.py tests/test_study_views_today.py && openspec validate introduce-study-intake-router --strict",
-    "result": "intake tests passed 6/6; study plan/today regression passed 12/12 with 2 warnings; OpenSpec valid"
+    "command": "cd assistant_backend && uv run pytest tests/test_study_intake_router.py && cd assistant_backend && uv run pytest tests/test_study_plan_router.py tests/test_study_views_today.py && cd assistant_backend && uv run pytest tests/test_integration.py -q && openspec validate introduce-study-intake-router --strict",
+    "result": "intake tests passed 17/17; study plan/today regression passed 12/12 with 2 warnings; integration passed 16/16 with 2 warnings; OpenSpec valid"
   },
   "blockedReason": null
 }

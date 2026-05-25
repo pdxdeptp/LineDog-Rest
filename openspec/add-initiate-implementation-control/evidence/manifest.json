@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-05-25T04:44:45Z",
+  "updatedAt": "2026-05-25T05:03:10Z",
   "entries": [
     {
       "id": "introduce-study-intake-router-product-deepen-round-1",
@@ -440,6 +440,76 @@
         }
       ],
       "nextCheckpoint": "introduce-study-intake-router:apply:source-preview-and-github-roles"
+    },
+    {
+      "id": "introduce-study-intake-router-apply-group-source-preview-and-github-roles",
+      "timestamp": "2026-05-25T05:03:10Z",
+      "kind": "apply_group",
+      "changeId": "introduce-study-intake-router",
+      "checkpoint": "introduce-study-intake-router:apply:source-preview-and-github-roles",
+      "groupId": "source-preview-and-github-roles",
+      "result": "completed",
+      "commit": "4bff7cf5847dd9de6d6965dc9612e04f5831b410",
+      "commands": [
+        {
+          "command": "cd assistant_backend && uv run pytest tests/test_study_intake_router.py",
+          "exitCode": 0,
+          "summary": "17 passed"
+        },
+        {
+          "command": "cd assistant_backend && uv run pytest tests/test_study_plan_router.py tests/test_study_views_today.py",
+          "exitCode": 0,
+          "summary": "12 passed, 2 warnings"
+        },
+        {
+          "command": "cd assistant_backend && uv run pytest tests/test_integration.py -q",
+          "exitCode": 0,
+          "summary": "16 passed, 2 warnings"
+        },
+        {
+          "command": "openspec validate introduce-study-intake-router --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        },
+        {
+          "command": "openspec instructions apply --change introduce-study-intake-router --json",
+          "exitCode": 0,
+          "summary": "11/21 tasks complete"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/add-initiate-implementation-control/evidence/introduce-study-intake-router/apply-groups/source-preview-and-github-roles.md",
+          "sha256": "a58560e66b7976bfa40a40c9f0fc8f14f13876577906902d96321be5bd8b6fc0",
+          "description": "Apply group evidence, TDD trace, verification, and review summary."
+        },
+        {
+          "path": "assistant_backend/src/handlers/models.py",
+          "sha256": "a34398ddf2b98f82f180928f5703cbf252d6970fcb5705e1129c8a07560be413",
+          "description": "Preview metadata models and synthetic/low-calibration unit markers."
+        },
+        {
+          "path": "assistant_backend/src/handlers/github_handler.py",
+          "sha256": "5e697a257553d76f017716aeedfd7b6756bc6c7ab69cbdd40dfc9eedbe8ba03c",
+          "description": "Add / Initiate-safe GitHub preview and legacy fallback calibration marking."
+        },
+        {
+          "path": "assistant_backend/src/study_plan/intake_preview.py",
+          "sha256": "73cb9ef273193f52e07711c3a974f096a6c3733e1e827cb4c666a02dda11d431",
+          "description": "Intake preview entry point for GitHub repositories."
+        },
+        {
+          "path": "assistant_backend/tests/test_study_intake_router.py",
+          "sha256": "a5533b0cba8b9bd7f65e1c457d0058dd673434eb46e60b26aa3b2ffc673f5ae2",
+          "description": "TDD tests for GitHub preview success, failure, partial fetch, role signals, and no fabricated structure."
+        },
+        {
+          "path": "openspec/changes/introduce-study-intake-router/tasks.md",
+          "sha256": "a208b636f0bb865d65409833abde0a1d3cf42740040b6d0717089c4464f55dd8",
+          "description": "OpenSpec tasks updated for completed source preview and GitHub role group."
+        }
+      ],
+      "nextCheckpoint": "introduce-study-intake-router:apply:routing-contracts-and-confirmation"
     }
   ]
 }

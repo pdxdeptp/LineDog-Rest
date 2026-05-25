@@ -5,7 +5,7 @@
 - Phase: active
 - Current change: introduce-study-intake-router
 - Current step: apply
-- Current checkpoint: introduce-study-intake-router:apply:source-preview-and-github-roles
+- Current checkpoint: introduce-study-intake-router:apply:routing-contracts-and-confirmation
 - Required product-deepen rounds before apply: 3
 - Required checkpoint after product deepening: scope_dependency_check
 - Product-deepen scope guard: every round must read adjacent changes and record scope decisions
@@ -217,6 +217,39 @@
   - `openspec/changes/redesign-study-intake-planning/tasks.md`
 - Next action:
   - Continue the `intake-data-and-idempotency` apply group with TDD.
+
+## Run 2026-05-25T05:03:10Z
+
+- Automation: add-initiate-changes
+- Checkpoint: introduce-study-intake-router:apply:source-preview-and-github-roles
+- Result: completed
+- Actions:
+  - Acquired `run.lock`.
+  - Classified dirty workspace paths by current apply target overlap.
+  - Protected unrelated dirty files without editing or staging them.
+  - Set `state.json.applyCursor.currentGroupId` to `source-preview-and-github-roles`.
+  - Ran `openspec-apply-change` with subagent-driven development and per-task TDD.
+  - Added Add / Initiate-safe GitHub preview helpers and models.
+  - Added shallow GitHub preview for title, description, README outline, topics, coarse directory signals, fetch status, calibration, and canonical repo role.
+  - Kept preview separate from legacy `fetch()` and LLM fallback paths.
+  - Marked legacy fallback GitHub units as synthetic and low-calibration.
+  - Added tests for success, failure, no fabricated structure, partial fetch, no LLM calls, legacy synthetic fallback, user-hint precedence, and all five canonical repo roles.
+  - Fixed review issues found by spec compliance and code quality reviewers.
+  - Marked tasks 2.1-2.4 and 4.4 complete.
+  - Created functional commit `4bff7cf5847dd9de6d6965dc9612e04f5831b410`.
+  - Wrote apply-group evidence at `openspec/add-initiate-implementation-control/evidence/introduce-study-intake-router/apply-groups/source-preview-and-github-roles.md`.
+- Verification:
+  - `cd assistant_backend && uv run pytest tests/test_study_intake_router.py`: 17 passed.
+  - `cd assistant_backend && uv run pytest tests/test_study_plan_router.py tests/test_study_views_today.py`: 12 passed, 2 warnings.
+  - `cd assistant_backend && uv run pytest tests/test_integration.py -q`: 16 passed, 2 warnings.
+  - `openspec validate introduce-study-intake-router --strict`: valid.
+  - `openspec instructions apply --change introduce-study-intake-router --json`: 11/21 tasks complete.
+- Review:
+  - Spec compliance re-review: APPROVED.
+  - Code quality re-review: APPROVED.
+- Manifest:
+  - Added `introduce-study-intake-router-apply-group-source-preview-and-github-roles`.
+- Next checkpoint: introduce-study-intake-router:apply:routing-contracts-and-confirmation
 
 ## Run 2026-05-25T04:44:45Z Apply Group Completed
 
