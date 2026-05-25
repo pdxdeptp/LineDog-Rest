@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-05-25T06:24:10Z",
+  "updatedAt": "2026-05-25T06:34:10Z",
   "entries": [
     {
       "id": "introduce-study-intake-router-product-deepen-round-1",
@@ -802,6 +802,50 @@
         }
       ],
       "nextCheckpoint": "persist-intake-plan-drafts:apply"
+    },
+    {
+      "id": "persist-intake-plan-drafts-apply-planning",
+      "timestamp": "2026-05-25T06:34:10Z",
+      "kind": "apply_planning",
+      "changeId": "persist-intake-plan-drafts",
+      "checkpoint": "persist-intake-plan-drafts:apply:planning",
+      "result": "completed",
+      "decision": "GO",
+      "commands": [
+        {
+          "command": "openspec status --change persist-intake-plan-drafts --json",
+          "exitCode": 0,
+          "summary": "ready; proposal/design/specs/tasks complete"
+        },
+        {
+          "command": "openspec instructions apply --change persist-intake-plan-drafts --json",
+          "exitCode": 0,
+          "summary": "apply context available; 35 pending tasks"
+        },
+        {
+          "command": "jq empty openspec/add-initiate-implementation-control/evidence/persist-intake-plan-drafts/apply-task-groups.json",
+          "exitCode": 0,
+          "summary": "valid JSON"
+        },
+        {
+          "command": "openspec validate persist-intake-plan-drafts --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/add-initiate-implementation-control/evidence/persist-intake-plan-drafts/apply-planning.md",
+          "sha256": "241c4928f60fbc9e8fbe1895207230d20991a1ec2ad428d2d066cf702eeafbfc",
+          "description": "Apply planning decision report."
+        },
+        {
+          "path": "openspec/add-initiate-implementation-control/evidence/persist-intake-plan-drafts/apply-task-groups.json",
+          "sha256": "498860d3e9db74681dd9da85113790bc93586cce6e0f8efbd57a1586f4dc49eb",
+          "description": "Sequential apply task groups and recovery cursor source."
+        }
+      ],
+      "nextCheckpoint": "persist-intake-plan-drafts:apply:draft-schema-migration-and-defaults"
     }
   ]
 }

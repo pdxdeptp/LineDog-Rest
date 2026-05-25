@@ -5,7 +5,7 @@
   "currentChangeIndex": 1,
   "currentChange": "persist-intake-plan-drafts",
   "currentStep": "apply",
-  "currentCheckpoint": "persist-intake-plan-drafts:apply",
+  "currentCheckpoint": "persist-intake-plan-drafts:apply:draft-schema-migration-and-defaults",
   "currentAttempt": 0,
   "runCounter": 12,
   "maxRetriesPerCheckpoint": 2,
@@ -34,7 +34,7 @@
       "commit": "4a5f6d43bdcc79ca9efea62d29dca707a103bdbb",
       "evidenceFile": "openspec/add-initiate-implementation-control/evidence/commits/introduce-study-intake-router-pre-apply.md"
     },
-    "pendingCommitReason": null
+    "pendingCommitReason": "persist-intake-plan-drafts apply planning generated task groups; create a safe pre-apply checkpoint commit before implementation starts."
   },
   "crossChangeContracts": {
     "schemaVersion": 1,
@@ -71,14 +71,14 @@
   },
   "applyCursor": {
     "schemaVersion": 1,
-    "activeChange": null,
+    "activeChange": "persist-intake-plan-drafts",
     "currentGroupId": null,
     "currentGroupStartedAt": null,
     "completedGroupIds": [],
     "blockedGroupId": null,
-    "taskGroupsFile": null,
-    "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/introduce-study-intake-router/apply-groups/routing-contracts-and-confirmation.md",
-    "lastCommit": "5955c594c1da37fc090d185d0f5e20771b2af429"
+    "taskGroupsFile": "openspec/add-initiate-implementation-control/evidence/persist-intake-plan-drafts/apply-task-groups.json",
+    "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/persist-intake-plan-drafts/apply-planning.md",
+    "lastCommit": null
   },
   "lock": {
     "path": "openspec/add-initiate-implementation-control/run.lock",
@@ -116,11 +116,11 @@
       "scopeDependencyCheckCompleted": true,
       "applyCompleted": false,
       "applyTaskGroups": {
-        "status": "not_planned",
-        "taskGroupsFile": null,
+        "status": "planned",
+        "taskGroupsFile": "openspec/add-initiate-implementation-control/evidence/persist-intake-plan-drafts/apply-task-groups.json",
         "completedGroupIds": [],
         "currentGroupId": null,
-        "lastEvidenceFile": null,
+        "lastEvidenceFile": "openspec/add-initiate-implementation-control/evidence/persist-intake-plan-drafts/apply-planning.md",
         "lastCommit": null
       }
     },
@@ -171,11 +171,11 @@
     }
   ],
   "lastRun": {
-    "completedAt": "2026-05-25T06:24:10Z",
-    "checkpoint": "persist-intake-plan-drafts:scope_dependency_check",
+    "completedAt": "2026-05-25T06:34:10Z",
+    "checkpoint": "persist-intake-plan-drafts:apply:planning",
     "result": "completed"
   },
-  "lastCompletedCheckpoint": "persist-intake-plan-drafts:scope_dependency_check",
+  "lastCompletedCheckpoint": "persist-intake-plan-drafts:apply:planning",
   "lastMigration": {
     "completedAt": "2026-05-25T03:56:29Z",
     "id": "require-three-product-deepen-rounds",
@@ -196,7 +196,7 @@
   "lastFailure": null,
   "lastVerification": {
     "command": "openspec validate persist-intake-plan-drafts --strict",
-    "result": "valid after scope dependency check"
+    "result": "valid after apply planning"
   },
   "blockedReason": null
 }

@@ -5,7 +5,7 @@
 - Phase: active
 - Current change: persist-intake-plan-drafts
 - Current step: apply
-- Current checkpoint: persist-intake-plan-drafts:apply
+- Current checkpoint: persist-intake-plan-drafts:apply:draft-schema-migration-and-defaults
 - Required product-deepen rounds before apply: 3
 - Required checkpoint after product deepening: scope_dependency_check
 - Product-deepen scope guard: every round must read adjacent changes and record scope decisions
@@ -454,3 +454,38 @@
 - Manifest:
   - Added `persist-intake-plan-drafts-scope-dependency-check`.
 - Next checkpoint: persist-intake-plan-drafts:apply
+
+## Run 2026-05-25T06:34:10Z Apply Planning
+
+- Automation: add-initiate-changes
+- Checkpoint: persist-intake-plan-drafts:apply:planning
+- Result: completed
+- Actions:
+  - Acquired `run.lock`.
+  - Read `state.json`, `runbook.md`, `progress.md`, `evidence/manifest.json`, and `workspace-baseline.json`.
+  - Ran `git status --porcelain=v1` and protected unrelated dirty files.
+  - Read apply schemas and the previous router apply-planning evidence.
+  - Read `persist-intake-plan-drafts` proposal, design, specs, and tasks.
+  - Ran `openspec status --change persist-intake-plan-drafts --json`.
+  - Ran `openspec instructions apply --change persist-intake-plan-drafts --json`; 35 tasks pending.
+  - Wrote apply planning evidence at `openspec/add-initiate-implementation-control/evidence/persist-intake-plan-drafts/apply-planning.md`.
+  - Wrote task-group recovery source at `openspec/add-initiate-implementation-control/evidence/persist-intake-plan-drafts/apply-task-groups.json`.
+  - Initialized `state.json.applyCursor` for this change.
+  - Planned sequential apply groups: `draft-schema-migration-and-defaults`, `draft-package-versioning-and-entrypoints`, `activation-boundary-and-events`, and `fallback-progress-and-final-verification`.
+- Decision:
+  - GO. No blockers found.
+- Protected unrelated dirty paths:
+  - `docs/agent-workflow.md`
+  - `openspec/changes/harden-add-initiate-automation-control/design.md`
+  - `openspec/changes/harden-add-initiate-automation-control/proposal.md`
+  - `openspec/changes/harden-add-initiate-automation-control/tasks.md`
+  - `openspec/changes/redesign-study-intake-planning/iteration-records/round-16-split-readiness-review.md`
+  - `openspec/changes/redesign-study-intake-planning/pre-split-readiness-audit.md`
+  - `openspec/changes/redesign-study-intake-planning/split-decision.md`
+  - `openspec/changes/redesign-study-intake-planning/tasks.md`
+- Verification:
+  - `jq empty openspec/add-initiate-implementation-control/evidence/persist-intake-plan-drafts/apply-task-groups.json`: valid.
+  - `openspec validate persist-intake-plan-drafts --strict`: valid.
+- Manifest:
+  - Added `persist-intake-plan-drafts-apply-planning`.
+- Next checkpoint: persist-intake-plan-drafts:apply:draft-schema-migration-and-defaults

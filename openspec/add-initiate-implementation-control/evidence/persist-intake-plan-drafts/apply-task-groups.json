@@ -1,0 +1,135 @@
+{
+  "changeId": "persist-intake-plan-drafts",
+  "generatedAt": "2026-05-25T06:34:10Z",
+  "groups": [
+    {
+      "id": "draft-schema-migration-and-defaults",
+      "taskIds": [
+        "1.1",
+        "1.2",
+        "1.7",
+        "3.4",
+        "4.1",
+        "4.8",
+        "4.10"
+      ],
+      "description": "Extend or wrap legacy draft storage idempotently, link draft headers to intake items, preserve draft/active separation, and prove the 60-minute capacity default remains in force.",
+      "targetFiles": [
+        "assistant_backend/src/db/schema.py",
+        "assistant_backend/src/db/init.py",
+        "assistant_backend/src/study_plan/lifecycle.py",
+        "assistant_backend/tests/test_study_plan_lifecycle.py",
+        "assistant_backend/tests/test_study_plan_router.py",
+        "assistant_backend/tests/test_integration.py"
+      ],
+      "testCommands": [
+        "cd assistant_backend && uv run pytest tests/test_study_plan_lifecycle.py -k 'draft or migration or active_daily_tasks'",
+        "cd assistant_backend && uv run pytest tests/test_integration.py -k 'daily_capacity_min'",
+        "cd assistant_backend && uv run pytest tests/test_study_plan_router.py -k 'start_endpoint or clarification_without_active_resources'"
+      ],
+      "evidenceFile": "openspec/add-initiate-implementation-control/evidence/persist-intake-plan-drafts/apply-groups/draft-schema-migration-and-defaults.md",
+      "dependsOn": []
+    },
+    {
+      "id": "draft-package-versioning-and-entrypoints",
+      "taskIds": [
+        "1.3",
+        "1.4",
+        "1.5",
+        "1.6",
+        "1.8",
+        "1.9",
+        "4.2",
+        "4.3",
+        "4.11"
+      ],
+      "description": "Add storage entry points for assumptions, package shells, meaningful-edit draft versions, non-meaningful metadata updates, latest fetch, draft kind, and target plan linkage.",
+      "targetFiles": [
+        "assistant_backend/src/db/schema.py",
+        "assistant_backend/src/study_plan/lifecycle.py",
+        "assistant_backend/src/study_plan/intake.py",
+        "assistant_backend/tests/test_study_plan_lifecycle.py",
+        "assistant_backend/tests/test_study_intake_router.py"
+      ],
+      "testCommands": [
+        "cd assistant_backend && uv run pytest tests/test_study_plan_lifecycle.py -k 'version or package or assumptions or target_plan or draft_kind'",
+        "cd assistant_backend && uv run pytest tests/test_study_intake_router.py -k 'handoff or scheduled_work or draft_phase'"
+      ],
+      "evidenceFile": "openspec/add-initiate-implementation-control/evidence/persist-intake-plan-drafts/apply-groups/draft-package-versioning-and-entrypoints.md",
+      "dependsOn": [
+        "draft-schema-migration-and-defaults"
+      ]
+    },
+    {
+      "id": "activation-boundary-and-events",
+      "taskIds": [
+        "2.1",
+        "2.2",
+        "2.3",
+        "2.4",
+        "2.5",
+        "2.6",
+        "2.7",
+        "2.8",
+        "2.9",
+        "4.4",
+        "4.5",
+        "4.6",
+        "4.7",
+        "4.11",
+        "4.12",
+        "4.13"
+      ],
+      "description": "Implement guarded activation, activation events, stale-version and activation-ready checks, transaction rollback, existing-plan activation targets, duplicate activation safety, invalid transitions, and post-activation discard rejection.",
+      "targetFiles": [
+        "assistant_backend/src/db/schema.py",
+        "assistant_backend/src/study_plan/lifecycle.py",
+        "assistant_backend/src/routers/study_plan.py",
+        "assistant_backend/tests/test_study_plan_lifecycle.py",
+        "assistant_backend/tests/test_study_plan_router.py",
+        "assistant_backend/tests/test_study_views_today.py"
+      ],
+      "testCommands": [
+        "cd assistant_backend && uv run pytest tests/test_study_plan_lifecycle.py -k 'confirm or activation or stale or transaction or duplicate or discard or transition or target_plan'",
+        "cd assistant_backend && uv run pytest tests/test_study_plan_router.py -k 'confirm_endpoint or cancel_endpoint or stale'",
+        "cd assistant_backend && uv run pytest tests/test_study_views_today.py"
+      ],
+      "evidenceFile": "openspec/add-initiate-implementation-control/evidence/persist-intake-plan-drafts/apply-groups/activation-boundary-and-events.md",
+      "dependsOn": [
+        "draft-schema-migration-and-defaults",
+        "draft-package-versioning-and-entrypoints"
+      ]
+    },
+    {
+      "id": "fallback-progress-and-final-verification",
+      "taskIds": [
+        "3.1",
+        "3.2",
+        "3.3",
+        "4.9"
+      ],
+      "description": "Persist fallback-only task progress separately from full completion, keep follow-up visible, and run final backend regression for draft persistence compatibility.",
+      "targetFiles": [
+        "assistant_backend/src/db/schema.py",
+        "assistant_backend/src/db/queries.py",
+        "assistant_backend/src/study_plan/lifecycle.py",
+        "assistant_backend/tests/test_study_plan_lifecycle.py",
+        "assistant_backend/tests/test_study_views_completion.py",
+        "openspec/changes/persist-intake-plan-drafts/tasks.md"
+      ],
+      "testCommands": [
+        "cd assistant_backend && uv run pytest tests/test_study_plan_lifecycle.py -k 'fallback'",
+        "cd assistant_backend && uv run pytest tests/test_study_views_completion.py -k 'fallback or completion'",
+        "cd assistant_backend && uv run pytest tests/test_study_plan_lifecycle.py tests/test_study_plan_router.py tests/test_study_intake_router.py tests/test_study_views_today.py tests/test_integration.py",
+        "openspec validate persist-intake-plan-drafts --strict",
+        "openspec instructions apply --change persist-intake-plan-drafts --json"
+      ],
+      "evidenceFile": "openspec/add-initiate-implementation-control/evidence/persist-intake-plan-drafts/apply-groups/fallback-progress-and-final-verification.md",
+      "dependsOn": [
+        "draft-schema-migration-and-defaults",
+        "draft-package-versioning-and-entrypoints",
+        "activation-boundary-and-events"
+      ]
+    }
+  ]
+}
