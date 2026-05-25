@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-05-25T15:15:14Z",
+  "updatedAt": "2026-05-25T16:35:21Z",
   "entries": [
     {
       "id": "introduce-study-intake-router-product-deepen-round-1",
@@ -2716,6 +2716,55 @@
         }
       ],
       "nextCheckpoint": "redesign-add-initiate-ui:apply:draft-review-options-and-activation"
+    },
+    {
+      "id": "redesign-add-initiate-ui-apply-draft-review-options-and-activation",
+      "timestamp": "2026-05-25T16:35:21Z",
+      "kind": "apply_group",
+      "changeId": "redesign-add-initiate-ui",
+      "checkpoint": "redesign-add-initiate-ui:apply:draft-review-options-and-activation",
+      "result": "completed",
+      "commands": [
+        {
+          "command": "xcodebuild test -project MalDaze.xcodeproj -scheme MalDaze -parallel-testing-enabled NO -only-testing:MalDazeTests/LearningAssistantViewModelTests -only-testing:MalDazeTests/LearningAssistantUISourceTests -quiet",
+          "exitCode": 0,
+          "summary": "focused Swift ViewModel/UI source tests passed"
+        },
+        {
+          "command": "openspec validate redesign-add-initiate-ui --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        },
+        {
+          "command": "git diff --check -- MalDaze/LearningAssistant/AssistantPanelView.swift MalDaze/LearningAssistant/LearningAssistantViewModel.swift MalDazeTests/LearningAssistantTests.swift",
+          "exitCode": 0,
+          "summary": "no whitespace errors"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/add-initiate-implementation-control/evidence/redesign-add-initiate-ui/apply-groups/draft-review-options-and-activation.md",
+          "sha256": "cd8b71adf2a19bcec88974e29c098a35f200e48fb4a9ae9b4921c809903278f1",
+          "description": "Apply group evidence for draft review, option effects, activation, reviews, and verification."
+        },
+        {
+          "path": "MalDaze/LearningAssistant/AssistantPanelView.swift",
+          "sha256": "9d368464ec8327a81c527134b70b7c4f76f74cf60f101b2ca47def3d70b078e9",
+          "description": "Add / Initiate draft review, infeasible review, option, activation, and edit UI."
+        },
+        {
+          "path": "MalDaze/LearningAssistant/LearningAssistantViewModel.swift",
+          "sha256": "d94a5c6153e06f1aebe77f0052b60d5169fbdc26ce4e1b50f523b54ec38340ab",
+          "description": "Draft review projection, option parameters, stale activation gates, local edit scope, and auto-load isolation."
+        },
+        {
+          "path": "MalDazeTests/LearningAssistantTests.swift",
+          "sha256": "5452c939e14fde2ccca5f54b43294895e82bf8117b71500bf280263b0334a9f0",
+          "description": "ViewModel and UI source tests for draft review, option effects, activation, stale handling, and auto-load isolation."
+        }
+      ],
+      "commit": "cd16e13a2370376815c1aa680e65f546e324047e",
+      "nextCheckpoint": "redesign-add-initiate-ui:apply:noise-boundaries-and-active-refresh"
     }
   ]
 }

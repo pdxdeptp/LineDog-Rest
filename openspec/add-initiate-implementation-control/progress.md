@@ -5,7 +5,7 @@
 - Phase: active
 - Current change: redesign-add-initiate-ui
 - Current step: apply
-- Current checkpoint: redesign-add-initiate-ui:apply:anchor-state-machine-and-recovery
+- Current checkpoint: redesign-add-initiate-ui:apply:noise-boundaries-and-active-refresh
 - Required product-deepen rounds before apply: 3
 - Required checkpoint after product deepening: scope_dependency_check
 - Product-deepen scope guard: every round must read adjacent changes and record scope decisions
@@ -69,16 +69,16 @@ Completed apply groups for `redesign-add-initiate-ui`:
 - `session-adapter-and-api-contract`
 - `entry-role-and-attachment-review`
 - `anchor-state-machine-and-recovery`
+- `draft-review-options-and-activation`
 
 Remaining apply groups for `redesign-add-initiate-ui`:
 
-- `draft-review-options-and-activation`
 - `noise-boundaries-and-active-refresh`
 - `real-context-qa-and-final-verification`
 
 Next required checkpoint for `redesign-add-initiate-ui`:
 
-- `apply:draft-review-options-and-activation`
+- `apply:noise-boundaries-and-active-refresh`
 
 ## Run Log
 
@@ -1430,3 +1430,29 @@ Next required checkpoint for `redesign-add-initiate-ui`:
 - Manifest:
   - Added `redesign-add-initiate-ui-apply-anchor-state-machine-and-recovery`.
 - Next checkpoint: redesign-add-initiate-ui:apply:draft-review-options-and-activation
+
+## Run 2026-05-25T16:35:21Z
+
+- Automation: add-initiate-changes
+- Checkpoint: redesign-add-initiate-ui:apply:draft-review-options-and-activation
+- Result: completed
+- Actions:
+  - Triggered `openspec-apply-change`, `superpowers:subagent-driven-development`, and per-task `superpowers:test-driven-development`.
+  - Implemented summary-first draft review, first-week schedule rendering, explicit expansion controls, fallback/risk/source metadata, canonical infeasibility options, hard-deadline late-finish filtering, option effects, activation, stale-draft blocking, retry, edit, cancel, and activation-failure paths.
+  - Added local per-task estimate edit controls while keeping edits scoped to session/draft/version and sending backend-compatible `estimate_edits: [taskId: minutes]` payloads.
+  - Fixed `autoLoadWhenReady: false` isolation so tests/previews do not respond to global backend-ready notifications.
+  - Completed multi-round spec and code-quality review loops; final code-quality re-review approved after the `estimate_edits` payload fix.
+  - Created implementation commit `cd16e13a2370376815c1aa680e65f546e324047e`.
+  - Wrote evidence at `openspec/add-initiate-implementation-control/evidence/redesign-add-initiate-ui/apply-groups/draft-review-options-and-activation.md`.
+- Verification:
+  - `xcodebuild test -project MalDaze.xcodeproj -scheme MalDaze -parallel-testing-enabled NO -only-testing:MalDazeTests/LearningAssistantViewModelTests -only-testing:MalDazeTests/LearningAssistantUISourceTests -quiet`: passed.
+  - `openspec validate redesign-add-initiate-ui --strict`: valid.
+  - `git diff --check -- MalDaze/LearningAssistant/AssistantPanelView.swift MalDaze/LearningAssistant/LearningAssistantViewModel.swift MalDazeTests/LearningAssistantTests.swift`: no whitespace errors.
+- Reviews:
+  - Spec compliance: approved after review-loop fixes.
+  - Code quality: approved after backend parameter shape correction.
+- Commits:
+  - Implementation: cd16e13a2370376815c1aa680e65f546e324047e
+- Manifest:
+  - Added `redesign-add-initiate-ui-apply-draft-review-options-and-activation`.
+- Next checkpoint: redesign-add-initiate-ui:apply:noise-boundaries-and-active-refresh
