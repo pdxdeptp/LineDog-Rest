@@ -5,7 +5,7 @@
 - Phase: active
 - Current change: redesign-add-initiate-ui
 - Current step: apply
-- Current checkpoint: redesign-add-initiate-ui:apply:session-adapter-and-api-contract
+- Current checkpoint: redesign-add-initiate-ui:apply:entry-role-and-attachment-review
 - Required product-deepen rounds before apply: 3
 - Required checkpoint after product deepening: scope_dependency_check
 - Product-deepen scope guard: every round must read adjacent changes and record scope decisions
@@ -66,11 +66,10 @@ Apply planning completed for `redesign-add-initiate-ui`: yes
 
 Completed apply groups for `redesign-add-initiate-ui`:
 
-- none
+- `session-adapter-and-api-contract`
 
 Remaining apply groups for `redesign-add-initiate-ui`:
 
-- `session-adapter-and-api-contract`
 - `entry-role-and-attachment-review`
 - `anchor-state-machine-and-recovery`
 - `draft-review-options-and-activation`
@@ -79,7 +78,7 @@ Remaining apply groups for `redesign-add-initiate-ui`:
 
 Next required checkpoint for `redesign-add-initiate-ui`:
 
-- `apply:session-adapter-and-api-contract`
+- `apply:entry-role-and-attachment-review`
 
 ## Run Log
 
@@ -1363,3 +1362,29 @@ Next required checkpoint for `redesign-add-initiate-ui`:
   - `jq empty openspec/add-initiate-implementation-control/evidence/redesign-add-initiate-ui/apply-task-groups.json`: valid.
   - `openspec validate redesign-add-initiate-ui --strict`: valid.
 - Next checkpoint: redesign-add-initiate-ui:apply:session-adapter-and-api-contract
+
+## Run 2026-05-25T13:14:55Z
+
+- Automation: add-initiate-changes
+- Checkpoint: redesign-add-initiate-ui:apply:session-adapter-and-api-contract
+- Result: completed
+- Actions:
+  - Triggered `openspec-apply-change`, `superpowers:subagent-driven-development`, and per-task `superpowers:test-driven-development`.
+  - Implemented the thin Add / Initiate session adapter and backend routes for sessions, role confirmation, anchor confirmation, option effects, and activation.
+  - Added session identity, canonical progress/review states, draft version, stale-event/session guards, and no-active-task-before-activation checks.
+  - Added Swift Add / Initiate request/response/progress models plus API-client and protocol methods.
+  - Preserved old URL ingestion as a compatibility path while keeping Add / Initiate on adapter endpoints.
+  - Completed multi-round spec and code-quality review fixes for canonical states, option-effect persistence, expected-version guards, session ownership, HTTP conflict mapping, Swift payload retention, and stale activation.
+  - Created implementation commit `ae36e59c7a84f20d7053808e625e76277296ac63`.
+  - Wrote evidence at `openspec/add-initiate-implementation-control/evidence/redesign-add-initiate-ui/apply-groups/session-adapter-and-api-contract.md`.
+- Verification:
+  - `cd assistant_backend && uv run pytest tests/test_study_add_initiate_adapter.py tests/test_study_intake_router.py -k 'add_initiate or session or adapter or progress or legacy'`: 15 passed, 55 deselected.
+  - `xcodebuild test -project MalDaze.xcodeproj -scheme MalDaze -only-testing:MalDazeTests/AssistantModelDecodingTests -quiet`: passed.
+  - `openspec validate redesign-add-initiate-ui --strict`: valid.
+  - `git diff --check` on current group files: no whitespace errors.
+- Reviews:
+  - Spec compliance: approved after three rounds.
+  - Code quality: approved after stale activation conflict fix.
+- Manifest:
+  - Added `redesign-add-initiate-ui-apply-session-adapter-and-api-contract`.
+- Next checkpoint: redesign-add-initiate-ui:apply:entry-role-and-attachment-review

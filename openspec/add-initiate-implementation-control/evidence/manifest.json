@@ -2581,6 +2581,44 @@
         }
       ],
       "nextCheckpoint": "redesign-add-initiate-ui:apply:session-adapter-and-api-contract"
+    },
+    {
+      "id": "redesign-add-initiate-ui-apply-session-adapter-and-api-contract",
+      "timestamp": "2026-05-25T13:14:55Z",
+      "kind": "apply_group",
+      "changeId": "redesign-add-initiate-ui",
+      "checkpoint": "redesign-add-initiate-ui:apply:session-adapter-and-api-contract",
+      "result": "completed",
+      "commands": [
+        {
+          "command": "cd assistant_backend && uv run pytest tests/test_study_add_initiate_adapter.py tests/test_study_intake_router.py -k 'add_initiate or session or adapter or progress or legacy'",
+          "exitCode": 0,
+          "summary": "15 passed, 55 deselected"
+        },
+        {
+          "command": "xcodebuild test -project MalDaze.xcodeproj -scheme MalDaze -only-testing:MalDazeTests/AssistantModelDecodingTests -quiet",
+          "exitCode": 0,
+          "summary": "passed"
+        },
+        {
+          "command": "openspec validate redesign-add-initiate-ui --strict",
+          "exitCode": 0,
+          "summary": "valid"
+        },
+        {
+          "command": "git commit -m \"Implement Add Initiate session adapter contract\"",
+          "exitCode": 0,
+          "summary": "ae36e59c7a84f20d7053808e625e76277296ac63"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "openspec/add-initiate-implementation-control/evidence/redesign-add-initiate-ui/apply-groups/session-adapter-and-api-contract.md",
+          "sha256": "03a0a66b095bccd1feef8dfaec40ca731fea9c222653f00bee06a6828fcf626e",
+          "description": "Apply group evidence for the Add / Initiate session adapter and API contract."
+        }
+      ],
+      "nextCheckpoint": "redesign-add-initiate-ui:apply:entry-role-and-attachment-review"
     }
   ]
 }
