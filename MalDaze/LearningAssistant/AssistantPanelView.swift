@@ -1024,43 +1024,15 @@ private struct AddInitiateView: View {
                     }
                 }
 
-                Picker("切换角色", selection: $selectedRole) {
-                    ForEach(AddInitiateRoleChoice.allCases) { role in
-                        Text("\(role.label) · \(role.rawValue)").tag(role)
-                    }
-                }
-                .pickerStyle(.menu)
-
-                if !vm.addInitiateExistingPlanCandidates.isEmpty {
-                    Picker("已有计划", selection: existingPlanSelection) {
-                        ForEach(vm.addInitiateExistingPlanCandidates) { plan in
-                            Text(plan.title).tag(Optional(plan.id))
-                        }
-                    }
-                    .pickerStyle(.menu)
-
-                    Picker("附件方式", selection: $selectedAttachmentMode) {
-                        ForEach(AddInitiateAttachmentMode.allCases) { mode in
-                            Text("\(mode.label) · \(mode.rawValue)").tag(mode)
-                        }
-                    }
-                    .pickerStyle(.radioGroup)
-                }
+                roleAndAttachmentControls
 
                 Button {
-                    Task {
-                        await vm.confirmAddInitiateRole(
-                            title: title.isEmpty ? rawInput : title,
-                            confirmedRole: selectedRole,
-                            existingPlanId: selectedExistingPlanID,
-                            attachmentMode: selectedAttachmentMode
-                        )
-                    }
+                    confirmSelectedAddInitiateRole()
                 } label: {
                     Label("确认角色", systemImage: "checkmark.circle.fill")
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(vm.isConfirmingAddInitiateRole)
+                .disabled(vm.isConfirmingAddInitiateRole || selectedRoleRequiresExistingPlan)
             }
             .padding(10)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -1074,7 +1046,7 @@ private struct AddInitiateView: View {
     private var anchorReviewCard: some View {
         if vm.addInitiateFlowState == .anchorReview ||
             vm.addInitiateFlowState == .planningProgress ||
-            vm.addInitiateFlowState == .needsInput {
+            vm.addInitiateFlowState == .draftNeedsInput {
             VStack(alignment: .leading, spacing: 10) {
                 Text("规划锚点")
                     .font(.headline)
@@ -1104,7 +1076,7 @@ private struct AddInitiateView: View {
                             .stroke(Color.secondary.opacity(0.25))
                     )
 
-                if vm.addInitiateFlowState != .needsInput {
+                if vm.addInitiateFlowState != .draftNeedsInput {
                     Button {
                         Task { await vm.confirmAddInitiateAnchors() }
                     } label: {
@@ -1127,26 +1099,12 @@ private struct AddInitiateView: View {
     @ViewBuilder
     private var recoveryAndReviewCard: some View {
         switch vm.addInitiateFlowState {
-        case .needsInput:
-            VStack(alignment: .leading, spacing: 10) {
-                Text("需要补充信息")
-                    .font(.headline)
-                    .accessibilityIdentifier("needs_input")
-                roleFact("角色", vm.addInitiateSession?.confirmedRole ?? "未定")
-                Text(addInitiateFocusedQuestionText)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                TextField("补充答案", text: $vm.addInitiateNeedsInputAnswer)
-                    .textFieldStyle(.roundedBorder)
-                Button {
-                    Task { await vm.answerAddInitiateNeedsInput() }
-                } label: {
-                    Label("继续规划", systemImage: "arrow.clockwise.circle.fill")
-                }
-                .buttonStyle(.borderedProminent)
-            }
-            .padding(10)
-            .background(Color(.controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+        case .routeNeedsInput:
+            routeClarificationCard
+        case .draftNeedsInput:
+            draftNeedsInputCard
+        case .nonPlanConfirmation:
+            nonPlanConfirmationCard
         case .compileFailed:
             compactReviewStateCard(
                 title: "规划失败",
@@ -1167,6 +1125,8 @@ private struct AddInitiateView: View {
             }
         case .activationFailed:
             activationFailedCard
+        case .activated:
+            activationSuccessCard
         case .cancelled:
             compactReviewStateCard(
                 title: "已取消",
@@ -1177,6 +1137,102 @@ private struct AddInitiateView: View {
             )
         default:
             EmptyView()
+        }
+    }
+
+    @ViewBuilder
+    private var routeClarificationCard: some View {
+        if let session = vm.addInitiateSession {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("确认处理方式")
+                    .font(.headline)
+                    .accessibilityIdentifier("route_needs_input")
+                Text(addInitiateFocusedQuestionText)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                roleAndAttachmentControls
+
+                Button {
+                    confirmSelectedAddInitiateRole()
+                } label: {
+                    Label("确认处理方式", systemImage: "checkmark.circle.fill")
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(vm.isConfirmingAddInitiateRole || selectedRoleRequiresExistingPlan)
+            }
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(.controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+            .onAppear { seedRoleReview(from: session) }
+            .onChange(of: roleReviewIdentity(for: session)) { _ in seedRoleReview(from: session) }
+        }
+    }
+
+    private var draftNeedsInputCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("需要补充信息")
+                .font(.headline)
+                .accessibilityIdentifier("needs_input")
+            roleFact("角色", vm.addInitiateSession?.confirmedRole ?? "未定")
+            Text(addInitiateFocusedQuestionText)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            TextField("补充答案", text: $vm.addInitiateNeedsInputAnswer)
+                .textFieldStyle(.roundedBorder)
+            Button {
+                Task { await vm.answerAddInitiateNeedsInput() }
+            } label: {
+                Label("继续规划", systemImage: "arrow.clockwise.circle.fill")
+            }
+            .buttonStyle(.borderedProminent)
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+    }
+
+    @ViewBuilder
+    private var nonPlanConfirmationCard: some View {
+        if let session = vm.addInitiateSession {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("确认保存方式")
+                    .font(.headline)
+                    .accessibilityIdentifier("non_plan_confirmation")
+
+                HStack(spacing: 10) {
+                    roleFact("推荐", session.recommendedRole ?? "未定")
+                    roleFact("信心", session.confidence ?? "unknown")
+                }
+
+                if let reasonCodes = session.reasonCodes, !reasonCodes.isEmpty {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("原因")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                        ForEach(reasonCodes, id: \.self) { reason in
+                            Text(reason)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
+                roleAndAttachmentControls
+
+                Button {
+                    confirmSelectedAddInitiateRole()
+                } label: {
+                    Label("确认保存", systemImage: "checkmark.circle.fill")
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(vm.isConfirmingAddInitiateRole || selectedRoleRequiresExistingPlan)
+            }
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(.controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+            .onAppear { seedRoleReview(from: session) }
+            .onChange(of: roleReviewIdentity(for: session)) { _ in seedRoleReview(from: session) }
         }
     }
 
@@ -1458,6 +1514,50 @@ private struct AddInitiateView: View {
         .background(Color(.controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
     }
 
+    private var activationSuccessCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("计划已创建", systemImage: "checkmark.circle.fill")
+                .font(.headline)
+                .accessibilityIdentifier("activation_success")
+            Text("可以切到主动学习视图继续安排，或继续添加下一项。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            VStack(alignment: .leading, spacing: 8) {
+                Button {
+                    vm.selectedPanelTab = .home
+                } label: {
+                    Label("Today", systemImage: "calendar.badge.checkmark")
+                }
+                .buttonStyle(.borderedProminent)
+
+                Button {
+                    vm.selectedPanelTab = .projectOverview
+                } label: {
+                    Label("Project Overview", systemImage: "folder")
+                }
+                .buttonStyle(.bordered)
+
+                Button {
+                    vm.selectedPanelTab = .calendar
+                } label: {
+                    Label("Calendar", systemImage: "calendar")
+                }
+                .buttonStyle(.bordered)
+
+                Button {
+                    prepareForNewAddInitiateInput()
+                } label: {
+                    Label("继续添加", systemImage: "plus.circle")
+                }
+                .buttonStyle(.bordered)
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+    }
+
     @ViewBuilder
     private func reviewFactLine(title: String, value: String?) -> some View {
         if let value, !value.isEmpty {
@@ -1475,7 +1575,7 @@ private struct AddInitiateView: View {
     @ViewBuilder
     private var terminalCard: some View {
         if let session = vm.addInitiateSession,
-           session.reviewState == .storedNonPlan || session.reviewState == .materialAttached {
+           vm.addInitiateFlowState == .nonPlanTerminal {
             VStack(alignment: .leading, spacing: 8) {
                 Label(session.reviewState == .materialAttached ? "材料已附加" : "已存为非计划条目", systemImage: "tray.full")
                     .font(.caption.weight(.semibold))
@@ -1545,6 +1645,55 @@ private struct AddInitiateView: View {
         rawInput = ""
         title = ""
         seededRoleReviewIdentity = nil
+    }
+
+    @ViewBuilder
+    private var roleAndAttachmentControls: some View {
+        Picker("处理方式", selection: $selectedRole) {
+            ForEach(AddInitiateRoleChoice.allCases) { role in
+                Text("\(role.label) · \(role.rawValue)").tag(role)
+            }
+        }
+        .pickerStyle(.menu)
+
+        if selectedRole == .attachToExistingPlan || selectedRole == .supportingMaterial {
+            if vm.addInitiateExistingPlanCandidates.isEmpty {
+                Text("请选择已有计划后继续。")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            } else {
+                Picker("已有计划", selection: existingPlanSelection) {
+                    ForEach(vm.addInitiateExistingPlanCandidates) { plan in
+                        Text(plan.title).tag(Optional(plan.id))
+                    }
+                }
+                .pickerStyle(.menu)
+            }
+        }
+
+        if selectedRole == .attachToExistingPlan {
+            Picker("附件方式", selection: $selectedAttachmentMode) {
+                ForEach(AddInitiateAttachmentMode.allCases) { mode in
+                    Text("\(mode.label) · \(mode.rawValue)").tag(mode)
+                }
+            }
+            .pickerStyle(.radioGroup)
+        }
+    }
+
+    private var selectedRoleRequiresExistingPlan: Bool {
+        (selectedRole == .attachToExistingPlan || selectedRole == .supportingMaterial) && selectedExistingPlanID == nil
+    }
+
+    private func confirmSelectedAddInitiateRole() {
+        Task {
+            await vm.confirmAddInitiateRole(
+                title: title.isEmpty ? rawInput : title,
+                confirmedRole: selectedRole,
+                existingPlanId: selectedExistingPlanID,
+                attachmentMode: selectedAttachmentMode
+            )
+        }
     }
 
     private func progressRow(_ label: String) -> some View {

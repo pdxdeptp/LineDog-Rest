@@ -2800,6 +2800,58 @@ final class LearningAssistantUISourceTests: XCTestCase {
         XCTAssertTrue(addSource.contains("cancelAddInitiateFlow"))
     }
 
+    func testAddInitiateStateBoundaryUISourceSeparatesRouteDraftNonPlanAndActivationFlows() throws {
+        let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
+        guard let start = source.range(of: "private struct AddInitiateView"),
+              let end = source[start.upperBound...].range(of: "private struct StudyPlanIntakeView") else {
+            XCTFail("AddInitiateView source section not found")
+            return
+        }
+        let addSource = String(source[start.lowerBound..<end.lowerBound])
+
+        func section(from startToken: String, to endToken: String) -> String {
+            guard let sectionStart = addSource.range(of: startToken),
+                  let sectionEnd = addSource[sectionStart.upperBound...].range(of: endToken) else {
+                return ""
+            }
+            return String(addSource[sectionStart.lowerBound..<sectionEnd.lowerBound])
+        }
+
+        let anchorSource = section(from: "private var anchorReviewCard", to: "private var recoveryAndReviewCard")
+        let recoverySource = section(from: "private var recoveryAndReviewCard", to: "private var infeasibleReviewCard")
+        let terminalSource = section(from: "private var terminalCard", to: "private func compactReviewStateCard")
+
+        XCTAssertTrue(addSource.contains("routeClarificationCard"))
+        XCTAssertTrue(recoverySource.contains("case .routeNeedsInput"))
+        XCTAssertFalse(anchorSource.contains(".routeNeedsInput"))
+        XCTAssertFalse(anchorSource.contains(".needsInput"))
+        XCTAssertTrue(anchorSource.contains("vm.addInitiateFlowState == .anchorReview"))
+        XCTAssertTrue(anchorSource.contains("vm.addInitiateFlowState == .planningProgress"))
+        XCTAssertTrue(anchorSource.contains("vm.addInitiateFlowState == .draftNeedsInput"))
+
+        XCTAssertTrue(recoverySource.contains("case .draftNeedsInput"))
+        XCTAssertTrue(recoverySource.contains("draftNeedsInputCard"))
+        XCTAssertTrue(addSource.contains("Task { await vm.answerAddInitiateNeedsInput() }"))
+
+        XCTAssertTrue(recoverySource.contains("case .nonPlanConfirmation"))
+        XCTAssertTrue(addSource.contains("nonPlanConfirmationCard"))
+        XCTAssertTrue(addSource.contains("vm.confirmAddInitiateRole"))
+        XCTAssertTrue(terminalSource.contains("vm.addInitiateFlowState == .nonPlanTerminal"))
+        XCTAssertFalse(terminalSource.contains("session.reviewState == .storedNonPlan || session.reviewState == .materialAttached"))
+
+        XCTAssertTrue(recoverySource.contains("case .activated"))
+        XCTAssertTrue(addSource.contains("activationSuccessCard"))
+        XCTAssertTrue(addSource.contains("计划已创建"))
+        XCTAssertTrue(addSource.contains("vm.selectedPanelTab = .home"))
+        XCTAssertTrue(addSource.contains("vm.selectedPanelTab = .projectOverview"))
+        XCTAssertTrue(addSource.contains("vm.selectedPanelTab = .calendar"))
+        XCTAssertTrue(addSource.contains("prepareForNewAddInitiateInput()"))
+
+        XCTAssertTrue(recoverySource.contains("case .activationFailed"))
+        XCTAssertTrue(addSource.contains("activationFailedCard"))
+        XCTAssertTrue(addSource.contains("activation_failed"))
+    }
+
     func testAddInitiateReviewStatesHideInputPrimaryWireRecoveryActionsAndAvoidVisibleRawTokens() throws {
         let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
         guard let start = source.range(of: "private struct AddInitiateView"),
@@ -2813,7 +2865,7 @@ final class LearningAssistantUISourceTests: XCTestCase {
         XCTAssertTrue(addSource.contains("await vm.activateAddInitiateDraft()"))
         XCTAssertTrue(addSource.contains("vm.prepareForNewAddInitiateInput()"))
         XCTAssertTrue(addSource.contains("vm.addInitiateAssumptionsText"))
-        XCTAssertTrue(addSource.contains("vm.addInitiateFlowState == .needsInput"))
+        XCTAssertTrue(addSource.contains("vm.addInitiateFlowState == .draftNeedsInput"))
         XCTAssertFalse(addSource.contains("analyzing_input / routing_item"))
         XCTAssertFalse(addSource.contains("planning_progress\")"))
         XCTAssertFalse(addSource.contains("deadline type"))
@@ -2888,7 +2940,7 @@ final class LearningAssistantUISourceTests: XCTestCase {
             "case .optionEffectProgress",
             "case .activationFailed",
             "case .cancelled",
-            "session.reviewState == .storedNonPlan || session.reviewState == .materialAttached"
+            "vm.addInitiateFlowState == .nonPlanTerminal"
         ]
         let forbiddenCreatedTaskWording = [
             "已创建任务",
@@ -3055,6 +3107,124 @@ final class LearningAssistantViewModelTests: XCTestCase {
         }
     }
 
+    func testRouteLevelNeedsInputWithoutDraftDoesNotConfirmAnchorsOrShowMissingDraftError() async {
+        let mock = MockAssistantAPIClient()
+        mock.addInitiateStartResult = sampleAddInitiateRouteNeedsInputSession()
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+
+        await vm.startAddInitiateSession(rawInput: "Maybe just keep this article for reference", sourceType: .url)
+
+        XCTAssertNil(vm.addInitiateSession?.draftId)
+        XCTAssertEqual(vm.addInitiateFlowState.rawValue, "route_needs_input")
+
+        vm.addInitiateNeedsInputAnswer = "Keep it as reference material"
+        await vm.answerAddInitiateNeedsInput()
+
+        XCTAssertEqual(mock.confirmAddInitiateAnchorCallCount, 0)
+        XCTAssertNil(mock.lastAddInitiateAnchorRequest)
+        XCTAssertEqual(mock.confirmAddInitiateRoleCallCount, 0)
+        XCTAssertNil(vm.addInitiateError)
+        XCTAssertEqual(vm.addInitiateFlowState.rawValue, "route_needs_input")
+    }
+
+    func testNonPlanRouteRecommendationsRequireExplicitConfirmationBeforeTerminalSuccess() async {
+        let cases: [(AddInitiateRoleChoice, String)] = [
+            (.referenceMaterial, "reference_material"),
+            (.laterResource, "later_resource"),
+            (.oneOffAction, "one_off_action")
+        ]
+
+        for (choice, recommendedRole) in cases {
+            let mock = MockAssistantAPIClient()
+            mock.addInitiateStartResult = sampleAddInitiatePendingNonPlanRecommendationSession(
+                recommendedRole: recommendedRole
+            )
+            mock.addInitiateRoleResult = sampleAddInitiateConfirmedNonPlanSession(
+                confirmedRole: choice.requestRole
+            )
+            let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+
+            await vm.startAddInitiateSession(rawInput: "Non-plan \(recommendedRole)", sourceType: .noteSnippet)
+
+            XCTAssertNil(vm.addInitiateSession?.confirmedRole, recommendedRole)
+            XCTAssertEqual(vm.addInitiateFlowState.rawValue, "non_plan_confirmation", recommendedRole)
+            XCTAssertEqual(mock.confirmAddInitiateRoleCallCount, 0, recommendedRole)
+            XCTAssertEqual(mock.fetchStudyTodayViewCallCount, 0, recommendedRole)
+
+            await vm.confirmAddInitiateRole(title: "Non-plan \(recommendedRole)", confirmedRole: choice)
+
+            XCTAssertEqual(mock.confirmAddInitiateRoleCallCount, 1, recommendedRole)
+            XCTAssertEqual(mock.lastAddInitiateRoleRequest?.confirmedRole, choice.requestRole, recommendedRole)
+            XCTAssertEqual(vm.addInitiateFlowState, .nonPlanTerminal, recommendedRole)
+            XCTAssertEqual(mock.fetchStudyTodayViewCallCount, 0, recommendedRole)
+            XCTAssertEqual(mock.fetchStudyProjectOverviewCallCount, 0, recommendedRole)
+            XCTAssertEqual(mock.fetchStudyCalendarLoadCallCount, 0, recommendedRole)
+        }
+    }
+
+    func testPendingNonPlanRecommendationsRequireConfirmationRegardlessOfNextAction() async {
+        let roles = [
+            "reference_material",
+            "later_resource",
+            "one_off_action"
+        ]
+        let nextActions: [(label: String, value: String?)] = [
+            ("nil", nil),
+            ("done", "done"),
+            ("unknown", "archive_without_prompt")
+        ]
+
+        for recommendedRole in roles {
+            for nextAction in nextActions {
+                let mock = MockAssistantAPIClient()
+                mock.addInitiateStartResult = sampleAddInitiatePendingNonPlanRecommendationSession(
+                    recommendedRole: recommendedRole,
+                    nextAction: nextAction.value
+                )
+                let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+                let context = "\(recommendedRole) nextAction=\(nextAction.label)"
+
+                await vm.startAddInitiateSession(rawInput: context, sourceType: .noteSnippet)
+
+                XCTAssertNil(vm.addInitiateSession?.confirmedRole, context)
+                XCTAssertEqual(vm.addInitiateSession?.recommendedRole, recommendedRole, context)
+                XCTAssertEqual(vm.addInitiateSession?.nextAction, nextAction.value, context)
+                XCTAssertEqual(vm.addInitiateFlowState.rawValue, "non_plan_confirmation", context)
+                XCTAssertEqual(mock.fetchStudyTodayViewCallCount, 0, context)
+                XCTAssertEqual(mock.fetchStudyProjectOverviewCallCount, 0, context)
+                XCTAssertEqual(mock.fetchStudyCalendarLoadCallCount, 0, context)
+                XCTAssertEqual(mock.generateStudySmartProposalsCallCount, 0, context)
+            }
+        }
+    }
+
+    func testPendingMaterialAttachmentRecommendationsRequireConfirmationBeforeTerminalSuccess() async {
+        let roles = [
+            "attach_to_existing_plan",
+            "supporting_material"
+        ]
+
+        for recommendedRole in roles {
+            let mock = MockAssistantAPIClient()
+            mock.addInitiateStartResult = sampleAddInitiatePendingMaterialAttachmentRecommendationSession(
+                recommendedRole: recommendedRole
+            )
+            let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+
+            await vm.startAddInitiateSession(rawInput: "Attach \(recommendedRole)", sourceType: .noteSnippet)
+
+            XCTAssertEqual(vm.addInitiateSession?.reviewState, .materialAttached, recommendedRole)
+            XCTAssertNil(vm.addInitiateSession?.confirmedRole, recommendedRole)
+            XCTAssertEqual(vm.addInitiateSession?.recommendedRole, recommendedRole, recommendedRole)
+            XCTAssertEqual(vm.addInitiateFlowState.rawValue, "non_plan_confirmation", recommendedRole)
+            XCTAssertEqual(mock.fetchStudyTodayViewCallCount, 0, recommendedRole)
+            XCTAssertEqual(mock.fetchStudyProjectOverviewCallCount, 0, recommendedRole)
+            XCTAssertEqual(mock.fetchResourcesCallCount, 0, recommendedRole)
+            XCTAssertEqual(mock.fetchStudyCalendarLoadCallCount, 0, recommendedRole)
+            XCTAssertEqual(mock.generateStudySmartProposalsCallCount, 0, recommendedRole)
+        }
+    }
+
     func testConfirmAddInitiateMaterialOnlyAttachmentIsQuietAndMapsSupportingMaterialRole() async {
         let mock = MockAssistantAPIClient()
         mock.addInitiateStartResult = sampleAddInitiateRoleReviewSession()
@@ -3077,6 +3247,7 @@ final class LearningAssistantViewModelTests: XCTestCase {
         XCTAssertEqual(mock.lastAddInitiateRoleRequest?.existingPlanId, 7)
         XCTAssertEqual(vm.addInitiateSession?.reviewState, .materialAttached)
         XCTAssertEqual(vm.addInitiateStage, .materialAttached)
+        XCTAssertEqual(vm.addInitiateFlowState, .nonPlanTerminal)
         XCTAssertEqual(mock.fetchStudyTodayViewCallCount, 0)
         XCTAssertEqual(mock.fetchStudyProjectOverviewCallCount, 0)
         XCTAssertEqual(mock.fetchStudyCalendarLoadCallCount, 0)
@@ -3243,7 +3414,7 @@ final class LearningAssistantViewModelTests: XCTestCase {
         XCTAssertEqual(mock.lastAddInitiateAnchorRequest?.targetOutput, "working course outline")
         XCTAssertEqual(mock.lastAddInitiateAnchorRequest?.targetDepth, "apply")
         XCTAssertEqual(mock.lastAddInitiateAnchorRequest?.assumptions?["accepted"]?.value as? [String], ["weekdays only", "no weekends"])
-        XCTAssertEqual(vm.addInitiateFlowState, .needsInput)
+        XCTAssertEqual(vm.addInitiateFlowState.rawValue, "draft_needs_input")
         XCTAssertEqual(vm.addInitiateRawInput, "Build a Swift testing course")
         XCTAssertEqual(vm.addInitiateSession?.confirmedRole, "new_plan")
         XCTAssertEqual(vm.addInitiateDeadline, "2026-07-01")
@@ -3273,7 +3444,7 @@ final class LearningAssistantViewModelTests: XCTestCase {
         vm.addInitiateAssumptionsText = "weekdays only"
 
         await vm.confirmAddInitiateAnchors()
-        XCTAssertEqual(vm.addInitiateFlowState, .needsInput)
+        XCTAssertEqual(vm.addInitiateFlowState.rawValue, "draft_needs_input")
 
         vm.addInitiateCapacityMinutes = 65
         vm.addInitiateAssumptionsText = "weekdays only\nskip backend work"
@@ -3281,12 +3452,14 @@ final class LearningAssistantViewModelTests: XCTestCase {
         await vm.answerAddInitiateNeedsInput()
 
         XCTAssertEqual(mock.confirmAddInitiateAnchorCallCount, 2)
+        XCTAssertEqual(mock.lastAddInitiateAnchorRequest?.draftId, 501)
         XCTAssertEqual(mock.lastAddInitiateAnchorRequest?.capacityMinutes, 65)
         XCTAssertEqual(mock.lastAddInitiateAnchorRequest?.assumptions?["accepted"]?.value as? [String], [
             "weekdays only",
             "skip backend work",
             "Exclude backend work"
         ])
+        XCTAssertEqual(vm.addInitiateSession?.draftId, 501)
         XCTAssertEqual(vm.addInitiateFlowState, .draftReview)
     }
 
@@ -3999,7 +4172,7 @@ final class LearningAssistantViewModelTests: XCTestCase {
         vm.addInitiateTargetDepth = "apply"
         await vm.confirmAddInitiateAnchors()
         await vm.applyAddInitiateOptionEffect(optionId: "answer_one_question")
-        XCTAssertEqual(vm.addInitiateFlowState, .needsInput)
+        XCTAssertEqual(vm.addInitiateFlowState.rawValue, "draft_needs_input")
     }
 
     func testOptionEffectCompilerRecomputeHandoffReturnsToAnchorReview() async {
@@ -4019,7 +4192,7 @@ final class LearningAssistantViewModelTests: XCTestCase {
         await vm.applyAddInitiateOptionEffect(optionId: "lower_depth")
 
         XCTAssertEqual(mock.lastAddInitiateOptionRequest?.optionId, "lower_depth")
-        XCTAssertEqual(vm.addInitiateFlowState, .needsInput)
+        XCTAssertEqual(vm.addInitiateFlowState.rawValue, "draft_needs_input")
         XCTAssertEqual(vm.addInitiateSession?.reviewState, .needsInput)
         XCTAssertEqual(vm.addInitiateSession?.draftVersion, 2)
     }
@@ -7749,6 +7922,130 @@ private func sampleAddInitiateRoleReviewSession(
         existingPlanCandidates: [
             ["id": AnyCodable(7), "title": AnyCodable("MalDaze")]
         ],
+        attachmentModeSuggestion: "material_only",
+        canonicalRepoRole: nil,
+        reviewPackage: nil,
+        activationResult: nil
+    )
+}
+
+private func sampleAddInitiateRouteNeedsInputSession(
+    sessionId: String = "add-initiate-1",
+    clientRequestId: String = "req-add-1",
+    intakeItemId: Int = 11
+) -> AddInitiateSessionResponse {
+    AddInitiateSessionResponse(
+        sessionId: sessionId,
+        clientRequestId: clientRequestId,
+        intakeItemId: intakeItemId,
+        draftId: nil,
+        draftVersion: nil,
+        stage: .needsInput,
+        reviewState: .needsInput,
+        recommendedRole: nil,
+        confirmedRole: nil,
+        confidence: "medium",
+        reasonCodes: ["ambiguous_route"],
+        nextAction: "answer_route_question",
+        createsActiveTasks: false,
+        resourceId: nil,
+        error: nil,
+        clarificationQuestion: ["question": AnyCodable("Should this become a plan or reference material?")],
+        existingPlanCandidates: nil,
+        attachmentModeSuggestion: nil,
+        canonicalRepoRole: nil,
+        reviewPackage: nil,
+        activationResult: nil
+    )
+}
+
+private func sampleAddInitiatePendingNonPlanRecommendationSession(
+    recommendedRole: String,
+    nextAction: String? = "confirm_role",
+    sessionId: String = "add-initiate-1",
+    clientRequestId: String = "req-add-1",
+    intakeItemId: Int = 11
+) -> AddInitiateSessionResponse {
+    AddInitiateSessionResponse(
+        sessionId: sessionId,
+        clientRequestId: clientRequestId,
+        intakeItemId: intakeItemId,
+        draftId: nil,
+        draftVersion: nil,
+        stage: .storedNonPlan,
+        reviewState: .storedNonPlan,
+        recommendedRole: recommendedRole,
+        confirmedRole: nil,
+        confidence: "high",
+        reasonCodes: ["non_plan_recommendation"],
+        nextAction: nextAction,
+        createsActiveTasks: false,
+        resourceId: nil,
+        error: nil,
+        clarificationQuestion: nil,
+        existingPlanCandidates: nil,
+        attachmentModeSuggestion: nil,
+        canonicalRepoRole: nil,
+        reviewPackage: nil,
+        activationResult: nil
+    )
+}
+
+private func sampleAddInitiateConfirmedNonPlanSession(
+    confirmedRole: String,
+    sessionId: String = "add-initiate-1",
+    clientRequestId: String = "req-add-1",
+    intakeItemId: Int = 11
+) -> AddInitiateSessionResponse {
+    AddInitiateSessionResponse(
+        sessionId: sessionId,
+        clientRequestId: clientRequestId,
+        intakeItemId: intakeItemId,
+        draftId: nil,
+        draftVersion: nil,
+        stage: .storedNonPlan,
+        reviewState: .storedNonPlan,
+        recommendedRole: confirmedRole,
+        confirmedRole: confirmedRole,
+        confidence: "high",
+        reasonCodes: ["stored_non_plan"],
+        nextAction: "done",
+        createsActiveTasks: false,
+        resourceId: 70,
+        error: nil,
+        clarificationQuestion: nil,
+        existingPlanCandidates: nil,
+        attachmentModeSuggestion: nil,
+        canonicalRepoRole: nil,
+        reviewPackage: nil,
+        activationResult: nil
+    )
+}
+
+private func sampleAddInitiatePendingMaterialAttachmentRecommendationSession(
+    recommendedRole: String,
+    sessionId: String = "add-initiate-1",
+    clientRequestId: String = "req-add-1",
+    intakeItemId: Int = 11
+) -> AddInitiateSessionResponse {
+    AddInitiateSessionResponse(
+        sessionId: sessionId,
+        clientRequestId: clientRequestId,
+        intakeItemId: intakeItemId,
+        draftId: nil,
+        draftVersion: nil,
+        stage: .materialAttached,
+        reviewState: .materialAttached,
+        recommendedRole: recommendedRole,
+        confirmedRole: nil,
+        confidence: "high",
+        reasonCodes: ["existing_project_context"],
+        nextAction: "confirm_role",
+        createsActiveTasks: false,
+        resourceId: nil,
+        error: nil,
+        clarificationQuestion: nil,
+        existingPlanCandidates: nil,
         attachmentModeSuggestion: "material_only",
         canonicalRepoRole: nil,
         reviewPackage: nil,

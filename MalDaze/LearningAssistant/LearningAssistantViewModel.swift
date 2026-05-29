@@ -124,10 +124,13 @@ enum AddInitiateFlowState: String, Equatable {
     case idleInput = "idle_input"
     case routingProgress = "routing_progress"
     case roleReview = "role_review"
+    case nonPlanConfirmation = "non_plan_confirmation"
     case nonPlanTerminal = "non_plan_terminal"
     case anchorReview = "anchor_review"
     case planningProgress = "planning_progress"
     case needsInput = "needs_input"
+    case routeNeedsInput = "route_needs_input"
+    case draftNeedsInput = "draft_needs_input"
     case compileFailed = "compile_failed"
     case infeasibleReview = "infeasible_review"
     case draftReview = "draft_review"
@@ -357,9 +360,12 @@ final class LearningAssistantViewModel: ObservableObject {
         case .anchorReview:
             return .anchorReview
         case .storedNonPlan, .materialAttached:
+            if Self.requiresAddInitiateTerminalConfirmation(session) {
+                return .nonPlanConfirmation
+            }
             return .nonPlanTerminal
         case .needsInput:
-            return .needsInput
+            return session.draftId == nil ? .routeNeedsInput : .draftNeedsInput
         case .compileFailed:
             return .compileFailed
         case .infeasibleReview:
@@ -384,6 +390,22 @@ final class LearningAssistantViewModel: ObservableObject {
         default:
             return 1
         }
+    }
+
+    private static func requiresAddInitiateTerminalConfirmation(_ session: AddInitiateSessionResponse) -> Bool {
+        session.confirmedRole == nil && isAddInitiateTerminalRecommendationRole(session.recommendedRole)
+    }
+
+    private static func isAddInitiateTerminalRecommendationRole(_ role: String?) -> Bool {
+        guard let role else { return false }
+        return [
+            AddInitiateRoleChoice.attachToExistingPlan.rawValue,
+            AddInitiateRoleChoice.supportingMaterial.rawValue,
+            AddInitiateRoleChoice.referenceMaterial.rawValue,
+            AddInitiateRoleChoice.laterResource.rawValue,
+            AddInitiateRoleChoice.oneOffAction.rawValue,
+            "immediate_one_off"
+        ].contains(role)
     }
 
     var addInitiateDraftReviewSummary: AddInitiateDraftReviewSummary? {
@@ -1517,6 +1539,10 @@ final class LearningAssistantViewModel: ObservableObject {
     }
 
     func answerAddInitiateNeedsInput() async {
+        guard addInitiateSession?.draftId != nil else {
+            addInitiateError = nil
+            return
+        }
         let answer = addInitiateNeedsInputAnswer.trimmingCharacters(in: .whitespacesAndNewlines)
         if !answer.isEmpty {
             let existing = Self.parseAddInitiateAssumptions(addInitiateAssumptionsText)
