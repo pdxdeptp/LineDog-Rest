@@ -1,6 +1,6 @@
 ## Context
 
-The Add / Initiate automation is a heartbeat automation that continues work in `/Users/cpt/Public/MalDaze` by reading local control files. The automation prompt has been updated to require three product-deepen rounds, but the local source of truth still records two rounds and the current checkpoint has already advanced to `apply_readiness`. The same control files also represent `apply` as one coarse checkpoint even though each change contains many independently verifiable tasks.
+The Add / Initiate automation is a heartbeat automation that continues work in `/Users/cpt/Public/MalDaze` by reading local control files. The automation prompt has been updated to require three product-deepen rounds, but the local source of truth still records two rounds and the current checkpoint has already advanced to a former pre-apply gate. The same control files also represent `apply` as one coarse checkpoint even though each change contains many independently verifiable tasks.
 
 ## Goals / Non-Goals
 
@@ -37,6 +37,6 @@ The Add / Initiate automation is a heartbeat automation that continues work in `
 
 ## Risks / Trade-offs
 
-- Migration can look like a backward step from `apply_readiness` to `product_deepen_round_3` -> mitigated by explicit migration evidence.
+- Migration can look like a backward step from the former pre-apply gate to `product_deepen_round_3` -> mitigated by explicit migration evidence.
 - Apply task groups may need adjustment as implementation reveals better boundaries -> mitigated by allowing task-group definitions to be updated before an apply group starts.
 - Workspace baseline can become stale -> mitigated by recording when it was captured and requiring a fresh comparison on every run.

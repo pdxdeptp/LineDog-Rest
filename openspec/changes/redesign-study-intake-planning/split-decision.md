@@ -40,5 +40,5 @@ The UI change may begin visual shell work earlier only if activation remains dis
 
 - No child change should redefine role enums, canonical repo roles, draft version rules, validation severity rules, or infeasibility option ids differently from the mother design.
 - Child changes should import only the relevant requirements from the mother design.
-- Each child change needs its own `opsx:apply-readiness` before implementation.
+- Each child change needs its own pre-apply planning before implementation.
 - If implementation reveals spec drift, update the relevant child change spec before continuing.

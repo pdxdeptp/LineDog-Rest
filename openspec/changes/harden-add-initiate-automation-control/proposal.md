@@ -4,7 +4,7 @@ The Add / Initiate implementation automation is expected to run for hours across
 
 ## What Changes
 
-- Align the authoritative control files with three product-deepening rounds before apply-readiness.
+- Align the authoritative control files with three product-deepening rounds before apply.
 - Record an explicit migration from the earlier two-round state machine to the three-round state machine.
 - Add resumable apply task-group tracking so an interrupted apply run can identify the next independently verifiable group.
 - Add a workspace safety baseline and overlap policy so the automation can distinguish accepted pre-existing changes from unsafe new or overlapping changes.

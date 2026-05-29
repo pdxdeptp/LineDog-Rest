@@ -39,8 +39,8 @@ Archive sync is path-driven: `changes/<change>/specs/<spec-id>/spec.md` merges b
 
 After `opsx:propose`, do not push straight to `opsx:apply` as the only next step. Offer a short choice:
 
-- Lightweight path: run `opsx:apply-readiness <change>` before implementation.
-- Full pre-apply path: run `opsx:product-deepen <change>` -> `opsx:scope-decision <change>` -> `opsx:apply-readiness <change>`.
+- Lightweight path: run pre-apply planning for `<change>` before implementation.
+- Full pre-apply path: run `opsx:product-deepen <change>` -> `opsx:scope-decision <change>` -> pre-apply planning for `<change>`.
 - Pause: leave the change ready for later review or manual edits.
 - Direct apply: proceed only if the user explicitly wants to skip pre-apply review.
 
@@ -103,7 +103,7 @@ System note: if the active environment does not permit spawning subagents unless
 
 ### Pre-Apply Dispatch Recheck
 
-If `opsx:product-deepen`, `opsx:scope-decision`, or `opsx:apply-readiness` changes `tasks.md`, `design.md`, or spec deltas before implementation:
+If `opsx:product-deepen`, `opsx:scope-decision`, or pre-apply planning changes `tasks.md`, `design.md`, or spec deltas before implementation:
 
 - Re-read the final `tasks.md`.
 - Identify shared write targets, especially shared test files, setup files, app entry points, route registries, project files, clients, and view models.

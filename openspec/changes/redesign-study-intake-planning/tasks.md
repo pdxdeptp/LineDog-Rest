@@ -90,4 +90,4 @@
 - [x] 7.1 Run scope decision and split this mother design into intake-router, draft-persistence, plan-compiler, deadline-scheduler, and add-initiate-ui implementation changes.
 - [x] 7.2 For each split change, copy only the relevant requirements and keep implementation tasks small enough for TDD/subagent dispatch.
 - [x] 7.3 Preserve the documented split dependency order: router, draft persistence, plan compiler, deadline scheduler, then Add / Initiate UI.
-- [ ] 7.4 Re-run apply-readiness on each split change before implementation.
+- [ ] 7.4 Re-run pre-apply planning on each split change before implementation.

@@ -8,7 +8,7 @@ The mother change should become stable enough to split into smaller implementati
 
 1. The design previously implied direct implementation despite being too broad.
 2. Split boundaries were discussed conversationally but not captured as a design artifact.
-3. `tasks.md` did not include a readiness step for splitting and re-running apply-readiness per child change.
+3. `tasks.md` did not include a planning step for splitting and re-running pre-apply planning per child change.
 
 ## Modifications Made
 

@@ -50,11 +50,11 @@ This audit checks whether the mother change is now stable enough to begin `opsx:
 ## Remaining Non-Blocking Work
 
 - Child changes have been created by `opsx:scope-decision`: `introduce-study-intake-router`, `persist-intake-plan-drafts`, `introduce-plan-compiler`, `introduce-deadline-scheduler`, and `redesign-add-initiate-ui`.
-- Each child change still needs its own `opsx:apply-readiness` before implementation.
+- Each child change still needs its own pre-apply planning before implementation.
 - Implementation details such as physical table names, exact endpoint paths, and prompt text belong in child changes, not this mother design.
 
 ## Readiness Decision
 
-Status: **SPLIT COMPLETE; CHILD CHANGES NEED APPLY READINESS**
+Status: **SPLIT COMPLETE; CHILD CHANGES NEED PRE-APPLY PLANNING**
 
-The mother document now resolves the cross-module P0/P1/P2 design gaps that would otherwise make child changes inconsistent. The next step is `opsx:apply-readiness` on the first child change, `introduce-study-intake-router`.
+The mother document now resolves the cross-module P0/P1/P2 design gaps that would otherwise make child changes inconsistent. The next step is pre-apply planning on the first child change, `introduce-study-intake-router`.

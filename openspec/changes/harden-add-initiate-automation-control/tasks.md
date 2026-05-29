@@ -57,3 +57,17 @@
 - [x] 11.1 Add cross-change contract state and evidence root.
 - [x] 11.2 Update apply completion rules to require downstream contract checks before advancing.
 - [x] 11.3 Add cross-change contract evidence schema.
+
+## 12. Scope Dependency Check
+
+- [x] 12.1 Add `scope_dependency_check` between product deepening and apply.
+- [x] 12.2 Add per-change scope dependency state fields.
+- [x] 12.3 Add scope dependency evidence schema and manifest support.
+- [x] 12.4 Update runbook and progress to include the new checkpoint.
+- [x] 12.5 Require every product-deepen round to consider adjacent change scope and record scope decisions.
+
+## 13. Remove Standalone Pre-Apply Gate
+
+- [x] 13.1 Remove the standalone pre-apply gate from the state machine, state flags, runbook, progress, and evidence manifest.
+- [x] 13.2 Move apply task-group planning into the `apply` stage preflight.
+- [x] 13.3 Update the heartbeat automation prompt to move directly from `scope_dependency_check` to `apply`.
