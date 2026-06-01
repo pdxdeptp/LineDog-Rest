@@ -960,12 +960,16 @@ private struct AddInitiateView: View {
 
     private var inputCard: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Label("Add / Initiate · 添加 / 立项", systemImage: "plus.circle")
+            Label("添加 / 立项", systemImage: "plus.circle")
                 .font(.headline)
+            Text("Add / Initiate：创建学习计划、加入已有计划、保存材料，或处理一次性行动。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
 
-            Picker("类型", selection: $sourceType) {
+            Picker("来源类型", selection: $sourceType) {
                 ForEach(AddInitiateSourceType.allCases) { type in
-                    Text("\(type.label) · \(type.rawValue)").tag(type)
+                    Text(type.label).tag(type)
                 }
             }
             .pickerStyle(.menu)
@@ -985,10 +989,10 @@ private struct AddInitiateView: View {
             if canShowAddInitiateInputPrimaryAction {
                 Button {
                     let submitted = rawInput.trimmingCharacters(in: .whitespacesAndNewlines)
-                    title = submitted
+                    title = initialAddInitiateTitle(from: submitted)
                     Task { await vm.startAddInitiateSession(rawInput: submitted, sourceType: sourceType) }
                 } label: {
-                    Label("Initiate / 立项", systemImage: "arrow.right.circle.fill")
+                    Label("继续处理", systemImage: "arrow.right.circle.fill")
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(rawInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || vm.isStartingAddInitiateSession)
@@ -1007,22 +1011,13 @@ private struct AddInitiateView: View {
                     .font(.headline)
 
                 HStack(spacing: 10) {
-                    roleFact("推荐", session.recommendedRole ?? "未定")
-                    roleFact("信心", session.confidence ?? "unknown")
+                    roleFact("推荐", LearningAssistantViewModel.localizedAddInitiateRoleLabel(session.recommendedRole ?? ""))
+                    roleFact("信心", LearningAssistantViewModel.localizedAddInitiateConfidenceLabel(session.confidence))
                 }
 
-                if let reasonCodes = session.reasonCodes, !reasonCodes.isEmpty {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("原因")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                        ForEach(reasonCodes, id: \.self) { reason in
-                            Text(reason)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
+                reasonCodesView(session.reasonCodes)
+
+                titleReviewField
 
                 roleAndAttachmentControls
 
@@ -1054,27 +1049,51 @@ private struct AddInitiateView: View {
 
                 TextField("截止日期 YYYY-MM-DD", text: $vm.addInitiateDeadline)
                     .textFieldStyle(.roundedBorder)
+                Text("截止日期格式：YYYY-MM-DD，例如 2026-07-01。")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
 
                 Picker("截止类型", selection: $vm.addInitiateDeadlineType) {
                     Text("可调整").tag("soft")
                     Text("固定").tag("hard")
                 }
                 .pickerStyle(.radioGroup)
+                Text(deadlineTypeGuidance)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
 
                 Stepper("可用时间 \(vm.addInitiateCapacityMinutes) 分钟/天", value: $vm.addInitiateCapacityMinutes, in: 15...720, step: 15)
 
                 TextField("目标产出", text: $vm.addInitiateTargetOutput)
                     .textFieldStyle(.roundedBorder)
 
-                TextField("目标深度", text: $vm.addInitiateTargetDepth)
-                    .textFieldStyle(.roundedBorder)
+                Picker("目标深度", selection: $vm.addInitiateTargetDepth) {
+                    ForEach(AddInitiateTargetDepthChoice.allCases) { choice in
+                        Text(choice.label).tag(choice.rawValue)
+                    }
+                }
+                .pickerStyle(.menu)
 
-                TextEditor(text: $vm.addInitiateAssumptionsText)
-                    .frame(minHeight: 58)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 6)
-                            .stroke(Color.secondary.opacity(0.25))
-                    )
+                if let selectedDepth = AddInitiateTargetDepthChoice(rawValue: vm.addInitiateTargetDepth) {
+                    Text(selectedDepth.guidance)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("假设（可编辑）")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    Text("每行一条；生成前可以删改或补充。")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                    TextEditor(text: $vm.addInitiateAssumptionsText)
+                        .frame(minHeight: 58)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(Color.secondary.opacity(0.25))
+                        )
+                }
 
                 if vm.addInitiateFlowState != .draftNeedsInput {
                     Button {
@@ -1151,6 +1170,8 @@ private struct AddInitiateView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
+                titleReviewField
+
                 roleAndAttachmentControls
 
                 Button {
@@ -1174,7 +1195,7 @@ private struct AddInitiateView: View {
             Text("需要补充信息")
                 .font(.headline)
                 .accessibilityIdentifier("needs_input")
-            roleFact("角色", vm.addInitiateSession?.confirmedRole ?? "未定")
+            roleFact("角色", LearningAssistantViewModel.localizedAddInitiateRoleLabel(vm.addInitiateSession?.confirmedRole ?? ""))
             Text(addInitiateFocusedQuestionText)
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -1201,22 +1222,13 @@ private struct AddInitiateView: View {
                     .accessibilityIdentifier("non_plan_confirmation")
 
                 HStack(spacing: 10) {
-                    roleFact("推荐", session.recommendedRole ?? "未定")
-                    roleFact("信心", session.confidence ?? "unknown")
+                    roleFact("推荐", LearningAssistantViewModel.localizedAddInitiateRoleLabel(session.recommendedRole ?? ""))
+                    roleFact("信心", LearningAssistantViewModel.localizedAddInitiateConfidenceLabel(session.confidence))
                 }
 
-                if let reasonCodes = session.reasonCodes, !reasonCodes.isEmpty {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("原因")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                        ForEach(reasonCodes, id: \.self) { reason in
-                            Text(reason)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
+                reasonCodesView(session.reasonCodes)
+
+                titleReviewField
 
                 roleAndAttachmentControls
 
@@ -1640,6 +1652,25 @@ private struct AddInitiateView: View {
         vm.addInitiateFlowState == .idleInput || vm.addInitiateFlowState == .routingProgress
     }
 
+    private var titleReviewField: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            TextField("标题", text: $title)
+                .textFieldStyle(.roundedBorder)
+            Text("确认这个标题会用于新计划、草案或保存条目。")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        }
+    }
+
+    private var deadlineTypeGuidance: String {
+        switch vm.addInitiateDeadlineType {
+        case "hard":
+            return "固定：尽量守住这个日期。"
+        default:
+            return "可调整：可以接受重新排期建议。"
+        }
+    }
+
     private func prepareForNewAddInitiateInput() {
         vm.prepareForNewAddInitiateInput()
         rawInput = ""
@@ -1648,10 +1679,26 @@ private struct AddInitiateView: View {
     }
 
     @ViewBuilder
+    private func reasonCodesView(_ reasonCodes: [String]?) -> some View {
+        if let reasonCodes, !reasonCodes.isEmpty {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("原因")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                ForEach(reasonCodes, id: \.self) { reason in
+                    Text(LearningAssistantViewModel.localizedAddInitiateReasonLabel(reason))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
     private var roleAndAttachmentControls: some View {
         Picker("处理方式", selection: $selectedRole) {
             ForEach(AddInitiateRoleChoice.allCases) { role in
-                Text("\(role.label) · \(role.rawValue)").tag(role)
+                Text(role.label).tag(role)
             }
         }
         .pickerStyle(.menu)
@@ -1674,7 +1721,7 @@ private struct AddInitiateView: View {
         if selectedRole == .attachToExistingPlan {
             Picker("附件方式", selection: $selectedAttachmentMode) {
                 ForEach(AddInitiateAttachmentMode.allCases) { mode in
-                    Text("\(mode.label) · \(mode.rawValue)").tag(mode)
+                    Text(mode.label).tag(mode)
                 }
             }
             .pickerStyle(.radioGroup)
@@ -1685,10 +1732,21 @@ private struct AddInitiateView: View {
         (selectedRole == .attachToExistingPlan || selectedRole == .supportingMaterial) && selectedExistingPlanID == nil
     }
 
+    private func initialAddInitiateTitle(from input: String) -> String {
+        let firstLine = input
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .first { !$0.isEmpty } ?? input.trimmingCharacters(in: .whitespacesAndNewlines)
+        if firstLine.count <= 80 {
+            return firstLine
+        }
+        return String(firstLine.prefix(80)).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     private func confirmSelectedAddInitiateRole() {
         Task {
             await vm.confirmAddInitiateRole(
-                title: title.isEmpty ? rawInput : title,
+                title: title.trimmingCharacters(in: .whitespacesAndNewlines),
                 confirmedRole: selectedRole,
                 existingPlanId: selectedExistingPlanID,
                 attachmentMode: selectedAttachmentMode
@@ -1742,7 +1800,7 @@ private struct AddInitiateView: View {
             selectedAttachmentMode = .materialOnly
         }
         selectedExistingPlanID = vm.addInitiateExistingPlanCandidates.first?.id
-        title = title.isEmpty ? rawInput : title
+        title = title.isEmpty ? initialAddInitiateTitle(from: rawInput) : title
     }
 
     private func roleReviewIdentity(for session: AddInitiateSessionResponse) -> String {

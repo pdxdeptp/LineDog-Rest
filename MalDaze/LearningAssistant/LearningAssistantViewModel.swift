@@ -120,6 +120,79 @@ enum AddInitiateAttachmentMode: String, CaseIterable, Identifiable {
     }
 }
 
+enum AddInitiateTargetDepthChoice: String, CaseIterable, Identifiable {
+    case quickOrientation = "skim_orientation"
+    case usableSkill = "can_use_it"
+    case projectOutput = "project_level_output"
+    case interviewReady = "interview_ready"
+    case sourceUnderstanding = "source_understanding"
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .quickOrientation: return "快速定位"
+        case .usableSkill: return "可上手使用"
+        case .projectOutput: return "项目作品"
+        case .interviewReady: return "面试准备"
+        case .sourceUnderstanding: return "源码理解"
+        }
+    }
+
+    var guidance: String {
+        switch self {
+        case .quickOrientation:
+            return "快速扫清地图，知道下一步要不要深入。"
+        case .usableSkill:
+            return "能做代表性练习或跑通一个可复用流程。"
+        case .projectOutput:
+            return "产出一个 demo、集成结果或可展示作品。"
+        case .interviewReady:
+            return "形成可复述、可追问、可复盘的面试答案。"
+        case .sourceUnderstanding:
+            return "读懂架构、关键路径、可修改点与权衡。"
+        }
+    }
+
+    static func label(for rawDepth: String) -> String {
+        let normalized = normalizedToken(for: rawDepth)
+        switch normalized {
+        case Self.quickOrientation.rawValue:
+            return quickOrientation.label
+        case Self.usableSkill.rawValue:
+            return usableSkill.label
+        case Self.projectOutput.rawValue:
+            return projectOutput.label
+        case Self.interviewReady.rawValue:
+            return interviewReady.label
+        case Self.sourceUnderstanding.rawValue:
+            return sourceUnderstanding.label
+        default:
+            return ""
+        }
+    }
+
+    static func normalizedToken(for rawDepth: String) -> String {
+        let trimmed = rawDepth.trimmingCharacters(in: .whitespacesAndNewlines)
+        switch trimmed.lowercased()
+            .replacingOccurrences(of: "-", with: "_")
+            .replacingOccurrences(of: "/", with: "_") {
+        case "skim", "orientation", "orient":
+            return quickOrientation.rawValue
+        case "apply", "can_use", "can_use_it", "understand":
+            return usableSkill.rawValue
+        case "project", "produce", "project_output", "project_level_output":
+            return projectOutput.rawValue
+        case "interview", "exam", "interview_ready":
+            return interviewReady.rawValue
+        case "understand_source", "source_understanding":
+            return sourceUnderstanding.rawValue
+        default:
+            return trimmed
+        }
+    }
+}
+
 enum AddInitiateFlowState: String, Equatable {
     case idleInput = "idle_input"
     case routingProgress = "routing_progress"
@@ -255,7 +328,11 @@ final class LearningAssistantViewModel: ObservableObject {
     @Published var addInitiateDeadlineType: String = "soft"
     @Published var addInitiateCapacityMinutes: Int = 60
     @Published var addInitiateTargetOutput: String = ""
-    @Published var addInitiateTargetDepth: String = "apply"
+    @Published var addInitiateTargetDepth: String = AddInitiateTargetDepthChoice.usableSkill.rawValue {
+        didSet {
+            normalizeAddInitiateTargetDepthIfNeeded()
+        }
+    }
     @Published var addInitiateAcceptedAssumptions: [String] = []
     @Published var addInitiateAssumptionsText: String = "" {
         didSet {
@@ -1232,9 +1309,13 @@ final class LearningAssistantViewModel: ObservableObject {
         }
         let trimmedDeadline = addInitiateDeadline.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedOutput = addInitiateTargetOutput.trimmingCharacters(in: .whitespacesAndNewlines)
-        let trimmedDepth = addInitiateTargetDepth.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedDepth = AddInitiateTargetDepthChoice.normalizedToken(for: addInitiateTargetDepth)
         guard !trimmedDeadline.isEmpty else {
             addInitiateError = "请填写截止日期。"
+            return
+        }
+        guard Self.isValidAddInitiateDeadline(trimmedDeadline) else {
+            addInitiateError = "截止日期格式需为 YYYY-MM-DD，例如 2026-07-01。"
             return
         }
         guard addInitiateCapacityMinutes > 0 else {
@@ -1492,7 +1573,7 @@ final class LearningAssistantViewModel: ObservableObject {
 
         switch optionId {
         case "lower_depth":
-            let depth = addInitiateTargetDepth.trimmingCharacters(in: .whitespacesAndNewlines)
+            let depth = AddInitiateTargetDepthChoice.normalizedToken(for: addInitiateTargetDepth)
             if !depth.isEmpty {
                 parameters["requested_depth"] = AnyCodable(depth)
             }
@@ -1575,11 +1656,18 @@ final class LearningAssistantViewModel: ObservableObject {
         addInitiateDeadlineType = "soft"
         addInitiateCapacityMinutes = 60
         addInitiateTargetOutput = ""
-        addInitiateTargetDepth = "apply"
+        addInitiateTargetDepth = AddInitiateTargetDepthChoice.usableSkill.rawValue
         addInitiateAcceptedAssumptions = []
         addInitiateAssumptionsText = ""
         addInitiateNeedsInputAnswer = ""
         addInitiateTaskEditDrafts = [:]
+    }
+
+    private func normalizeAddInitiateTargetDepthIfNeeded() {
+        let normalized = AddInitiateTargetDepthChoice.normalizedToken(for: addInitiateTargetDepth)
+        if normalized != addInitiateTargetDepth {
+            addInitiateTargetDepth = normalized
+        }
     }
 
     private func seedAddInitiateAnchorsIfNeeded(from session: AddInitiateSessionResponse) {
@@ -1588,7 +1676,7 @@ final class LearningAssistantViewModel: ObservableObject {
             addInitiateTargetOutput = addInitiateRawInput
         }
         if addInitiateTargetDepth.isEmpty {
-            addInitiateTargetDepth = "apply"
+            addInitiateTargetDepth = AddInitiateTargetDepthChoice.usableSkill.rawValue
         }
     }
 
@@ -1604,6 +1692,20 @@ final class LearningAssistantViewModel: ObservableObject {
             .components(separatedBy: .newlines)
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
+    }
+
+    private static func isValidAddInitiateDeadline(_ deadline: String) -> Bool {
+        guard deadline.range(of: #"^\d{4}-\d{2}-\d{2}$"#, options: .regularExpression) != nil else {
+            return false
+        }
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.isLenient = false
+        guard let date = formatter.date(from: deadline) else { return false }
+        return formatter.string(from: date) == deadline
     }
 
     private static func buildAddInitiateDraftReviewSummary(
@@ -1643,8 +1745,10 @@ final class LearningAssistantViewModel: ObservableObject {
             ),
             targetOutput: stringValue(pairedValue(in: package, snake: "target_output", camel: "targetOutput"))
                 ?? fallbackTargetOutput,
-            targetDepth: stringValue(pairedValue(in: package, snake: "target_depth", camel: "targetDepth"))
-                ?? fallbackTargetDepth,
+            targetDepth: localizedAddInitiateTargetDepthLabel(
+                stringValue(pairedValue(in: package, snake: "target_depth", camel: "targetDepth"))
+                    ?? fallbackTargetDepth
+            ),
             deadlineFit: localizedAddInitiateToken(
                 stringValue(pairedValue(in: package, snake: "deadline_fit", camel: "deadlineFit"))
                     ?? stringValue(package["status"]?.value)
@@ -1818,15 +1922,55 @@ final class LearningAssistantViewModel: ObservableObject {
             (intValue(confidence["rough"]) ?? 0) > 0
     }
 
-    private static func localizedAddInitiateRoleLabel(_ rawRole: String) -> String {
-        switch rawRole {
+    static func localizedAddInitiateRoleLabel(_ rawRole: String) -> String {
+        switch rawRole.trimmingCharacters(in: .whitespacesAndNewlines) {
         case "new_plan": return "新计划"
         case "attach_to_existing_plan": return "加入已有计划"
+        case "supporting_material": return "辅助材料"
         case "reference_material": return "参考资料"
         case "later_resource": return "稍后处理"
         case "immediate_one_off", "one_off_action": return "一次性行动"
-        default: return rawRole.isEmpty ? "未定" : rawRole
+        default: return "待确认用途"
         }
+    }
+
+    static func localizedAddInitiateConfidenceLabel(_ rawConfidence: String?) -> String {
+        guard let confidence = rawConfidence?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !confidence.isEmpty else {
+            return "未定"
+        }
+        switch confidence {
+        case "high": return "较高"
+        case "medium": return "中等"
+        case "low": return "较低"
+        case "unknown": return "未定"
+        default: return localizedAddInitiateToken(confidence)
+        }
+    }
+
+    static func localizedAddInitiateReasonLabel(_ rawReason: String) -> String {
+        switch rawReason {
+        case "existing_project_context": return "已有计划上下文"
+        case "source_material": return "来源材料信号"
+        case "planning_language": return "计划生成信号"
+        case "ambiguous_route": return "需要确认用途"
+        case "non_plan_recommendation": return "更适合保存或一次性处理"
+        case "stored_non_plan": return "已按非计划条目保存"
+        case "plan_generating": return "计划生成信号"
+        case "missing_scope": return "范围还不够明确"
+        case "compiler_validation_failed": return "规划校验未通过"
+        case "feasible_schedule": return "排期可行"
+        case "capacity_gap": return "可用时间不足"
+        case "stored_for_later": return "已保存待处理"
+        case "activation_guard_failed": return "激活前校验失败"
+        case "activated": return "已激活"
+        default: return localizedAddInitiateToken(rawReason)
+        }
+    }
+
+    static func localizedAddInitiateTargetDepthLabel(_ rawDepth: String) -> String {
+        let mapped = AddInitiateTargetDepthChoice.label(for: rawDepth)
+        return mapped.isEmpty ? localizedAddInitiateToken(rawDepth) : mapped
     }
 
     private static func localizedAddInitiateLoadState(_ rawState: String) -> String {

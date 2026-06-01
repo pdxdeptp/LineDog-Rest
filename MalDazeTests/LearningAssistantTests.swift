@@ -2874,6 +2874,82 @@ final class LearningAssistantUISourceTests: XCTestCase {
         XCTAssertFalse(addSource.contains("title: \"cancelled\""))
     }
 
+    func testAddInitiatePolishUsesLocalizedPrimaryLabelsAndTitleReviewControls() throws {
+        let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
+        let viewModelSource = try sourceFile("MalDaze/LearningAssistant/LearningAssistantViewModel.swift")
+        guard let start = source.range(of: "private struct AddInitiateView"),
+              let end = source[start.upperBound...].range(of: "private struct StudyPlanIntakeView") else {
+            XCTFail("AddInitiateView source section not found")
+            return
+        }
+        let addSource = String(source[start.lowerBound..<end.lowerBound])
+
+        XCTAssertTrue(addSource.contains("创建学习计划"))
+        XCTAssertTrue(addSource.contains("加入已有计划"))
+        XCTAssertTrue(addSource.contains("保存材料"))
+        XCTAssertTrue(addSource.contains("一次性行动"))
+        XCTAssertTrue(addSource.contains("TextField(\"标题\""))
+        XCTAssertTrue(addSource.contains("titleReviewField"))
+        XCTAssertTrue(addSource.contains("initialAddInitiateTitle"))
+        XCTAssertTrue(addSource.contains("type.label).tag(type)"))
+        XCTAssertTrue(addSource.contains("role.label).tag(role)"))
+        XCTAssertTrue(addSource.contains("mode.label).tag(mode)"))
+        XCTAssertTrue(addSource.contains("localizedAddInitiateReasonLabel(reason)"))
+        XCTAssertTrue(addSource.contains("localizedAddInitiateConfidenceLabel"))
+        XCTAssertTrue(viewModelSource.contains("static func localizedAddInitiateReasonLabel"))
+        XCTAssertTrue(viewModelSource.contains("已有计划上下文"))
+        XCTAssertTrue(viewModelSource.contains("计划生成信号"))
+
+        XCTAssertFalse(addSource.contains("\\(type.label) · \\(type.rawValue)"))
+        XCTAssertFalse(addSource.contains("\\(role.label) · \\(role.rawValue)"))
+        XCTAssertFalse(addSource.contains("\\(mode.label) · \\(mode.rawValue)"))
+        XCTAssertFalse(addSource.contains("Text(reason)"))
+        XCTAssertFalse(addSource.contains("roleFact(\"推荐\", session.recommendedRole ?? \"未定\")"))
+        XCTAssertFalse(addSource.contains("roleFact(\"信心\", session.confidence ?? \"unknown\")"))
+    }
+
+    func testAddInitiateRoleConfirmationDoesNotFallbackToRawInputWhenTitleIsCleared() throws {
+        let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
+        guard let start = source.range(of: "private func confirmSelectedAddInitiateRole()"),
+              let end = source[start.upperBound...].range(of: "private func progressRow") else {
+            XCTFail("confirmSelectedAddInitiateRole source section not found")
+            return
+        }
+        let confirmSource = String(source[start.lowerBound..<end.lowerBound])
+
+        XCTAssertTrue(confirmSource.contains("title: title.trimmingCharacters(in: .whitespacesAndNewlines)"))
+        XCTAssertFalse(confirmSource.contains("title.isEmpty ? rawInput : title"))
+    }
+
+    func testAddInitiateAnchorPolishUsesDeadlineGuidanceDepthChoicesAndReviewableAssumptions() throws {
+        let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
+        let viewModelSource = try sourceFile("MalDaze/LearningAssistant/LearningAssistantViewModel.swift")
+        guard let start = source.range(of: "private struct AddInitiateView"),
+              let end = source[start.upperBound...].range(of: "private struct StudyPlanIntakeView") else {
+            XCTFail("AddInitiateView source section not found")
+            return
+        }
+        let addSource = String(source[start.lowerBound..<end.lowerBound])
+
+        XCTAssertTrue(viewModelSource.contains("enum AddInitiateTargetDepthChoice"))
+        XCTAssertTrue(viewModelSource.contains("case quickOrientation = \"skim_orientation\""))
+        XCTAssertTrue(viewModelSource.contains("case usableSkill = \"can_use_it\""))
+        XCTAssertTrue(viewModelSource.contains("case projectOutput = \"project_level_output\""))
+        XCTAssertTrue(viewModelSource.contains("case interviewReady = \"interview_ready\""))
+        XCTAssertTrue(viewModelSource.contains("case sourceUnderstanding = \"source_understanding\""))
+        XCTAssertTrue(addSource.contains("AddInitiateTargetDepthChoice.allCases"))
+        XCTAssertTrue(addSource.contains("Text(choice.label).tag(choice.rawValue)"))
+        XCTAssertTrue(addSource.contains("截止日期格式"))
+        XCTAssertTrue(addSource.contains("可调整：可以接受重新排期建议"))
+        XCTAssertTrue(addSource.contains("固定：尽量守住这个日期"))
+        XCTAssertTrue(addSource.contains("假设（可编辑）"))
+        XCTAssertTrue(addSource.contains("每行一条"))
+
+        XCTAssertFalse(addSource.contains("TextField(\"目标深度\""))
+        XCTAssertFalse(addSource.contains("Text(\"apply\")"))
+        XCTAssertFalse(addSource.contains("Text(\"planning_language\")"))
+    }
+
     func testAddInitiateDraftReviewUISourceIsSummaryFirstWithExplicitExpansionControls() throws {
         let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
         guard let start = source.range(of: "private struct AddInitiateView"),
@@ -3412,7 +3488,7 @@ final class LearningAssistantViewModelTests: XCTestCase {
         XCTAssertEqual(mock.lastAddInitiateAnchorRequest?.deadlineType, "hard")
         XCTAssertEqual(mock.lastAddInitiateAnchorRequest?.capacityMinutes, 75)
         XCTAssertEqual(mock.lastAddInitiateAnchorRequest?.targetOutput, "working course outline")
-        XCTAssertEqual(mock.lastAddInitiateAnchorRequest?.targetDepth, "apply")
+        XCTAssertEqual(mock.lastAddInitiateAnchorRequest?.targetDepth, "can_use_it")
         XCTAssertEqual(mock.lastAddInitiateAnchorRequest?.assumptions?["accepted"]?.value as? [String], ["weekdays only", "no weekends"])
         XCTAssertEqual(vm.addInitiateFlowState.rawValue, "draft_needs_input")
         XCTAssertEqual(vm.addInitiateRawInput, "Build a Swift testing course")
@@ -3422,6 +3498,67 @@ final class LearningAssistantViewModelTests: XCTestCase {
         XCTAssertEqual(mock.fetchStudyTodayViewCallCount, 0)
         XCTAssertEqual(mock.fetchStudyProjectOverviewCallCount, 0)
         XCTAssertEqual(mock.fetchStudyCalendarLoadCallCount, 0)
+    }
+
+    func testConfirmAddInitiateAnchorsRejectsInvalidDeadlineBeforeCallingAPI() async {
+        let mock = MockAssistantAPIClient()
+        mock.addInitiateStartResult = sampleAddInitiateRoleReviewSession()
+        mock.addInitiateRoleResult = sampleAddInitiateAnchorReviewSession()
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+
+        await vm.startAddInitiateSession(rawInput: "Build a Swift testing course", sourceType: .textGoal)
+        await vm.confirmAddInitiateRole(title: "Swift testing", confirmedRole: .newPlan)
+
+        vm.addInitiateDeadline = "2026-02-31"
+        vm.addInitiateDeadlineType = "hard"
+        vm.addInitiateCapacityMinutes = 75
+        vm.addInitiateTargetOutput = "working course outline"
+        vm.addInitiateTargetDepth = "can_use_it"
+
+        await vm.confirmAddInitiateAnchors()
+
+        XCTAssertEqual(mock.confirmAddInitiateAnchorCallCount, 0)
+        XCTAssertNil(mock.lastAddInitiateAnchorRequest)
+        XCTAssertEqual(vm.addInitiateError, "截止日期格式需为 YYYY-MM-DD，例如 2026-07-01。")
+        XCTAssertEqual(vm.addInitiateFlowState, .anchorReview)
+    }
+
+    func testLegacyAddInitiateTargetDepthAliasesNormalizeForPickerAndRequests() async {
+        let mock = MockAssistantAPIClient()
+        mock.addInitiateStartResult = sampleAddInitiateRoleReviewSession()
+        mock.addInitiateRoleResult = sampleAddInitiateAnchorReviewSession()
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+
+        XCTAssertEqual(LearningAssistantViewModel.localizedAddInitiateTargetDepthLabel("apply"), "可上手使用")
+        XCTAssertEqual(LearningAssistantViewModel.localizedAddInitiateTargetDepthLabel("understand"), "可上手使用")
+        XCTAssertEqual(LearningAssistantViewModel.localizedAddInitiateTargetDepthLabel("skim"), "快速定位")
+
+        vm.addInitiateTargetDepth = "apply"
+        XCTAssertEqual(vm.addInitiateTargetDepth, "can_use_it")
+
+        vm.addInitiateTargetDepth = "skim"
+        XCTAssertEqual(vm.addInitiateTargetDepth, "skim_orientation")
+
+        await vm.startAddInitiateSession(rawInput: "Build an apply-depth plan", sourceType: .textGoal)
+        await vm.confirmAddInitiateRole(title: "Apply depth plan", confirmedRole: .newPlan)
+        vm.addInitiateDeadline = "2026-07-01"
+        vm.addInitiateCapacityMinutes = 75
+        vm.addInitiateTargetOutput = "working outline"
+        vm.addInitiateTargetDepth = "understand"
+
+        await vm.confirmAddInitiateAnchors()
+
+        XCTAssertEqual(vm.addInitiateTargetDepth, "can_use_it")
+        XCTAssertEqual(mock.lastAddInitiateAnchorRequest?.targetDepth, "can_use_it")
+    }
+
+    func testAddInitiateRoleAndConfidenceFallbackLabelsDoNotExposeRawIdsOrEmptyStrings() {
+        XCTAssertEqual(LearningAssistantViewModel.localizedAddInitiateRoleLabel("custom_backend_role"), "待确认用途")
+        XCTAssertEqual(LearningAssistantViewModel.localizedAddInitiateRoleLabel(""), "待确认用途")
+        XCTAssertEqual(LearningAssistantViewModel.localizedAddInitiateConfidenceLabel(""), "未定")
+        XCTAssertEqual(LearningAssistantViewModel.localizedAddInitiateConfidenceLabel(" \n "), "未定")
+        XCTAssertEqual(LearningAssistantViewModel.localizedAddInitiateConfidenceLabel("unknown"), "未定")
+        XCTAssertEqual(LearningAssistantViewModel.localizedAddInitiateConfidenceLabel(nil), "未定")
     }
 
     func testNeedsInputKeepsAnchorsEditableAndSubmitsAnswerWithKnownContext() async {
@@ -3492,7 +3629,7 @@ final class LearningAssistantViewModelTests: XCTestCase {
         XCTAssertEqual(mock.lastAddInitiateAnchorRequest?.deadline, "2026-08-15")
         XCTAssertEqual(mock.lastAddInitiateAnchorRequest?.capacityMinutes, 45)
         XCTAssertEqual(mock.lastAddInitiateAnchorRequest?.targetOutput, "repo rebuild plan")
-        XCTAssertEqual(mock.lastAddInitiateAnchorRequest?.targetDepth, "understand")
+        XCTAssertEqual(mock.lastAddInitiateAnchorRequest?.targetDepth, "can_use_it")
         XCTAssertEqual(vm.addInitiateFlowState, .draftReview)
         XCTAssertEqual(vm.addInitiatePrimaryActionCount, 1)
     }
@@ -4222,7 +4359,7 @@ final class LearningAssistantViewModelTests: XCTestCase {
 
         await vm.applyAddInitiateOptionEffect(optionId: "lower_depth")
         XCTAssertEqual(mock.lastAddInitiateOptionRequest?.parameters?.keys.sorted(), ["requested_depth"])
-        XCTAssertEqual(mock.lastAddInitiateOptionRequest?.parameters?["requested_depth"]?.value as? String, "skim")
+        XCTAssertEqual(mock.lastAddInitiateOptionRequest?.parameters?["requested_depth"]?.value as? String, "skim_orientation")
 
         await vm.applyAddInitiateOptionEffect(optionId: "increase_capacity")
         XCTAssertEqual(mock.lastAddInitiateOptionRequest?.parameters?.keys.sorted(), ["new_daily_capacity_min"])
@@ -4362,6 +4499,26 @@ final class LearningAssistantViewModelTests: XCTestCase {
         XCTAssertEqual(summary?.sourceDetailLines, ["标题: Camel Guide", "类型: GitHub 仓库"])
         XCTAssertEqual(summary?.deadlineRisk, "硬截止日期压力")
         XCTAssertFalse(vm.canActivateAddInitiateDraft)
+    }
+
+    func testDraftReviewSummaryUsesLocalizedTargetDepthLabelWhileRequestKeepsMachineValue() async {
+        var package = sampleAddInitiateDraftReviewPackage(dayCount: 1)
+        package["target_depth"] = AnyCodable("project_level_output")
+        let mock = MockAssistantAPIClient()
+        mock.addInitiateStartResult = sampleAddInitiateRoleReviewSession()
+        mock.addInitiateRoleResult = sampleAddInitiateAnchorReviewSession()
+        mock.addInitiateAnchorResult = sampleAddInitiateDraftReviewSession(reviewPackage: package)
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+
+        await vm.startAddInitiateSession(rawInput: "Build a portfolio output", sourceType: .textGoal)
+        await vm.confirmAddInitiateRole(title: "Portfolio output", confirmedRole: .newPlan)
+        vm.addInitiateDeadline = "2026-06-20"
+        vm.addInitiateTargetOutput = "portfolio output"
+        vm.addInitiateTargetDepth = "project_level_output"
+        await vm.confirmAddInitiateAnchors()
+
+        XCTAssertEqual(mock.lastAddInitiateAnchorRequest?.targetDepth, "project_level_output")
+        XCTAssertEqual(vm.addInitiateDraftReviewSummary?.targetDepth, "项目作品")
     }
 
     func testVisibleReviewProjectionHumanizesUnknownRawIds() async {
