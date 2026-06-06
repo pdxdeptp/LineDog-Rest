@@ -22,6 +22,7 @@
 - [x] 3.5 Implement the Disk Arbitration session wrapper, whole-disk unmount/eject callbacks, dissenter mapping, and no-force operation path.
 - [x] 3.6 Add failing source-level tests rejecting Finder automation, System Events, Finder AppleScript eject, and default force unmount/eject usage.
 - [x] 3.7 Perform spec compliance and code quality review for Time Machine coordination, Disk Arbitration result mapping, and no-GUI/no-force guarantees.
+- [x] 3.8 Implement and review helper orchestration that collects live disk evidence, resolves the T7 target, coordinates Time Machine, invokes Disk Arbitration, and emits exactly one JSON result.
 
 ## 4. App Service, Scheduling, And Logging
 
