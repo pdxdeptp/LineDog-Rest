@@ -1,9 +1,9 @@
 ## 1. Helper Target And Core Models
 
-- [ ] 1.1 Add failing tests or source checks requiring a bundled `T7EjectHelper` executable target, app-bundle copy integration, and Disk Arbitration/IOKit linkage.
-- [ ] 1.2 Add the `T7EjectHelper` command-line target and bundle-copy project wiring with a thin executable entry point.
-- [ ] 1.3 Add failing Swift tests for `T7EjectResult` JSON decoding/encoding across `success`, `failed`, and `idle` outcomes with the required diagnostic fields.
-- [ ] 1.4 Implement shared result/status models, reason enums, Chinese message mapping, and stdout JSON formatting.
+- [x] 1.1 Add failing tests or source checks requiring a bundled `T7EjectHelper` executable target, app-bundle copy integration, and Disk Arbitration/IOKit linkage.
+- [x] 1.2 Add the `T7EjectHelper` command-line target and bundle-copy project wiring with a thin executable entry point.
+- [x] 1.3 Add failing Swift tests for `T7EjectResult` JSON decoding/encoding across `success`, `failed`, and `idle` outcomes with the required diagnostic fields.
+- [x] 1.4 Implement shared result/status models, reason enums, Chinese message mapping, and stdout JSON formatting.
 
 ## 2. Target Discovery And Safety
 

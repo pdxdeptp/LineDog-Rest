@@ -59,6 +59,12 @@
 		A23A /* ResetIdlePetPositionShortcut.swift in Sources */ = {isa = PBXBuildFile; fileRef = B23A /* ResetIdlePetPositionShortcut.swift */; };
 		A23B /* MalDazeDockIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = B23B /* MalDazeDockIcon.swift */; };
 		A235 /* Carbon.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B235 /* Carbon.framework */; };
+		A250 /* T7EjectResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = B250 /* T7EjectResult.swift */; };
+		A251 /* T7EjectResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = B250 /* T7EjectResult.swift */; };
+		A252 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = B251 /* main.swift */; };
+		A253 /* DiskArbitration.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B253 /* DiskArbitration.framework */; };
+		A254 /* IOKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B254 /* IOKit.framework */; };
+		A255 /* T7EjectHelper in CopyFiles */ = {isa = PBXBuildFile; fileRef = C250 /* T7EjectHelper */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		A301 /* MockWindowManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B301 /* MockWindowManager.swift */; };
 		A302 /* MalDazeInteractionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B302 /* MalDazeInteractionTests.swift */; };
 		A303 /* MockRemindersEventStoreBacking.swift in Sources */ = {isa = PBXBuildFile; fileRef = B303 /* MockRemindersEventStoreBacking.swift */; };
@@ -82,9 +88,17 @@
 		A310 /* LearningAssistantTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B310 /* LearningAssistantTests.swift */; };
 		A311 /* PetRendererTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B311 /* PetRendererTests.swift */; };
 		A312 /* BackendProcessManagerLifecycleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B312 /* BackendProcessManagerLifecycleTests.swift */; };
+		A313 /* T7EjectHelperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B313 /* T7EjectHelperTests.swift */; };
 /* End PBXBuildFile section */
 
-/* Begin PBXContainerItemProxy section */
+	/* Begin PBXContainerItemProxy section */
+		J250 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = G200 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F250;
+			remoteInfo = T7EjectHelper;
+		};
 		J302 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = G200 /* Project object */;
@@ -158,6 +172,11 @@
 		C301 /* MalDazeTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MalDazeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B235 /* Carbon.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Carbon.framework; path = System/Library/Frameworks/Carbon.framework; sourceTree = SDKROOT; };
 		B240 /* LineDog */ = {isa = PBXFileReference; lastKnownFileType = folder; path = LineDog; sourceTree = "<group>"; };
+		B250 /* T7EjectResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = T7EjectResult.swift; sourceTree = "<group>"; };
+		B251 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		B253 /* DiskArbitration.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = DiskArbitration.framework; path = System/Library/Frameworks/DiskArbitration.framework; sourceTree = SDKROOT; };
+		B254 /* IOKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = IOKit.framework; path = System/Library/Frameworks/IOKit.framework; sourceTree = SDKROOT; };
+		C250 /* T7EjectHelper */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = T7EjectHelper; sourceTree = BUILT_PRODUCTS_DIR; };
 		B401 /* AssistantAPIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssistantAPIClient.swift; sourceTree = "<group>"; };
 		B402 /* LearningAssistantViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningAssistantViewModel.swift; sourceTree = "<group>"; };
 		B403 /* AssistantPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssistantPanelView.swift; sourceTree = "<group>"; };
@@ -172,7 +191,22 @@
 		B310 /* LearningAssistantTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningAssistantTests.swift; sourceTree = "<group>"; };
 		B311 /* PetRendererTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetRendererTests.swift; sourceTree = "<group>"; };
 		B312 /* BackendProcessManagerLifecycleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendProcessManagerLifecycleTests.swift; sourceTree = "<group>"; };
-/* End PBXFileReference section */
+		B313 /* T7EjectHelperTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = T7EjectHelperTests.swift; sourceTree = "<group>"; };
+	/* End PBXFileReference section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		D252 /* Copy T7EjectHelper */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 6;
+			files = (
+				A255 /* T7EjectHelper in CopyFiles */,
+			);
+			name = "Copy T7EjectHelper";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		D200 /* Frameworks */ = {
@@ -180,6 +214,15 @@
 			buildActionMask = 2147483647;
 			files = (
 				A235 /* Carbon.framework in Frameworks */,
+				);
+				runOnlyForDeploymentPostprocessing = 0;
+			};
+		D250 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A253 /* DiskArbitration.framework in Frameworks */,
+				A254 /* IOKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -197,6 +240,7 @@
 			isa = PBXGroup;
 			children = (
 				E201 /* MalDaze */,
+				E20F /* T7EjectHelper */,
 				E206 /* MalDazeTests */,
 				E202 /* Products */,
 			);
@@ -220,6 +264,7 @@
 				E20C /* HydrationReminder */,
 				E209 /* Reminders */,
 				E20A /* SmartReminder */,
+				E20E /* T7Eject */,
 				E20B /* Settings */,
 				E20D /* LearningAssistant */,
 				B227 /* MalDazeDefaults.swift */,
@@ -240,6 +285,7 @@
 			isa = PBXGroup;
 			children = (
 				C200 /* MalDaze.app */,
+				C250 /* T7EjectHelper */,
 				C301 /* MalDazeTests.xctest */,
 			);
 			name = Products;
@@ -287,12 +333,13 @@
 				B307 /* DeskReminderTimeFormatterTests.swift */,
 				B308 /* DeskReminderSidebarMergerTests.swift */,
 				B309 /* ControlPanelPresentationTests.swift */,
-				B310 /* LearningAssistantTests.swift */,
-				B311 /* PetRendererTests.swift */,
-				B312 /* BackendProcessManagerLifecycleTests.swift */,
-			);
-			path = MalDazeTests;
-			sourceTree = "<group>";
+					B310 /* LearningAssistantTests.swift */,
+					B311 /* PetRendererTests.swift */,
+					B312 /* BackendProcessManagerLifecycleTests.swift */,
+					B313 /* T7EjectHelperTests.swift */,
+				);
+				path = MalDazeTests;
+				sourceTree = "<group>";
 		};
 		E207 /* SevenMinuteReminder */ = {
 			isa = PBXGroup;
@@ -379,6 +426,22 @@
 			path = LearningAssistant;
 			sourceTree = "<group>";
 		};
+		E20E /* T7Eject */ = {
+			isa = PBXGroup;
+			children = (
+				B250 /* T7EjectResult.swift */,
+			);
+			path = T7Eject;
+			sourceTree = "<group>";
+		};
+		E20F /* T7EjectHelper */ = {
+			isa = PBXGroup;
+			children = (
+				B251 /* main.swift */,
+			);
+			path = T7EjectHelper;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -389,15 +452,33 @@
 				F202 /* Sources */,
 				D200 /* Frameworks */,
 				F203 /* Resources */,
+				D252 /* Copy T7EjectHelper */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				J251 /* PBXTargetDependency */,
 			);
 			name = MalDaze;
 			productName = MalDaze;
 			productReference = C200 /* MalDaze.app */;
 			productType = "com.apple.product-type.application";
+		};
+		F250 /* T7EjectHelper */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F251 /* Build configuration list for PBXNativeTarget "T7EjectHelper" */;
+			buildPhases = (
+				D251 /* Sources */,
+				D250 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = T7EjectHelper;
+			productName = T7EjectHelper;
+			productReference = C250 /* T7EjectHelper */;
+			productType = "com.apple.product-type.tool";
 		};
 		F300 /* MalDazeTests */ = {
 			isa = PBXNativeTarget;
@@ -429,6 +510,9 @@
 					F200 = {
 						CreatedOnToolsVersion = 15.0;
 					};
+					F250 = {
+						CreatedOnToolsVersion = 15.0;
+					};
 					F300 = {
 						CreatedOnToolsVersion = 15.0;
 						TestTargetID = F200;
@@ -449,6 +533,7 @@
 			projectRoot = "";
 			targets = (
 				F200 /* MalDaze */,
+				F250 /* T7EjectHelper */,
 				F300 /* MalDazeTests */,
 			);
 		};
@@ -529,8 +614,18 @@
 				A407 /* IngestionView.swift in Sources */,
 				A408 /* FullPlanSheetView.swift in Sources */,
 				A409 /* BackendProcessManager.swift in Sources */,
-				A40A /* AssistantAPIClientProtocol.swift in Sources */,
-				A40B /* LearningPreferencesView.swift in Sources */,
+					A40A /* AssistantAPIClientProtocol.swift in Sources */,
+					A40B /* LearningPreferencesView.swift in Sources */,
+					A250 /* T7EjectResult.swift in Sources */,
+				);
+				runOnlyForDeploymentPostprocessing = 0;
+			};
+		D251 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A251 /* T7EjectResult.swift in Sources */,
+				A252 /* main.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -547,15 +642,21 @@
 				A307 /* DeskReminderTimeFormatterTests.swift in Sources */,
 				A308 /* DeskReminderSidebarMergerTests.swift in Sources */,
 				A309 /* ControlPanelPresentationTests.swift in Sources */,
-				A310 /* LearningAssistantTests.swift in Sources */,
-				A311 /* PetRendererTests.swift in Sources */,
-				A312 /* BackendProcessManagerLifecycleTests.swift in Sources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
+					A310 /* LearningAssistantTests.swift in Sources */,
+					A311 /* PetRendererTests.swift in Sources */,
+					A312 /* BackendProcessManagerLifecycleTests.swift in Sources */,
+					A313 /* T7EjectHelperTests.swift in Sources */,
+				);
+				runOnlyForDeploymentPostprocessing = 0;
+			};
 /* End PBXSourcesBuildPhase section */
 
-/* Begin PBXTargetDependency section */
+	/* Begin PBXTargetDependency section */
+		J251 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F250 /* T7EjectHelper */;
+			targetProxy = J250 /* PBXContainerItemProxy */;
+		};
 		J301 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = F200 /* MalDaze */;
@@ -741,6 +842,42 @@
 			};
 			name = Release;
 		};
+		H250 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 7MUZ966XS3;
+				GENERATE_INFOPLIST_FILE = NO;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited)";
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.maldaze.T7EjectHelper;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		H251 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 7MUZ966XS3;
+				GENERATE_INFOPLIST_FILE = NO;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited)";
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.maldaze.T7EjectHelper;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
 		H204 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -795,6 +932,15 @@
 			buildConfigurations = (
 				H202 /* Debug */,
 				H203 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		F251 /* Build configuration list for PBXNativeTarget "T7EjectHelper" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				H250 /* Debug */,
+				H251 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
