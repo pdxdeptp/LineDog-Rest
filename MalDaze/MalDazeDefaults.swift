@@ -155,6 +155,17 @@ enum MalDazeDefaults {
     /// 安静时段结束/恢复时间（距 0:00 的分钟数），默认 480 = 08:00。
     static let hydrationQuietResumeMinutes = "MalDaze.hydrationReminder.quietResumeMinutes"
 
+    /// T7 安全推出自动调度开关（默认开）。
+    static let t7EjectAutomaticEnabled = "MalDaze.t7Eject.automaticEnabled"
+    /// T7 自动推出窗口开始时间（距 0:00 的分钟数），默认 1200 = 20:00。
+    static let t7EjectScheduleStartMinuteOfDay = "MalDaze.t7Eject.scheduleStartMinuteOfDay"
+    /// T7 自动推出窗口结束时间（距 0:00 的分钟数），默认 1425 = 23:45。
+    static let t7EjectScheduleEndMinuteOfDay = "MalDaze.t7Eject.scheduleEndMinuteOfDay"
+    /// T7 自动推出重试间隔（秒），默认 900 = 15 分钟。
+    static let t7EjectRetryIntervalSeconds = "MalDaze.t7Eject.retryIntervalSeconds"
+    /// 本地日期 token；当天成功或已卸载后，自动调度不再重复。
+    static let t7EjectLastCompletedDay = "MalDaze.t7Eject.lastCompletedDay"
+
     /// 休息打断风格："fullscreen"（默认霸屏）或 "breakRun"（跑屏漫游）。
     static let breakInterruptStyle = "MalDaze.breakInterruptStyle"
 

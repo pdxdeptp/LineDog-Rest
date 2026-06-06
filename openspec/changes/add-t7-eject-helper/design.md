@@ -162,6 +162,24 @@ Rationale: stdout JSON makes the helper easy to test and invoke manually. JSONL 
 
 Alternative considered: app directly inspects process exit code and stderr only. Rejected because it loses structured error categories and mounted-volume evidence.
 
+### Decision 8: Keep app-side service, scheduler, and UI seams explicit
+
+The app-side implementation must be split by responsibility even if small types live in the same Swift source file:
+
+- `T7EjectProcessRunning`: one-shot child-process execution with stdout, stderr, exit status, timeout, and spawn-failure reporting.
+- `T7EjectHelperPathResolving`: bundled/development helper lookup only; no schedule or UI state.
+- `T7EjectLogWriting`: append-only JSONL persistence with injectable file URL or writer for tests.
+- `T7EjectSchedulePolicy`: pure local-time eligibility, retry interval, daily completion, and next-attempt decisions.
+- `T7EjectService`: orchestration boundary that prevents concurrent runs, invokes the helper, parses stdout JSON, records logs, and publishes latest state.
+- `AppViewModel`: lifecycle owner and UI-facing command surface; it may start/stop the service and expose state, but should not parse helper stdout or write logs.
+- `DashboardRootView`: presentation only; it may render controls and call `AppViewModel` commands, but must not resolve helper paths, spawn processes, write logs, or know Disk Arbitration details.
+
+Before implementing UI, the service implementation must be reviewed against these seams. If a previous broad implementation combined these responsibilities in a way that makes tests brittle or future UI workers guess, refactor to these seams before adding right-column controls.
+
+Rationale: the original app-service task combined process execution, JSON parsing, logging, scheduling, defaults, lifecycle, and UI state. That made implementation slower and pushed interface design into the apply step. Explicit seams make TDD smaller, allow focused review, and keep the safety-sensitive helper boundary diagnosable.
+
+Apply boundary: do not assign one worker to implement service/scheduler and right-column UI together. UI work starts only after the service state contract is reviewed and stable.
+
 ## Risks / Trade-offs
 
 - [Risk] Disk Arbitration metadata can vary by device and macOS version. -> Mitigation: keep resolver protocol-based, log raw relevant metadata in debug records, and validate with both name and stable identifiers.
@@ -170,14 +188,16 @@ Alternative considered: app directly inspects process exit code and stderr only.
 - [Risk] Automatic default-on behavior can surprise users if they do not notice it. -> Mitigation: right-column section clearly shows the enabled state, latest result, and manual off switch.
 - [Risk] Adding a helper target changes Xcode project structure. -> Mitigation: keep shared resolver/status models in regular Swift files with deterministic tests, and keep the executable wrapper thin.
 - [Risk] App-bound scheduling does not run if MalDaze is closed. -> Mitigation: this is an explicit product decision; UI copy/status should imply the automation runs while MalDaze is running.
+- [Risk] Broad app-side tasks can hide design decisions inside implementation. -> Mitigation: keep service/scheduler/UI seams explicit in this design and add a review gate before UI work.
 
 ## Migration Plan
 
 1. Register default UserDefaults for T7 auto eject enabled, schedule window, retry interval, Time Machine timeout, and stability wait.
 2. Add the helper target and copy it into the MalDaze app bundle.
 3. Add app-side service and bind it into `AppViewModel` startup/termination lifecycle.
-4. Add right-column desk-pet controls and result display.
-5. Add tests and manual QA steps.
+4. Review the app-side service against the explicit process/path/log/schedule/service/lifecycle seams before UI work.
+5. Add right-column desk-pet controls and result display using the reviewed `AppViewModel` state contract.
+6. Add tests and manual QA steps.
 
 Rollback is code-level: disabling/removing the service and helper leaves existing user data untouched. No disk, Time Machine, or database migration is required.
 

@@ -76,6 +76,7 @@
 		A25E /* T7EjectHelperRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = B25D /* T7EjectHelperRunner.swift */; };
 		A25F /* T7DiskUtilInventoryProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = B25E /* T7DiskUtilInventoryProvider.swift */; };
 		A260 /* T7DiskUtilInventoryProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = B25E /* T7DiskUtilInventoryProvider.swift */; };
+		A261 /* T7EjectService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B261 /* T7EjectService.swift */; };
 		A301 /* MockWindowManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B301 /* MockWindowManager.swift */; };
 		A302 /* MalDazeInteractionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B302 /* MalDazeInteractionTests.swift */; };
 		A303 /* MockRemindersEventStoreBacking.swift in Sources */ = {isa = PBXBuildFile; fileRef = B303 /* MockRemindersEventStoreBacking.swift */; };
@@ -104,6 +105,7 @@
 		A315 /* T7TimeMachineControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B315 /* T7TimeMachineControllerTests.swift */; };
 		A316 /* T7DiskArbitrationEjectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B316 /* T7DiskArbitrationEjectorTests.swift */; };
 		A317 /* T7EjectHelperRunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B317 /* T7EjectHelperRunnerTests.swift */; };
+		A318 /* T7EjectServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B318 /* T7EjectServiceTests.swift */; };
 /* End PBXBuildFile section */
 
 	/* Begin PBXContainerItemProxy section */
@@ -197,6 +199,7 @@
 		B25A /* T7DiskArbitrationEjector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = T7DiskArbitrationEjector.swift; sourceTree = "<group>"; };
 		B25D /* T7EjectHelperRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = T7EjectHelperRunner.swift; sourceTree = "<group>"; };
 		B25E /* T7DiskUtilInventoryProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = T7DiskUtilInventoryProvider.swift; sourceTree = "<group>"; };
+		B261 /* T7EjectService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = T7EjectService.swift; sourceTree = "<group>"; };
 		B401 /* AssistantAPIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssistantAPIClient.swift; sourceTree = "<group>"; };
 		B402 /* LearningAssistantViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningAssistantViewModel.swift; sourceTree = "<group>"; };
 		B403 /* AssistantPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssistantPanelView.swift; sourceTree = "<group>"; };
@@ -216,6 +219,7 @@
 		B315 /* T7TimeMachineControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = T7TimeMachineControllerTests.swift; sourceTree = "<group>"; };
 		B316 /* T7DiskArbitrationEjectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = T7DiskArbitrationEjectorTests.swift; sourceTree = "<group>"; };
 		B317 /* T7EjectHelperRunnerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = T7EjectHelperRunnerTests.swift; sourceTree = "<group>"; };
+		B318 /* T7EjectServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = T7EjectServiceTests.swift; sourceTree = "<group>"; };
 	/* End PBXFileReference section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -366,6 +370,7 @@
 					B315 /* T7TimeMachineControllerTests.swift */,
 					B316 /* T7DiskArbitrationEjectorTests.swift */,
 					B317 /* T7EjectHelperRunnerTests.swift */,
+					B318 /* T7EjectServiceTests.swift */,
 				);
 				path = MalDazeTests;
 				sourceTree = "<group>";
@@ -464,6 +469,7 @@
 				B25A /* T7DiskArbitrationEjector.swift */,
 				B25D /* T7EjectHelperRunner.swift */,
 				B25E /* T7DiskUtilInventoryProvider.swift */,
+				B261 /* T7EjectService.swift */,
 			);
 			path = T7Eject;
 			sourceTree = "<group>";
@@ -656,6 +662,7 @@
 					A25A /* T7DiskArbitrationEjector.swift in Sources */,
 					A25D /* T7EjectHelperRunner.swift in Sources */,
 					A25F /* T7DiskUtilInventoryProvider.swift in Sources */,
+					A261 /* T7EjectService.swift in Sources */,
 				);
 				runOnlyForDeploymentPostprocessing = 0;
 			};
@@ -694,6 +701,7 @@
 					A315 /* T7TimeMachineControllerTests.swift in Sources */,
 					A316 /* T7DiskArbitrationEjectorTests.swift in Sources */,
 					A317 /* T7EjectHelperRunnerTests.swift in Sources */,
+					A318 /* T7EjectServiceTests.swift in Sources */,
 				);
 				runOnlyForDeploymentPostprocessing = 0;
 			};

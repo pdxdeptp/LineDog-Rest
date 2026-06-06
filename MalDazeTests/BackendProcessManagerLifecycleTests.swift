@@ -56,6 +56,19 @@ final class BackendProcessManagerLifecycleTests: XCTestCase {
         XCTAssertTrue(backend.didStop)
     }
 
+    func testApplicationWillTerminateStopsRegisteredT7Lifecycle() {
+        let backend = RecordingAppBackendLifecycle()
+        let t7Lifecycle = RecordingT7EjectLifecycle()
+        T7EjectAppLifecycleRegistry.shared.register(t7Lifecycle)
+        let delegate = MalDazeAppDelegate(backendLifecycle: backend)
+        defer { T7EjectAppLifecycleRegistry.shared.unregister(t7Lifecycle) }
+
+        delegate.applicationWillTerminate(Notification(name: NSApplication.willTerminateNotification))
+
+        XCTAssertTrue(backend.didStop)
+        XCTAssertEqual(t7Lifecycle.stopCount, 1)
+    }
+
     func testApplicationWillTerminateStopsBackendBeforeTerminationCleanup() {
         var events: [String] = []
         let backend = RecordingAppBackendLifecycle {
@@ -112,7 +125,9 @@ final class BackendProcessManagerLifecycleTests: XCTestCase {
         )
 
         manager.startIfNeeded()
-        try await Task.sleep(nanoseconds: 50_000_000)
+        try await waitUntil {
+            process.didRun && !manager.isStarting
+        }
 
         XCTAssertTrue(process.didRun)
         XCTAssertFalse(manager.isReady)
@@ -134,14 +149,18 @@ final class BackendProcessManagerLifecycleTests: XCTestCase {
         )
 
         manager.startIfNeeded()
-        try await Task.sleep(nanoseconds: 50_000_000)
+        try await waitUntil {
+            firstProcess.didRun && !manager.isStarting
+        }
 
         XCTAssertTrue(firstProcess.didRun)
         XCTAssertFalse(manager.isReady)
         XCTAssertFalse(manager.isStarting)
 
         manager.startIfNeeded()
-        try await Task.sleep(nanoseconds: 50_000_000)
+        try await waitUntil {
+            secondProcess.didRun && !manager.isStarting
+        }
 
         XCTAssertTrue(secondProcess.didRun)
         XCTAssertFalse(manager.isReady)
@@ -234,7 +253,9 @@ final class BackendProcessManagerLifecycleTests: XCTestCase {
         XCTAssertTrue(manager.isStarting)
 
         oldProcess.fireTerminationHandler()
-        try await Task.sleep(nanoseconds: 50_000_000)
+        try await waitUntil {
+            newProcess.didRun && manager.isReady && !manager.isStarting
+        }
 
         XCTAssertTrue(newProcess.didRun)
         XCTAssertTrue(manager.isReady)
@@ -262,6 +283,20 @@ final class BackendProcessManagerLifecycleTests: XCTestCase {
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
         defaults.removePersistentDomain(forName: suiteName)
         return (defaults, suiteName)
+    }
+
+    private func waitUntil(
+        timeoutNanoseconds: UInt64 = 1_000_000_000,
+        _ condition: @escaping @MainActor () -> Bool
+    ) async throws {
+        let deadline = DispatchTime.now().uptimeNanoseconds + timeoutNanoseconds
+        while !condition() {
+            if DispatchTime.now().uptimeNanoseconds > deadline {
+                XCTFail("Timed out waiting for condition")
+                return
+            }
+            try await Task.sleep(nanoseconds: 1_000_000)
+        }
     }
 }
 
@@ -306,6 +341,22 @@ private final class RecordingBackendProcess: BackendProcessControlling {
 }
 
 private struct TestBackendRunError: Error {}
+
+@MainActor
+private final class RecordingT7EjectLifecycle: T7EjectServiceLifecycle {
+    private(set) var stopCount = 0
+    var isRunning: Bool { false }
+    var latestResult: T7EjectResult? { nil }
+    var isAutomaticEnabled: Bool { true }
+    var isSchedulerRunningForTesting: Bool { false }
+
+    func startScheduler() {}
+    func cancelScheduler() {}
+
+    func stop() {
+        stopCount += 1
+    }
+}
 
 private final class RecordingAppBackendLifecycle: AppBackendLifecycleManaging {
     var isReady = false

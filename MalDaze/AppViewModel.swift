@@ -73,6 +73,8 @@ final class AppViewModel: ObservableObject {
     private let fiveMinuteCatCompanion: FiveMinuteCatCompanionController
     /// 喝水提醒控制器，不经过 `WindowManager`。
     private let hydrationReminder: HydrationReminderController
+    /// T7 安全推出服务；调度生命周期绑定在 AppViewModel 内。
+    let t7EjectService: any T7EjectServiceLifecycle
 
     private var wasResting = false
     private var testRestActive = false
@@ -90,6 +92,15 @@ final class AppViewModel: ObservableObject {
     /// 智能提醒写入的 `EKAlarm` 到点后弹出与 7 分钟倒计时相同的中央铃铛。
     private var smartReminderBellTasks: [String: Task<Void, Never>] = [:]
 
+    private static var isRunningUnderXCTest: Bool {
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+            || NSClassFromString("XCTestCase") != nil
+    }
+
+    private static func shouldBootstrapT7EjectScheduler(explicitValue: Bool?) -> Bool {
+        explicitValue ?? !isRunningUnderXCTest
+    }
+
     /// - Parameters:
     ///   - bootstrapAutoEngine: 应用启动为 `true` 并立即跑自动模式；单测传 `false` 避免后台 tick。
     init(
@@ -100,12 +111,16 @@ final class AppViewModel: ObservableObject {
         sevenMinuteReminder: SevenMinuteReminderController? = nil,
         fiveMinuteCatCompanion: FiveMinuteCatCompanionController? = nil,
         hydrationReminder: HydrationReminderController? = nil,
-        deskReminders: DeskRemindersModel? = nil
+        deskReminders: DeskRemindersModel? = nil,
+        t7EjectService: (any T7EjectServiceLifecycle)? = nil,
+        bootstrapT7EjectScheduler: Bool? = nil
     ) {
         self.windowManager = windowManager
         self.sevenMinuteReminder = sevenMinuteReminder ?? SevenMinuteReminderController()
         self.fiveMinuteCatCompanion = fiveMinuteCatCompanion ?? FiveMinuteCatCompanionController()
         self.hydrationReminder = hydrationReminder ?? HydrationReminderController()
+        self.t7EjectService = t7EjectService ?? T7EjectService.live()
+        T7EjectAppLifecycleRegistry.shared.register(self.t7EjectService)
         self.isHydrationReminderEnabled = UserDefaults.standard.bool(forKey: MalDazeDefaults.hydrationReminderEnabled)
         let rawStyle = UserDefaults.standard.string(forKey: MalDazeDefaults.breakInterruptStyle) ?? ""
         self.breakInterruptStyle = BreakInterruptStyle(rawValue: rawStyle) ?? .fullscreen
@@ -185,6 +200,9 @@ final class AppViewModel: ObservableObject {
         if self.isHydrationReminderEnabled {
             self.hydrationReminder.start()
         }
+        if Self.shouldBootstrapT7EjectScheduler(explicitValue: bootstrapT7EjectScheduler) {
+            self.t7EjectService.startScheduler()
+        }
 
         self.deskReminders.objectWillChange
             .receive(on: DispatchQueue.main)
@@ -258,6 +276,11 @@ final class AppViewModel: ObservableObject {
     }
 
     deinit {
+        let t7 = t7EjectService
+        Task { @MainActor in
+            T7EjectAppLifecycleRegistry.shared.unregister(t7)
+            t7.stop()
+        }
         let h = hydrationReminder
         Task { @MainActor in h.cancel() }
         if let smartReminderShortcutObserver {
@@ -627,6 +650,7 @@ final class AppViewModel: ObservableObject {
     }
 
     func quitApp() {
+        T7EjectAppLifecycleRegistry.shared.stopRegisteredService()
         NSApp.terminate(nil)
     }
 

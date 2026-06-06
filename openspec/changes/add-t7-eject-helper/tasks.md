@@ -26,20 +26,25 @@
 
 ## 4. App Service, Scheduling, And Logging
 
-- [ ] 4.1 Add failing tests for `T7EjectService` helper invocation, stdout JSON parsing, invalid JSON handling, process failure handling, in-flight concurrency prevention, and diagnostic log writes.
-- [ ] 4.2 Implement `T7EjectService` with injectable process runner, clock/calendar, helper path resolution, JSON result parsing, observable state, and JSONL logging.
-- [ ] 4.3 Add failing scheduler tests for default auto-enabled behavior, 20:00-23:45 local window, 15-minute retry interval, daily success suppression, `idle_already_unmounted` daily completion, `idle_not_connected` continued retry eligibility, manual runs outside the window, and disabled-auto cancellation.
-- [ ] 4.4 Implement the app-bound scheduler, persisted defaults, daily completion tracking, and app lifecycle start/stop integration through `AppViewModel`.
-- [ ] 4.5 Add failing tests proving no LaunchAgent, cron, or detached scheduler is installed for T7 eject.
-- [ ] 4.6 Perform spec compliance and code quality review for app-bound lifecycle, scheduling, logging, and helper process safety.
+- [x] 4.1 Add failing tests for `T7EjectService` helper invocation, stdout JSON parsing, invalid JSON handling, process failure handling, in-flight concurrency prevention, and diagnostic log writes.
+- [x] 4.2 Implement `T7EjectService` with injectable process runner, clock/calendar, helper path resolution, JSON result parsing, observable state, and JSONL logging.
+- [x] 4.3 Add failing scheduler tests for default auto-enabled behavior, 20:00-23:45 local window, 15-minute retry interval, daily success suppression, `idle_already_unmounted` daily completion, `idle_not_connected` continued retry eligibility, manual runs outside the window, and disabled-auto cancellation.
+- [x] 4.4 Implement the app-bound scheduler, persisted defaults, daily completion tracking, and app lifecycle start/stop integration through `AppViewModel`.
+- [x] 4.5 Add failing tests proving no LaunchAgent, cron, or detached scheduler is installed for T7 eject.
+- [x] 4.6 Perform spec compliance and code quality review for app-bound lifecycle, scheduling, logging, and helper process safety.
+- [x] 4.7 Before UI work, review the current app-side implementation against the explicit `T7EjectProcessRunning`, helper-path, log-writer, schedule-policy, service, `AppViewModel`, and view-presentation seams; if responsibilities are entangled, refactor with focused tests before continuing.
 
 ## 5. Desk-Pet Right Column UI
 
-- [ ] 5.1 Add failing source/UI tests requiring a `T7 安全推出` section in the desk-pet panel right column.
-- [ ] 5.2 Add failing tests for default-on automatic toggle, persisted off state, manual button availability while auto is off, in-progress disabled state, schedule configuration persistence, and latest-result display.
-- [ ] 5.3 Implement right-column T7 controls in the dashboard/control surface and bind them to `T7EjectService`.
-- [ ] 5.4 Add concise Chinese status copy for success, idle, busy/dissenter, Time Machine still running, unsafe target, eject failed after unmount, and unexpected error.
-- [ ] 5.5 Perform spec compliance and code quality review for desk-pet-controls UI requirements and status presentation.
+- [ ] 5.1 Add failing tests for the `AppViewModel` UI-facing T7 state contract: latest result, in-flight state, automatic-enabled binding, schedule values, manual-run command, and automatic-toggle command.
+- [ ] 5.2 Add failing source/UI tests requiring a `T7 安全推出` section in the desk-pet panel right column and proving `DashboardRootView` does not resolve helper paths, spawn processes, write logs, or call Disk Arbitration directly.
+- [ ] 5.3 Add failing tests for manual action behavior: available when automatic mode is off, disabled or marked in-progress while a helper run is active, and routed through the reviewed service command.
+- [ ] 5.4 Add failing tests for automatic toggle behavior in the right-column UI: default on, persisted off state, disabled-auto cancellation, and no loss of the manual safe-eject action.
+- [ ] 5.5 Add failing tests for schedule controls: persisted start/end/retry values, clamped valid ranges, and rescheduling when values change.
+- [ ] 5.6 Add failing tests for concise Chinese latest-result display, including success, idle, disk busy/dissenter, Time Machine still running, unsafe target, eject failed after unmount, unexpected error, and latest run time.
+- [ ] 5.7 Implement the right-column `T7 安全推出` section using existing dashboard control styles and the reviewed `AppViewModel` state/command contract.
+- [ ] 5.8 Implement status/date formatting as view-model or pure formatting helpers so SwiftUI presentation stays thin.
+- [ ] 5.9 Perform spec compliance and code quality review for desk-pet-controls UI requirements, status presentation, and separation from process/logging/Disk Arbitration concerns.
 
 ## 6. Verification And Manual QA
 

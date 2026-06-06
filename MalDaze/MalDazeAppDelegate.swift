@@ -71,6 +71,7 @@ final class MalDazeAppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         backendLifecycle.stop()
+        T7EjectAppLifecycleRegistry.shared.stopRegisteredService()
         terminationCleanupAfterBackendStop()
     }
 
