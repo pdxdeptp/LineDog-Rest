@@ -1,17 +1,6 @@
 import Foundation
 
 enum MalDazeDefaults {
-    // 学习助手后端 LLM 配置
-    static let backendLLMProvider    = "MalDaze.backend.llmProvider"    // "gemini"|"openai"|"deepseek"
-    static let backendLLMModel       = "MalDaze.backend.llmModel"
-    static let backendGeminiAPIKey   = "MalDaze.backend.geminiAPIKey"
-    static let backendOpenAIAPIKey   = "MalDaze.backend.openAIAPIKey"
-    static let backendDeepSeekAPIKey = "MalDaze.backend.deepSeekAPIKey"
-    static let assistantBackendLazyStartupEnabled = "MalDaze.assistantBackend.lazyStartupEnabled"
-    static let defaultBackendLLMProvider = "gemini"
-    static let defaultBackendLLMModel    = "gemini-2.5-flash"
-    static let defaultAssistantBackendLazyStartupEnabled = true
-
     // 智能输入 LLM 配置（新 provider-aware 设置）
     static let smartInputLLMProvider    = "MalDaze.smartInput.llmProvider"
     static let smartInputLLMModel       = "MalDaze.smartInput.llmModel"
@@ -20,38 +9,6 @@ enum MalDazeDefaults {
     static let smartInputDeepSeekAPIKey = "MalDaze.smartInput.deepSeekAPIKey"
     static let defaultSmartInputLLMProvider = "gemini"
     static let defaultSmartInputLLMModel    = "gemini-2.5-flash"
-
-    static func resolvedAssistantBackendLazyStartupEnabled(defaults: UserDefaults = .standard) -> Bool {
-        guard defaults.object(forKey: assistantBackendLazyStartupEnabled) != nil else {
-            return defaultAssistantBackendLazyStartupEnabled
-        }
-        return defaults.bool(forKey: assistantBackendLazyStartupEnabled)
-    }
-
-    static func resolvedBackendProvider(defaults: UserDefaults = .standard) -> LLMProviderID {
-        let raw = defaults.string(forKey: backendLLMProvider) ?? defaultBackendLLMProvider
-        return LLMProviderCatalog.provider(for: raw)
-    }
-
-    static func resolvedBackendModel(defaults: UserDefaults = .standard) -> String {
-        let provider = resolvedBackendProvider(defaults: defaults)
-        return resolvedModel(
-            rawModel: defaults.string(forKey: backendLLMModel),
-            provider: provider,
-            fallbackModel: LLMProviderCatalog.defaultModel(for: provider)
-        )
-    }
-
-    static func resolvedBackendAPIKey(for provider: LLMProviderID, defaults: UserDefaults = .standard) -> String {
-        switch provider {
-        case .gemini:
-            return trimmed(defaults.string(forKey: backendGeminiAPIKey))
-        case .openai:
-            return trimmed(defaults.string(forKey: backendOpenAIAPIKey))
-        case .deepseek:
-            return trimmed(defaults.string(forKey: backendDeepSeekAPIKey))
-        }
-    }
 
     static func resolvedSmartInputProvider(defaults: UserDefaults = .standard) -> LLMProviderID {
         let raw = defaults.string(forKey: smartInputLLMProvider) ?? defaultSmartInputLLMProvider

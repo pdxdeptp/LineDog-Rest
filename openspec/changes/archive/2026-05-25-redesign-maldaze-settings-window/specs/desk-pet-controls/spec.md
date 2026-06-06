@@ -6,7 +6,7 @@ The system SHALL present the MalDaze settings window opened from the Dashboard s
 #### Scenario: Settings window opens with categories
 - **WHEN** the user activates the Dashboard right-column settings gear
 - **THEN** the system opens the existing MalDaze settings window
-- **AND** the window presents distinct settings categories for learning assistant, smart input, and shortcuts
+- **AND** the window presents distinct settings categories for retired middle-column feature, smart input, and shortcuts
 - **AND** the selected category's details are visually separated from the category navigation
 
 #### Scenario: Existing settings remain reachable
@@ -34,11 +34,11 @@ The system SHALL provide polished, provider-aware API key entry controls that ma
 - **AND** the show/hide control has an accessible name
 
 #### Scenario: Provider context is preserved
-- **WHEN** the user changes the learning-assistant backend provider
+- **WHEN** the user changes the retired-feature backend provider
 - **THEN** the model picker updates using the existing provider catalog behavior
 - **AND** the visible API key entry corresponds to the selected backend provider
-- **AND** Smart Input Gemini key entry remains separate from the learning-assistant backend provider key
-- **AND** Smart Input Gemini key entry uses the same Google Gemini provider identity and visual API key row treatment as the learning-assistant Gemini entry
+- **AND** Smart Input Gemini key entry remains separate from the retired-feature backend provider key
+- **AND** Smart Input Gemini key entry uses the same Google Gemini provider identity and visual API key row treatment as the retired-feature Gemini entry
 
 ### Requirement: Shortcut recorder presentation
 The system SHALL present global shortcut settings as consistent, readable rows while preserving the existing recorder behavior.

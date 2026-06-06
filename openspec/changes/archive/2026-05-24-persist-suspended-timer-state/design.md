@@ -17,7 +17,7 @@ The requested behavior is specifically about user intent after pressing "停止�
 
 - Persist precise countdown remaining time or current work/rest phase.
 - Persist normal timer mode selection outside of the stopped-session snapshot.
-- Change seven-minute reminders, hydration reminders, learning assistant state, or backend behavior.
+- Change seven-minute reminders, hydration reminders, retired middle-column feature state, or backend behavior.
 
 ## Decisions
 

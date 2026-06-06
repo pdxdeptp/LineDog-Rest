@@ -2,7 +2,7 @@
 
 `MalDazeSettingsView` now has a polished split settings shell, but the LLM settings model is still uneven:
 
-- Learning assistant has provider, model, and selected-provider API key state for Gemini, OpenAI, and DeepSeek.
+- retired middle-column feature has provider, model, and selected-provider API key state for Gemini, OpenAI, and DeepSeek.
 - Smart Input still has Gemini-only `geminiAPIKey` and `geminiModelId` storage, plus a Gemini-specific API client and orchestrator dependency.
 - The UI repeats the same conceptual controls in different shapes, which made the latest polish pass feel inconsistent as soon as both features needed provider choice.
 
@@ -11,7 +11,7 @@ The user-facing mental model should be: "MalDaze has two LLM-powered features. E
 ```
 Settings
 └── API Key / LLM
-    ├── Learning Assistant
+    ├── retired middle-column feature
     │   ├── Provider: Gemini | OpenAI | DeepSeek
     │   ├── Model
     │   └── Selected-provider API Key
@@ -25,9 +25,9 @@ Settings
 
 **Goals:**
 
-- Give Smart Input the same provider choices as the learning assistant.
+- Give Smart Input the same provider choices as the retired middle-column feature.
 - Replace duplicated LLM controls with a reusable settings module that can render either feature's provider/model/API-key controls.
-- Preserve independent settings per feature; Smart Input changes must not mutate learning-assistant provider/model/key values.
+- Preserve independent settings per feature; Smart Input changes must not mutate retired-feature provider/model/key values.
 - Preserve existing Gemini Smart Input defaults so current users do not lose behavior after upgrade.
 - Update Smart Input runtime dispatch so the selected provider and model are used for reminder parsing.
 - Keep the settings page visually calm, native, and aligned with the panel's pale-blue accent.
@@ -36,7 +36,7 @@ Settings
 
 - No Keychain migration in this change; API keys remain local `UserDefaults` values with truthful copy.
 - No network "test key" button.
-- No backend learning-assistant API redesign; learning assistant keeps its current backend provider behavior.
+- No backend retired-feature API redesign; retired middle-column feature keeps its current backend provider behavior.
 - No new third-party dependency.
 - No shared global API key unless the user explicitly asks later. Each feature owns separate credentials.
 
@@ -52,7 +52,7 @@ Add a reusable SwiftUI module such as `LLMProviderSettingsSection` or `LLMProvid
 - model binding;
 - provider-specific key bindings;
 - provider/model catalog;
-- optional extra rows, such as learning assistant lazy startup or Smart Input shortcut.
+- optional extra rows, such as retired middle-column feature lazy startup or Smart Input shortcut.
 
 The module should own the visual pattern: feature header, provider segmented control, model picker, selected-provider API key row, local-only copy, saved/empty state, and show/hide state.
 
@@ -75,7 +75,7 @@ Alternative considered: reusing `BackendLLMCatalog` directly from Smart Input. T
 
 ### 3. Keep separate persistence namespaces
 
-Learning assistant keeps existing backend keys:
+retired middle-column feature keeps existing backend keys:
 
 - `MalDaze.backend.llmProvider`
 - `MalDaze.backend.llmModel`
@@ -93,7 +93,7 @@ Smart Input should gain parallel keys, for example:
 
 The existing `MalDaze.geminiAPIKey` and `MalDaze.geminiModelId` values should be read as migration/default fallback for Smart Input Gemini so existing users do not have to re-enter their Gemini key.
 
-Alternative considered: one app-wide provider/key shared by both features. That reduces settings surface, but it removes useful separation: a user may want the learning assistant on a stronger/expensive model while Smart Input uses a fast/cheap model.
+Alternative considered: one app-wide provider/key shared by both features. That reduces settings surface, but it removes useful separation: a user may want the retired middle-column feature on a stronger/expensive model while Smart Input uses a fast/cheap model.
 
 ### 4. Rename the settings category to API Key / LLM
 
@@ -166,5 +166,5 @@ Rollback: revert the new Smart Input provider keys and runtime facade; existing 
 ## Open Questions
 
 - Should the left sidebar label be "API Key", "模型与密钥", or "AI 设置"? My recommendation is "模型与密钥" because the section contains provider, model, and key, not only secrets.
-- Should Smart Input default to Gemini even if the learning assistant is currently OpenAI/DeepSeek? My recommendation is yes: keep independent defaults and avoid surprising behavior.
+- Should Smart Input default to Gemini even if the retired middle-column feature is currently OpenAI/DeepSeek? My recommendation is yes: keep independent defaults and avoid surprising behavior.
 - Should the old Gemini-only Smart Input keys be written forward into new Smart Input Gemini keys automatically, or only read as fallback? My recommendation is read as fallback in runtime plus write forward when settings opens, so UI state becomes explicit without forcing a one-time migration task elsewhere.

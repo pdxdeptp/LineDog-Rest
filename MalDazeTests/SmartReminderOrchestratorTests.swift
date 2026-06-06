@@ -28,23 +28,23 @@ final class SmartReminderOrchestratorTests: XCTestCase {
         XCTAssertTrue(LLMProviderCatalog.models(for: .deepseek).contains { $0.id == "deepseek-v4-flash" })
     }
 
-    func testBackendModelFallsBackToSelectedProviderDefault() {
-        let suiteName = "MalDaze.tests.backendProviderFallback.\(UUID().uuidString)"
+    func testSmartInputModelFallsBackToSelectedProviderDefault() {
+        let suiteName = "MalDaze.tests.smartInputProviderFallback.\(UUID().uuidString)"
         let d = UserDefaults(suiteName: suiteName)!
         defer { d.removePersistentDomain(forName: suiteName) }
 
-        d.set("openai", forKey: MalDazeDefaults.backendLLMProvider)
-        XCTAssertEqual(MalDazeDefaults.resolvedBackendModel(defaults: d), LLMProviderCatalog.defaultModel(for: .openai))
+        d.set("openai", forKey: MalDazeDefaults.smartInputLLMProvider)
+        XCTAssertEqual(MalDazeDefaults.resolvedSmartInputModel(defaults: d), LLMProviderCatalog.defaultModel(for: .openai))
 
-        d.set("bad/name", forKey: MalDazeDefaults.backendLLMModel)
-        XCTAssertEqual(MalDazeDefaults.resolvedBackendModel(defaults: d), LLMProviderCatalog.defaultModel(for: .openai))
+        d.set("bad/name", forKey: MalDazeDefaults.smartInputLLMModel)
+        XCTAssertEqual(MalDazeDefaults.resolvedSmartInputModel(defaults: d), LLMProviderCatalog.defaultModel(for: .openai))
 
-        d.set("deepseek", forKey: MalDazeDefaults.backendLLMProvider)
-        d.removeObject(forKey: MalDazeDefaults.backendLLMModel)
-        XCTAssertEqual(MalDazeDefaults.resolvedBackendModel(defaults: d), LLMProviderCatalog.defaultModel(for: .deepseek))
+        d.set("deepseek", forKey: MalDazeDefaults.smartInputLLMProvider)
+        d.removeObject(forKey: MalDazeDefaults.smartInputLLMModel)
+        XCTAssertEqual(MalDazeDefaults.resolvedSmartInputModel(defaults: d), LLMProviderCatalog.defaultModel(for: .deepseek))
 
-        d.set("bad:model", forKey: MalDazeDefaults.backendLLMModel)
-        XCTAssertEqual(MalDazeDefaults.resolvedBackendModel(defaults: d), LLMProviderCatalog.defaultModel(for: .deepseek))
+        d.set("bad:model", forKey: MalDazeDefaults.smartInputLLMModel)
+        XCTAssertEqual(MalDazeDefaults.resolvedSmartInputModel(defaults: d), LLMProviderCatalog.defaultModel(for: .deepseek))
     }
 
     func testSmartInputConfigurationFallsBackToLegacyGeminiStorage() {
@@ -78,28 +78,21 @@ final class SmartReminderOrchestratorTests: XCTestCase {
         XCTAssertEqual(MalDazeDefaults.resolvedSmartInputAPIKey(for: .gemini, defaults: d), "")
     }
 
-    func testAssistantAndSmartInputProviderStorageRemainIndependent() {
-        let suiteName = "MalDaze.tests.independentLLM.\(UUID().uuidString)"
+    func testSmartInputProviderStorageUsesSelectedProviderOnly() {
+        let suiteName = "MalDaze.tests.smartInputSelectedProvider.\(UUID().uuidString)"
         let d = UserDefaults(suiteName: suiteName)!
         defer { d.removePersistentDomain(forName: suiteName) }
 
-        d.set("openai", forKey: MalDazeDefaults.backendLLMProvider)
-        d.set("gpt-5.4", forKey: MalDazeDefaults.backendLLMModel)
-        d.set("assistant-openai-key", forKey: MalDazeDefaults.backendOpenAIAPIKey)
         d.set("deepseek", forKey: MalDazeDefaults.smartInputLLMProvider)
         d.set("deepseek-v4-flash", forKey: MalDazeDefaults.smartInputLLMModel)
         d.set("smart-deepseek-key", forKey: MalDazeDefaults.smartInputDeepSeekAPIKey)
 
-        XCTAssertEqual(MalDazeDefaults.resolvedBackendAPIKey(for: .openai, defaults: d), "assistant-openai-key")
         XCTAssertEqual(MalDazeDefaults.resolvedSmartInputAPIKey(for: .deepseek, defaults: d), "smart-deepseek-key")
-        XCTAssertEqual(d.string(forKey: MalDazeDefaults.backendLLMModel), "gpt-5.4")
         XCTAssertEqual(d.string(forKey: MalDazeDefaults.smartInputLLMModel), "deepseek-v4-flash")
 
         d.set("gemini", forKey: MalDazeDefaults.smartInputLLMProvider)
         d.set(LLMProviderCatalog.defaultModel(for: .gemini), forKey: MalDazeDefaults.smartInputLLMModel)
 
-        XCTAssertEqual(d.string(forKey: MalDazeDefaults.backendLLMProvider), "openai")
-        XCTAssertEqual(d.string(forKey: MalDazeDefaults.backendLLMModel), "gpt-5.4")
         XCTAssertEqual(MalDazeDefaults.resolvedSmartInputModel(defaults: d), MalDazeDefaults.defaultGeminiModelId)
     }
 

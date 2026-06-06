@@ -118,11 +118,11 @@ final class ControlPanelPresentationTests: XCTestCase {
             "DashboardRootView.swift should expose the dashboard content view."
         )
         XCTAssertTrue(
-            contentSource.contains("DashboardRootView(viewModel: viewModel, assistantViewModel: learningAssistantViewModel)"),
+            contentSource.contains("DashboardRootView(viewModel: viewModel)"),
             "DeskPetDashboardView should host the dashboard content directly instead of wrapping MenuBarContentView."
         )
         XCTAssertFalse(
-            contentSource.contains("MenuBarContentView(viewModel: viewModel, assistantViewModel: learningAssistantViewModel)"),
+            contentSource.contains("MenuBarContentView(viewModel: viewModel)"),
             "DeskPetDashboardView should no longer leave a menu-bar-named shell around the dashboard."
         )
     }
@@ -551,24 +551,20 @@ final class ControlPanelPresentationTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(frame.minY, insetVisibleFrame.minY)
     }
 
-    func testWideDashboardShellKeepsOuterColumnsFixedAndAssistantAdaptive() throws {
+    func testWideDashboardShellKeepsRemindersAndControlsColumnsFixedWithoutAssistantColumn() throws {
         let source = try readProjectSource("MalDaze/DashboardRootView.swift")
 
         XCTAssertTrue(
             source.contains(".frame(width: DashboardLayout.remindersColumnWidth"),
-            "The reminders sidebar should keep a fixed width in the wide dashboard shell."
+            "The reminders sidebar should keep a fixed width in the dashboard shell."
         )
         XCTAssertTrue(
             source.contains(".frame(width: DashboardLayout.controlsColumnWidth"),
-            "The right controls column should keep a fixed width in the wide dashboard shell."
-        )
-        XCTAssertTrue(
-            source.contains(".frame(minWidth: DashboardLayout.assistantMinimumColumnWidth, maxWidth: .infinity"),
-            "AssistantPanelView should receive the remaining adaptive width between the fixed outer columns."
+            "The right controls column should keep a fixed width in the dashboard shell."
         )
         XCTAssertFalse(
-            source.contains(".frame(width: assistantColumnWidth"),
-            "AssistantPanelView should no longer be pinned to the old narrow fixed width."
+            source.contains("AssistantPanelView") || source.contains("assistantMinimumColumnWidth"),
+            "The retained dashboard shell should not allocate a Learning Assistant column."
         )
     }
 
@@ -718,12 +714,7 @@ final class ControlPanelPresentationTests: XCTestCase {
         XCTAssertTrue(accentAsset.contains("\"green\" : \"0.720\""))
         XCTAssertTrue(accentAsset.contains("\"blue\" : \"0.980\""))
 
-        for relativePath in [
-            "MalDaze/DashboardRootView.swift",
-            "MalDaze/LearningAssistant/FullPlanSheetView.swift",
-            "MalDaze/LearningAssistant/ResourceProgressView.swift",
-            "MalDaze/LearningAssistant/TaskRowView.swift"
-        ] {
+        for relativePath in ["MalDaze/DashboardRootView.swift"] {
             let source = try readProjectSource(relativePath)
             XCTAssertFalse(
                 source.contains(".green") || source.contains("Color.green"),
@@ -863,21 +854,119 @@ final class ControlPanelPresentationTests: XCTestCase {
         )
     }
 
-    func testSettingsExposeAssistantBackendLazyStartupTradeoff() throws {
+    func testSettingsDoNotExposeAssistantBackendLazyStartupTradeoff() throws {
         let settingsSource = try readProjectSource("MalDaze/Settings/MalDazeSettingsView.swift")
 
-        XCTAssertTrue(
+        XCTAssertFalse(
             settingsSource.contains("@AppStorage(MalDazeDefaults.assistantBackendLazyStartupEnabled)"),
-            "Settings should expose the persistent assistant backend lazy startup key."
+            "Settings should not expose the retired assistant backend lazy startup key."
         )
-        XCTAssertTrue(
+        XCTAssertFalse(
             settingsSource.contains("省电") && settingsSource.contains("首次打开"),
-            "Settings should explain that lazy startup saves energy while the first assistant open may wait for backend startup."
+            "Settings should not explain retired assistant backend lazy startup behavior."
         )
-        XCTAssertTrue(
+        XCTAssertFalse(
             settingsSource.contains("下次 App 启动") && settingsSource.contains("不会立即启动或停止"),
-            "Settings should clarify that the lazy startup switch changes the next app-launch strategy and does not immediately start or stop an existing backend."
+            "Settings should not keep retired backend startup helper copy."
         )
+    }
+
+    func testSwiftAppSourcesDoNotWireRetiredLearningAssistantSurface() throws {
+        let dashboardSource = try readProjectSource("MalDaze/DashboardRootView.swift")
+        let settingsSource = try readProjectSource("MalDaze/Settings/MalDazeSettingsView.swift")
+        let defaultsSource = try readProjectSource("MalDaze/MalDazeDefaults.swift")
+        let appDelegateSource = try readProjectSource("MalDaze/MalDazeAppDelegate.swift")
+        let projectSource = try readProjectSource("MalDaze.xcodeproj/project.pbxproj")
+
+        let retiredTokensByFile = [
+            "DashboardRootView.swift": [
+                "LearningAssistantViewModel",
+                "AssistantPanelView",
+                "assistantViewModel",
+                "assistantMinimumColumnWidth",
+                "refreshForDashboardOpen()"
+            ],
+            "MalDazeSettingsView.swift": [
+                "backendProvider",
+                "backendModel",
+                "selectedBackendAPIKey",
+                "assistantBackendLazyStartupEnabled",
+                "learningAssistantSettingsPane",
+                "学习助手"
+            ],
+            "MalDazeDefaults.swift": [
+                "backendLLMProvider",
+                "backendLLMModel",
+                "backendGeminiAPIKey",
+                "backendOpenAIAPIKey",
+                "backendDeepSeekAPIKey",
+                "assistantBackendLazyStartupEnabled",
+                "resolvedAssistantBackendLazyStartupEnabled",
+                "resolvedBackendAPIKey"
+            ],
+            "MalDazeAppDelegate.swift": [
+                "BackendProcessManager",
+                "AppBackendLifecycleManaging",
+                "backendLifecycle",
+                "resolvedAssistantBackendLazyStartupEnabled"
+            ],
+            "project.pbxproj": [
+                "LearningAssistant",
+                "AssistantPanelView",
+                "LearningAssistantViewModel",
+                "BackendProcessManager",
+                "LearningAssistantTests",
+                "BackendProcessManagerLifecycleTests"
+            ]
+        ]
+
+        let sourcesByFile = [
+            "DashboardRootView.swift": dashboardSource,
+            "MalDazeSettingsView.swift": settingsSource,
+            "MalDazeDefaults.swift": defaultsSource,
+            "MalDazeAppDelegate.swift": appDelegateSource,
+            "project.pbxproj": projectSource
+        ]
+
+        for (file, tokens) in retiredTokensByFile {
+            let source = try XCTUnwrap(sourcesByFile[file])
+            for token in tokens {
+                XCTAssertFalse(
+                    source.contains(token),
+                    "\(file) should not keep retired Learning Assistant wiring token: \(token)"
+                )
+            }
+        }
+
+        for retainedDashboardToken in [
+            "remindersSidebar",
+            "mainControlsColumn",
+            "dashboardTimerQuickAction",
+            "dashboardHydrationQuickAction",
+            "viewModel.startSevenMinuteReminder()",
+            "viewModel.startFiveMinuteCatCompanion()"
+        ] {
+            XCTAssertTrue(
+                dashboardSource.contains(retainedDashboardToken),
+                "Dashboard should preserve retained control token: \(retainedDashboardToken)"
+            )
+        }
+
+        for retainedSettingsToken in [
+            "@AppStorage(MalDazeDefaults.smartInputLLMProvider)",
+            "@AppStorage(MalDazeDefaults.smartInputLLMModel)",
+            "@AppStorage(MalDazeDefaults.smartInputGeminiAPIKey)",
+            "@AppStorage(MalDazeDefaults.smartInputOpenAIAPIKey)",
+            "@AppStorage(MalDazeDefaults.smartInputDeepSeekAPIKey)",
+            "selectedSmartInputAPIKey",
+            "shortcutsSettingsPane",
+            "title: \"添加提醒\""
+        ] {
+            XCTAssertTrue(
+                settingsSource.contains(retainedSettingsToken),
+                "Settings should preserve retained Smart Reminder or shortcut token: \(retainedSettingsToken)"
+            )
+        }
     }
 
     func testMalDazeSettingsUsesCategorizedDetailShell() throws {
@@ -913,7 +1002,7 @@ final class ControlPanelPresentationTests: XCTestCase {
         XCTAssertTrue(apiKeyRowSource.contains(".accessibilityLabel"))
     }
 
-    func testMalDazeSettingsRendersTwoSharedLLMProviderCardsInModelCredentialsCategory() throws {
+    func testMalDazeSettingsRendersOnlySmartInputProviderCardInModelCredentialsCategory() throws {
         let settingsSource = try readProjectSource("MalDaze/Settings/MalDazeSettingsView.swift")
         let modelPaneSource = try propertySource(named: "modelCredentialsSettingsPane", in: settingsSource)
         let cardSource = try structSource(named: "LLMProviderSettingsCard", in: settingsSource)
@@ -922,10 +1011,9 @@ final class ControlPanelPresentationTests: XCTestCase {
         XCTAssertTrue(settingsSource.contains("return \"模型与密钥\""))
         XCTAssertEqual(
             modelPaneSource.ranges(of: "LLMProviderSettingsCard(").count,
-            2,
-            "The dedicated model/key category should render learning assistant and Smart Input through two instances of the same reusable module."
+            1,
+            "The dedicated model/key category should render only the retained Smart Input module."
         )
-        XCTAssertTrue(modelPaneSource.contains("title: \"学习助手\""))
         XCTAssertTrue(modelPaneSource.contains("title: \"智能输入\""))
         XCTAssertTrue(cardSource.contains("LLMProviderCatalog.providerOptions"))
         XCTAssertTrue(cardSource.contains("LLMProviderCatalog.models(for: provider.wrappedValue)"))
@@ -935,17 +1023,17 @@ final class ControlPanelPresentationTests: XCTestCase {
         XCTAssertTrue(cardSource.contains("SettingsDesignPalette.paleBlueAccent"))
     }
 
-    func testMalDazeSettingsCategoryOrderIncludesLearningAssistantBetweenCredentialsAndShortcuts() throws {
+    func testMalDazeSettingsCategoryOrderExcludesLearningAssistant() throws {
         let settingsSource = try readProjectSource("MalDaze/Settings/MalDazeSettingsView.swift")
         let sidebarSource = try propertySource(named: "settingsSidebar", in: settingsSource)
 
         XCTAssertOrdered(
-            ["case modelCredentials", "case learningAssistant", "case shortcuts"],
+            ["case modelCredentials", "case shortcuts"],
             in: settingsSource,
-            "Settings categories should place Learning Assistant between model credentials and shortcuts."
+            "Settings categories should keep retained credentials and shortcuts."
         )
-        XCTAssertTrue(settingsSource.contains("case .learningAssistant: return \"学习助手\""))
-        XCTAssertTrue(settingsSource.contains("case .learningAssistant: return \"启动与运行\""))
+        XCTAssertFalse(settingsSource.contains("learningAssistant"))
+        XCTAssertFalse(settingsSource.contains("学习助手"))
         XCTAssertTrue(settingsSource.contains("var helperCopy: String"))
         XCTAssertTrue(sidebarSource.contains("selectedCategory.helperCopy"))
         XCTAssertFalse(
@@ -960,13 +1048,14 @@ final class ControlPanelPresentationTests: XCTestCase {
 
         XCTAssertEqual(
             modelPaneSource.ranges(of: "LLMProviderSettingsCard(").count,
-            2,
-            "Model credentials should keep one Learning Assistant card and one Smart Input card."
+            1,
+            "Model credentials should keep only the retained Smart Input card."
         )
 
         let forbiddenTokens = [
             "ShortcutSettingRow(",
             "添加提醒",
+            "学习助手",
             "懒启动学习助手后端",
             "按需启动后端",
             "assistantBackendLazyStartupEnabled"
@@ -1010,22 +1099,14 @@ final class ControlPanelPresentationTests: XCTestCase {
         XCTAssertTrue(shortcutsSource.contains("smartKeyLabel = d.keyLabel"))
     }
 
-    func testLearningAssistantCategoryContainsBackendStartupOnly() throws {
+    func testSettingsDoesNotContainLearningAssistantCategoryOrBackendStartupPane() throws {
         let settingsSource = try readProjectSource("MalDaze/Settings/MalDazeSettingsView.swift")
         let viewSource = try structSource(named: "MalDazeSettingsView", in: settingsSource)
-        let learningAssistantSource = try propertySource(named: "learningAssistantSettingsPane", in: settingsSource)
 
-        XCTAssertTrue(viewSource.contains("case .learningAssistant:"))
-        XCTAssertTrue(viewSource.contains("learningAssistantSettingsPane"))
-        XCTAssertTrue(learningAssistantSource.contains("后端启动"))
-        XCTAssertTrue(learningAssistantSource.contains("控制学习助手本地后端何时启动。"))
-        XCTAssertTrue(learningAssistantSource.contains("启动策略"))
-        XCTAssertTrue(learningAssistantSource.contains("在省电启动和首次打开速度之间取舍。"))
-        XCTAssertTrue(learningAssistantSource.contains("按需启动后端"))
-        XCTAssertTrue(learningAssistantSource.contains("$assistantBackendLazyStartupEnabled"))
-        XCTAssertTrue(learningAssistantSource.contains("不会立即启动或停止当前后端"))
-        XCTAssertFalse(learningAssistantSource.contains("LLMProviderSettingsCard("))
-        XCTAssertFalse(learningAssistantSource.contains("ShortcutSettingRow("))
+        XCTAssertFalse(viewSource.contains("case .learningAssistant:"))
+        XCTAssertFalse(settingsSource.contains("learningAssistantSettingsPane"))
+        XCTAssertFalse(settingsSource.contains("按需启动后端"))
+        XCTAssertFalse(settingsSource.contains("assistantBackendLazyStartupEnabled"))
     }
 
     func testMalDazeSettingsSmartInputUsesSharedProvidersAndIndependentStorageHooks() throws {
@@ -1078,11 +1159,6 @@ final class ControlPanelPresentationTests: XCTestCase {
         let settingsSource = try readProjectSource("MalDaze/Settings/MalDazeSettingsView.swift")
 
         let requiredTokens = [
-            "@AppStorage(MalDazeDefaults.backendLLMProvider)",
-            "@AppStorage(MalDazeDefaults.backendLLMModel)",
-            "@AppStorage(MalDazeDefaults.backendGeminiAPIKey)",
-            "@AppStorage(MalDazeDefaults.backendOpenAIAPIKey)",
-            "@AppStorage(MalDazeDefaults.backendDeepSeekAPIKey)",
             "@AppStorage(MalDazeDefaults.smartInputLLMProvider)",
             "@AppStorage(MalDazeDefaults.smartInputLLMModel)",
             "@AppStorage(MalDazeDefaults.smartInputGeminiAPIKey)",
@@ -1106,17 +1182,14 @@ final class ControlPanelPresentationTests: XCTestCase {
         }
     }
 
-    func testAppDelegateStartupModeUsesInjectedUserDefaults() throws {
+    func testAppDelegateDoesNotStartRetiredAssistantBackend() throws {
         let appDelegateSource = try readProjectSource("MalDaze/MalDazeAppDelegate.swift")
 
-        XCTAssertTrue(
-            appDelegateSource.contains("private let userDefaults: UserDefaults"),
-            "MalDazeAppDelegate should keep an injectable UserDefaults store so tests do not mutate UserDefaults.standard."
-        )
-        XCTAssertTrue(
-            appDelegateSource.contains("resolvedAssistantBackendLazyStartupEnabled(defaults: userDefaults)"),
-            "MalDazeAppDelegate should resolve assistant backend startup mode from its injected UserDefaults store."
-        )
+        XCTAssertFalse(appDelegateSource.contains("BackendProcessManager"))
+        XCTAssertFalse(appDelegateSource.contains("AppBackendLifecycleManaging"))
+        XCTAssertFalse(appDelegateSource.contains("resolvedAssistantBackendLazyStartupEnabled"))
+        XCTAssertTrue(appDelegateSource.contains("MalDazeCarbonGlobalHotKeys.start()"))
+        XCTAssertTrue(appDelegateSource.contains("MalDazeCarbonGlobalHotKeys.stop()"))
     }
 
     func testSmartReminderInputPanelUsesVerticalWrappingInput() throws {

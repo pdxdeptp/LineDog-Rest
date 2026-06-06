@@ -1,16 +1,8 @@
 import AppKit
 import SwiftUI
 
-/// 设置窗口：Gemini API Key、全局快捷键等。
+/// 设置窗口：Smart Reminder API Key、全局快捷键等。
 struct MalDazeSettingsView: View {
-    // 学习助手后端 LLM
-    @AppStorage(MalDazeDefaults.backendLLMProvider)    private var backendProvider    = MalDazeDefaults.defaultBackendLLMProvider
-    @AppStorage(MalDazeDefaults.backendLLMModel)       private var backendModel       = MalDazeDefaults.defaultBackendLLMModel
-    @AppStorage(MalDazeDefaults.backendGeminiAPIKey)   private var backendGeminiKey   = ""
-    @AppStorage(MalDazeDefaults.backendOpenAIAPIKey)   private var backendOpenAIKey   = ""
-    @AppStorage(MalDazeDefaults.backendDeepSeekAPIKey) private var backendDeepSeekKey = ""
-    @AppStorage(MalDazeDefaults.assistantBackendLazyStartupEnabled) private var assistantBackendLazyStartupEnabled = MalDazeDefaults.defaultAssistantBackendLazyStartupEnabled
-
     // 桌宠智能输入 LLM
     @AppStorage(MalDazeDefaults.smartInputLLMProvider)    private var smartInputProvider    = MalDazeDefaults.defaultSmartInputLLMProvider
     @AppStorage(MalDazeDefaults.smartInputLLMModel)       private var smartInputModel       = MalDazeDefaults.defaultSmartInputLLMModel
@@ -41,7 +33,6 @@ struct MalDazeSettingsView: View {
     @State private var isRecordingSevenMinuteShortcut = false
     @State private var isRecordingResetPetShortcut = false
     @State private var selectedCategory: SettingsCategory = .modelCredentials
-    @State private var isBackendAPIKeyVisible = false
     @State private var isSmartInputAPIKeyVisible = false
 
     private var shortcutRecorderBusy: Bool {
@@ -77,25 +68,6 @@ struct MalDazeSettingsView: View {
             keyCode: UInt16(clamping: resetPetKeyCode),
             modifiers: NSEvent.ModifierFlags(rawValue: UInt(clamping: max(0, resetPetModifiersRaw))),
             keyLabel: resetPetKeyLabel
-        )
-    }
-
-    private var selectedBackendAPIKey: Binding<String> {
-        Binding(
-            get: {
-                switch LLMProviderCatalog.provider(for: backendProvider) {
-                case .openai: return backendOpenAIKey
-                case .deepseek: return backendDeepSeekKey
-                case .gemini: return backendGeminiKey
-                }
-            },
-            set: { newValue in
-                switch LLMProviderCatalog.provider(for: backendProvider) {
-                case .openai: backendOpenAIKey = newValue
-                case .deepseek: backendDeepSeekKey = newValue
-                case .gemini: backendGeminiKey = newValue
-                }
-            }
         )
     }
 
@@ -170,9 +142,6 @@ struct MalDazeSettingsView: View {
     }
 
     private func repairModelSelectionsIfNeeded() {
-        if !LLMProviderCatalog.models(for: backendProvider).contains(where: { $0.id == backendModel }) {
-            backendModel = LLMProviderCatalog.defaultModel(for: backendProvider)
-        }
         if !LLMProviderCatalog.models(for: smartInputProvider).contains(where: { $0.id == selectedSmartInputModel.wrappedValue }) {
             smartInputModel = LLMProviderCatalog.defaultModel(for: smartInputProvider)
         }
@@ -187,7 +156,7 @@ struct MalDazeSettingsView: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text("MalDaze")
                     .font(.title3.bold())
-                Text("桌宠、学习助手与提醒")
+                Text("桌宠、智能提醒与快捷键")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -225,8 +194,6 @@ struct MalDazeSettingsView: View {
             switch selectedCategory {
             case .modelCredentials:
                 modelCredentialsSettingsPane
-            case .learningAssistant:
-                learningAssistantSettingsPane
             case .shortcuts:
                 shortcutsSettingsPane
             }
@@ -236,21 +203,8 @@ struct MalDazeSettingsView: View {
     private var modelCredentialsSettingsPane: some View {
         VStack(alignment: .leading, spacing: 12) {
             LLMProviderSettingsCard(
-                title: "学习助手",
-                subtitle: "用于中栏学习助手生成计划、复盘与对话；下次后端启动时生效。",
-                providerContext: "学习助手后端",
-                systemImage: "server.rack",
-                provider: $backendProvider,
-                model: $backendModel,
-                apiKey: selectedBackendAPIKey,
-                isKeyVisible: $isBackendAPIKeyVisible
-            ) {
-                EmptyView()
-            }
-
-            LLMProviderSettingsCard(
                 title: "智能输入",
-                subtitle: "用于自然语言解析提醒事项；与学习助手 Key、模型分开保存。",
+                subtitle: "用于自然语言解析提醒事项。",
                 providerContext: "智能输入提醒解析",
                 systemImage: "text.bubble",
                 provider: $smartInputProvider,
@@ -259,33 +213,6 @@ struct MalDazeSettingsView: View {
                 isKeyVisible: $isSmartInputAPIKeyVisible
             ) {
                 EmptyView()
-            }
-        }
-    }
-
-    private var learningAssistantSettingsPane: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            SettingsGroup(
-                title: "后端启动",
-                subtitle: "控制学习助手本地后端何时启动。",
-                systemImage: "bolt.horizontal.circle",
-                trailing: "下次启动生效"
-            ) {
-                SettingsLabeledRow(
-                    title: "启动策略",
-                    subtitle: "在省电启动和首次打开速度之间取舍。"
-                ) {
-                    Toggle(isOn: $assistantBackendLazyStartupEnabled) {
-                        Text("按需启动后端")
-                    }
-                    .toggleStyle(.switch)
-                    .help("开启后 App 启动时不会拉起后端，首次打开学习助手时再启动；关闭后下次 App 启动完成后预先启动后端；切换不会立即启动或停止当前后端。")
-
-                    Text("开启后 App 启动时不会拉起后端，首次打开学习助手时再启动；关闭后下次 App 启动完成后预先启动后端；切换不会立即启动或停止当前后端。")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
             }
         }
     }
@@ -421,7 +348,6 @@ private enum SettingsDesignPalette {
 
 private enum SettingsCategory: String, CaseIterable, Identifiable {
     case modelCredentials
-    case learningAssistant
     case shortcuts
 
     var id: Self { self }
@@ -429,7 +355,6 @@ private enum SettingsCategory: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .modelCredentials: return "模型与密钥"
-        case .learningAssistant: return "学习助手"
         case .shortcuts: return "快捷键"
         }
     }
@@ -437,7 +362,6 @@ private enum SettingsCategory: String, CaseIterable, Identifiable {
     var subtitle: String {
         switch self {
         case .modelCredentials: return "LLM 凭据与默认模型"
-        case .learningAssistant: return "启动与运行"
         case .shortcuts: return "全局操作"
         }
     }
@@ -445,7 +369,6 @@ private enum SettingsCategory: String, CaseIterable, Identifiable {
     var systemImage: String {
         switch self {
         case .modelCredentials: return "key.horizontal"
-        case .learningAssistant: return "graduationcap"
         case .shortcuts: return "keyboard"
         }
     }
@@ -454,8 +377,6 @@ private enum SettingsCategory: String, CaseIterable, Identifiable {
         switch self {
         case .modelCredentials:
             return "API Key 按当前实现即时保存到本机设置；本页只改善入口、说明与可读性。"
-        case .learningAssistant:
-            return "学习助手运行设置会在下次相关启动路径中生效。"
         case .shortcuts:
             return "快捷键录制仅更新本机设置，恢复默认不会影响其他类别。"
         }

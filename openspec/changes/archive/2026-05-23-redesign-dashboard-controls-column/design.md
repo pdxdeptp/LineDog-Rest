@@ -19,7 +19,7 @@ The behavior is useful, but the visual model is flat. Primary actions and rare s
 
 - No changes to timer engines, hydration scheduling, countdown behavior, cat companion behavior, shortcut registration, or persistence keys.
 - No new external dependency or custom icon package.
-- No redesign of the left reminders column or middle learning assistant column.
+- No redesign of the left reminders column or middle retired middle-column feature column.
 - No production SwiftUI implementation in this design-preview step.
 
 ## Decisions

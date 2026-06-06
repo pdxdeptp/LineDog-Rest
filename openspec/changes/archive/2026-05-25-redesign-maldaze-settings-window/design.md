@@ -1,6 +1,6 @@
 ## Context
 
-`MalDazeSettingsView` currently uses one grouped SwiftUI `Form` with sequential `Section`s for learning-assistant LLM provider settings, Smart Input Gemini settings, and four shortcut recorders. The independent settings window is a small `480 x 440` floating `NSWindow` that hosts the same view.
+`MalDazeSettingsView` currently uses one grouped SwiftUI `Form` with sequential `Section`s for retired-feature LLM provider settings, Smart Input Gemini settings, and four shortcut recorders. The independent settings window is a small `480 x 440` floating `NSWindow` that hosts the same view.
 
 This is functionally compact, but it creates three UX problems:
 
@@ -69,7 +69,7 @@ API key rows should include:
 - short local-only helper copy;
 - no network validation or save button because current persistence is immediate through `@AppStorage`.
 
-For backend LLM settings, only the selected provider's key row should be emphasized; other provider keys can remain hidden to match current behavior. For Smart Input, Gemini stays explicit and separate so users understand it powers natural-language reminder parsing rather than the learning assistant backend.
+For backend LLM settings, only the selected provider's key row should be emphasized; other provider keys can remain hidden to match current behavior. For Smart Input, Gemini stays explicit and separate so users understand it powers natural-language reminder parsing rather than the retired middle-column feature backend.
 
 Alternative considered: add a "Test key" action. That would require network validation behavior and failure states beyond this visual redesign.
 
