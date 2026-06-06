@@ -7,11 +7,11 @@
 
 ## 2. Target Discovery And Safety
 
-- [ ] 2.1 Add failing resolver fixture tests for both target volumes mounted, only `Storage` mounted, target absent, target already unmounted, multiple physical disks, internal disk rejection, and unrelated external disks.
-- [ ] 2.2 Implement protocol-based disk inventory models that represent volumes, APFS containers, physical stores, external/internal metadata, stable identifiers, and physical whole-disk resolution.
-- [ ] 2.3 Implement conservative T7 target resolution using volume names, persisted/seed stable identifiers, APFS topology, external-disk metadata, and optional Samsung T7 media metadata.
-- [ ] 2.4 Add failing source-level tests proving the helper does not hard-code dynamic `/dev/diskN` identifiers for configuration.
-- [ ] 2.5 Perform spec compliance and code quality review for target discovery against unsafe-target, idle, and single-disk consistency scenarios.
+- [x] 2.1 Add failing resolver fixture tests for both target volumes mounted, only `Storage` mounted, target absent, target already unmounted, multiple physical disks, internal disk rejection, and unrelated external disks.
+- [x] 2.2 Implement protocol-based disk inventory models that represent volumes, APFS containers, physical stores, external/internal metadata, stable identifiers, and physical whole-disk resolution.
+- [x] 2.3 Implement conservative T7 target resolution using volume names, persisted/seed stable identifiers, APFS topology, external-disk metadata, and optional Samsung T7 media metadata.
+- [x] 2.4 Add failing source-level tests proving the helper does not hard-code dynamic `/dev/diskN` identifiers for configuration.
+- [x] 2.5 Perform spec compliance and code quality review for target discovery against unsafe-target, idle, and single-disk consistency scenarios.
 
 ## 3. Time Machine And Disk Arbitration
 
