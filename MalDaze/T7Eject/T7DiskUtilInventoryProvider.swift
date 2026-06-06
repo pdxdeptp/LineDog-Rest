@@ -218,16 +218,18 @@ struct T7DiskUtilInventoryProvider: T7DiskInventoryProviding {
                     continue
                 }
                 let diskIdentifier = string(in: volume, keys: ["DeviceIdentifier", "DiskIdentifier"])
+                let info = diskIdentifier.flatMap { infoPlistsByIdentifier[$0] } ?? [:]
                 volumes.append(
                     T7VolumeEvidence(
                         name: name,
                         stableIdentifier: string(in: volume, keys: ["APFSVolumeUUID", "VolumeUUID", "DiskUUID", "UUID"]),
                         diskIdentifier: diskIdentifier,
-                        mountPoint: mountPoint(from: volume),
-                        apfsRole: firstRole(from: volume),
+                        mountPoint: mountPoint(from: volume) ?? mountPoint(from: info),
+                        apfsRole: firstRole(from: volume) ?? firstRole(from: info),
                         parentWholeDiskIdentifier: containerDiskIdentifier,
                         apfsContainerStableIdentifier: containerStableIdentifier,
                         physicalStoreStableIdentifier: storeStableIdentifier
+                            ?? string(in: info, keys: ["APFSPhysicalStoreUUID", "PhysicalStoreUUID"])
                     )
                 )
             }

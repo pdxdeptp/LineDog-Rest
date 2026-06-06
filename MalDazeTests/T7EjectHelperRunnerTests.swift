@@ -231,6 +231,20 @@ final class T7EjectHelperRunnerTests: XCTestCase {
         XCTAssertEqual(resolution.mountedVolumeNames, ["Storage", "T7 Shield"])
     }
 
+    func testDiskUtilInventoryProviderBackfillsMountPointsFromVolumeInfoWhenAPFSListOmitsThem() throws {
+        let inventory = try T7DiskUtilInventoryProvider.makeInventory(
+            diskListPlist: T7DiskUtilFixture.diskList,
+            apfsListPlist: T7DiskUtilFixture.apfsListWithoutVolumeMountPoints,
+            infoPlistsByIdentifier: T7DiskUtilFixture.infoByIdentifierWithVolumeMountPoints
+        )
+
+        let resolution = T7TargetResolver(configuration: .samsungT7ShieldSeed)
+            .resolve(in: inventory)
+
+        XCTAssertEqual(resolution.outcome, .readyToEject)
+        XCTAssertEqual(resolution.mountedVolumeNames, ["Storage", "T7 Shield"])
+    }
+
     func testDiskUtilInventoryProviderFailsClosedWhenExternalEvidenceIsUnknown() throws {
         var infoByIdentifier = T7DiskUtilFixture.infoByIdentifier
         infoByIdentifier["disk4"] = [
@@ -613,6 +627,35 @@ private enum T7DiskUtilFixture {
         ],
     ]
 
+    static let apfsListWithoutVolumeMountPoints: [String: Any] = [
+        "Containers": [
+            [
+                "ContainerReference": "disk5",
+                "APFSContainerUUID": T7HelperRunnerFixture.apfsContainerUUID,
+                "PhysicalStores": [
+                    [
+                        "DeviceIdentifier": "disk4s2",
+                        "DiskUUID": T7HelperRunnerFixture.physicalStoreUUID,
+                    ],
+                ],
+                "Volumes": [
+                    [
+                        "DeviceIdentifier": "disk5s1",
+                        "Name": "Storage",
+                        "APFSVolumeUUID": T7HelperRunnerFixture.storageVolumeUUID,
+                        "Roles": [],
+                    ],
+                    [
+                        "DeviceIdentifier": "disk5s2",
+                        "Name": "T7 Shield",
+                        "APFSVolumeUUID": T7HelperRunnerFixture.shieldVolumeUUID,
+                        "Roles": ["Backup"],
+                    ],
+                ],
+            ],
+        ],
+    ]
+
     static let infoByIdentifier: [String: [String: Any]] = [
         "disk4": [
             "DeviceIdentifier": "disk4",
@@ -629,4 +672,27 @@ private enum T7DiskUtilFixture {
             "DiskUUID": T7HelperRunnerFixture.physicalStoreUUID,
         ],
     ]
+
+    static let infoByIdentifierWithVolumeMountPoints: [String: [String: Any]] = {
+        var info = infoByIdentifier
+        info["disk5s1"] = [
+            "DeviceIdentifier": "disk5s1",
+            "VolumeName": "Storage",
+            "VolumeUUID": T7HelperRunnerFixture.storageVolumeUUID,
+            "MountPoint": "/Volumes/Storage",
+            "ParentWholeDisk": "disk5",
+            "APFSContainerUUID": T7HelperRunnerFixture.apfsContainerUUID,
+            "APFSPhysicalStoreUUID": T7HelperRunnerFixture.physicalStoreUUID,
+        ]
+        info["disk5s2"] = [
+            "DeviceIdentifier": "disk5s2",
+            "VolumeName": "T7 Shield",
+            "VolumeUUID": T7HelperRunnerFixture.shieldVolumeUUID,
+            "MountPoint": "/Volumes/T7 Shield",
+            "ParentWholeDisk": "disk5",
+            "APFSContainerUUID": T7HelperRunnerFixture.apfsContainerUUID,
+            "APFSPhysicalStoreUUID": T7HelperRunnerFixture.physicalStoreUUID,
+        ]
+        return info
+    }()
 }
