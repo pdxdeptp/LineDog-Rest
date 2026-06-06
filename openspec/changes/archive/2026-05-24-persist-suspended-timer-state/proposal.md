@@ -7,7 +7,7 @@ Users can stop the active timer and see a resume action during the current app s
 - Persist the user-stopped timer session state, including the suspended timer mode, when the user chooses "停止计时".
 - Restore the stopped state on app launch so the app stays paused in the suspended mode and continues to show "恢复计时" instead of auto-starting the timer.
 - Clear the persisted stopped state when the user resumes timers, starts a new manual focus session, or switches timer mode.
-- Keep this limited to the desk-pet timer controls; no backend, reminder, or learning assistant behavior changes.
+- Keep this limited to the desk-pet timer controls; no backend, reminder, or retired middle-column feature behavior changes.
 
 ## Capabilities
 

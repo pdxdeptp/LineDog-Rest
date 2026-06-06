@@ -9,7 +9,7 @@
 
 - [x] 2.1 Refactor `MalDazeSettingsView` into a polished settings shell with sidebar categories and a right detail pane.
 - [x] 2.2 Implement reusable local settings helpers for category buttons, setting groups, API key rows, and shortcut rows.
-- [x] 2.3 Redesign the learning-assistant settings category with provider/model selection, selected-provider API key row, backend startup toggle, and concise helper/status copy.
+- [x] 2.3 Redesign the retired-feature settings category with provider/model selection, selected-provider API key row, backend startup toggle, and concise helper/status copy.
 - [x] 2.4 Redesign the Smart Input settings category with Gemini API key row, model picker, and shortcut row while preserving natural-language reminder behavior.
 - [x] 2.5 Redesign the shortcuts category for the desk pet menu, desk pet reset, and independent countdown shortcuts with consistent keycap, record, restore, and disabled states.
 - [x] 2.6 Update `MalDazeSettingsWindowPresenter` sizing to fit the new category-and-detail layout while still centering through `MalDazePresentationAnchor`.

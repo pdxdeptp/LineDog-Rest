@@ -3,7 +3,6 @@ import SwiftUI
 
 private enum DashboardLayout {
     static let remindersColumnWidth: CGFloat = 300
-    static let assistantMinimumColumnWidth: CGFloat = 360
     static let controlsColumnWidth: CGFloat = 300
     static let horizontalPadding: CGFloat = 12
     static let dividerWidth: CGFloat = 1
@@ -13,11 +12,9 @@ private enum DashboardLayout {
 
     static var minimumContentWidth: CGFloat {
         remindersColumnWidth
-        + assistantMinimumColumnWidth
         + controlsColumnWidth
-        + 2 * horizontalPadding
-        + 2 * horizontalPadding
-        + 2 * dividerWidth
+        + 4 * horizontalPadding
+        + dividerWidth
     }
 
     static func preferredContentSize(screenVisibleFrame visibleFrame: NSRect?) -> NSSize {
@@ -48,7 +45,6 @@ struct DeskPetDashboardView: View {
     }
 
     @ObservedObject var viewModel: AppViewModel
-    @StateObject private var learningAssistantViewModel: LearningAssistantViewModel
 
     static func preferredContentSize(screenVisibleFrame visibleFrame: NSRect?) -> NSSize {
         DashboardLayout.preferredContentSize(screenVisibleFrame: visibleFrame)
@@ -57,11 +53,10 @@ struct DeskPetDashboardView: View {
     @MainActor
     init(viewModel: AppViewModel) {
         self.viewModel = viewModel
-        _learningAssistantViewModel = StateObject(wrappedValue: LearningAssistantViewModel())
     }
 
     var body: some View {
-        DashboardRootView(viewModel: viewModel, assistantViewModel: learningAssistantViewModel)
+        DashboardRootView(viewModel: viewModel)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .background {
                 ZStack {
@@ -76,9 +71,6 @@ struct DeskPetDashboardView: View {
                 DashboardPanelSurface.shape()
                     .strokeBorder(Color(.separatorColor).opacity(DashboardPanelSurface.borderOpacity), lineWidth: 0.5)
             )
-            .onReceive(NotificationCenter.default.publisher(for: MalDazeBroadcastNotifications.deskPetDashboardDidOpen)) { _ in
-                Task { await learningAssistantViewModel.refreshForDashboardOpen() }
-            }
     }
 }
 
@@ -223,10 +215,9 @@ private struct DashboardUtilityButton: View {
     }
 }
 
-/// Dashboard 主内容：三栏看板，由桌宠 Dashboard Panel 展示。
+/// Dashboard 主内容：提醒事项 + 桌宠控制，由桌宠 Dashboard Panel 展示。
 struct DashboardRootView: View {
     @ObservedObject var viewModel: AppViewModel
-    private let assistantViewModel: LearningAssistantViewModel?
 
     @AppStorage(MalDazeDefaults.sevenMinuteReminderDurationMinutes) private var sevenMinuteMinutesStored = 7
     @AppStorage(MalDazeDefaults.hydrationReminderIntervalMinutes) private var hydrationIntervalStored = 90
@@ -255,9 +246,8 @@ struct DashboardRootView: View {
     @State private var petAppearanceExpanded = false
     @State private var hydrationSettingsExpanded = false
 
-    init(viewModel: AppViewModel, assistantViewModel: LearningAssistantViewModel? = nil) {
+    init(viewModel: AppViewModel) {
         self.viewModel = viewModel
-        self.assistantViewModel = assistantViewModel
     }
 
     private var sevenMinuteMinutesResolved: Int {
@@ -317,7 +307,7 @@ struct DashboardRootView: View {
         DispatchQueue.main.async(execute: work)
     }
 
-    /// 三栏外圈与右栏标题行：数值集中，避免「窗体顶边 vs 首行」只靠右栏独自撑开。
+    /// 两栏外圈与右栏标题行：数值集中，避免「窗体顶边 vs 首行」只靠右栏独自撑开。
     private enum MainPanelChrome {
         static let horizontalPadding = DashboardLayout.horizontalPadding
         /// 整块内容上内边距。顶部留白唯一控制点，改此处即可（不要在 ScrollView 上加 ignoresSafeArea，否则会被抵消）。
@@ -354,18 +344,6 @@ struct DashboardRootView: View {
                 remindersSidebar
                     .frame(width: DashboardLayout.remindersColumnWidth, alignment: .topLeading)
                     .padding(.trailing, MainPanelChrome.horizontalPadding)
-
-                Divider()
-
-                // 中栏：学习助手
-                VStack(alignment: .leading, spacing: 0) {
-                    if let assistantViewModel {
-                        AssistantPanelView(viewModel: assistantViewModel)
-                    } else {
-                        AssistantPanelView()
-                    }
-                }
-                .frame(minWidth: DashboardLayout.assistantMinimumColumnWidth, maxWidth: .infinity, alignment: .topLeading)
 
                 Divider()
 

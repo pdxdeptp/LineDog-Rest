@@ -1,16 +1,16 @@
 ## ADDED Requirements
 
 ### Requirement: Unified LLM provider settings module
-The system SHALL present learning assistant and Smart Input LLM credentials through a shared provider/model/API-key settings module.
+The system SHALL present retired middle-column feature and Smart Input LLM credentials through a shared provider/model/API-key settings module.
 
 #### Scenario: Dedicated LLM settings category
 - **WHEN** the redesigned MalDaze settings window renders
 - **THEN** the system presents a dedicated settings category for model and API key configuration
-- **AND** the category contains separate configuration surfaces for learning assistant and Smart Input
+- **AND** the category contains separate configuration surfaces for retired middle-column feature and Smart Input
 - **AND** both surfaces use the same provider picker, model picker, selected-provider API key row, saved/empty state, show/hide affordance, and local-only storage copy
 
 #### Scenario: Shared module with feature-specific copy
-- **WHEN** the learning assistant and Smart Input LLM settings surfaces render
+- **WHEN** the retired middle-column feature and Smart Input LLM settings surfaces render
 - **THEN** both surfaces are built from the same reusable LLM settings module or helper
 - **AND** each surface still communicates its feature-specific purpose
 - **AND** visual styling, spacing, button treatment, and pale-blue active accents are consistent between the two surfaces

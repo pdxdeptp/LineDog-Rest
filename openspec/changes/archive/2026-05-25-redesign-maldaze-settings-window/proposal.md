@@ -1,13 +1,13 @@
 ## Why
 
-The settings window opened from the Dashboard right-column gear currently feels like an uncurated macOS form dump: learning-assistant keys, smart-input Gemini settings, backend startup behavior, and shortcut recorders all compete at the same visual level. API key entry in particular is primitive, with raw secure fields and little state, provider context, or confidence that the secret is handled locally.
+The settings window opened from the Dashboard right-column gear currently feels like an uncurated macOS form dump: retired-feature keys, smart-input Gemini settings, backend startup behavior, and shortcut recorders all compete at the same visual level. API key entry in particular is primitive, with raw secure fields and little state, provider context, or confidence that the secret is handled locally.
 
 This change redesigns the settings experience so it feels like a polished MalDaze control surface: structured, calm, scannable, and trustworthy while preserving the existing local persistence and shortcut behavior.
 
 ## What Changes
 
 - Replace the single grouped `Form` stack with a designed settings window shell that separates categories, detail content, and status/helper information.
-- Redesign API key input rows for the learning-assistant backend providers and Smart Input Gemini key with visible labels, provider-aware copy, saved/empty state, show/hide affordance, and local-only reassurance.
+- Redesign API key input rows for the retired-feature backend providers and Smart Input Gemini key with visible labels, provider-aware copy, saved/empty state, show/hide affordance, and local-only reassurance.
 - Group provider/model selection, API key entry, backend lazy startup, Smart Input configuration, and shortcut recorders into clear sections or tabs without removing any existing capability.
 - Improve shortcut rows with consistent keycap styling, primary/secondary actions, recording state feedback, and preserved Esc cancellation behavior.
 - Resize the independent settings window to match the new layout instead of constraining it to the current small raw-form frame.

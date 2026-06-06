@@ -281,7 +281,7 @@ The Dashboard right controls column SHALL map each visible action to an explicit
 - **AND** 下一次打开可恢复仍然有效的本地状态
 
 ### Requirement: 宽屏桌宠 Dashboard Panel
-桌宠 Dashboard Panel SHALL 使用接近当前屏幕可见宽度的横向布局，并将中间学习助手栏设为自适应主区域。
+桌宠 Dashboard Panel SHALL 使用接近当前屏幕可见宽度的横向布局，并将中间主内容区域设为自适应区域。
 
 #### Scenario: 桌宠入口打开宽屏 Dashboard Panel
 - **WHEN** 用户左键点击常态桌宠命中区打开 Dashboard Panel
@@ -295,15 +295,15 @@ The Dashboard right controls column SHALL map each visible action to an explicit
 - **AND** 右侧控制栏保持固定宽度
 - **AND** 分隔线和外边距保持固定宽度
 
-#### Scenario: 学习助手栏自适应
+#### Scenario: 主内容区域自适应
 - **WHEN** 当前屏幕可见宽度大于三栏最小宽度
-- **THEN** 中间学习助手栏获得左右栏之外的剩余宽度
-- **AND** 学习助手栏宽度随屏幕宽度增加而增加
+- **THEN** 中间主内容区域获得左右栏之外的剩余宽度
+- **AND** 主内容区域宽度随屏幕宽度增加而增加
 
 #### Scenario: 窄屏降级
 - **WHEN** 当前屏幕可见宽度不足以展示目标宽屏宽度
 - **THEN** panel 宽度被 clamp 到当前屏幕可见区域内
-- **AND** 学习助手栏保持最小可读宽度
+- **AND** 中间主内容区域保持最小可读宽度
 
 #### Scenario: Panel position
 - **WHEN** Dashboard Panel 从桌宠入口打开
@@ -315,13 +315,12 @@ The MalDaze settings window SHALL keep credentials, shortcut recorders, and runt
 
 #### Scenario: Model credentials page excludes unrelated controls
 - **WHEN** the user opens the "模型与密钥" settings category
-- **THEN** the detail pane SHALL show Learning Assistant and Smart Input LLM provider/model/API-key configuration
+- **THEN** the detail pane SHALL show Smart Input LLM provider/model/API-key configuration
 - **AND** the detail pane SHALL NOT show shortcut recorder controls such as "录制", "恢复默认", or Smart Input "添加提醒"
-- **AND** the detail pane SHALL NOT show the learning-assistant lazy backend startup toggle
 
 #### Scenario: Provider selection uses compact dropdown controls
 - **WHEN** the user opens the "模型与密钥" settings category
-- **THEN** each LLM feature surface SHALL render the service-provider selector as a dropdown or popup menu control
+- **THEN** the Smart Input LLM surface SHALL render the service-provider selector as a dropdown or popup menu control
 - **AND** the provider selector SHALL visually align with the model dropdown control
 - **AND** the provider selector SHALL NOT render as a segmented control
 
@@ -331,17 +330,10 @@ The MalDaze settings window SHALL keep credentials, shortcut recorders, and runt
 - **AND** the Smart Input "添加提醒" shortcut row SHALL appear with the other shortcut rows
 - **AND** each shortcut row SHALL keep its current record, restore-default, default-copy, and storage behavior
 
-#### Scenario: Learning Assistant category owns lazy backend startup
-- **WHEN** the user needs to configure learning-assistant lazy backend startup
-- **THEN** the settings window SHALL provide a "学习助手" category or equivalently named learning-assistant runtime category
-- **AND** the category SHALL describe startup/runtime behavior rather than LLM credentials
-- **AND** the lazy backend startup setting SHALL be reachable from that category
-- **AND** toggling it SHALL preserve the existing lazy-backend storage key and startup semantics
-
 #### Scenario: Category helper copy matches selected category
 - **WHEN** the user opens any settings category
 - **THEN** persistent helper copy in the settings shell SHALL match the selected category's purpose
-- **AND** API-key-specific helper copy SHALL NOT remain visible while the selected category is "学习助手" or "快捷键"
+- **AND** API-key-specific helper copy SHALL NOT remain visible while the selected category is "快捷键"
 
 #### Scenario: Category content does not visually bleed or overlap
 - **WHEN** the user switches between settings categories, scrolls the detail pane, or uses the default settings window size
@@ -372,12 +364,12 @@ The system SHALL present the MalDaze settings window opened from the Dashboard s
 #### Scenario: Settings window opens with categories
 - **WHEN** the user activates the Dashboard right-column settings gear
 - **THEN** the system opens the existing MalDaze settings window
-- **AND** the window presents distinct settings categories for learning assistant, smart input, and shortcuts
+- **AND** the window presents distinct settings categories for Smart Input and shortcuts
 - **AND** the selected category's details are visually separated from the category navigation
 
 #### Scenario: Existing settings remain reachable
 - **WHEN** the redesigned settings window renders
-- **THEN** controls remain available for backend LLM provider, backend LLM model, selected backend provider API key, backend lazy startup, Smart Input Gemini API key, Smart Input Gemini model, and all existing shortcut recorders
+- **THEN** controls remain available for Smart Input provider, Smart Input model, selected-provider API key, and all existing shortcut recorders
 - **AND** the redesign does not change existing persistence keys, provider model IDs, or shortcut default values
 
 #### Scenario: Window sizing supports the redesigned layout
@@ -400,11 +392,9 @@ The system SHALL provide polished, provider-aware API key entry controls that ma
 - **AND** the show/hide control has an accessible name
 
 #### Scenario: Provider context is preserved
-- **WHEN** the user changes the learning-assistant backend provider
+- **WHEN** the user changes the Smart Input provider
 - **THEN** the model picker updates using the existing provider catalog behavior
-- **AND** the visible API key entry corresponds to the selected backend provider
-- **AND** Smart Input Gemini key entry remains separate from the learning-assistant backend provider key
-- **AND** Smart Input Gemini key entry uses the same Google Gemini provider identity and visual API key row treatment as the learning-assistant Gemini entry
+- **AND** the visible API key entry corresponds to the selected Smart Input provider
 
 ### Requirement: Shortcut recorder presentation
 The system SHALL present global shortcut settings as consistent, readable rows while preserving the existing recorder behavior.
@@ -442,11 +432,11 @@ The system SHALL keep settings controls accessible and visually polished across 
 ### Requirement: Dashboard Panel internal click stability
 Dashboard Panel dismissal logic SHALL preserve the panel when the user clicks inside the Dashboard Panel content.
 
-#### Scenario: Bottom navigation click stays in panel
+#### Scenario: Internal control click stays in panel
 - **WHEN** the Dashboard Panel is visible
-- **AND** the user clicks a learning assistant bottom-navigation item inside the panel
+- **AND** the user clicks an interactive control inside the panel
 - **THEN** the panel remains visible
-- **AND** the learning assistant selected tab changes according to the clicked item
+- **AND** the clicked control handles the action normally
 
 #### Scenario: Internal click during focus transition
 - **WHEN** the Dashboard Panel is visible and the app processes a focus or activation transition
@@ -477,25 +467,19 @@ The Dashboard left reminder plan sidebar SHALL display human-facing reminder not
 - **WHEN** the Dashboard left "计划" sidebar renders a reminder without user-facing notes
 - **THEN** the reminder row displays the title and due-time information without an empty detail line
 
-### Requirement: Unified LLM provider settings module
-The system SHALL present learning assistant and Smart Input LLM credentials through a shared provider/model/API-key settings module.
+### Requirement: Smart Input LLM provider settings
+The system SHALL present Smart Input LLM credentials through a provider/model/API-key settings module.
 
 #### Scenario: Dedicated LLM settings category
 - **WHEN** the redesigned MalDaze settings window renders
 - **THEN** the system presents a dedicated settings category for model and API key configuration
-- **AND** the category contains separate configuration surfaces for learning assistant and Smart Input
-- **AND** both surfaces use the same provider picker, model picker, selected-provider API key row, saved/empty state, show/hide affordance, and local-only storage copy
+- **AND** the category contains Smart Input configuration
+- **AND** the surface uses the provider picker, model picker, selected-provider API key row, saved/empty state, show/hide affordance, and local-only storage copy
 
-#### Scenario: Shared module with feature-specific copy
-- **WHEN** the learning assistant and Smart Input LLM settings surfaces render
-- **THEN** both surfaces are built from the same reusable LLM settings module or helper
-- **AND** each surface still communicates its feature-specific purpose
-- **AND** visual styling, spacing, button treatment, and pale-blue active accents are consistent between the two surfaces
-
-#### Scenario: Independent feature configuration
-- **WHEN** the user changes provider, model, or API key for one feature
-- **THEN** the system persists that feature's value independently
-- **AND** the other feature's provider, model, and API key values are not changed
+#### Scenario: Feature-specific copy
+- **WHEN** the Smart Input LLM settings surface renders
+- **THEN** the surface communicates that it powers natural-language reminder parsing
+- **AND** visual styling, spacing, button treatment, and pale-blue active accents remain consistent with the settings window
 
 ### Requirement: Smart Input provider selection
 The system SHALL allow Smart Input reminder parsing to use Google Gemini, OpenAI, or DeepSeek.

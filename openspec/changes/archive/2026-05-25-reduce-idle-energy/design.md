@@ -23,7 +23,7 @@ The optimization needs to preserve user-visible interaction: clicking or draggin
 
 **Non-Goals:**
 
-- Do not redesign the pet visuals, menu UI, or learning assistant UI.
+- Do not redesign the pet visuals, menu UI, or retired middle-column feature UI.
 - Do not remove break-run or fullscreen rest modes.
 - Do not change backend API contracts or learning data storage.
 - Do not add new third-party dependencies.

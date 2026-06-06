@@ -2,7 +2,7 @@
 
 The desk pet entry currently opens a wide `NSPopover` that hosts the same control surface previously used by the menu bar. That was reasonable while the menu bar and desk pet had to share the same appearance, but the menu bar is now being treated as a compact settings launcher. The desk pet entry is free to become a dedicated dashboard surface rather than a popover-shaped menu.
 
-The current dashboard already behaves more like a small workbench than a contextual popover: it has a wide three-column layout, a learning assistant home, resource progress, ingestion, chat/adjust-plan flows, reminders, and timer/pet controls. `NSPopover` gives native chrome, but it also imposes popover timing, arrow placement, internal cooldown behavior, and first-frame rendering constraints that are awkward for a rich dashboard.
+The current dashboard already behaves more like a small workbench than a contextual popover: it has a wide three-column layout, a retired middle-column feature home, resource progress, retired intake, chat/adjust-plan flows, reminders, and timer/pet controls. `NSPopover` gives native chrome, but it also imposes popover timing, arrow placement, internal cooldown behavior, and first-frame rendering constraints that are awkward for a rich dashboard.
 
 This change assumes the menu bar split is complete or lands before implementation. It does not design or modify the menu bar settings launcher.
 
@@ -12,7 +12,7 @@ This change assumes the menu bar split is complete or lands before implementatio
 
 - Replace the desk pet `NSPopover` with a dedicated `NSPanel` dashboard.
 - Keep the dashboard visually lightweight, desk-pet-adjacent, and easy to dismiss.
-- Preserve the wide three-column dashboard structure: reminders, learning assistant, and controls.
+- Preserve the wide three-column dashboard structure: reminders, retired middle-column feature, and controls.
 - Improve first-open and repeat-open responsiveness by reusing the panel, SwiftUI host, and dashboard state.
 - Avoid repeated gray startup flashes when cached dashboard content is available.
 - Keep keyboard input, buttons, and focus behavior reliable inside the dashboard.
@@ -22,7 +22,7 @@ This change assumes the menu bar split is complete or lands before implementatio
 
 - No menu bar entry redesign in this change.
 - No backend API redesign.
-- No major learning assistant information architecture redesign beyond cached startup and panel hosting expectations.
+- No major retired middle-column feature information architecture redesign beyond cached startup and panel hosting expectations.
 - No persistent user-resizable dashboard window unless a follow-up change asks for it.
 - No replacement of the main desk pet stage window.
 
@@ -52,15 +52,15 @@ The implementation should avoid cold-creating the entire SwiftUI tree on every d
 - The `NSPanel`.
 - The `NSHostingController`.
 - A dashboard root view or existing dashboard content adapted for panel hosting.
-- Long-lived dashboard state, especially the learning assistant view model or coordinator.
+- Long-lived dashboard state, especially the retired middle-column feature view model or coordinator.
 
-Closing the dashboard should normally hide/order out the panel rather than destroy the controller. This keeps repeat opens fast and preserves local UI state such as selected learning tab, chat draft, ingestion draft, expanded tasks, and loaded dashboard data.
+Closing the dashboard should normally hide/order out the panel rather than destroy the controller. This keeps repeat opens fast and preserves local UI state such as selected dashboard tab, chat draft, retired intake draft, expanded tasks, and loaded dashboard data.
 
 Alternative considered: recreate everything on every open. Rejected because it repeats SwiftUI layout, view model initialization, backend fetches, and visible startup placeholders.
 
 ### D3: Reframe the root view as a dashboard, not a menu
 
-The current `MenuBarContentView` can be reused as an implementation source, but the desk pet root should be named and treated as a dashboard surface. The clean end state is a `DashboardRootView` or equivalent with reusable child components for reminders, learning assistant, and controls.
+The current `MenuBarContentView` can be reused as an implementation source, but the desk pet root should be named and treated as a dashboard surface. The clean end state is a `DashboardRootView` or equivalent with reusable child components for reminders, retired middle-column feature, and controls.
 
 Implementation can migrate incrementally:
 
@@ -74,7 +74,7 @@ Alternative considered: simply place `MenuBarContentView` inside an `NSPanel` an
 
 When dashboard data has been loaded before, reopening the panel should show the last available content immediately and start a background refresh with a small loading indicator. The dashboard should only show the whole-column backend-starting state when there is no useful cached dashboard content yet.
 
-This preserves the current offline model for true service failure: if refresh fails and the app determines the assistant service is unavailable, the learning assistant column may enter the existing offline state. The change is only about avoiding unnecessary startup placeholders on repeat opens.
+This preserves the current offline model for true service failure: if refresh fails and the app determines the assistant service is unavailable, the retired middle-column feature column may enter the existing offline state. The change is only about avoiding unnecessary startup placeholders on repeat opens.
 
 Alternative considered: always clear and refetch on panel open. Rejected because it makes every open feel like a cold start even when the app already has useful data.
 
@@ -98,7 +98,7 @@ The dashboard should keep the current wide layout intent:
 
 - Width near the active screen visible width with a safe margin.
 - Left and right columns fixed.
-- Learning assistant middle column adaptive.
+- retired middle-column feature middle column adaptive.
 - Clamp to visible screen bounds.
 - Position near the desk pet when possible, but prefer staying fully visible over preserving a strict anchor.
 
@@ -119,7 +119,7 @@ The dashboard does not need an arrow. Its relationship to the desk pet can be co
 2. Add failing tests that reject `NSPopover()` for the desk pet dashboard path and require an `NSPanel`-backed dashboard controller.
 3. Introduce the dashboard panel/controller and keep the old popover path until the tests drive replacement.
 4. Move or wrap the current wide control panel content into a dashboard-specific root.
-5. Move learning assistant/dashboard state ownership to a long-lived owner if needed for cached repeat opens.
+5. Move retired middle-column feature/dashboard state ownership to a long-lived owner if needed for cached repeat opens.
 6. Replace popover show/close/event monitor code with panel positioning, show, hide, and dismissal monitors.
 7. Run Swift tests and perform manual desktop QA for first open, repeat open, outside click, Esc, app deactivation, text input, and backend startup/offline states.
 

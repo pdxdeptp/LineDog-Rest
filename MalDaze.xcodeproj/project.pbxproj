@@ -68,20 +68,7 @@
 		A307 /* DeskReminderTimeFormatterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B307 /* DeskReminderTimeFormatterTests.swift */; };
 		A308 /* DeskReminderSidebarMergerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B308 /* DeskReminderSidebarMergerTests.swift */; };
 		A309 /* ControlPanelPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B309 /* ControlPanelPresentationTests.swift */; };
-		A401 /* AssistantAPIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B401 /* AssistantAPIClient.swift */; };
-		A402 /* LearningAssistantViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B402 /* LearningAssistantViewModel.swift */; };
-		A403 /* AssistantPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B403 /* AssistantPanelView.swift */; };
-		A404 /* TaskRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B404 /* TaskRowView.swift */; };
-		A405 /* ResourceProgressView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B405 /* ResourceProgressView.swift */; };
-		A406 /* ChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B406 /* ChatView.swift */; };
-		A407 /* IngestionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B407 /* IngestionView.swift */; };
-		A408 /* FullPlanSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B408 /* FullPlanSheetView.swift */; };
-		A40B /* LearningPreferencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B40B /* LearningPreferencesView.swift */; };
-		A409 /* BackendProcessManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B409 /* BackendProcessManager.swift */; };
-		A40A /* AssistantAPIClientProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = B40A /* AssistantAPIClientProtocol.swift */; };
-		A310 /* LearningAssistantTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B310 /* LearningAssistantTests.swift */; };
 		A311 /* PetRendererTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B311 /* PetRendererTests.swift */; };
-		A312 /* BackendProcessManagerLifecycleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B312 /* BackendProcessManagerLifecycleTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -158,20 +145,7 @@
 		C301 /* MalDazeTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MalDazeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B235 /* Carbon.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Carbon.framework; path = System/Library/Frameworks/Carbon.framework; sourceTree = SDKROOT; };
 		B240 /* LineDog */ = {isa = PBXFileReference; lastKnownFileType = folder; path = LineDog; sourceTree = "<group>"; };
-		B401 /* AssistantAPIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssistantAPIClient.swift; sourceTree = "<group>"; };
-		B402 /* LearningAssistantViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningAssistantViewModel.swift; sourceTree = "<group>"; };
-		B403 /* AssistantPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssistantPanelView.swift; sourceTree = "<group>"; };
-		B404 /* TaskRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskRowView.swift; sourceTree = "<group>"; };
-		B405 /* ResourceProgressView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResourceProgressView.swift; sourceTree = "<group>"; };
-		B406 /* ChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatView.swift; sourceTree = "<group>"; };
-		B407 /* IngestionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IngestionView.swift; sourceTree = "<group>"; };
-		B408 /* FullPlanSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FullPlanSheetView.swift; sourceTree = "<group>"; };
-		B409 /* BackendProcessManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendProcessManager.swift; sourceTree = "<group>"; };
-		B40A /* AssistantAPIClientProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssistantAPIClientProtocol.swift; sourceTree = "<group>"; };
-		B40B /* LearningPreferencesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningPreferencesView.swift; sourceTree = "<group>"; };
-		B310 /* LearningAssistantTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningAssistantTests.swift; sourceTree = "<group>"; };
 		B311 /* PetRendererTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetRendererTests.swift; sourceTree = "<group>"; };
-		B312 /* BackendProcessManagerLifecycleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendProcessManagerLifecycleTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -221,7 +195,6 @@
 				E209 /* Reminders */,
 				E20A /* SmartReminder */,
 				E20B /* Settings */,
-				E20D /* LearningAssistant */,
 				B227 /* MalDazeDefaults.swift */,
 				B233 /* DeskPetMenuShortcut.swift */,
 				B234 /* MalDazeCarbonGlobalHotKeys.swift */,
@@ -287,9 +260,7 @@
 				B307 /* DeskReminderTimeFormatterTests.swift */,
 				B308 /* DeskReminderSidebarMergerTests.swift */,
 				B309 /* ControlPanelPresentationTests.swift */,
-				B310 /* LearningAssistantTests.swift */,
 				B311 /* PetRendererTests.swift */,
-				B312 /* BackendProcessManagerLifecycleTests.swift */,
 			);
 			path = MalDazeTests;
 			sourceTree = "<group>";
@@ -359,24 +330,6 @@
 				B228 /* MalDazeSettingsView.swift */,
 			);
 			path = Settings;
-			sourceTree = "<group>";
-		};
-		E20D /* LearningAssistant */ = {
-			isa = PBXGroup;
-			children = (
-				B401 /* AssistantAPIClient.swift */,
-				B402 /* LearningAssistantViewModel.swift */,
-				B403 /* AssistantPanelView.swift */,
-				B404 /* TaskRowView.swift */,
-				B405 /* ResourceProgressView.swift */,
-				B406 /* ChatView.swift */,
-				B407 /* IngestionView.swift */,
-				B408 /* FullPlanSheetView.swift */,
-				B409 /* BackendProcessManager.swift */,
-				B40A /* AssistantAPIClientProtocol.swift */,
-				B40B /* LearningPreferencesView.swift */,
-			);
-			path = LearningAssistant;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -520,17 +473,6 @@
 				A230 /* SmartReminderNotesComposer.swift in Sources */,
 				A231 /* DeskReminderSidebarFormatting.swift in Sources */,
 				A232 /* SmartReminderModelDebugLog.swift in Sources */,
-				A401 /* AssistantAPIClient.swift in Sources */,
-				A402 /* LearningAssistantViewModel.swift in Sources */,
-				A403 /* AssistantPanelView.swift in Sources */,
-				A404 /* TaskRowView.swift in Sources */,
-				A405 /* ResourceProgressView.swift in Sources */,
-				A406 /* ChatView.swift in Sources */,
-				A407 /* IngestionView.swift in Sources */,
-				A408 /* FullPlanSheetView.swift in Sources */,
-				A409 /* BackendProcessManager.swift in Sources */,
-				A40A /* AssistantAPIClientProtocol.swift in Sources */,
-				A40B /* LearningPreferencesView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -547,9 +489,7 @@
 				A307 /* DeskReminderTimeFormatterTests.swift in Sources */,
 				A308 /* DeskReminderSidebarMergerTests.swift in Sources */,
 				A309 /* ControlPanelPresentationTests.swift in Sources */,
-				A310 /* LearningAssistantTests.swift in Sources */,
 				A311 /* PetRendererTests.swift in Sources */,
-				A312 /* BackendProcessManagerLifecycleTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
