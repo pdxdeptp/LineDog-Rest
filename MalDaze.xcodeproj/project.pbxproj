@@ -67,6 +67,11 @@
 		A255 /* T7EjectHelper in CopyFiles */ = {isa = PBXBuildFile; fileRef = C250 /* T7EjectHelper */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		A256 /* T7TargetResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = B256 /* T7TargetResolver.swift */; };
 		A257 /* T7TargetResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = B256 /* T7TargetResolver.swift */; };
+		A258 /* T7TimeMachineController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B258 /* T7TimeMachineController.swift */; };
+		A259 /* T7TimeMachineController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B258 /* T7TimeMachineController.swift */; };
+		A25A /* T7DiskArbitrationEjector.swift in Sources */ = {isa = PBXBuildFile; fileRef = B25A /* T7DiskArbitrationEjector.swift */; };
+		A25B /* T7DiskArbitrationEjector.swift in Sources */ = {isa = PBXBuildFile; fileRef = B25A /* T7DiskArbitrationEjector.swift */; };
+		A25C /* DiskArbitration.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B253 /* DiskArbitration.framework */; };
 		A301 /* MockWindowManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B301 /* MockWindowManager.swift */; };
 		A302 /* MalDazeInteractionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B302 /* MalDazeInteractionTests.swift */; };
 		A303 /* MockRemindersEventStoreBacking.swift in Sources */ = {isa = PBXBuildFile; fileRef = B303 /* MockRemindersEventStoreBacking.swift */; };
@@ -92,6 +97,8 @@
 		A312 /* BackendProcessManagerLifecycleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B312 /* BackendProcessManagerLifecycleTests.swift */; };
 		A313 /* T7EjectHelperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B313 /* T7EjectHelperTests.swift */; };
 		A314 /* T7TargetResolverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B314 /* T7TargetResolverTests.swift */; };
+		A315 /* T7TimeMachineControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B315 /* T7TimeMachineControllerTests.swift */; };
+		A316 /* T7DiskArbitrationEjectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B316 /* T7DiskArbitrationEjectorTests.swift */; };
 /* End PBXBuildFile section */
 
 	/* Begin PBXContainerItemProxy section */
@@ -181,6 +188,8 @@
 		B254 /* IOKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = IOKit.framework; path = System/Library/Frameworks/IOKit.framework; sourceTree = SDKROOT; };
 		C250 /* T7EjectHelper */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = T7EjectHelper; sourceTree = BUILT_PRODUCTS_DIR; };
 		B256 /* T7TargetResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = T7TargetResolver.swift; sourceTree = "<group>"; };
+		B258 /* T7TimeMachineController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = T7TimeMachineController.swift; sourceTree = "<group>"; };
+		B25A /* T7DiskArbitrationEjector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = T7DiskArbitrationEjector.swift; sourceTree = "<group>"; };
 		B401 /* AssistantAPIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssistantAPIClient.swift; sourceTree = "<group>"; };
 		B402 /* LearningAssistantViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningAssistantViewModel.swift; sourceTree = "<group>"; };
 		B403 /* AssistantPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssistantPanelView.swift; sourceTree = "<group>"; };
@@ -197,6 +206,8 @@
 		B312 /* BackendProcessManagerLifecycleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendProcessManagerLifecycleTests.swift; sourceTree = "<group>"; };
 		B313 /* T7EjectHelperTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = T7EjectHelperTests.swift; sourceTree = "<group>"; };
 		B314 /* T7TargetResolverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = T7TargetResolverTests.swift; sourceTree = "<group>"; };
+		B315 /* T7TimeMachineControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = T7TimeMachineControllerTests.swift; sourceTree = "<group>"; };
+		B316 /* T7DiskArbitrationEjectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = T7DiskArbitrationEjectorTests.swift; sourceTree = "<group>"; };
 	/* End PBXFileReference section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -219,6 +230,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A235 /* Carbon.framework in Frameworks */,
+				A25C /* DiskArbitration.framework in Frameworks */,
 				);
 				runOnlyForDeploymentPostprocessing = 0;
 			};
@@ -343,6 +355,8 @@
 					B312 /* BackendProcessManagerLifecycleTests.swift */,
 					B313 /* T7EjectHelperTests.swift */,
 					B314 /* T7TargetResolverTests.swift */,
+					B315 /* T7TimeMachineControllerTests.swift */,
+					B316 /* T7DiskArbitrationEjectorTests.swift */,
 				);
 				path = MalDazeTests;
 				sourceTree = "<group>";
@@ -437,6 +451,8 @@
 			children = (
 				B250 /* T7EjectResult.swift */,
 				B256 /* T7TargetResolver.swift */,
+				B258 /* T7TimeMachineController.swift */,
+				B25A /* T7DiskArbitrationEjector.swift */,
 			);
 			path = T7Eject;
 			sourceTree = "<group>";
@@ -625,6 +641,8 @@
 					A40B /* LearningPreferencesView.swift in Sources */,
 					A250 /* T7EjectResult.swift in Sources */,
 					A256 /* T7TargetResolver.swift in Sources */,
+					A258 /* T7TimeMachineController.swift in Sources */,
+					A25A /* T7DiskArbitrationEjector.swift in Sources */,
 				);
 				runOnlyForDeploymentPostprocessing = 0;
 			};
@@ -634,6 +652,8 @@
 			files = (
 				A251 /* T7EjectResult.swift in Sources */,
 				A257 /* T7TargetResolver.swift in Sources */,
+				A259 /* T7TimeMachineController.swift in Sources */,
+				A25B /* T7DiskArbitrationEjector.swift in Sources */,
 				A252 /* main.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -656,6 +676,8 @@
 					A312 /* BackendProcessManagerLifecycleTests.swift in Sources */,
 					A313 /* T7EjectHelperTests.swift in Sources */,
 					A314 /* T7TargetResolverTests.swift in Sources */,
+					A315 /* T7TimeMachineControllerTests.swift in Sources */,
+					A316 /* T7DiskArbitrationEjectorTests.swift in Sources */,
 				);
 				runOnlyForDeploymentPostprocessing = 0;
 			};

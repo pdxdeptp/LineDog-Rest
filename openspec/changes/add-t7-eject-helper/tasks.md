@@ -15,13 +15,13 @@
 
 ## 3. Time Machine And Disk Arbitration
 
-- [ ] 3.1 Add failing tests for `tmutil status` parsing with `Running = 0`, `Running = 1`, malformed output, and command failure.
-- [ ] 3.2 Implement the Time Machine controller abstraction with `tmutil status`, `tmutil stopbackup`, polling timeout, and post-stop stability wait.
-- [ ] 3.3 Add failing tests for Time Machine still-running timeout and successful stop-before-unmount sequencing.
-- [ ] 3.4 Add failing tests for Disk Arbitration wrapper outcomes: unmount success then eject success, unmount dissenter, eject dissenter after unmount, and remaining mounted-volume evidence.
-- [ ] 3.5 Implement the Disk Arbitration session wrapper, whole-disk unmount/eject callbacks, dissenter mapping, and no-force operation path.
-- [ ] 3.6 Add failing source-level tests rejecting Finder automation, System Events, Finder AppleScript eject, and default force unmount/eject usage.
-- [ ] 3.7 Perform spec compliance and code quality review for Time Machine coordination, Disk Arbitration result mapping, and no-GUI/no-force guarantees.
+- [x] 3.1 Add failing tests for `tmutil status` parsing with `Running = 0`, `Running = 1`, malformed output, and command failure.
+- [x] 3.2 Implement the Time Machine controller abstraction with `tmutil status`, `tmutil stopbackup`, polling timeout, and post-stop stability wait.
+- [x] 3.3 Add failing tests for Time Machine still-running timeout and successful stop-before-unmount sequencing.
+- [x] 3.4 Add failing tests for Disk Arbitration wrapper outcomes: unmount success then eject success, unmount dissenter, eject dissenter after unmount, and remaining mounted-volume evidence.
+- [x] 3.5 Implement the Disk Arbitration session wrapper, whole-disk unmount/eject callbacks, dissenter mapping, and no-force operation path.
+- [x] 3.6 Add failing source-level tests rejecting Finder automation, System Events, Finder AppleScript eject, and default force unmount/eject usage.
+- [x] 3.7 Perform spec compliance and code quality review for Time Machine coordination, Disk Arbitration result mapping, and no-GUI/no-force guarantees.
 
 ## 4. App Service, Scheduling, And Logging
 
