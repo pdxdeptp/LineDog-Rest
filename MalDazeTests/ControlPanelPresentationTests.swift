@@ -661,6 +661,57 @@ final class ControlPanelPresentationTests: XCTestCase {
         XCTAssertTrue(hydrationSource.contains("viewModel.setHydrationReminderEnabled(false)"))
     }
 
+    func testDashboardRightColumnContainsT7SafeEjectSectionUsingExistingControlStyles() throws {
+        let source = try readProjectSource("MalDaze/DashboardRootView.swift")
+        let settingsSource = try propertySource(named: "controlsSettingsGroups", in: source)
+
+        XCTAssertOrdered(
+            ["title: \"桌宠外观\"", "dashboardT7SafeEjectSection", "title: \"喝水设置\""],
+            in: settingsSource,
+            "The T7 safe-eject section should live in the right-column settings stack before hydration settings."
+        )
+        XCTAssertTrue(source.contains("DashboardControlDisclosureSection"))
+        XCTAssertTrue(source.contains("DashboardQuickActionButton"))
+        XCTAssertTrue(source.contains(".tint(SwitchOnTrackTint.paleBlue)"))
+        XCTAssertTrue(source.contains("viewModel.isT7AutomaticEjectEnabled"))
+        XCTAssertTrue(source.contains("viewModel.setT7AutomaticEjectEnabled"))
+        XCTAssertTrue(source.contains("viewModel.t7ScheduleConfiguration"))
+        XCTAssertTrue(source.contains("viewModel.updateT7ScheduleConfiguration"))
+        XCTAssertTrue(source.contains("viewModel.isT7ManualEjectAvailable"))
+        XCTAssertTrue(source.contains("viewModel.t7LatestResultDisplay"))
+        let t7Source = try propertySource(named: "dashboardT7SafeEjectSection", in: source)
+        XCTAssertFalse(t7Source.localizedCaseInsensitiveContains("force"))
+        XCTAssertFalse(t7Source.contains("强制推出"))
+    }
+
+    func testDashboardT7SectionStaysPresentationOnly() throws {
+        let source = try readProjectSource("MalDaze/DashboardRootView.swift")
+        let forbiddenTokens = [
+            "T7BundledEjectHelperURLResolver",
+            "helperURLResolver",
+            "T7EjectProcessRunner",
+            "Process(",
+            "T7EjectJSONLLogWriter",
+            "FileHandle",
+            "JSONL",
+            "DiskArbitration",
+            "DASession",
+            "DADisk"
+        ]
+
+        for token in forbiddenTokens {
+            XCTAssertFalse(
+                source.contains(token),
+                "DashboardRootView must stay presentation-only and not contain T7 implementation token: \(token)"
+            )
+        }
+
+        let t7Source = try propertySource(named: "dashboardT7SafeEjectSection", in: source)
+        XCTAssertFalse(t7Source.contains("switch viewModel.t7LatestResult"))
+        XCTAssertFalse(t7Source.contains("T7EjectResult.message(for:"))
+        XCTAssertFalse(t7Source.contains("DateFormatter("))
+    }
+
     func testInterfaceSuccessAccentsUsePaleBlueInsteadOfGreen() throws {
         let accentAsset = try readProjectSource("MalDaze/Assets.xcassets/AccentColor.colorset/Contents.json")
         XCTAssertTrue(accentAsset.contains("\"red\" : \"0.450\""))

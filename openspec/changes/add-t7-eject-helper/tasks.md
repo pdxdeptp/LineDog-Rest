@@ -36,23 +36,23 @@
 
 ## 5. Desk-Pet Right Column UI
 
-- [ ] 5.1 Add failing tests for the `AppViewModel` UI-facing T7 state contract: latest result, in-flight state, automatic-enabled binding, schedule values, manual-run command, and automatic-toggle command.
-- [ ] 5.2 Add failing source/UI tests requiring a `T7 安全推出` section in the desk-pet panel right column and proving `DashboardRootView` does not resolve helper paths, spawn processes, write logs, or call Disk Arbitration directly.
-- [ ] 5.3 Add failing tests for manual action behavior: available when automatic mode is off, disabled or marked in-progress while a helper run is active, and routed through the reviewed service command.
-- [ ] 5.4 Add failing tests for automatic toggle behavior in the right-column UI: default on, persisted off state, disabled-auto cancellation, and no loss of the manual safe-eject action.
-- [ ] 5.5 Add failing tests for schedule controls: persisted start/end/retry values, clamped valid ranges, and rescheduling when values change.
-- [ ] 5.6 Add failing tests for concise Chinese latest-result display, including success, idle, disk busy/dissenter, Time Machine still running, unsafe target, eject failed after unmount, unexpected error, and latest run time.
-- [ ] 5.7 Implement the right-column `T7 安全推出` section using existing dashboard control styles and the reviewed `AppViewModel` state/command contract.
-- [ ] 5.8 Implement status/date formatting as view-model or pure formatting helpers so SwiftUI presentation stays thin.
-- [ ] 5.9 Perform spec compliance and code quality review for desk-pet-controls UI requirements, status presentation, and separation from process/logging/Disk Arbitration concerns.
+- [x] 5.1 Add failing tests for the `AppViewModel` UI-facing T7 state contract: latest result, in-flight state, automatic-enabled binding, schedule values, manual-run command, and automatic-toggle command.
+- [x] 5.2 Add failing source/UI tests requiring a `T7 安全推出` section in the desk-pet panel right column and proving `DashboardRootView` does not resolve helper paths, spawn processes, write logs, or call Disk Arbitration directly.
+- [x] 5.3 Add failing tests for manual action behavior: available when automatic mode is off, disabled or marked in-progress while a helper run is active, and routed through the reviewed service command.
+- [x] 5.4 Add failing tests for automatic toggle behavior in the right-column UI: default on, persisted off state, disabled-auto cancellation, and no loss of the manual safe-eject action.
+- [x] 5.5 Add failing tests for schedule controls: persisted start/end/retry values, clamped valid ranges, and rescheduling when values change.
+- [x] 5.6 Add failing tests for concise Chinese latest-result display, including success, idle, disk busy/dissenter, Time Machine still running, unsafe target, eject failed after unmount, unexpected error, and latest run time.
+- [x] 5.7 Implement the right-column `T7 安全推出` section using existing dashboard control styles and the reviewed `AppViewModel` state/command contract.
+- [x] 5.8 Implement status/date formatting as view-model or pure formatting helpers so SwiftUI presentation stays thin.
+- [x] 5.9 Perform spec compliance and code quality review for desk-pet-controls UI requirements, status presentation, and separation from process/logging/Disk Arbitration concerns.
 
 ## 6. Verification And Manual QA
 
-- [ ] 6.1 Run `openspec validate add-t7-eject-helper --strict` or the repository's equivalent OpenSpec validation.
-- [ ] 6.2 Run the relevant Swift/Xcode test suite for MalDaze and `T7EjectHelper`.
+- [x] 6.1 Run `openspec validate add-t7-eject-helper --strict` or the repository's equivalent OpenSpec validation.
+- [x] 6.2 Run the relevant Swift/Xcode test suite for MalDaze and `T7EjectHelper`.
 - [ ] 6.3 Manually verify with the T7 disconnected that scheduled/manual helper paths return idle without an error UI.
 - [ ] 6.4 Manually verify with only `Storage` mounted that the helper resolves the same physical T7 target and attempts the safe whole-disk eject path.
 - [ ] 6.5 Manually verify with both `Storage` and `T7 Shield` mounted and Time Machine idle that `/Volumes/Storage` and `/Volumes/T7 Shield` disappear after success.
 - [ ] 6.6 Manually verify with Time Machine running that the helper stops backup, waits for idle/stability, and either ejects safely or returns `time_machine_still_running`.
 - [ ] 6.7 Manually verify that failed/busy cases do not use force and show a diagnostic right-column message.
-- [ ] 6.8 Confirm the feature runs only while MalDaze is running and does not install or depend on LaunchAgent/cron behavior.
+- [x] 6.8 Confirm the feature runs only while MalDaze is running and does not install or depend on LaunchAgent/cron behavior.

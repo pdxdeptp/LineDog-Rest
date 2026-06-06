@@ -577,6 +577,165 @@ final class T7EjectServiceTests: XCTestCase {
         XCTAssertEqual(lifecycle.stopCount, 1)
     }
 
+    func testAppViewModelExposesT7UIStateAndRoutesCommandsThroughService() async throws {
+        let latest = Self.result(status: .idle, reason: .idleNotConnected)
+        let service = RecordingT7EjectUIService(
+            latestResultValue: latest,
+            isRunningValue: false,
+            isAutomaticEnabledValue: true,
+            scheduleConfigurationValue: T7EjectScheduleConfiguration(
+                startMinuteOfDay: 21 * 60,
+                endMinuteOfDay: 23 * 60,
+                retryIntervalSeconds: 20 * 60
+            ),
+            manualResult: Self.result(status: .success, reason: nil)
+        )
+        let viewModel = AppViewModel(
+            windowManager: MockWindowManager(),
+            bootstrapAutoEngine: false,
+            t7EjectService: service,
+            bootstrapT7EjectScheduler: false
+        )
+
+        XCTAssertEqual(viewModel.t7LatestResult, latest)
+        XCTAssertFalse(viewModel.isT7EjectRunning)
+        XCTAssertTrue(viewModel.isT7AutomaticEjectEnabled)
+        XCTAssertEqual(viewModel.t7ScheduleConfiguration.startMinuteOfDay, 21 * 60)
+        XCTAssertEqual(viewModel.t7ScheduleConfiguration.endMinuteOfDay, 23 * 60)
+        XCTAssertEqual(viewModel.t7ScheduleConfiguration.retryIntervalSeconds, 20 * 60)
+
+        viewModel.setT7AutomaticEjectEnabled(false)
+        XCTAssertEqual(service.setAutomaticEnabledCalls, [false])
+        XCTAssertTrue(viewModel.isT7ManualEjectAvailable)
+
+        let updated = T7EjectScheduleConfiguration(
+            startMinuteOfDay: 20 * 60 + 30,
+            endMinuteOfDay: 22 * 60 + 45,
+            retryIntervalSeconds: 30 * 60
+        )
+        viewModel.updateT7ScheduleConfiguration(updated)
+        XCTAssertEqual(service.updatedScheduleConfigurations, [updated])
+
+        let manual = await viewModel.runT7ManualEject()
+        XCTAssertEqual(manual, service.manualResult)
+        XCTAssertEqual(service.manualRunCount, 1)
+    }
+
+    func testAppViewModelT7ManualActionIsAvailableWhenAutomaticOffAndUnavailableWhileRunning() {
+        let idleService = RecordingT7EjectUIService(
+            isRunningValue: false,
+            isAutomaticEnabledValue: false
+        )
+        let idleViewModel = AppViewModel(
+            windowManager: MockWindowManager(),
+            bootstrapAutoEngine: false,
+            t7EjectService: idleService,
+            bootstrapT7EjectScheduler: false
+        )
+        XCTAssertFalse(idleViewModel.isT7AutomaticEjectEnabled)
+        XCTAssertTrue(idleViewModel.isT7ManualEjectAvailable)
+
+        let runningService = RecordingT7EjectUIService(
+            isRunningValue: true,
+            isAutomaticEnabledValue: false
+        )
+        let runningViewModel = AppViewModel(
+            windowManager: MockWindowManager(),
+            bootstrapAutoEngine: false,
+            t7EjectService: runningService,
+            bootstrapT7EjectScheduler: false
+        )
+        XCTAssertFalse(runningViewModel.isT7ManualEjectAvailable)
+    }
+
+    func testAppViewModelPublishesWhenLiveT7ServiceRunningStateChanges() async throws {
+        let (defaults, suiteName) = try makeIsolatedDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let runner = BlockingT7EjectProcessRunner()
+        let service = makeService(defaults: defaults, runner: runner)
+        let viewModel = AppViewModel(
+            windowManager: MockWindowManager(),
+            bootstrapAutoEngine: false,
+            t7EjectService: service,
+            bootstrapT7EjectScheduler: false
+        )
+        var publishCount = 0
+        let cancellable = viewModel.objectWillChange.sink {
+            publishCount += 1
+        }
+        defer { cancellable.cancel() }
+
+        let runTask = Task { @MainActor in
+            await service.runManualEject()
+        }
+        try await waitUntil { service.isRunning }
+
+        XCTAssertGreaterThan(publishCount, 0)
+
+        runner.complete(with: .init(
+            terminationStatus: 0,
+            stdout: try stdoutData(for: Self.result(status: .success, reason: nil)),
+            stderr: ""
+        ))
+        _ = await runTask.value
+    }
+
+    func testAppViewModelFormatsConciseChineseT7LatestResultDisplay() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/New_York")!
+        let endedAt = Self.date("2026-06-06 20:15")
+        let cases: [(String, T7EjectResult?, String, String?)] = [
+            ("idle before first run", nil, "尚未运行", nil),
+            ("success", Self.result(status: .success, reason: nil, endedAt: endedAt), "T7 已安全推出。", "上次运行：20:15"),
+            ("idle not connected", Self.result(status: .idle, reason: .idleNotConnected, endedAt: endedAt), "未发现已连接的 T7。", "上次运行：20:15"),
+            ("busy", Self.result(status: .failed, reason: .diskBusy, endedAt: endedAt), "T7 正在被占用，未强制推出。", "上次运行：20:15"),
+            ("dissenter", Self.result(status: .failed, reason: .diskArbitrationDissented, endedAt: endedAt), "macOS 拒绝推出 T7，未强制推出。", "上次运行：20:15"),
+            ("time machine", Self.result(status: .failed, reason: .timeMachineStillRunning, endedAt: endedAt), "Time Machine 仍在运行，未强制推出 T7。", "上次运行：20:15"),
+            ("unsafe multiple target", Self.result(status: .failed, reason: .unsafeTargetMultipleDisks, endedAt: endedAt), "T7 目标解析到多个磁盘，未强制推出。", "上次运行：20:15"),
+            ("unsafe internal target", Self.result(status: .failed, reason: .unsafeTargetInternalDisk, endedAt: endedAt), "目标看起来是内部磁盘，未强制推出。", "上次运行：20:15"),
+            ("eject failed after unmount", Self.result(status: .failed, reason: .unmountSucceededEjectFailed, endedAt: endedAt), "T7 已卸载，但未强制推出。", "上次运行：20:15"),
+            ("unexpected", Self.result(status: .failed, reason: .unexpectedError, endedAt: endedAt), "T7 推出时遇到未知错误，未强制推出。", "上次运行：20:15"),
+            ("generic failed", Self.result(status: .failed, reason: nil, endedAt: endedAt), "T7 未强制推出，请稍后重试。", "上次运行：20:15"),
+        ]
+
+        for (name, result, expectedStatus, expectedTime) in cases {
+            let display = AppViewModel.t7LatestResultDisplay(for: result, calendar: calendar)
+            XCTAssertEqual(display.statusText, expectedStatus, name)
+            XCTAssertEqual(display.runTimeText, expectedTime, name)
+            if result?.status == .failed {
+                XCTAssertTrue(display.statusText.contains("未强制推出"), name)
+            }
+        }
+    }
+
+    func testServiceScheduleUpdateClampsPersistsAndReschedulesActiveScheduler() async throws {
+        let (defaults, suiteName) = try makeIsolatedDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let clock = MutableT7EjectServiceClock(Self.date("2026-06-06 12:00"))
+        let service = makeService(
+            defaults: defaults,
+            runner: RecordingT7EjectProcessRunner(),
+            clock: clock
+        )
+        service.startScheduler()
+        XCTAssertTrue(service.isSchedulerRunningForTesting)
+
+        service.updateScheduleConfiguration(T7EjectScheduleConfiguration(
+            startMinuteOfDay: -20,
+            endMinuteOfDay: 30 * 60,
+            retryIntervalSeconds: 12
+        ))
+
+        XCTAssertTrue(service.isSchedulerRunningForTesting)
+        XCTAssertEqual(service.scheduleConfiguration.startMinuteOfDay, 0)
+        XCTAssertEqual(service.scheduleConfiguration.endMinuteOfDay, 23 * 60 + 59)
+        XCTAssertEqual(service.scheduleConfiguration.retryIntervalSeconds, 60)
+        XCTAssertEqual(defaults.integer(forKey: MalDazeDefaults.t7EjectScheduleStartMinuteOfDay), 0)
+        XCTAssertEqual(defaults.integer(forKey: MalDazeDefaults.t7EjectScheduleEndMinuteOfDay), 23 * 60 + 59)
+        XCTAssertEqual(defaults.integer(forKey: MalDazeDefaults.t7EjectRetryIntervalSeconds), 60)
+        service.cancelScheduler()
+    }
+
     func testAppViewModelQuitAppStopsT7LifecycleBeforeTerminatingInSource() throws {
         let source = try Self.productionSource(at: "MalDaze/AppViewModel.swift")
         let stopRange = try XCTUnwrap(source.range(of: "T7EjectAppLifecycleRegistry.shared.stopRegisteredService()"))
@@ -669,7 +828,8 @@ final class T7EjectServiceTests: XCTestCase {
         reason: T7EjectReason?,
         wholeDisk: String? = "disk4",
         volumes: [String] = ["Storage"],
-        remainingMountedVolumes: [String] = []
+        remainingMountedVolumes: [String] = [],
+        endedAt: Date = Date(timeIntervalSince1970: 1_780_000_001)
     ) -> T7EjectResult {
         T7EjectResult(
             status: status,
@@ -684,7 +844,7 @@ final class T7EjectServiceTests: XCTestCase {
             dissenterStatus: nil,
             dissenterMessage: nil,
             startedAt: Date(timeIntervalSince1970: 1_780_000_000),
-            endedAt: Date(timeIntervalSince1970: 1_780_000_001),
+            endedAt: endedAt,
             message: T7EjectResult.message(for: status, reason: reason)
         )
     }
@@ -778,12 +938,22 @@ private func makeSignalAwareTemporaryScript(
     let startedMarkerURL = directory.appendingPathComponent("started")
     let terminatedMarkerURL = directory.appendingPathComponent("terminated")
     try """
-    #!/bin/sh
-    trap '/bin/sleep \(terminationDelaySeconds); printf terminated > \(shellDoubleQuoted(terminatedMarkerURL.path)); exit 77' TERM INT
-    printf started > \(shellDoubleQuoted(startedMarkerURL.path))
-    while true; do
-        /bin/sleep 0.05
-    done
+    #!/usr/bin/perl
+    use strict;
+    use warnings;
+    $SIG{TERM} = sub {
+        select(undef, undef, undef, \(terminationDelaySeconds));
+        open(my $terminated, ">", \(perlDoubleQuoted(terminatedMarkerURL.path))) or die $!;
+        print $terminated "terminated";
+        close($terminated);
+        exit 77;
+    };
+    open(my $started, ">", \(perlDoubleQuoted(startedMarkerURL.path))) or die $!;
+    print $started "started";
+    close($started);
+    while (1) {
+        select(undef, undef, undef, 0.05);
+    }
     """.write(to: executableURL, atomically: true, encoding: .utf8)
     try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: executableURL.path)
 
@@ -795,12 +965,12 @@ private func makeSignalAwareTemporaryScript(
     )
 }
 
-private func shellDoubleQuoted(_ value: String) -> String {
+private func perlDoubleQuoted(_ value: String) -> String {
     var escaped = value
     escaped = escaped.replacingOccurrences(of: "\\", with: "\\\\")
     escaped = escaped.replacingOccurrences(of: "\"", with: "\\\"")
     escaped = escaped.replacingOccurrences(of: "$", with: "\\$")
-    escaped = escaped.replacingOccurrences(of: "`", with: "\\`")
+    escaped = escaped.replacingOccurrences(of: "@", with: "\\@")
     return "\"\(escaped)\""
 }
 
@@ -914,6 +1084,70 @@ private final class RecordingT7EjectServiceLifecycle: T7EjectServiceLifecycle {
 
     func stop() {
         stopCount += 1
+    }
+}
+
+@MainActor
+private final class RecordingT7EjectUIService: T7EjectServiceUIControlling {
+    private(set) var startCount = 0
+    private(set) var cancelCount = 0
+    private(set) var stopCount = 0
+    private(set) var manualRunCount = 0
+    private(set) var setAutomaticEnabledCalls: [Bool] = []
+    private(set) var updatedScheduleConfigurations: [T7EjectScheduleConfiguration] = []
+
+    var latestResultValue: T7EjectResult?
+    var isRunningValue: Bool
+    var isAutomaticEnabledValue: Bool
+    var scheduleConfigurationValue: T7EjectScheduleConfiguration
+    let manualResult: T7EjectResult
+
+    var isRunning: Bool { isRunningValue }
+    var latestResult: T7EjectResult? { latestResultValue }
+    var isAutomaticEnabled: Bool { isAutomaticEnabledValue }
+    var scheduleConfiguration: T7EjectScheduleConfiguration { scheduleConfigurationValue }
+    var isSchedulerRunningForTesting: Bool { startCount > cancelCount + stopCount }
+
+    init(
+        latestResultValue: T7EjectResult? = nil,
+        isRunningValue: Bool = false,
+        isAutomaticEnabledValue: Bool = true,
+        scheduleConfigurationValue: T7EjectScheduleConfiguration = .default,
+        manualResult: T7EjectResult = T7EjectResult.idleNotConnected()
+    ) {
+        self.latestResultValue = latestResultValue
+        self.isRunningValue = isRunningValue
+        self.isAutomaticEnabledValue = isAutomaticEnabledValue
+        self.scheduleConfigurationValue = scheduleConfigurationValue
+        self.manualResult = manualResult
+    }
+
+    func startScheduler() {
+        startCount += 1
+    }
+
+    func cancelScheduler() {
+        cancelCount += 1
+    }
+
+    func stop() {
+        stopCount += 1
+    }
+
+    func setAutomaticEnabled(_ enabled: Bool) {
+        setAutomaticEnabledCalls.append(enabled)
+        isAutomaticEnabledValue = enabled
+    }
+
+    func updateScheduleConfiguration(_ configuration: T7EjectScheduleConfiguration) {
+        updatedScheduleConfigurations.append(configuration)
+        scheduleConfigurationValue = configuration
+    }
+
+    func runManualEject() async -> T7EjectResult {
+        manualRunCount += 1
+        latestResultValue = manualResult
+        return manualResult
     }
 }
 

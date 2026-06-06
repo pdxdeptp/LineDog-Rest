@@ -185,6 +185,15 @@ protocol T7EjectServiceLifecycle: AnyObject {
 }
 
 @MainActor
+protocol T7EjectServiceUIControlling: T7EjectServiceLifecycle {
+    var scheduleConfiguration: T7EjectScheduleConfiguration { get }
+
+    func setAutomaticEnabled(_ enabled: Bool)
+    func updateScheduleConfiguration(_ configuration: T7EjectScheduleConfiguration)
+    func runManualEject() async -> T7EjectResult
+}
+
+@MainActor
 final class T7EjectAppLifecycleRegistry {
     static let shared = T7EjectAppLifecycleRegistry()
 
@@ -210,7 +219,7 @@ final class T7EjectAppLifecycleRegistry {
 }
 
 @MainActor
-final class T7EjectService: ObservableObject, T7EjectServiceLifecycle {
+final class T7EjectService: ObservableObject, T7EjectServiceUIControlling {
     typealias HelperURLResolver = () throws -> URL
 
     @Published private(set) var isRunning = false

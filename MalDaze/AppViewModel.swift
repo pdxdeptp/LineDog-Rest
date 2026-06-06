@@ -16,6 +16,11 @@ final class AppViewModel: ObservableObject {
         case breakRun   = "breakRun"
     }
 
+    struct T7LatestResultDisplay: Equatable {
+        let statusText: String
+        let runTimeText: String?
+    }
+
     @Published private(set) var mode: Mode = .auto
     @Published private(set) var statusLine: String = "自动模式：正在对齐系统时钟…"
     /// 状态栏小狗与「休息中」红态；与桌宠非休息配色同步。
@@ -75,6 +80,7 @@ final class AppViewModel: ObservableObject {
     private let hydrationReminder: HydrationReminderController
     /// T7 安全推出服务；调度生命周期绑定在 AppViewModel 内。
     let t7EjectService: any T7EjectServiceLifecycle
+    private let t7EjectUIService: (any T7EjectServiceUIControlling)?
 
     private var wasResting = false
     private var testRestActive = false
@@ -119,8 +125,10 @@ final class AppViewModel: ObservableObject {
         self.sevenMinuteReminder = sevenMinuteReminder ?? SevenMinuteReminderController()
         self.fiveMinuteCatCompanion = fiveMinuteCatCompanion ?? FiveMinuteCatCompanionController()
         self.hydrationReminder = hydrationReminder ?? HydrationReminderController()
-        self.t7EjectService = t7EjectService ?? T7EjectService.live()
-        T7EjectAppLifecycleRegistry.shared.register(self.t7EjectService)
+        let resolvedT7EjectService = t7EjectService ?? T7EjectService.live()
+        self.t7EjectService = resolvedT7EjectService
+        self.t7EjectUIService = resolvedT7EjectService as? any T7EjectServiceUIControlling
+        T7EjectAppLifecycleRegistry.shared.register(resolvedT7EjectService)
         self.isHydrationReminderEnabled = UserDefaults.standard.bool(forKey: MalDazeDefaults.hydrationReminderEnabled)
         let rawStyle = UserDefaults.standard.string(forKey: MalDazeDefaults.breakInterruptStyle) ?? ""
         self.breakInterruptStyle = BreakInterruptStyle(rawValue: rawStyle) ?? .fullscreen
@@ -211,6 +219,14 @@ final class AppViewModel: ObservableObject {
             }
             .store(in: &cancellables)
 
+        if let observableT7Service = resolvedT7EjectService as? T7EjectService {
+            observableT7Service.objectWillChange
+                .sink { [weak self] _ in
+                    self?.objectWillChange.send()
+                }
+                .store(in: &cancellables)
+        }
+
         smartReminderShortcutObserver = NotificationCenter.default.addObserver(
             forName: MalDazeBroadcastNotifications.openSmartReminderInput,
             object: nil,
@@ -273,6 +289,107 @@ final class AppViewModel: ObservableObject {
 
     private func resolvedRestDurationSecondsFromDefaults() -> TimeInterval {
         TimeInterval(Self.clampedPomodoroRestMinutes(UserDefaults.standard.integer(forKey: MalDazeDefaults.pomodoroRestDurationMinutes)) * 60)
+    }
+
+    var t7LatestResult: T7EjectResult? {
+        t7EjectService.latestResult
+    }
+
+    var isT7EjectRunning: Bool {
+        t7EjectService.isRunning
+    }
+
+    var isT7AutomaticEjectEnabled: Bool {
+        t7EjectService.isAutomaticEnabled
+    }
+
+    var t7ScheduleConfiguration: T7EjectScheduleConfiguration {
+        t7EjectUIService?.scheduleConfiguration ?? .default
+    }
+
+    var isT7ManualEjectAvailable: Bool {
+        !isT7EjectRunning
+    }
+
+    var t7LatestResultDisplay: T7LatestResultDisplay {
+        Self.t7LatestResultDisplay(for: t7LatestResult)
+    }
+
+    @discardableResult
+    func runT7ManualEject() async -> T7EjectResult {
+        guard let t7EjectUIService else {
+            let now = Date()
+            return T7EjectResult(
+                status: .failed,
+                reason: .unexpectedError,
+                action: .safeEject,
+                wholeDisk: nil,
+                apfsContainer: nil,
+                volumes: [],
+                timeMachineWasRunning: false,
+                timeMachineStopped: false,
+                remainingMountedVolumes: [],
+                dissenterStatus: nil,
+                dissenterMessage: "T7 eject service does not expose UI commands.",
+                startedAt: now,
+                endedAt: now,
+                message: T7EjectResult.message(for: .failed, reason: .unexpectedError)
+            )
+        }
+        let result = await t7EjectUIService.runManualEject()
+        objectWillChange.send()
+        return result
+    }
+
+    func setT7AutomaticEjectEnabled(_ enabled: Bool) {
+        t7EjectUIService?.setAutomaticEnabled(enabled)
+        objectWillChange.send()
+    }
+
+    func updateT7ScheduleConfiguration(_ configuration: T7EjectScheduleConfiguration) {
+        t7EjectUIService?.updateScheduleConfiguration(configuration)
+        objectWillChange.send()
+    }
+
+    static func t7LatestResultDisplay(
+        for result: T7EjectResult?,
+        calendar: Calendar = .current
+    ) -> T7LatestResultDisplay {
+        guard let result else {
+            return T7LatestResultDisplay(statusText: "尚未运行", runTimeText: nil)
+        }
+        let components = calendar.dateComponents([.hour, .minute], from: result.endedAt)
+        let hour = components.hour ?? 0
+        let minute = components.minute ?? 0
+        return T7LatestResultDisplay(
+            statusText: t7LatestResultStatusText(for: result),
+            runTimeText: String(format: "上次运行：%02d:%02d", hour, minute)
+        )
+    }
+
+    private static func t7LatestResultStatusText(for result: T7EjectResult) -> String {
+        guard result.status == .failed else {
+            return result.message
+        }
+
+        switch result.reason {
+        case .diskBusy:
+            return "T7 正在被占用，未强制推出。"
+        case .diskArbitrationDissented:
+            return "macOS 拒绝推出 T7，未强制推出。"
+        case .timeMachineStillRunning:
+            return "Time Machine 仍在运行，未强制推出 T7。"
+        case .unsafeTargetMultipleDisks:
+            return "T7 目标解析到多个磁盘，未强制推出。"
+        case .unsafeTargetInternalDisk:
+            return "目标看起来是内部磁盘，未强制推出。"
+        case .unmountSucceededEjectFailed:
+            return "T7 已卸载，但未强制推出。"
+        case .unexpectedError:
+            return "T7 推出时遇到未知错误，未强制推出。"
+        default:
+            return "T7 未强制推出，请稍后重试。"
+        }
     }
 
     deinit {

@@ -253,6 +253,7 @@ struct DashboardRootView: View {
     @State private var focusSettingsExpanded = true
     @State private var restBehaviorExpanded = false
     @State private var petAppearanceExpanded = false
+    @State private var t7SafeEjectExpanded = true
     @State private var hydrationSettingsExpanded = false
 
     init(viewModel: AppViewModel, assistantViewModel: LearningAssistantViewModel? = nil) {
@@ -756,6 +757,18 @@ struct DashboardRootView: View {
         }
     }
 
+    private var dashboardT7ManualQuickAction: some View {
+        DashboardQuickActionButton(
+            title: viewModel.isT7EjectRunning ? "正在推出 T7" : "立即安全推出",
+            subtitle: viewModel.isT7EjectRunning ? "请等待当前运行完成。" : "手动执行一次。",
+            systemImage: viewModel.isT7EjectRunning ? "externaldrive.badge.timemachine" : "externaldrive.badge.eject",
+            isDisabled: !viewModel.isT7ManualEjectAvailable
+        ) {
+            guard viewModel.isT7ManualEjectAvailable else { return }
+            Task { await viewModel.runT7ManualEject() }
+        }
+    }
+
     private var dashboardCatQuickAction: some View {
         DashboardQuickActionButton(
             title: viewModel.isFiveMinuteCatCompanionActive ? "提前关闭小猫" : "召唤小猫",
@@ -914,6 +927,8 @@ struct DashboardRootView: View {
                 }
             }
 
+            dashboardT7SafeEjectSection
+
             DashboardControlDisclosureSection(
                 title: "喝水设置",
                 systemImage: "drop.fill",
@@ -985,6 +1000,105 @@ struct DashboardRootView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
+        }
+    }
+
+    private var dashboardT7SafeEjectSection: some View {
+        let display = viewModel.t7LatestResultDisplay
+        let configuration = viewModel.t7ScheduleConfiguration
+        return DashboardControlDisclosureSection(
+            title: "T7 安全推出",
+            systemImage: "externaldrive.badge.eject",
+            isExpanded: $t7SafeEjectExpanded
+        ) {
+            VStack(alignment: .leading, spacing: 9) {
+                Toggle(isOn: Binding(
+                    get: { viewModel.isT7AutomaticEjectEnabled },
+                    set: { enabled in scheduleViewModelWork { viewModel.setT7AutomaticEjectEnabled(enabled) } }
+                )) {
+                    Text("自动推出")
+                        .font(.subheadline)
+                }
+                .toggleStyle(.switch)
+                .tint(SwitchOnTrackTint.paleBlue)
+
+                HStack(spacing: 6) {
+                    Text("开始")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    DatePicker(
+                        "",
+                        selection: Binding(
+                            get: { minutesToDate(configuration.startMinuteOfDay) },
+                            set: { updateT7Schedule(startMinuteOfDay: dateToMinutes($0)) }
+                        ),
+                        displayedComponents: .hourAndMinute
+                    )
+                    .labelsHidden()
+                    .datePickerStyle(.compact)
+                }
+                .disabled(!viewModel.isT7AutomaticEjectEnabled)
+
+                HStack(spacing: 6) {
+                    Text("结束")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    DatePicker(
+                        "",
+                        selection: Binding(
+                            get: { minutesToDate(configuration.endMinuteOfDay) },
+                            set: { updateT7Schedule(endMinuteOfDay: dateToMinutes($0)) }
+                        ),
+                        displayedComponents: .hourAndMinute
+                    )
+                    .labelsHidden()
+                    .datePickerStyle(.compact)
+                }
+                .disabled(!viewModel.isT7AutomaticEjectEnabled)
+
+                Stepper(
+                    value: Binding(
+                        get: { max(1, configuration.retryIntervalSeconds / 60) },
+                        set: { updateT7Schedule(retryIntervalSeconds: max(1, $0) * 60) }
+                    ),
+                    in: 1...180,
+                    step: 1
+                ) {
+                    Text("重试间隔：\(max(1, configuration.retryIntervalSeconds / 60)) 分钟")
+                        .font(.subheadline)
+                }
+                .disabled(!viewModel.isT7AutomaticEjectEnabled)
+
+                dashboardT7ManualQuickAction
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(display.statusText)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.primary)
+                    if let runTimeText = display.runTimeText {
+                        Text(runTimeText)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+
+    private func updateT7Schedule(
+        startMinuteOfDay: Int? = nil,
+        endMinuteOfDay: Int? = nil,
+        retryIntervalSeconds: Int? = nil
+    ) {
+        let current = viewModel.t7ScheduleConfiguration
+        let updated = T7EjectScheduleConfiguration(
+            startMinuteOfDay: startMinuteOfDay ?? current.startMinuteOfDay,
+            endMinuteOfDay: endMinuteOfDay ?? current.endMinuteOfDay,
+            retryIntervalSeconds: retryIntervalSeconds ?? current.retryIntervalSeconds
+        )
+        scheduleViewModelWork {
+            viewModel.updateT7ScheduleConfiguration(updated)
         }
     }
 
