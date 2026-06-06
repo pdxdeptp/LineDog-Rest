@@ -244,7 +244,6 @@ struct AddInitiateDraftScheduleDay: Identifiable, Equatable {
 
 struct AddInitiateTaskEditDraft: Equatable {
     let itemId: String
-    var title: String
     var minutes: Int
 }
 
@@ -270,6 +269,7 @@ struct AddInitiateInfeasibleOptionChoice: Identifiable, Equatable {
     let optionId: String
     let localizedLabel: String
     let effectDescription: String
+    let parameterDescription: String?
 
     var id: String { optionId }
 }
@@ -521,7 +521,8 @@ final class LearningAssistantViewModel: ObservableObject {
             return AddInitiateInfeasibleOptionChoice(
                 optionId: optionId,
                 localizedLabel: Self.localizedAddInitiateOptionLabel(optionId),
-                effectDescription: Self.localizedAddInitiateOptionEffect(effect)
+                effectDescription: Self.localizedAddInitiateOptionEffect(effect),
+                parameterDescription: addInitiateOptionParameterDescription(optionId: optionId)
             )
         }
     }
@@ -550,6 +551,7 @@ final class LearningAssistantViewModel: ObservableObject {
               session.draftId != nil else {
             return false
         }
+        guard addInitiateTaskEditDrafts.isEmpty else { return false }
         guard let package = session.reviewPackage else { return true }
         if let isLatest = Self.boolValue(Self.pairedValue(in: package, snake: "is_latest_version", camel: "isLatestVersion")), !isLatest {
             return false
@@ -563,6 +565,19 @@ final class LearningAssistantViewModel: ObservableObject {
             return false
         }
         return true
+    }
+
+    var addInitiateDraftActivationBlockedMessage: String? {
+        guard addInitiateFlowState == .draftReview || addInitiateFlowState == .activationFailed else { return nil }
+        if !addInitiateTaskEditDrafts.isEmpty {
+            return "请先应用或放弃估算调整，再激活草案。"
+        }
+        return canActivateAddInitiateDraft ? nil : "草案已变更，请先重新载入最新版本。"
+    }
+
+    var shouldShowDraftReviewDuringAddInitiateOptionProgress: Bool {
+        guard addInitiateFlowState == .optionEffectProgress else { return false }
+        return addInitiateSession?.reviewState == .draftReview || addInitiateSession?.reviewState == .activationFailed
     }
 
     // MARK: - Private
@@ -1395,6 +1410,10 @@ final class LearningAssistantViewModel: ObservableObject {
             addInitiateError = "缺少可调整的 Add / Initiate 草案。"
             return
         }
+        if let validationMessage = addInitiateOptionParameterValidationMessage(optionId: optionId) {
+            addInitiateError = validationMessage
+            return
+        }
 
         let operationGeneration = addInitiateFlowGeneration
         addInitiateOptionRequestSequence += 1
@@ -1427,6 +1446,9 @@ final class LearningAssistantViewModel: ObservableObject {
                 return
             }
             reconcileAddInitiateTaskEditDrafts(previous: addInitiateSession, next: response)
+            if optionId == "edit_estimates" {
+                addInitiateTaskEditDrafts = [:]
+            }
             addInitiateSession = response
             addInitiateError = response.error
             addInitiateLocalFlowState = nil
@@ -1452,7 +1474,7 @@ final class LearningAssistantViewModel: ObservableObject {
             return
         }
         guard canActivateAddInitiateDraft else {
-            addInitiateError = "草案已变更，请先重新载入最新版本。"
+            addInitiateError = addInitiateDraftActivationBlockedMessage ?? "草案已变更，请先重新载入最新版本。"
             return
         }
 
@@ -1523,35 +1545,8 @@ final class LearningAssistantViewModel: ObservableObject {
         addInitiateLocalFlowState = .anchorReview
     }
 
-    func beginAddInitiateTaskEdit(_ item: AddInitiateDraftScheduleItem) {
-        if addInitiateTaskEditDrafts[item.id] == nil {
-            addInitiateTaskEditDrafts[item.id] = AddInitiateTaskEditDraft(
-                itemId: item.id,
-                title: item.title,
-                minutes: item.minutes
-            )
-        }
-    }
-
-    func addInitiateTaskEditTitle(for item: AddInitiateDraftScheduleItem) -> String {
-        addInitiateTaskEditDrafts[item.id]?.title ?? item.title
-    }
-
     func addInitiateTaskEditMinutes(for item: AddInitiateDraftScheduleItem) -> Int {
         addInitiateTaskEditDrafts[item.id]?.minutes ?? item.minutes
-    }
-
-    func updateAddInitiateTaskEditTitle(itemId: String, title: String) {
-        guard var draft = addInitiateTaskEditDrafts[itemId] else {
-            addInitiateTaskEditDrafts[itemId] = AddInitiateTaskEditDraft(
-                itemId: itemId,
-                title: title,
-                minutes: 0
-            )
-            return
-        }
-        draft.title = title
-        addInitiateTaskEditDrafts[itemId] = draft
     }
 
     func updateAddInitiateTaskEditMinutes(itemId: String, minutes: Int) {
@@ -1559,13 +1554,16 @@ final class LearningAssistantViewModel: ObservableObject {
         guard var draft = addInitiateTaskEditDrafts[itemId] else {
             addInitiateTaskEditDrafts[itemId] = AddInitiateTaskEditDraft(
                 itemId: itemId,
-                title: "",
                 minutes: clampedMinutes
             )
             return
         }
         draft.minutes = clampedMinutes
         addInitiateTaskEditDrafts[itemId] = draft
+    }
+
+    func canApplyAddInitiateOption(_ optionId: String) -> Bool {
+        addInitiateOptionParameterValidationMessage(optionId: optionId) == nil
     }
 
     private func buildAddInitiateOptionParameters(optionId: String) -> [String: AnyCodable]? {
@@ -1611,6 +1609,59 @@ final class LearningAssistantViewModel: ObservableObject {
                 (draft.itemId, draft.minutes)
             })
         parameters["estimate_edits"] = AnyCodable(edits)
+    }
+
+    private func addInitiateOptionParameterDescription(optionId: String) -> String? {
+        switch optionId {
+        case "lower_depth":
+            let depth = AddInitiateTargetDepthChoice.normalizedToken(for: addInitiateTargetDepth)
+            guard !depth.isEmpty,
+                  !AddInitiateTargetDepthChoice.label(for: depth).isEmpty else { return nil }
+            return "目标深度：\(Self.localizedAddInitiateTargetDepthLabel(depth))"
+        case "increase_capacity":
+            guard addInitiateCapacityMinutes > 0 else { return nil }
+            return "每日容量：\(addInitiateCapacityMinutes) 分钟"
+        case "extend_deadline":
+            let deadline = addInitiateDeadline.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !deadline.isEmpty else { return nil }
+            return "目标截止：\(deadline)"
+        case "edit_estimates":
+            let count = addInitiateTaskEditDrafts.count
+            return count > 0 ? "估算调整：\(count) 项" : "估算调整：请先在单项编辑中修改分钟数"
+        case "rebalance":
+            return "负载形态：均衡"
+        default:
+            return nil
+        }
+    }
+
+    private func addInitiateOptionParameterValidationMessage(optionId: String) -> String? {
+        switch optionId {
+        case "extend_deadline":
+            let deadline = addInitiateDeadline.trimmingCharacters(in: .whitespacesAndNewlines)
+            if deadline.isEmpty {
+                return "请先填写要应用的目标截止日期。"
+            }
+            if !Self.isValidAddInitiateDeadline(deadline) {
+                return "截止日期格式需为 YYYY-MM-DD，例如 2026-07-01。"
+            }
+        case "increase_capacity":
+            if addInitiateCapacityMinutes <= 0 {
+                return "请先填写要应用的每日容量。"
+            }
+        case "lower_depth":
+            let depth = AddInitiateTargetDepthChoice.normalizedToken(for: addInitiateTargetDepth)
+            if depth.isEmpty || AddInitiateTargetDepthChoice.label(for: depth).isEmpty {
+                return "请选择要应用的目标深度。"
+            }
+        case "edit_estimates":
+            if addInitiateTaskEditDrafts.isEmpty {
+                return "请先在单项编辑中调整估算分钟数。"
+            }
+        default:
+            break
+        }
+        return nil
     }
 
     private func addInitiateFocusedQuestionId() -> String? {

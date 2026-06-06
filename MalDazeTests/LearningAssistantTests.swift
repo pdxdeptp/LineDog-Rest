@@ -2971,13 +2971,66 @@ final class LearningAssistantUISourceTests: XCTestCase {
         XCTAssertTrue(addSource.contains("ForEach(summary.fullScheduleDays"))
         XCTAssertTrue(addSource.contains("ForEach(day.items"))
         XCTAssertTrue(addSource.contains("editableTaskRow"))
-        XCTAssertTrue(addSource.contains("TextField(\"任务标题\""))
         XCTAssertTrue(addSource.contains("Stepper(value: addInitiateTaskEditMinutesBinding"))
-        XCTAssertTrue(addSource.contains("vm.beginAddInitiateTaskEdit(item)"))
+        XCTAssertTrue(addSource.contains("applyAddInitiateOptionEffect(optionId: \"edit_estimates\")"))
         XCTAssertFalse(addSource.contains("disabledEditRow"))
         XCTAssertFalse(addSource.contains(".disabled(true)"))
         XCTAssertFalse(addSource.contains("共 \\(summary.fullScheduleDayCount) 天，默认只展示首周摘要。"))
         XCTAssertFalse(addSource.contains("可编辑项 \\(summary.editableTaskCount) 个，编辑后需重新审阅。"))
+    }
+
+    func testAddInitiateDraftReviewDoesNotPresentTaskTitleAsSavedEditAndAppliesEstimateEdits() throws {
+        let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
+        guard let start = source.range(of: "private func editableTaskRow"),
+              let end = source[start.upperBound...].range(of: "private var activationFailedCard") else {
+            XCTFail("editableTaskRow source section not found")
+            return
+        }
+        let editSource = String(source[start.lowerBound..<end.lowerBound])
+
+        XCTAssertFalse(editSource.contains("TextField(\"任务标题\""))
+        XCTAssertFalse(editSource.contains("addInitiateTaskEditTitleBinding"))
+        XCTAssertTrue(editSource.contains("Stepper(value: addInitiateTaskEditMinutesBinding"))
+        XCTAssertTrue(editSource.contains("applyAddInitiateOptionEffect(optionId: \"edit_estimates\")"))
+        XCTAssertFalse(editSource.contains("记录本地编辑草稿，激活前不会创建主动任务"))
+    }
+
+    func testAddInitiateEstimateEditControlsDisableWhileApplyingOption() throws {
+        let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
+        guard let draftStart = source.range(of: "private func draftReviewCard"),
+              let draftEnd = source[draftStart.upperBound...].range(of: "private func editableTaskRow"),
+              let rowStart = source.range(of: "private func editableTaskRow"),
+              let rowEnd = source[rowStart.upperBound...].range(of: "private func addInitiateTaskEditMinutesBinding") else {
+            XCTFail("draftReviewCard/editableTaskRow source sections not found")
+            return
+        }
+        let draftSource = String(source[draftStart.lowerBound..<draftEnd.lowerBound])
+        let rowSource = String(source[rowStart.lowerBound..<rowEnd.lowerBound])
+
+        XCTAssertTrue(draftSource.contains("editableTaskRow(item, isApplyingOption: isApplyingOption)"))
+        XCTAssertTrue(rowSource.contains("private func editableTaskRow(_ item: AddInitiateDraftScheduleItem, isApplyingOption: Bool)"))
+        XCTAssertTrue(rowSource.contains(".disabled(isApplyingOption)"))
+        XCTAssertTrue(rowSource.contains(".disabled(isApplyingOption || !vm.addInitiateTaskEditDrafts.keys.contains(item.id))"))
+    }
+
+    func testAddInitiateInfeasibleOptionsSurfaceVisibleParameterConfirmations() throws {
+        let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
+        let viewModelSource = try sourceFile("MalDaze/LearningAssistant/LearningAssistantViewModel.swift")
+        guard let start = source.range(of: "private var infeasibleReviewCard"),
+              let end = source[start.upperBound...].range(of: "private func draftReviewCard") else {
+            XCTFail("infeasibleReviewCard source section not found")
+            return
+        }
+        let infeasibleSource = String(source[start.lowerBound..<end.lowerBound])
+
+        XCTAssertTrue(viewModelSource.contains("parameterDescription"))
+        XCTAssertTrue(infeasibleSource.contains("option.parameterDescription"))
+        XCTAssertTrue(infeasibleSource.contains("vm.canApplyAddInitiateOption(option.optionId)"))
+        XCTAssertTrue(viewModelSource.contains("new_deadline"))
+        XCTAssertTrue(viewModelSource.contains("new_daily_capacity_min"))
+        XCTAssertTrue(viewModelSource.contains("requested_depth"))
+        XCTAssertTrue(viewModelSource.contains("load_shape"))
+        XCTAssertTrue(viewModelSource.contains("estimate_edits"))
     }
 
     func testAddInitiateInfeasibleAndActivationUISourceUsesCanonicalOptionsRetryEditCancel() throws {
@@ -3000,7 +3053,24 @@ final class LearningAssistantUISourceTests: XCTestCase {
         XCTAssertTrue(addSource.contains("取消"))
         XCTAssertTrue(addSource.contains("case .optionEffectProgress"))
         XCTAssertTrue(addSource.contains("infeasibleReviewCard(isApplyingOption: true)"))
-        XCTAssertFalse(addSource.contains("draftReviewCard(isApplyingOption: true)"))
+        XCTAssertTrue(addSource.contains("draftReviewCard(isApplyingOption: true)"))
+        XCTAssertTrue(addSource.contains("vm.shouldShowDraftReviewDuringAddInitiateOptionProgress"))
+    }
+
+    func testAddInitiateDraftReviewOptionProgressUsesDraftReviewCopyNotInfeasibleCopy() throws {
+        let source = try sourceFile("MalDaze/LearningAssistant/AssistantPanelView.swift")
+        guard let start = source.range(of: "case .optionEffectProgress:"),
+              let end = source[start.upperBound...].range(of: "case .activationFailed:") else {
+            XCTFail("optionEffectProgress source section not found")
+            return
+        }
+        let progressSource = String(source[start.lowerBound..<end.lowerBound])
+
+        XCTAssertTrue(progressSource.contains("vm.shouldShowDraftReviewDuringAddInitiateOptionProgress"))
+        XCTAssertTrue(progressSource.contains("draftReviewCard(isApplyingOption: true)"))
+        XCTAssertTrue(progressSource.contains("infeasibleReviewCard(isApplyingOption: true)"))
+        XCTAssertTrue(progressSource.contains("正在更新草案"))
+        XCTAssertTrue(progressSource.contains("正在应用选项"))
     }
 
     func testAddInitiateProgressAndTerminalUISourceDoesNotPresentCreatedTaskWording() throws {
@@ -4234,6 +4304,116 @@ final class LearningAssistantViewModelTests: XCTestCase {
         ])
     }
 
+    func testInfeasibleOptionChoicesExposeConcreteParameterDescriptions() async {
+        let package: [String: AnyCodable] = [
+            "deadline_type": AnyCodable("soft"),
+            "risk_report": AnyCodable([
+                "canonical_infeasibility_option_ids": [
+                    "extend_deadline",
+                    "increase_capacity",
+                    "lower_depth",
+                    "rebalance",
+                    "edit_estimates"
+                ]
+            ]),
+            "infeasibility_options": AnyCodable([
+                ["id": "extend_deadline", "effect_type": "review_recompute"],
+                ["id": "increase_capacity", "effect_type": "review_recompute"],
+                ["id": "lower_depth", "effect_type": "compiler_recompute_required"],
+                ["id": "rebalance", "effect_type": "review_recompute"],
+                ["id": "edit_estimates", "effect_type": "review_recompute"]
+            ])
+        ]
+        let mock = MockAssistantAPIClient()
+        mock.addInitiateStartResult = sampleAddInitiateRoleReviewSession()
+        mock.addInitiateRoleResult = sampleAddInitiateAnchorReviewSession()
+        mock.addInitiateAnchorResult = sampleAddInitiateInfeasibleReviewSession(reviewPackage: package)
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+
+        await vm.startAddInitiateSession(rawInput: "Parameterized infeasible options", sourceType: .textGoal)
+        await vm.confirmAddInitiateRole(title: "Parameterized infeasible options", confirmedRole: .newPlan)
+        vm.addInitiateDeadline = "2026-07-15"
+        vm.addInitiateCapacityMinutes = 90
+        vm.addInitiateTargetOutput = "parameterized plan"
+        vm.addInitiateTargetDepth = "project"
+        await vm.confirmAddInitiateAnchors()
+        vm.updateAddInitiateTaskEditMinutes(itemId: "task-1", minutes: 35)
+
+        let descriptions = Dictionary(uniqueKeysWithValues: vm.addInitiateInfeasibleOptionChoices.map {
+            ($0.optionId, $0.parameterDescription)
+        })
+        XCTAssertEqual(descriptions["extend_deadline"] ?? nil, "目标截止：2026-07-15")
+        XCTAssertEqual(descriptions["increase_capacity"] ?? nil, "每日容量：90 分钟")
+        XCTAssertEqual(descriptions["lower_depth"] ?? nil, "目标深度：项目作品")
+        XCTAssertEqual(descriptions["rebalance"] ?? nil, "负载形态：均衡")
+        XCTAssertEqual(descriptions["edit_estimates"] ?? nil, "估算调整：1 项")
+    }
+
+    func testRequiredOptionParametersAreBlockedBeforeCallingAPIWhenMissing() async {
+        let requiredOptionsPackage: [String: AnyCodable] = [
+            "deadline_type": AnyCodable("soft"),
+            "risk_report": AnyCodable([
+                "canonical_infeasibility_option_ids": [
+                    "extend_deadline",
+                    "increase_capacity",
+                    "lower_depth",
+                    "edit_estimates"
+                ]
+            ]),
+            "infeasibility_options": AnyCodable([
+                ["id": "extend_deadline", "effect_type": "review_recompute"],
+                ["id": "increase_capacity", "effect_type": "review_recompute"],
+                ["id": "lower_depth", "effect_type": "compiler_recompute_required"],
+                ["id": "edit_estimates", "effect_type": "review_recompute"]
+            ])
+        ]
+
+        let cases: [(String, (LearningAssistantViewModel) -> Void, String)] = [
+            ("extend_deadline", { vm in
+                vm.addInitiateDeadline = "   "
+                vm.addInitiateCapacityMinutes = 60
+                vm.addInitiateTargetDepth = "apply"
+            }, "请先填写要应用的目标截止日期。"),
+            ("increase_capacity", { vm in
+                vm.addInitiateDeadline = "2026-07-15"
+                vm.addInitiateCapacityMinutes = 0
+                vm.addInitiateTargetDepth = "apply"
+            }, "请先填写要应用的每日容量。"),
+            ("lower_depth", { vm in
+                vm.addInitiateDeadline = "2026-07-15"
+                vm.addInitiateCapacityMinutes = 60
+                vm.addInitiateTargetDepth = "not_a_depth"
+            }, "请选择要应用的目标深度。"),
+            ("edit_estimates", { vm in
+                vm.addInitiateDeadline = "2026-07-15"
+                vm.addInitiateCapacityMinutes = 60
+                vm.addInitiateTargetDepth = "apply"
+            }, "请先在单项编辑中调整估算分钟数。")
+        ]
+
+        for (optionId, configure, expectedError) in cases {
+            let mock = MockAssistantAPIClient()
+            mock.addInitiateStartResult = sampleAddInitiateRoleReviewSession()
+            mock.addInitiateRoleResult = sampleAddInitiateAnchorReviewSession()
+            mock.addInitiateAnchorResult = sampleAddInitiateInfeasibleReviewSession(reviewPackage: requiredOptionsPackage)
+            let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+
+            await vm.startAddInitiateSession(rawInput: "Missing \(optionId)", sourceType: .textGoal)
+            await vm.confirmAddInitiateRole(title: "Missing \(optionId)", confirmedRole: .newPlan)
+            vm.addInitiateDeadline = "2026-07-15"
+            vm.addInitiateCapacityMinutes = 60
+            vm.addInitiateTargetOutput = "missing parameter"
+            vm.addInitiateTargetDepth = "apply"
+            await vm.confirmAddInitiateAnchors()
+            configure(vm)
+
+            await vm.applyAddInitiateOptionEffect(optionId: optionId)
+            XCTAssertEqual(mock.applyAddInitiateOptionEffectCallCount, 0, optionId)
+            XCTAssertEqual(vm.addInitiateError, expectedError, optionId)
+            XCTAssertEqual(vm.addInitiateFlowState, .infeasibleReview, optionId)
+        }
+    }
+
     func testDraftReviewPerTaskEditDraftRecordsLocallyWithoutActiveRefresh() async throws {
         let mock = MockAssistantAPIClient()
         mock.addInitiateStartResult = sampleAddInitiateRoleReviewSession()
@@ -4251,16 +4431,40 @@ final class LearningAssistantViewModelTests: XCTestCase {
         await vm.confirmAddInitiateAnchors()
 
         let item = try XCTUnwrap(vm.addInitiateDraftReviewSummary?.fullScheduleDays.first?.items.first)
-        vm.beginAddInitiateTaskEdit(item)
-        vm.updateAddInitiateTaskEditTitle(itemId: item.id, title: "Edited task title")
         vm.updateAddInitiateTaskEditMinutes(itemId: item.id, minutes: 35)
 
-        XCTAssertEqual(vm.addInitiateTaskEditDrafts[item.id]?.title, "Edited task title")
         XCTAssertEqual(vm.addInitiateTaskEditDrafts[item.id]?.minutes, 35)
+        XCTAssertFalse(vm.canActivateAddInitiateDraft)
         XCTAssertEqual(vm.addInitiateFlowState, .draftReview)
         XCTAssertEqual(mock.fetchStudyTodayViewCallCount, 0)
         XCTAssertEqual(mock.fetchStudyProjectOverviewCallCount, 0)
         XCTAssertEqual(mock.fetchStudyCalendarLoadCallCount, 0)
+    }
+
+    func testPendingEstimateEditsBlockActivationWithEstimateSpecificGuidance() async throws {
+        let mock = MockAssistantAPIClient()
+        mock.addInitiateStartResult = sampleAddInitiateRoleReviewSession()
+        mock.addInitiateRoleResult = sampleAddInitiateAnchorReviewSession()
+        mock.addInitiateAnchorResult = sampleAddInitiateDraftReviewSession(
+            reviewPackage: sampleAddInitiateDraftReviewPackage(dayCount: 1)
+        )
+        let vm = LearningAssistantViewModel(api: mock, autoLoadWhenReady: false)
+
+        await vm.startAddInitiateSession(rawInput: "Estimate-specific guidance", sourceType: .textGoal)
+        await vm.confirmAddInitiateRole(title: "Estimate-specific guidance", confirmedRole: .newPlan)
+        vm.addInitiateDeadline = "2026-07-15"
+        vm.addInitiateTargetOutput = "estimate-specific plan"
+        vm.addInitiateTargetDepth = "apply"
+        await vm.confirmAddInitiateAnchors()
+
+        let item = try XCTUnwrap(vm.addInitiateDraftReviewSummary?.fullScheduleDays.first?.items.first)
+        vm.updateAddInitiateTaskEditMinutes(itemId: item.id, minutes: 35)
+
+        XCTAssertFalse(vm.canActivateAddInitiateDraft)
+        await vm.activateAddInitiateDraft()
+        XCTAssertEqual(mock.activateAddInitiateDraftCallCount, 0)
+        XCTAssertEqual(vm.addInitiateError, "请先应用或放弃估算调整，再激活草案。")
+        XCTAssertNotEqual(vm.addInitiateError, "草案已变更，请先重新载入最新版本。")
     }
 
     func testOptionEffectAcceptsNewReviewStorageAndFocusedNeedsInputResults() async {
@@ -4374,8 +4578,6 @@ final class LearningAssistantViewModelTests: XCTestCase {
         XCTAssertNil(mock.lastAddInitiateOptionRequest?.parameters)
 
         let item = try XCTUnwrap(vm.addInitiateDraftReviewSummary?.fullScheduleDays.first?.items.first)
-        vm.beginAddInitiateTaskEdit(item)
-        vm.updateAddInitiateTaskEditTitle(itemId: item.id, title: "Edited task")
         vm.updateAddInitiateTaskEditMinutes(itemId: item.id, minutes: 35)
         await vm.applyAddInitiateOptionEffect(optionId: "edit_estimates")
         XCTAssertEqual(mock.lastAddInitiateOptionRequest?.parameters?.keys.sorted(), ["estimate_edits"])
@@ -4576,15 +4778,13 @@ final class LearningAssistantViewModelTests: XCTestCase {
         await vm.confirmAddInitiateAnchors()
 
         let item = try XCTUnwrap(vm.addInitiateDraftReviewSummary?.fullScheduleDays.first?.items.first)
-        vm.beginAddInitiateTaskEdit(item)
-        vm.updateAddInitiateTaskEditTitle(itemId: item.id, title: "Stale local title")
+        vm.updateAddInitiateTaskEditMinutes(itemId: item.id, minutes: 35)
         XCTAssertFalse(vm.addInitiateTaskEditDrafts.isEmpty)
 
         await vm.applyAddInitiateOptionEffect(optionId: "reduce_scope")
 
         XCTAssertEqual(vm.addInitiateSession?.draftVersion, 3)
         XCTAssertTrue(vm.addInitiateTaskEditDrafts.isEmpty)
-        XCTAssertEqual(vm.addInitiateTaskEditTitle(for: item), item.title)
     }
 
     func testAnchorReconfirmationNewDraftClearsLocalTaskEditDraftsForReusedTaskId() async throws {
@@ -4603,8 +4803,7 @@ final class LearningAssistantViewModelTests: XCTestCase {
         await vm.confirmAddInitiateAnchors()
 
         let item = try XCTUnwrap(vm.addInitiateDraftReviewSummary?.fullScheduleDays.first?.items.first)
-        vm.beginAddInitiateTaskEdit(item)
-        vm.updateAddInitiateTaskEditTitle(itemId: item.id, title: "Stale anchor title")
+        vm.updateAddInitiateTaskEditMinutes(itemId: item.id, minutes: 35)
         XCTAssertFalse(vm.addInitiateTaskEditDrafts.isEmpty)
 
         mock.addInitiateAnchorResult = sampleAddInitiateDraftReviewSession(draftVersion: 3, reviewPackage: package)
@@ -4613,7 +4812,6 @@ final class LearningAssistantViewModelTests: XCTestCase {
 
         XCTAssertEqual(vm.addInitiateSession?.draftVersion, 3)
         XCTAssertTrue(vm.addInitiateTaskEditDrafts.isEmpty)
-        XCTAssertEqual(vm.addInitiateTaskEditTitle(for: item), item.title)
     }
 
     // MARK: 1.4 / 3.2-3.6 首页 dashboard 状态层

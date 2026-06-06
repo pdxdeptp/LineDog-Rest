@@ -1138,9 +1138,16 @@ private struct AddInitiateView: View {
         case .draftReview:
             draftReviewCard(isApplyingOption: false)
         case .optionEffectProgress:
-            VStack(alignment: .leading, spacing: 10) {
-                progressRow("正在应用选项")
-                infeasibleReviewCard(isApplyingOption: true)
+            if vm.shouldShowDraftReviewDuringAddInitiateOptionProgress {
+                VStack(alignment: .leading, spacing: 10) {
+                    progressRow("正在更新草案")
+                    draftReviewCard(isApplyingOption: true)
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 10) {
+                    progressRow("正在应用选项")
+                    infeasibleReviewCard(isApplyingOption: true)
+                }
             }
         case .activationFailed:
             activationFailedCard
@@ -1273,15 +1280,22 @@ private struct AddInitiateView: View {
                     Button {
                         Task { await vm.applyAddInitiateOptionEffect(optionId: option.optionId) }
                     } label: {
-                        HStack {
-                            Text(option.localizedLabel)
-                            Spacer(minLength: 8)
-                            Text(option.effectDescription)
-                                .foregroundStyle(.secondary)
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack {
+                                Text(option.localizedLabel)
+                                Spacer(minLength: 8)
+                                Text(option.effectDescription)
+                                    .foregroundStyle(.secondary)
+                            }
+                            if let parameterDescription = option.parameterDescription {
+                                Text(parameterDescription)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
                     .buttonStyle(.bordered)
-                    .disabled(isApplyingOption)
+                    .disabled(isApplyingOption || !vm.canApplyAddInitiateOption(option.optionId))
                     .accessibilityIdentifier("addInitiateOption_\(option.optionId)")
                 }
             }
@@ -1403,7 +1417,7 @@ private struct AddInitiateView: View {
                 DisclosureGroup("单项编辑") {
                     ForEach(summary.fullScheduleDays) { day in
                         ForEach(day.items) { item in
-                            editableTaskRow(item)
+                            editableTaskRow(item, isApplyingOption: isApplyingOption)
                         }
                     }
                 }
@@ -1439,8 +1453,8 @@ private struct AddInitiateView: View {
                 .disabled(isApplyingOption)
             }
 
-            if !vm.canActivateAddInitiateDraft {
-                Text("草案已变更，请先重新载入最新版本。")
+            if let blockedMessage = vm.addInitiateDraftActivationBlockedMessage {
+                Text(blockedMessage)
                     .font(.caption)
                     .foregroundStyle(.orange)
             }
@@ -1450,31 +1464,23 @@ private struct AddInitiateView: View {
         .background(Color(.controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
     }
 
-    private func editableTaskRow(_ item: AddInitiateDraftScheduleItem) -> some View {
+    private func editableTaskRow(_ item: AddInitiateDraftScheduleItem, isApplyingOption: Bool) -> some View {
         HStack(spacing: 8) {
-            TextField("任务标题", text: addInitiateTaskEditTitleBinding(for: item))
-                .textFieldStyle(.roundedBorder)
             Stepper(value: addInitiateTaskEditMinutesBinding(for: item), in: 5...600, step: 5) {
                 Text("\(vm.addInitiateTaskEditMinutes(for: item)) 分钟")
                     .font(.caption.monospacedDigit())
             }
+            .disabled(isApplyingOption)
             Button {
-                vm.beginAddInitiateTaskEdit(item)
+                Task { await vm.applyAddInitiateOptionEffect(optionId: "edit_estimates") }
             } label: {
-                Label("记录编辑", systemImage: "pencil")
+                Label("更新估算", systemImage: "pencil")
             }
             .labelStyle(.iconOnly)
             .buttonStyle(.borderless)
-            .help("记录本地编辑草稿，激活前不会创建主动任务")
+            .disabled(isApplyingOption || !vm.addInitiateTaskEditDrafts.keys.contains(item.id))
+            .help("应用估算调整并重新审阅草案")
         }
-        .onAppear { vm.beginAddInitiateTaskEdit(item) }
-    }
-
-    private func addInitiateTaskEditTitleBinding(for item: AddInitiateDraftScheduleItem) -> Binding<String> {
-        Binding(
-            get: { vm.addInitiateTaskEditTitle(for: item) },
-            set: { vm.updateAddInitiateTaskEditTitle(itemId: item.id, title: $0) }
-        )
     }
 
     private func addInitiateTaskEditMinutesBinding(for item: AddInitiateDraftScheduleItem) -> Binding<Int> {
@@ -1515,8 +1521,8 @@ private struct AddInitiateView: View {
                 }
                 .buttonStyle(.bordered)
             }
-            if !vm.canActivateAddInitiateDraft {
-                Text("草案已变更，请先重新载入最新版本。")
+            if let blockedMessage = vm.addInitiateDraftActivationBlockedMessage {
+                Text(blockedMessage)
                     .font(.caption)
                     .foregroundStyle(.orange)
             }
