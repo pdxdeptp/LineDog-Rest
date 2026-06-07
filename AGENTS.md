@@ -3,6 +3,7 @@
 This is the compact project contract. Full workflow detail lives in `docs/agent-workflow.md`.
 
 ## Always
+- Cross-repo Hermes coupling (canonical, maintain here only): `docs/integrations/hermes.md`. Hermes side is pointer-only: `~/.hermes/docs/integrations/maldaze.md`.
 - Output in Chinese; reason in English unless code or technical terms require English.
 - Protect user work: never reset, revert, overwrite, merge, or rebase user changes without explicit permission.
 - Before invoking any Superpowers skill, announce: `触发 skill: <skill-name>`.
