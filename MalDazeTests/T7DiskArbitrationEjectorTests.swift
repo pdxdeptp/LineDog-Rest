@@ -62,6 +62,51 @@ final class T7DiskArbitrationEjectorTests: XCTestCase {
         XCTAssertEqual(result.message, "T7 已卸载但推出失败。")
     }
 
+    func testUnsupportedDiskArbitrationEjectFallsBackToNonForceDiskUtilEject() async {
+        let operation = FakeDiskArbitrationOperation(
+            unmountResult: .success,
+            ejectResult: .dissented(T7DiskArbitrationDissenter(status: 49168, message: nil)),
+            remainingMountedVolumes: []
+        )
+        let diskUtilFallback = FakeDiskUtilEjectFallback(result: .success)
+        let ejector = T7DiskArbitrationEjector(
+            operation: operation,
+            diskUtilFallback: diskUtilFallback,
+            clock: TestClock()
+        )
+
+        let result = await ejector.eject(Self.request())
+
+        XCTAssertEqual(operation.events, [.unmountWholeDisk("disk4"), .ejectWholeDisk("disk4")])
+        XCTAssertEqual(diskUtilFallback.events, [.ejectWholeDisk("disk4")])
+        XCTAssertEqual(result.status, .success)
+        XCTAssertNil(result.reason)
+        XCTAssertEqual(result.remainingMountedVolumes, [])
+        XCTAssertNil(result.dissenterStatus)
+        XCTAssertNil(result.dissenterMessage)
+    }
+
+    func testDiskUtilFallbackSuccessStillFailsWhenTargetVolumesRemainMounted() async {
+        let operation = FakeDiskArbitrationOperation(
+            unmountResult: .success,
+            ejectResult: .dissented(T7DiskArbitrationDissenter(status: 49168, message: nil)),
+            remainingMountedVolumes: ["Storage"]
+        )
+        let diskUtilFallback = FakeDiskUtilEjectFallback(result: .success)
+        let ejector = T7DiskArbitrationEjector(
+            operation: operation,
+            diskUtilFallback: diskUtilFallback,
+            clock: TestClock()
+        )
+
+        let result = await ejector.eject(Self.request())
+
+        XCTAssertEqual(diskUtilFallback.events, [.ejectWholeDisk("disk4")])
+        XCTAssertEqual(result.status, .failed)
+        XCTAssertEqual(result.reason, .unmountSucceededEjectFailed)
+        XCTAssertEqual(result.remainingMountedVolumes, ["Storage"])
+    }
+
     func testRemainingMountedVolumeEvidenceIsReportedAfterFailure() async {
         let operation = FakeDiskArbitrationOperation(
             unmountResult: .dissented(T7DiskArbitrationDissenter(status: 49155, message: "Volume still in use")),
@@ -176,6 +221,17 @@ final class T7DiskArbitrationEjectorTests: XCTestCase {
         }
     }
 
+    func testDiskUtilFallbackTimeoutWaitsForProcessTerminationBeforeReportingFailure() throws {
+        let source = try Self.productionSource(at: "MalDaze/T7Eject/T7DiskArbitrationEjector.swift")
+        let timeoutStart = try XCTUnwrap(source.range(of: "func terminateAfterTimeout"))
+        let finishStart = try XCTUnwrap(source[timeoutStart.lowerBound...].range(of: "\n    func finish("))
+        let timeoutBody = source[timeoutStart.lowerBound..<finishStart.lowerBound]
+
+        XCTAssertTrue(timeoutBody.contains("process.terminate()"))
+        XCTAssertFalse(timeoutBody.contains("finish(.dissented"))
+        XCTAssertTrue(source.contains("finishAfterTimeoutTermination("))
+    }
+
     private static func request(
         mountedVolumeNames: [String] = ["Storage", "T7 Shield"]
     ) -> T7DiskArbitrationEjectRequest {
@@ -238,6 +294,24 @@ private final class FakeDiskArbitrationOperation: T7DiskArbitrationOperating {
 private struct TestClock: T7DiskArbitrationClock {
     func now() -> Date {
         Date(timeIntervalSince1970: 1_780_000_000)
+    }
+}
+
+private final class FakeDiskUtilEjectFallback: T7DiskUtilEjectFallbacking {
+    enum Event: Equatable {
+        case ejectWholeDisk(String)
+    }
+
+    private let result: T7DiskArbitrationOperationResult
+    private(set) var events: [Event] = []
+
+    init(result: T7DiskArbitrationOperationResult) {
+        self.result = result
+    }
+
+    func ejectWholeDisk(_ wholeDiskIdentifier: String) async -> T7DiskArbitrationOperationResult {
+        events.append(.ejectWholeDisk(wholeDiskIdentifier))
+        return result
     }
 }
 

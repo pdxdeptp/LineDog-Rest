@@ -49,15 +49,24 @@ protocol T7DiskArbitrationOperating {
     ) async -> [String]
 }
 
+protocol T7DiskUtilEjectFallbacking: AnyObject {
+    func ejectWholeDisk(_ wholeDiskIdentifier: String) async -> T7DiskArbitrationOperationResult
+}
+
 struct T7DiskArbitrationEjector {
+    private static let diskArbitrationUnsupportedEjectStatus = 49_168
+
     private let operation: any T7DiskArbitrationOperating
+    private let diskUtilFallback: any T7DiskUtilEjectFallbacking
     private let clock: any T7DiskArbitrationClock
 
     init(
         operation: any T7DiskArbitrationOperating = T7DiskArbitrationSessionOperation(),
+        diskUtilFallback: any T7DiskUtilEjectFallbacking = T7DiskUtilEjectFallback(),
         clock: any T7DiskArbitrationClock = T7SystemDiskArbitrationClock()
     ) {
         self.operation = operation
+        self.diskUtilFallback = diskUtilFallback
         self.clock = clock
     }
 
@@ -105,6 +114,25 @@ struct T7DiskArbitrationEjector {
                 startedAt: startedAt
             )
         case .dissented(let dissenter):
+            if shouldUseDiskUtilFallback(after: dissenter) {
+                let fallbackResult = await diskUtilFallback.ejectWholeDisk(request.wholeDiskIdentifier)
+                let fallbackRemaining = await operation.remainingMountedVolumes(
+                    named: request.mountedVolumeNames,
+                    onWholeDisk: request.wholeDiskIdentifier
+                )
+
+                if case .success = fallbackResult, fallbackRemaining.isEmpty {
+                    return result(
+                        status: .success,
+                        reason: nil,
+                        request: request,
+                        remainingMountedVolumes: fallbackRemaining,
+                        dissenter: nil,
+                        startedAt: startedAt
+                    )
+                }
+            }
+
             return result(
                 status: .failed,
                 reason: .unmountSucceededEjectFailed,
@@ -114,6 +142,10 @@ struct T7DiskArbitrationEjector {
                 startedAt: startedAt
             )
         }
+    }
+
+    private func shouldUseDiskUtilFallback(after dissenter: T7DiskArbitrationDissenter) -> Bool {
+        dissenter.status == Self.diskArbitrationUnsupportedEjectStatus
     }
 
     private func result(
@@ -153,6 +185,156 @@ struct T7DiskArbitrationEjector {
         }
 
         return .diskArbitrationDissented
+    }
+}
+
+final class T7DiskUtilEjectFallback: T7DiskUtilEjectFallbacking {
+    private let timeout: TimeInterval
+
+    init(timeout: TimeInterval = 60) {
+        self.timeout = timeout
+    }
+
+    func ejectWholeDisk(_ wholeDiskIdentifier: String) async -> T7DiskArbitrationOperationResult {
+        await withCheckedContinuation { continuation in
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/sbin/diskutil")
+            process.arguments = ["eject", Self.bsdName(from: wholeDiskIdentifier)]
+
+            let outputPipe = Pipe()
+            let errorPipe = Pipe()
+            process.standardOutput = outputPipe
+            process.standardError = errorPipe
+
+            let box = T7DiskUtilEjectProcessBox(
+                process: process,
+                outputPipe: outputPipe,
+                errorPipe: errorPipe,
+                continuation: continuation
+            )
+
+            process.terminationHandler = { _ in
+                box.finishFromProcessTermination()
+            }
+
+            do {
+                try process.run()
+            } catch {
+                box.finish(.dissented(T7DiskArbitrationDissenter(
+                    status: Int(kDAReturnError),
+                    message: "diskutil eject could not start: \(error)"
+                )))
+                return
+            }
+
+            let timeout = timeout
+            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + timeout) {
+                box.terminateAfterTimeout(timeout)
+            }
+        }
+    }
+
+    private static func bsdName(from identifier: String) -> String {
+        if identifier.hasPrefix("/dev/") {
+            return String(identifier.dropFirst("/dev/".count))
+        }
+        return identifier
+    }
+}
+
+private final class T7DiskUtilEjectProcessBox: @unchecked Sendable {
+    private let process: Process
+    private let outputPipe: Pipe
+    private let errorPipe: Pipe
+    private let continuation: CheckedContinuation<T7DiskArbitrationOperationResult, Never>
+    private let lock = NSLock()
+    private var hasFinished = false
+    private var pendingTimeout: TimeInterval?
+
+    init(
+        process: Process,
+        outputPipe: Pipe,
+        errorPipe: Pipe,
+        continuation: CheckedContinuation<T7DiskArbitrationOperationResult, Never>
+    ) {
+        self.process = process
+        self.outputPipe = outputPipe
+        self.errorPipe = errorPipe
+        self.continuation = continuation
+    }
+
+    func finishFromProcessTermination() {
+        let status = process.terminationStatus
+        let stdout = Self.string(from: outputPipe)
+        let stderr = Self.string(from: errorPipe)
+
+        if let timeout = takePendingTimeout() {
+            finishAfterTimeoutTermination(timeout, status: status, stderr: stderr)
+            return
+        }
+
+        if status == 0 {
+            finish(.success)
+        } else {
+            let details = [stderr, stdout]
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+                .joined(separator: " ")
+            finish(.dissented(T7DiskArbitrationDissenter(
+                status: Int(status),
+                message: details.isEmpty ? "diskutil eject failed with status \(status)." : details
+            )))
+        }
+    }
+
+    func terminateAfterTimeout(_ timeout: TimeInterval) {
+        lock.lock()
+        let shouldTerminate = !hasFinished
+        if shouldTerminate {
+            pendingTimeout = timeout
+        }
+        lock.unlock()
+
+        guard shouldTerminate else {
+            return
+        }
+
+        if process.isRunning {
+            process.terminate()
+        }
+    }
+
+    func finish(_ result: T7DiskArbitrationOperationResult) {
+        lock.lock()
+        guard !hasFinished else {
+            lock.unlock()
+            return
+        }
+        hasFinished = true
+        lock.unlock()
+
+        continuation.resume(returning: result)
+    }
+
+    private func takePendingTimeout() -> TimeInterval? {
+        lock.lock()
+        let timeout = pendingTimeout
+        pendingTimeout = nil
+        lock.unlock()
+        return timeout
+    }
+
+    private func finishAfterTimeoutTermination(_ timeout: TimeInterval, status: Int32, stderr: String) {
+        let trimmedStderr = stderr.trimmingCharacters(in: .whitespacesAndNewlines)
+        let suffix = trimmedStderr.isEmpty ? "" : " \(trimmedStderr)"
+        finish(.dissented(T7DiskArbitrationDissenter(
+            status: Int(kDAReturnBusy),
+            message: "diskutil eject timed out after \(String(format: "%.3f", timeout)) seconds; terminated with status \(status).\(suffix)"
+        )))
+    }
+
+    private static func string(from pipe: Pipe) -> String {
+        String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
     }
 }
 

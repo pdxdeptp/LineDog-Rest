@@ -14,7 +14,7 @@ disk4 physical external USB, media "PSSD T7 Shield"
 
 This topology matters because APFS volume `ParentWholeDisk` can point at the virtual APFS container (`disk5`) rather than the physical eject target (`disk4`). The helper must resolve the physical external whole disk before ejecting, while still using the target volumes as the identity anchor.
 
-Apple's Disk Arbitration API provides the non-GUI equivalent path: create a session, resolve disk objects, unmount all volumes through a whole-disk unmount, then eject the whole disk. Time Machine adds a separate coordination step: when `tmutil status` reports `Running = 1`, the helper should call `tmutil stopbackup`, wait until the backup is not running, then allow a short stability period for backupd, Spotlight, Finder, and filesystem flushes.
+Apple's Disk Arbitration API provides the primary non-GUI path: create a session, resolve disk objects, unmount all volumes through a whole-disk unmount, then eject the whole disk. On Samsung T7 Shield media that reports as fixed USB media, direct `DADiskEject` can return a lower-level `0xc010` refusal while Finder can still eject through macOS's DiskManagement path. For that specific post-unmount refusal, the helper may fall back to non-force `diskutil eject <wholeDisk>`; it still must not use Finder automation or force. Time Machine adds a separate coordination step: when `tmutil status` reports `Running = 1`, the helper should call `tmutil stopbackup`, wait until the backup is not running, then allow a short stability period for backupd, Spotlight, Finder, and filesystem flushes.
 
 ## Goals / Non-Goals
 
@@ -84,7 +84,7 @@ target volume disk(s)
   -> physical external whole disk for eject
 ```
 
-The Disk Arbitration operation should unmount all volumes associated with the target physical disk and then eject that physical whole disk. The result JSON should include both the physical `wholeDisk` and, when known, the `apfsContainer`.
+The Disk Arbitration operation should unmount all volumes associated with the target physical disk and then eject that physical whole disk. If the Disk Arbitration eject step returns the observed fixed-media refusal after unmount has succeeded, the helper may issue one non-force `diskutil eject` fallback against the same physical whole disk. The result JSON should include both the physical `wholeDisk` and, when known, the `apfsContainer`.
 
 Rationale: Finder's result is physical-disk safety, not merely detaching an APFS container. The observed T7 topology makes a naive `DADiskCopyWholeDisk` result potentially ambiguous if it returns the APFS virtual whole disk.
 

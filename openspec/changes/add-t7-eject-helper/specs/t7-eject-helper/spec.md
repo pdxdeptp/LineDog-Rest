@@ -84,6 +84,13 @@ The helper SHALL use Disk Arbitration for the core unmount/eject path.
 - **AND** include dissenter details when available
 - **AND** report remaining mounted target volumes
 
+#### Scenario: Disk Arbitration eject hits fixed-media refusal
+- **WHEN** whole-disk unmount succeeds
+- **AND** Disk Arbitration eject returns the observed fixed-media refusal code
+- **THEN** the helper MAY call non-force `diskutil eject` for the same resolved physical whole disk
+- **AND** SHALL return `success` only if that fallback succeeds and no target volumes remain mounted
+- **AND** SHALL NOT call Finder, System Events, AppleScript Finder eject, or force eject
+
 #### Scenario: Already unmounted
 - **WHEN** the target physical disk is present but target volumes are already unmounted
 - **THEN** the helper SHALL return `idle_already_unmounted`
