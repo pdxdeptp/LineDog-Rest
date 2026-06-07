@@ -155,9 +155,15 @@ The app SHALL schedule automatic T7 eject attempts while MalDaze is running.
 - **THEN** the app SHALL try at the configured retry interval
 - **AND** use default values of 20:00 start, 23:45 end, and 15 minutes retry interval unless the user has changed them
 
-#### Scenario: Success stops retries for the day
+#### Scenario: Cross-midnight nightly window
+- **WHEN** the configured end time is earlier than the start time
+- **THEN** the app SHALL treat the configured window as crossing midnight
+- **AND** keep retry eligibility across the calendar-day boundary while local time remains inside that window
+
+#### Scenario: Success stops retries for the nightly window
 - **WHEN** a scheduled run returns `success` or `idle_already_unmounted`
-- **THEN** the app SHALL stop additional scheduled attempts for that local day
+- **THEN** the app SHALL stop additional scheduled attempts for that nightly window
+- **AND** after-midnight times in a cross-midnight window SHALL belong to the window that started on the previous local day
 
 #### Scenario: Not connected does not stop retries
 - **WHEN** a scheduled run returns `idle_not_connected`

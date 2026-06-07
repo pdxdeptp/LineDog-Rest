@@ -38,7 +38,7 @@ struct T7EjectScheduleConfiguration: Equatable {
         let clampedStart = min(max(startMinuteOfDay, 0), 23 * 60 + 59)
         let clampedEnd = min(max(endMinuteOfDay, 0), 23 * 60 + 59)
         self.startMinuteOfDay = clampedStart
-        self.endMinuteOfDay = max(clampedEnd, clampedStart)
+        self.endMinuteOfDay = clampedEnd
         self.retryIntervalSeconds = max(retryIntervalSeconds, 60)
     }
 
@@ -82,7 +82,7 @@ struct T7EjectSchedulePolicy {
         guard isInsideWindow(now) else {
             return false
         }
-        guard completedDayToken != dayToken(for: now) else {
+        guard completedDayToken != windowToken(for: now) else {
             return false
         }
         guard retryDelayRemaining(now: now, lastAttemptDate: lastAttemptDate) == nil else {
@@ -96,8 +96,8 @@ struct T7EjectSchedulePolicy {
         completedDayToken: String?,
         lastAttemptDate: Date?
     ) -> TimeInterval {
-        if completedDayToken == dayToken(for: date) {
-            return delayUntilWindowStart(after: date, forceTomorrow: true)
+        if completedDayToken == windowToken(for: date) {
+            return delayUntilWindowStart(after: date)
         }
         guard isInsideWindow(date) else {
             return delayUntilWindowStart(after: date)
@@ -106,8 +106,8 @@ struct T7EjectSchedulePolicy {
             return 0
         }
         let retryDate = date.addingTimeInterval(retryDelay)
-        guard dayToken(for: retryDate) == dayToken(for: date), isInsideWindow(retryDate) else {
-            return delayUntilWindowStart(after: date, forceTomorrow: true)
+        guard isInsideWindow(retryDate), windowToken(for: retryDate) == windowToken(for: date) else {
+            return delayUntilWindowStart(after: date)
         }
         return retryDelay
     }
@@ -116,7 +116,7 @@ struct T7EjectSchedulePolicy {
         guard result.status == .success || result.reason == .idleAlreadyUnmounted else {
             return nil
         }
-        return dayToken(for: now)
+        return windowToken(for: now)
     }
 
     func dayToken(for date: Date) -> String {
@@ -129,6 +129,9 @@ struct T7EjectSchedulePolicy {
 
     private func isInsideWindow(_ date: Date) -> Bool {
         let minute = localMinuteOfDay(for: date)
+        if isCrossMidnightWindow {
+            return minute >= configuration.startMinuteOfDay || minute <= configuration.endMinuteOfDay
+        }
         return minute >= configuration.startMinuteOfDay && minute <= configuration.endMinuteOfDay
     }
 
@@ -147,14 +150,27 @@ struct T7EjectSchedulePolicy {
         return retryInterval - elapsed
     }
 
-    private func delayUntilWindowStart(after date: Date, forceTomorrow: Bool = false) -> TimeInterval {
+    private func delayUntilWindowStart(after date: Date) -> TimeInterval {
         let todayStart = windowStart(onSameLocalDayAs: date)
-        if !forceTomorrow, date < todayStart {
+        if date < todayStart {
             return max(0, todayStart.timeIntervalSince(date))
         }
         let tomorrow = calendar.date(byAdding: .day, value: 1, to: date)
             ?? date.addingTimeInterval(24 * 60 * 60)
         return max(0, windowStart(onSameLocalDayAs: tomorrow).timeIntervalSince(date))
+    }
+
+    private var isCrossMidnightWindow: Bool {
+        configuration.endMinuteOfDay < configuration.startMinuteOfDay
+    }
+
+    private func windowToken(for date: Date) -> String {
+        guard isCrossMidnightWindow, localMinuteOfDay(for: date) <= configuration.endMinuteOfDay else {
+            return dayToken(for: date)
+        }
+        let previousDay = calendar.date(byAdding: .day, value: -1, to: date)
+            ?? date.addingTimeInterval(-24 * 60 * 60)
+        return dayToken(for: previousDay)
     }
 
     private func windowStart(onSameLocalDayAs date: Date) -> Date {

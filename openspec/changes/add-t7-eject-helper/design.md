@@ -113,11 +113,12 @@ Alternative considered: skip Time Machine and let Disk Arbitration fail if busy.
 - default start: 20:00;
 - default end: 23:45;
 - default retry interval: 15 minutes;
-- once a run returns `success` or `idle_already_unmounted`, no further scheduled attempts run that local day;
+- if the configured end time is earlier than the start time, the window crosses midnight, for example 20:00 to 02:00;
+- once a run returns `success` or `idle_already_unmounted`, no further scheduled attempts run in that nightly window;
 - `idle_not_connected` is logged but does not count as success, so a later reconnect in the same window can still be caught;
 - manual runs are allowed outside the window and share the same no-force helper path.
 
-The scheduling, last-success day, and in-flight state live in the app process. App termination stops future attempts and should not install, update, or depend on any LaunchAgent.
+The scheduling, last-completed nightly window token, and in-flight state live in the app process. For a cross-midnight window, after-midnight times belong to the window that started on the previous local day. App termination stops future attempts and should not install, update, or depend on any LaunchAgent.
 
 Rationale: the user wants this tied to the desk pet and closed with the desk pet. App-bound scheduling also avoids silently managing disks after the user quits MalDaze.
 

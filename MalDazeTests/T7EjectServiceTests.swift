@@ -390,14 +390,14 @@ final class T7EjectServiceTests: XCTestCase {
         XCTAssertEqual(runner.requestedExecutableURLs.count, 3)
     }
 
-    func testScheduleConfigurationNormalizesCrossMidnightWindowToSameDaySlot() async throws {
+    func testScheduleConfigurationAllowsCrossMidnightWindowAndSuppressesOnlyThatNight() async throws {
         let configuration = T7EjectScheduleConfiguration(
             startMinuteOfDay: 23 * 60,
             endMinuteOfDay: 1 * 60,
             retryIntervalSeconds: 15 * 60
         )
         XCTAssertEqual(configuration.startMinuteOfDay, 23 * 60)
-        XCTAssertEqual(configuration.endMinuteOfDay, 23 * 60)
+        XCTAssertEqual(configuration.endMinuteOfDay, 1 * 60)
 
         let (defaults, suiteName) = try makeIsolatedDefaults()
         defer { defaults.removePersistentDomain(forName: suiteName) }
@@ -408,18 +408,67 @@ final class T7EjectServiceTests: XCTestCase {
                 stdout: try stdoutData(for: Self.result(status: .success, reason: nil)),
                 stderr: ""
             )),
+            .success(.init(
+                terminationStatus: 0,
+                stdout: try stdoutData(for: Self.result(status: .success, reason: nil)),
+                stderr: ""
+            )),
         ])
         let service = makeService(defaults: defaults, runner: runner, clock: clock)
         service.updateScheduleConfiguration(configuration)
 
         let afterMidnight = await service.runScheduledEjectIfEligibleForTesting()
-        XCTAssertNil(afterMidnight)
-        XCTAssertEqual(runner.requestedExecutableURLs.count, 0)
+        XCTAssertEqual(afterMidnight?.status, .success)
+        XCTAssertEqual(runner.requestedExecutableURLs.count, 1)
+
+        clock.now = Self.date("2026-06-07 00:45")
+        let sameNightSuppressed = await service.runScheduledEjectIfEligibleForTesting()
+        XCTAssertNil(sameNightSuppressed)
+        XCTAssertEqual(runner.requestedExecutableURLs.count, 1)
 
         clock.now = Self.date("2026-06-07 23:00")
-        let sameDaySlot = await service.runScheduledEjectIfEligibleForTesting()
-        XCTAssertEqual(sameDaySlot?.status, .success)
+        let nextNight = await service.runScheduledEjectIfEligibleForTesting()
+        XCTAssertEqual(nextNight?.status, .success)
+        XCTAssertEqual(runner.requestedExecutableURLs.count, 2)
+    }
+
+    func testCrossMidnightWindowKeepsRetryEligibilityAcrossCalendarDayBoundary() async throws {
+        let configuration = T7EjectScheduleConfiguration(
+            startMinuteOfDay: 23 * 60,
+            endMinuteOfDay: 1 * 60,
+            retryIntervalSeconds: 15 * 60
+        )
+        let (defaults, suiteName) = try makeIsolatedDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let clock = MutableT7EjectServiceClock(Self.date("2026-06-06 23:50"))
+        let runner = RecordingT7EjectProcessRunner(outputs: [
+            .success(.init(
+                terminationStatus: 0,
+                stdout: try stdoutData(for: Self.result(status: .idle, reason: .idleNotConnected)),
+                stderr: ""
+            )),
+            .success(.init(
+                terminationStatus: 0,
+                stdout: try stdoutData(for: Self.result(status: .success, reason: nil)),
+                stderr: ""
+            )),
+        ])
+        let service = makeService(defaults: defaults, runner: runner, clock: clock)
+        service.updateScheduleConfiguration(configuration)
+
+        let beforeMidnight = await service.runScheduledEjectIfEligibleForTesting()
+        XCTAssertEqual(beforeMidnight?.reason, .idleNotConnected)
         XCTAssertEqual(runner.requestedExecutableURLs.count, 1)
+
+        clock.now = Self.date("2026-06-07 00:05")
+        let afterMidnightRetry = await service.runScheduledEjectIfEligibleForTesting()
+        XCTAssertEqual(afterMidnightRetry?.status, .success)
+        XCTAssertEqual(runner.requestedExecutableURLs.count, 2)
+
+        clock.now = Self.date("2026-06-07 01:01")
+        let afterWindow = await service.runScheduledEjectIfEligibleForTesting()
+        XCTAssertNil(afterWindow)
+        XCTAssertEqual(runner.requestedExecutableURLs.count, 2)
     }
 
     func testSchedulerSuppressesRestOfLocalDayAfterSuccessOrAlreadyUnmountedButRetriesNextDay() async throws {
