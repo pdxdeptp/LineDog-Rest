@@ -28,6 +28,29 @@
 		A213 /* MalDazeBroadcastNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = B213 /* MalDazeBroadcastNotifications.swift */; };
 		A214 /* FiveMinuteCatCompanionController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B214 /* FiveMinuteCatCompanionController.swift */; };
 		A23C /* HydrationReminderController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B23C /* HydrationReminderController.swift */; };
+		A27D /* SleepScheduleContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = B27D /* SleepScheduleContract.swift */; };
+		A27E /* SleepReminderPlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = B27E /* SleepReminderPlan.swift */; };
+		A27F /* SleepReminderController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B27F /* SleepReminderController.swift */; };
+		A280 /* SleepScheduleFileWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = B280 /* SleepScheduleFileWatcher.swift */; };
+		A281 /* SleepReminderScheduleSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = B281 /* SleepReminderScheduleSnapshot.swift */; };
+		A282 /* SleepReminderSchedulingPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = B282 /* SleepReminderSchedulingPolicy.swift */; };
+		A283 /* SleepReminderFiredStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B283 /* SleepReminderFiredStore.swift */; };
+		A284 /* SleepReminderReconciler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B284 /* SleepReminderReconciler.swift */; };
+		A31E /* SleepScheduleContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31E /* SleepScheduleContractTests.swift */; };
+		A31G /* SleepReminderClamshellTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31G /* SleepReminderClamshellTests.swift */; };
+		A31I /* SevenMinuteReminderCompletionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31I /* SevenMinuteReminderCompletionTests.swift */; };
+		A285 /* InterventionRequestContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = B285 /* InterventionRequestContract.swift */; };
+		A286 /* InterventionRequestAckStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B286 /* InterventionRequestAckStore.swift */; };
+		A287 /* InterventionRequestFileWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = B287 /* InterventionRequestFileWatcher.swift */; };
+		A288 /* InterventionRequestController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B288 /* InterventionRequestController.swift */; };
+		A290 /* HermesScheduleModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B290 /* HermesScheduleModels.swift */; };
+		A291 /* HermesScheduleCLI.swift in Sources */ = {isa = PBXBuildFile; fileRef = B291 /* HermesScheduleCLI.swift */; };
+		A292 /* LearningDeskPanelViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B292 /* LearningDeskPanelViewModel.swift */; };
+		A293 /* LearningDeskPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B293 /* LearningDeskPanelView.swift */; };
+		A294 /* LearningTaskRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B294 /* LearningTaskRow.swift */; };
+		A295 /* LearningMovePreviewSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B295 /* LearningMovePreviewSheet.swift */; };
+		A31F /* InterventionRequestContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31F /* InterventionRequestContractTests.swift */; };
+		A31J /* HermesScheduleModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31J /* HermesScheduleModelsTests.swift */; };
 		A215 /* ReminderDisplayItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = B215 /* ReminderDisplayItem.swift */; };
 		A216 /* RemindersCalendarDescriptor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B216 /* RemindersCalendarDescriptor.swift */; };
 		A217 /* RemindersSelectedListPreference.swift in Sources */ = {isa = PBXBuildFile; fileRef = B217 /* RemindersSelectedListPreference.swift */; };
@@ -133,6 +156,29 @@
 		B213 /* MalDazeBroadcastNotifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MalDazeBroadcastNotifications.swift; sourceTree = "<group>"; };
 		B214 /* FiveMinuteCatCompanionController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FiveMinuteCatCompanionController.swift; sourceTree = "<group>"; };
 		B23C /* HydrationReminderController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HydrationReminderController.swift; sourceTree = "<group>"; };
+		B27D /* SleepScheduleContract.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepScheduleContract.swift; sourceTree = "<group>"; };
+		B27E /* SleepReminderPlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepReminderPlan.swift; sourceTree = "<group>"; };
+		B27F /* SleepReminderController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepReminderController.swift; sourceTree = "<group>"; };
+		B280 /* SleepScheduleFileWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepScheduleFileWatcher.swift; sourceTree = "<group>"; };
+		B281 /* SleepReminderScheduleSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepReminderScheduleSnapshot.swift; sourceTree = "<group>"; };
+		B282 /* SleepReminderSchedulingPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepReminderSchedulingPolicy.swift; sourceTree = "<group>"; };
+		B283 /* SleepReminderFiredStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepReminderFiredStore.swift; sourceTree = "<group>"; };
+		B284 /* SleepReminderReconciler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepReminderReconciler.swift; sourceTree = "<group>"; };
+		B31E /* SleepScheduleContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepScheduleContractTests.swift; sourceTree = "<group>"; };
+		B31G /* SleepReminderClamshellTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepReminderClamshellTests.swift; sourceTree = "<group>"; };
+		B31I /* SevenMinuteReminderCompletionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SevenMinuteReminderCompletionTests.swift; sourceTree = "<group>"; };
+		B285 /* InterventionRequestContract.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InterventionRequestContract.swift; sourceTree = "<group>"; };
+		B286 /* InterventionRequestAckStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InterventionRequestAckStore.swift; sourceTree = "<group>"; };
+		B287 /* InterventionRequestFileWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InterventionRequestFileWatcher.swift; sourceTree = "<group>"; };
+		B288 /* InterventionRequestController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InterventionRequestController.swift; sourceTree = "<group>"; };
+		B290 /* HermesScheduleModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HermesScheduleModels.swift; sourceTree = "<group>"; };
+		B291 /* HermesScheduleCLI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HermesScheduleCLI.swift; sourceTree = "<group>"; };
+		B292 /* LearningDeskPanelViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningDeskPanelViewModel.swift; sourceTree = "<group>"; };
+		B293 /* LearningDeskPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningDeskPanelView.swift; sourceTree = "<group>"; };
+		B294 /* LearningTaskRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningTaskRow.swift; sourceTree = "<group>"; };
+		B295 /* LearningMovePreviewSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningMovePreviewSheet.swift; sourceTree = "<group>"; };
+		B31F /* InterventionRequestContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InterventionRequestContractTests.swift; sourceTree = "<group>"; };
+		B31J /* HermesScheduleModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HermesScheduleModelsTests.swift; sourceTree = "<group>"; };
 		B215 /* ReminderDisplayItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderDisplayItem.swift; sourceTree = "<group>"; };
 		B216 /* RemindersCalendarDescriptor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemindersCalendarDescriptor.swift; sourceTree = "<group>"; };
 		B217 /* RemindersSelectedListPreference.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemindersSelectedListPreference.swift; sourceTree = "<group>"; };
@@ -265,6 +311,9 @@
 				E207 /* SevenMinuteReminder */,
 				E208 /* FiveMinuteCat */,
 				E20C /* HydrationReminder */,
+				E20D /* SleepReminder */,
+				E210 /* InterventionRequest */,
+				E211 /* LearningDeskPanel */,
 				E209 /* Reminders */,
 				E20A /* SmartReminder */,
 				E20E /* T7Eject */,
@@ -342,6 +391,11 @@
 					B316 /* T7DiskArbitrationEjectorTests.swift */,
 					B317 /* T7EjectHelperRunnerTests.swift */,
 					B318 /* T7EjectServiceTests.swift */,
+					B31E /* SleepScheduleContractTests.swift */,
+					B31G /* SleepReminderClamshellTests.swift */,
+					B31I /* SevenMinuteReminderCompletionTests.swift */,
+					B31F /* InterventionRequestContractTests.swift */,
+					B31J /* HermesScheduleModelsTests.swift */,
 				);
 				path = MalDazeTests;
 				sourceTree = "<group>";
@@ -368,6 +422,45 @@
 				B23C /* HydrationReminderController.swift */,
 			);
 			path = HydrationReminder;
+			sourceTree = "<group>";
+		};
+		E20D /* SleepReminder */ = {
+			isa = PBXGroup;
+			children = (
+				B27D /* SleepScheduleContract.swift */,
+				B27E /* SleepReminderPlan.swift */,
+				B27F /* SleepReminderController.swift */,
+				B280 /* SleepScheduleFileWatcher.swift */,
+				B281 /* SleepReminderScheduleSnapshot.swift */,
+				B282 /* SleepReminderSchedulingPolicy.swift */,
+				B283 /* SleepReminderFiredStore.swift */,
+				B284 /* SleepReminderReconciler.swift */,
+			);
+			path = SleepReminder;
+			sourceTree = "<group>";
+		};
+		E210 /* InterventionRequest */ = {
+			isa = PBXGroup;
+			children = (
+				B285 /* InterventionRequestContract.swift */,
+				B286 /* InterventionRequestAckStore.swift */,
+				B287 /* InterventionRequestFileWatcher.swift */,
+				B288 /* InterventionRequestController.swift */,
+			);
+			path = InterventionRequest;
+			sourceTree = "<group>";
+		};
+		E211 /* LearningDeskPanel */ = {
+			isa = PBXGroup;
+			children = (
+				B290 /* HermesScheduleModels.swift */,
+				B291 /* HermesScheduleCLI.swift */,
+				B292 /* LearningDeskPanelViewModel.swift */,
+				B293 /* LearningDeskPanelView.swift */,
+				B294 /* LearningTaskRow.swift */,
+				B295 /* LearningMovePreviewSheet.swift */,
+			);
+			path = LearningDeskPanel;
 			sourceTree = "<group>";
 		};
 		E209 /* Reminders */ = {
@@ -568,6 +661,24 @@
 				A213 /* MalDazeBroadcastNotifications.swift in Sources */,
 				A214 /* FiveMinuteCatCompanionController.swift in Sources */,
 				A23C /* HydrationReminderController.swift in Sources */,
+				A27D /* SleepScheduleContract.swift in Sources */,
+				A27E /* SleepReminderPlan.swift in Sources */,
+				A27F /* SleepReminderController.swift in Sources */,
+				A280 /* SleepScheduleFileWatcher.swift in Sources */,
+				A281 /* SleepReminderScheduleSnapshot.swift in Sources */,
+				A282 /* SleepReminderSchedulingPolicy.swift in Sources */,
+				A283 /* SleepReminderFiredStore.swift in Sources */,
+				A284 /* SleepReminderReconciler.swift in Sources */,
+				A285 /* InterventionRequestContract.swift in Sources */,
+				A286 /* InterventionRequestAckStore.swift in Sources */,
+				A287 /* InterventionRequestFileWatcher.swift in Sources */,
+				A288 /* InterventionRequestController.swift in Sources */,
+				A290 /* HermesScheduleModels.swift in Sources */,
+				A291 /* HermesScheduleCLI.swift in Sources */,
+				A292 /* LearningDeskPanelViewModel.swift in Sources */,
+				A293 /* LearningDeskPanelView.swift in Sources */,
+				A294 /* LearningTaskRow.swift in Sources */,
+				A295 /* LearningMovePreviewSheet.swift in Sources */,
 				A215 /* ReminderDisplayItem.swift in Sources */,
 				A216 /* RemindersCalendarDescriptor.swift in Sources */,
 				A217 /* RemindersSelectedListPreference.swift in Sources */,
@@ -642,6 +753,11 @@
 					A316 /* T7DiskArbitrationEjectorTests.swift in Sources */,
 					A317 /* T7EjectHelperRunnerTests.swift in Sources */,
 					A318 /* T7EjectServiceTests.swift in Sources */,
+					A31E /* SleepScheduleContractTests.swift in Sources */,
+					A31G /* SleepReminderClamshellTests.swift in Sources */,
+					A31I /* SevenMinuteReminderCompletionTests.swift in Sources */,
+					A31F /* InterventionRequestContractTests.swift in Sources */,
+					A31J /* HermesScheduleModelsTests.swift in Sources */,
 				);
 				runOnlyForDeploymentPostprocessing = 0;
 			};

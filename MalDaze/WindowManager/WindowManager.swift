@@ -58,10 +58,10 @@ struct BreakRunShieldScreenResolver {
     }
 }
 
-/// 跑屏模式固定在屏幕左下角的倒计时视图；点击 20 次可提前结束休息。
+/// 跑屏模式固定在屏幕左下角的倒计时视图；点击 10 次可提前结束休息。
 private final class BreakRunCountdownView: NSView {
     let label = NSTextField(labelWithString: "5:00")
-    var onTwentyClicks: (() -> Void)?
+    var onTenClicks: (() -> Void)?
     private var clickCount = 0
     private var lastClickAt: TimeInterval = 0
 
@@ -95,9 +95,9 @@ private final class BreakRunCountdownView: NSView {
         if event.timestamp - lastClickAt > 3.0 { clickCount = 0 }
         lastClickAt = event.timestamp
         clickCount += 1
-        if clickCount >= 20 {
+        if clickCount >= 10 {
             clickCount = 0
-            onTwentyClicks?()
+            onTenClicks?()
         }
     }
 }
@@ -792,7 +792,7 @@ final class WindowManager: WindowManaging {
         panel.ignoresMouseEvents = false
 
         let cv = BreakRunCountdownView(frame: NSRect(origin: .zero, size: panelSize))
-        cv.onTwentyClicks = { [weak self] in
+        cv.onTenClicks = { [weak self] in
             Task { @MainActor [weak self] in
                 self?.deskMenuViewModel?.endRestEarlyFromDeskPet()
             }

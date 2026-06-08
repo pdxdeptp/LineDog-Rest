@@ -98,7 +98,7 @@ enum MalDazeDefaults {
     static let resetIdlePetShortcutModifiers = "MalDaze.resetIdlePetShortcut.modifiers"
     static let resetIdlePetShortcutKeyLabel = "MalDaze.resetIdlePetShortcut.keyLabel"
 
-    /// 休息霸屏期间连续单击桌宠 20 下可提前结束休息（默认开）。
+    /// 休息霸屏期间连续单击桌宠 10 下可提前结束休息（默认开）。
     static let restDoubleClickEndsRest = "MalDaze.restDoubleClickEndsRest"
 
     /// 喝水提醒开关（默认关）。
@@ -122,6 +122,23 @@ enum MalDazeDefaults {
     static let t7EjectRetryIntervalSeconds = "MalDaze.t7Eject.retryIntervalSeconds"
     /// 本地日期 token；当天成功或已卸载后，自动调度不再重复。
     static let t7EjectLastCompletedDay = "MalDaze.t7Eject.lastCompletedDay"
+
+    /// 睡眠提醒总开关（默认开）；依赖 Hermes `sleep_schedule.json`。
+    static let sleepScheduleEnabled = "MalDaze.sleepSchedule.enabled"
+
+    static func resolvedSleepScheduleEnabled(from defaults: UserDefaults = .standard) -> Bool {
+        defaults.object(forKey: sleepScheduleEnabled) == nil
+            ? true
+            : defaults.bool(forKey: sleepScheduleEnabled)
+    }
+    static let sleepScheduleRemindersEnabled = "MalDaze.sleepSchedule.remindersEnabled"
+    static let sleepScheduleLockScreenEnabled = "MalDaze.sleepSchedule.lockScreenEnabled"
+    static let sleepScheduleDismissOnClamshell = "MalDaze.sleepSchedule.dismissOnClamshell"
+    static let sleepScheduleShowerReminderEnabled = "MalDaze.sleepSchedule.showerReminderEnabled"
+    /// 已触发睡眠事件所属 Hermes `updatedAt`。
+    static let sleepScheduleFiredContractUpdatedAt = "MalDaze.sleepSchedule.firedContractUpdatedAt"
+    /// 已触发睡眠事件 stable id 列表（同契约内防重响）。
+    static let sleepScheduleFiredEventIDs = "MalDaze.sleepSchedule.firedEventIDs"
 
     /// 休息打断风格："fullscreen"（默认霸屏）或 "breakRun"（跑屏漫游）。
     static let breakInterruptStyle = "MalDaze.breakInterruptStyle"

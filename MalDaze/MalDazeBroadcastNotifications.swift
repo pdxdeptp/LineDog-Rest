@@ -17,6 +17,8 @@ enum MalDazeBroadcastNotifications {
     static let idlePetIconSidePointsChanged = Notification.Name("com.maldaze.idlePetIconSidePointsChanged")
     /// 桌宠动画强度（滑杆）提交后投递；运行中的 `AppViewModel` 同步到 `PetRenderer`。
     static let idlePetAnimationIntensityChanged = Notification.Name("com.maldaze.idlePetAnimationIntensityChanged")
+    /// 设置页或控制面板变更睡眠提醒开关后投递；`AppViewModel` 同步调度。
+    static let sleepScheduleSettingsChanged = Notification.Name("com.maldaze.sleepScheduleSettingsChanged")
     /// `userInfo` 中为 `NSValue` 包 `NSRect`（屏幕坐标）。
     static let idlePetScreenFrameUserInfoKey = "screenFrame"
 }

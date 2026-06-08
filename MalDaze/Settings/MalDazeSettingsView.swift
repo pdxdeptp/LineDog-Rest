@@ -28,6 +28,12 @@ struct MalDazeSettingsView: View {
     @AppStorage(MalDazeDefaults.resetIdlePetShortcutModifiers) private var resetPetModifiersRaw: Int = ResetIdlePetPositionShortcut.defaultModifiersStorageInt
     @AppStorage(MalDazeDefaults.resetIdlePetShortcutKeyLabel) private var resetPetKeyLabel: String = ResetIdlePetPositionShortcut.default.keyLabel
 
+    @AppStorage(MalDazeDefaults.sleepScheduleEnabled) private var sleepScheduleEnabled = true
+    @AppStorage(MalDazeDefaults.sleepScheduleRemindersEnabled) private var sleepRemindersEnabled = true
+    @AppStorage(MalDazeDefaults.sleepScheduleLockScreenEnabled) private var sleepLockScreenEnabled = true
+    @AppStorage(MalDazeDefaults.sleepScheduleDismissOnClamshell) private var sleepDismissOnClamshell = true
+    @AppStorage(MalDazeDefaults.sleepScheduleShowerReminderEnabled) private var sleepShowerReminderEnabled = true
+
     @State private var isRecordingSmartShortcut = false
     @State private var isRecordingDeskShortcut = false
     @State private var isRecordingSevenMinuteShortcut = false
@@ -196,6 +202,8 @@ struct MalDazeSettingsView: View {
                 modelCredentialsSettingsPane
             case .shortcuts:
                 shortcutsSettingsPane
+            case .sleepReminder:
+                sleepReminderSettingsPane
             }
         }
     }
@@ -288,6 +296,61 @@ struct MalDazeSettingsView: View {
         }
     }
 
+    private var sleepReminderSettingsPane: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SettingsGroup(
+                title: "睡眠提醒",
+                subtitle: "依赖 Hermes 每日晨报更新的 sleep_schedule.json。",
+                systemImage: "moon.zzz.fill",
+                trailing: "只读契约"
+            ) {
+                Toggle(isOn: $sleepScheduleEnabled) {
+                    Text("开启睡眠提醒")
+                }
+                .toggleStyle(.switch)
+                .onChange(of: sleepScheduleEnabled) { _ in
+                    NotificationCenter.default.post(name: MalDazeBroadcastNotifications.sleepScheduleSettingsChanged, object: nil)
+                }
+
+                Toggle(isOn: $sleepRemindersEnabled) {
+                    Text("睡前铃铛链")
+                }
+                .toggleStyle(.switch)
+                .disabled(!sleepScheduleEnabled)
+                .onChange(of: sleepRemindersEnabled) { _ in
+                    NotificationCenter.default.post(name: MalDazeBroadcastNotifications.sleepScheduleSettingsChanged, object: nil)
+                }
+
+                Toggle(isOn: $sleepLockScreenEnabled) {
+                    Text("截止后 5 分钟霸屏")
+                }
+                .toggleStyle(.switch)
+                .disabled(!sleepScheduleEnabled)
+                .onChange(of: sleepLockScreenEnabled) { _ in
+                    NotificationCenter.default.post(name: MalDazeBroadcastNotifications.sleepScheduleSettingsChanged, object: nil)
+                }
+
+                Toggle(isOn: $sleepDismissOnClamshell) {
+                    Text("合盖自动取消挡屏")
+                }
+                .toggleStyle(.switch)
+                .disabled(!sleepScheduleEnabled)
+                .onChange(of: sleepDismissOnClamshell) { _ in
+                    NotificationCenter.default.post(name: MalDazeBroadcastNotifications.sleepScheduleSettingsChanged, object: nil)
+                }
+
+                Toggle(isOn: $sleepShowerReminderEnabled) {
+                    Text("训练日洗澡提醒（T-90）")
+                }
+                .toggleStyle(.switch)
+                .disabled(!sleepScheduleEnabled)
+                .onChange(of: sleepShowerReminderEnabled) { _ in
+                    NotificationCenter.default.post(name: MalDazeBroadcastNotifications.sleepScheduleSettingsChanged, object: nil)
+                }
+            }
+        }
+    }
+
     private var shortcutRecorders: some View {
         VStack(spacing: 0) {
             GlobalShortcutKeyRecorder(
@@ -349,6 +412,7 @@ private enum SettingsDesignPalette {
 private enum SettingsCategory: String, CaseIterable, Identifiable {
     case modelCredentials
     case shortcuts
+    case sleepReminder
 
     var id: Self { self }
 
@@ -356,6 +420,7 @@ private enum SettingsCategory: String, CaseIterable, Identifiable {
         switch self {
         case .modelCredentials: return "模型与密钥"
         case .shortcuts: return "快捷键"
+        case .sleepReminder: return "睡眠提醒"
         }
     }
 
@@ -363,6 +428,7 @@ private enum SettingsCategory: String, CaseIterable, Identifiable {
         switch self {
         case .modelCredentials: return "LLM 凭据与默认模型"
         case .shortcuts: return "全局操作"
+        case .sleepReminder: return "Hermes 契约与睡前链"
         }
     }
 
@@ -370,6 +436,7 @@ private enum SettingsCategory: String, CaseIterable, Identifiable {
         switch self {
         case .modelCredentials: return "key.horizontal"
         case .shortcuts: return "keyboard"
+        case .sleepReminder: return "moon.zzz.fill"
         }
     }
 
@@ -379,6 +446,8 @@ private enum SettingsCategory: String, CaseIterable, Identifiable {
             return "API Key 按当前实现即时保存到本机设置；本页只改善入口、说明与可读性。"
         case .shortcuts:
             return "快捷键录制仅更新本机设置，恢复默认不会影响其他类别。"
+        case .sleepReminder:
+            return "目标时间由 Hermes 晨报写入 ~/.hermes/data/sleep/sleep_schedule.json；桌宠只读该文件。"
         }
     }
 }

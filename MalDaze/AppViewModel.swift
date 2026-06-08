@@ -32,7 +32,7 @@ final class AppViewModel: ObservableObject {
     @Published private(set) var showResumeChronoButton = false
     /// 休息全屏时是否拦截鼠标（默认开）；关则休息时仍可正常点击背后桌面与应用。
     @Published private(set) var restBlocksClicksDuringRest: Bool
-    /// 休息霸屏期间连续单击桌宠 20 下可提前结束休息（默认开）。
+    /// 休息霸屏期间连续单击桌宠 10 下可提前结束休息（默认开）。
     @Published private(set) var restDoubleClickEndsRest: Bool
     /// 独立 7 分钟倒计时进行中（与桌宠无关）；结束后出现铃铛直至点击关闭。
     @Published private(set) var isSevenMinuteReminderRunning = false
@@ -40,6 +40,14 @@ final class AppViewModel: ObservableObject {
     @Published private(set) var isFiveMinuteCatCompanionActive = false
     /// 喝水提醒已调度（计时中或浮层待操作）为 true；开关关闭或调用 cancel 后变 false。
     @Published private(set) var isHydrationReminderEnabled: Bool
+    /// 睡眠提醒总开关（UserDefaults）；调度成功且契约有效时为 true。
+    @Published private(set) var isSleepScheduleEnabled: Bool
+    /// 睡眠契约无效或读取失败时的用户可见说明；nil 表示正常。
+    @Published private(set) var sleepScheduleError: String?
+    /// 睡眠提醒调度快照（契约目标、计划时刻、桌宠上次读 JSON 时间）。
+    @Published private(set) var sleepScheduleStatus: SleepReminderScheduleSnapshot?
+    /// Hermes 强提醒契约无效或读取失败时的说明；nil 表示正常。
+    @Published private(set) var interventionRequestError: String?
     /// 休息打断风格，持久化到 UserDefaults。
     @Published private(set) var breakInterruptStyle: BreakInterruptStyle
 
@@ -78,6 +86,10 @@ final class AppViewModel: ObservableObject {
     private let fiveMinuteCatCompanion: FiveMinuteCatCompanionController
     /// 喝水提醒控制器，不经过 `WindowManager`。
     private let hydrationReminder: HydrationReminderController
+    /// 睡前提醒链；只读 Hermes `sleep_schedule.json`。
+    private let sleepReminder: SleepReminderController
+    /// Hermes 强提醒；只读 `intervention_request.json`。
+    private let interventionRequest: InterventionRequestController
     /// T7 安全推出服务；调度生命周期绑定在 AppViewModel 内。
     let t7EjectService: any T7EjectServiceLifecycle
     private let t7EjectUIService: (any T7EjectServiceUIControlling)?
@@ -95,6 +107,7 @@ final class AppViewModel: ObservableObject {
     private var resetIdlePetShortcutObserver: NSObjectProtocol?
     private var idlePetIconSidePointsObserver: NSObjectProtocol?
     private var idlePetAnimationIntensityObserver: NSObjectProtocol?
+    private var sleepScheduleSettingsObserver: NSObjectProtocol?
     /// 智能提醒写入的 `EKAlarm` 到点后弹出与 7 分钟倒计时相同的中央铃铛。
     private var smartReminderBellTasks: [String: Task<Void, Never>] = [:]
 
@@ -117,19 +130,31 @@ final class AppViewModel: ObservableObject {
         sevenMinuteReminder: SevenMinuteReminderController? = nil,
         fiveMinuteCatCompanion: FiveMinuteCatCompanionController? = nil,
         hydrationReminder: HydrationReminderController? = nil,
+        sleepReminder: SleepReminderController? = nil,
+        interventionRequest: InterventionRequestController? = nil,
         deskReminders: DeskRemindersModel? = nil,
         t7EjectService: (any T7EjectServiceLifecycle)? = nil,
         bootstrapT7EjectScheduler: Bool? = nil
     ) {
         self.windowManager = windowManager
-        self.sevenMinuteReminder = sevenMinuteReminder ?? SevenMinuteReminderController()
+        let resolvedSevenMinuteReminder = sevenMinuteReminder ?? SevenMinuteReminderController()
+        self.sevenMinuteReminder = resolvedSevenMinuteReminder
         self.fiveMinuteCatCompanion = fiveMinuteCatCompanion ?? FiveMinuteCatCompanionController()
         self.hydrationReminder = hydrationReminder ?? HydrationReminderController()
+        self.sleepReminder = sleepReminder ?? SleepReminderController(
+            bellPresenter: resolvedSevenMinuteReminder,
+            windowManager: windowManager
+        )
+        self.interventionRequest = interventionRequest ?? InterventionRequestController(
+            bellPresenter: resolvedSevenMinuteReminder
+        )
         let resolvedT7EjectService = t7EjectService ?? T7EjectService.live()
         self.t7EjectService = resolvedT7EjectService
         self.t7EjectUIService = resolvedT7EjectService as? any T7EjectServiceUIControlling
         T7EjectAppLifecycleRegistry.shared.register(resolvedT7EjectService)
         self.isHydrationReminderEnabled = UserDefaults.standard.bool(forKey: MalDazeDefaults.hydrationReminderEnabled)
+        self.isSleepScheduleEnabled = MalDazeDefaults.resolvedSleepScheduleEnabled()
+        self.sleepScheduleError = nil
         let rawStyle = UserDefaults.standard.string(forKey: MalDazeDefaults.breakInterruptStyle) ?? ""
         self.breakInterruptStyle = BreakInterruptStyle(rawValue: rawStyle) ?? .fullscreen
         self.deskReminders = deskReminders ?? DeskRemindersModel()
@@ -208,6 +233,30 @@ final class AppViewModel: ObservableObject {
         if self.isHydrationReminderEnabled {
             self.hydrationReminder.start()
         }
+
+        // 总开关仅由 UserDefaults / setSleepScheduleEnabled 驱动；调度成败不覆写开关，避免 UI 被藏起。
+        self.sleepReminder.onScheduleStateChanged = { _ in }
+        self.sleepReminder.onError = { [weak self] message in
+            self?.sleepScheduleError = message
+        }
+        self.sleepReminder.onSnapshotChanged = { [weak self] snapshot in
+            self?.sleepScheduleStatus = snapshot
+        }
+        self.sleepReminder.onDismissTimerRestForSleepLock = { [weak self] in
+            guard let self else { return }
+            if self.testRestActive || self.wasResting {
+                self.windowManager.dismissRestImmediately(bringIdlePetWindowToFront: false)
+            }
+        }
+        if self.isSleepScheduleEnabled {
+            self.sleepReminder.start()
+        }
+
+        self.interventionRequest.onError = { [weak self] message in
+            self?.interventionRequestError = message
+        }
+        self.interventionRequest.start()
+
         if Self.shouldBootstrapT7EjectScheduler(explicitValue: bootstrapT7EjectScheduler) {
             self.t7EjectService.startScheduler()
         }
@@ -273,6 +322,27 @@ final class AppViewModel: ObservableObject {
             queue: .main
         ) { [weak self] _ in
             self?.applyIdlePetAnimationFromUserDefaults()
+        }
+
+        sleepScheduleSettingsObserver = NotificationCenter.default.addObserver(
+            forName: MalDazeBroadcastNotifications.sleepScheduleSettingsChanged,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.syncSleepScheduleFromUserDefaults()
+        }
+    }
+
+    private func syncSleepScheduleFromUserDefaults() {
+        let enabled = MalDazeDefaults.resolvedSleepScheduleEnabled()
+        if enabled {
+            if !isSleepScheduleEnabled {
+                setSleepScheduleEnabled(true)
+            } else {
+                sleepReminder.reloadAndReschedule()
+            }
+        } else if isSleepScheduleEnabled {
+            setSleepScheduleEnabled(false)
         }
     }
 
@@ -400,6 +470,8 @@ final class AppViewModel: ObservableObject {
         }
         let h = hydrationReminder
         Task { @MainActor in h.cancel() }
+        let sleep = sleepReminder
+        Task { @MainActor in sleep.cancel() }
         if let smartReminderShortcutObserver {
             NotificationCenter.default.removeObserver(smartReminderShortcutObserver)
         }
@@ -417,6 +489,9 @@ final class AppViewModel: ObservableObject {
         }
         if let idlePetAnimationIntensityObserver {
             NotificationCenter.default.removeObserver(idlePetAnimationIntensityObserver)
+        }
+        if let sleepScheduleSettingsObserver {
+            NotificationCenter.default.removeObserver(sleepScheduleSettingsObserver)
         }
     }
 
@@ -594,6 +669,43 @@ final class AppViewModel: ObservableObject {
         hydrationReminder.testing_fireNow()
     }
 
+    /// 手动预览睡眠排程中的下一项（仅 `deliver`，不标记已触发、不影响 Timer）。
+    @discardableResult
+    func testFireNextSleepReminder() -> String {
+        sleepReminder.testing_fireNextScheduledReminder()
+    }
+
+    func setSleepScheduleEnabled(_ enabled: Bool) {
+        UserDefaults.standard.set(enabled, forKey: MalDazeDefaults.sleepScheduleEnabled)
+        isSleepScheduleEnabled = enabled
+        if enabled {
+            sleepReminder.start()
+        } else {
+            sleepScheduleError = nil
+            sleepScheduleStatus = nil
+            sleepReminder.cancel()
+        }
+    }
+
+    func setSleepScheduleRemindersEnabled(_ enabled: Bool) {
+        UserDefaults.standard.set(enabled, forKey: MalDazeDefaults.sleepScheduleRemindersEnabled)
+        if isSleepScheduleEnabled { sleepReminder.reloadAndReschedule() }
+    }
+
+    func setSleepScheduleLockScreenEnabled(_ enabled: Bool) {
+        UserDefaults.standard.set(enabled, forKey: MalDazeDefaults.sleepScheduleLockScreenEnabled)
+        if isSleepScheduleEnabled { sleepReminder.reloadAndReschedule() }
+    }
+
+    func setSleepScheduleDismissOnClamshell(_ enabled: Bool) {
+        UserDefaults.standard.set(enabled, forKey: MalDazeDefaults.sleepScheduleDismissOnClamshell)
+    }
+
+    func setSleepScheduleShowerReminderEnabled(_ enabled: Bool) {
+        UserDefaults.standard.set(enabled, forKey: MalDazeDefaults.sleepScheduleShowerReminderEnabled)
+        if isSleepScheduleEnabled { sleepReminder.reloadAndReschedule() }
+    }
+
     private func toggleSevenMinuteReminderFromGlobalShortcut() {
         if isSevenMinuteReminderRunning {
             cancelSevenMinuteReminder()
@@ -709,10 +821,15 @@ final class AppViewModel: ObservableObject {
         syncPetDisplayMode()
     }
 
-    /// 休息全屏中央小狗**连续单击 20 下**：收起霸屏，并让计时引擎退出当前休息段（测试休息则走与普通结束相同的回调）。
-    /// 若用户在设置中关闭「单击 20 下桌宠结束休息」，本函数直接返回。
+    /// 休息全屏中央小狗**连续单击 10 下**：收起霸屏，并让计时引擎退出当前休息段（测试休息则走与普通结束相同的回调）。
+    /// 若用户在设置中关闭「单击 10 下桌宠结束休息」，本函数直接返回。
     func endRestEarlyFromDeskPet() {
         guard restDoubleClickEndsRest else { return }
+        if sleepReminder.isSleepLockActive {
+            windowManager.dismissRestImmediately(bringIdlePetWindowToFront: false)
+            sleepReminder.clearSleepLockActiveFlag()
+            return
+        }
         if testRestActive {
             windowManager.dismissRestImmediately()
             return

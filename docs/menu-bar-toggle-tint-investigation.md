@@ -22,7 +22,7 @@
 - 私有颜色：`SwitchOnTrackTint.paleBlue`（sRGB `0.45, 0.72, 0.98`）。
 - 下列控件在 `.toggleStyle(.switch)` **之后**链式 `.tint(SwitchOnTrackTint.paleBlue)`：
   - 「休息期间阻止点击桌面」
-  - 「单击 20 下桌宠可提前结束休息」
+  - 「单击 10 下桌宠可提前结束休息」
   - 「开启喝水提醒」
   - 「开启安静时段」
 

@@ -15,14 +15,21 @@ final class SevenMinuteReminderController {
     private var startedDurationMinutes: Int = 7
     private var screenObserver: NSObjectProtocol?
     private var lastReminderMessage: String = ""
+    private var completionMessage: String = ""
 
     func start() {
+        start(minutes: Self.configuredDurationMinutes(), completionMessage: "")
+    }
+
+    /// Hermes 强提醒：使用契约分钟数与结束文案（非 UserDefaults 默认时长）。
+    func start(minutes: Int, completionMessage: String) {
         stopTickTimer()
         tearDownCountdownUI()
         tearDownReminderUI()
-        let minutes = Self.configuredDurationMinutes()
-        startedDurationMinutes = minutes
-        remainingSeconds = minutes * 60
+        let clamped = min(180, max(1, minutes))
+        startedDurationMinutes = clamped
+        self.completionMessage = completionMessage
+        remainingSeconds = clamped * 60
         observeScreensIfNeeded()
         installCountdownWindow()
         refreshCountdownLabel()
@@ -30,11 +37,20 @@ final class SevenMinuteReminderController {
         onRunningChanged?(true)
     }
 
+    /// 单测：立即触发倒计时结束铃铛（不等待真实时间）。
+    func testing_finishCountdownImmediately() {
+        remainingSeconds = 0
+        onCountdownFinished()
+    }
+
+    var testing_lastReminderMessage: String { lastReminderMessage }
+
     func cancel() {
         stopTickTimer()
         tearDownCountdownUI()
         tearDownReminderUI()
         removeScreenObserver()
+        completionMessage = ""
         onRunningChanged?(false)
     }
 
@@ -43,6 +59,13 @@ final class SevenMinuteReminderController {
         observeScreensIfNeeded()
         showReminderWindow(message: message)
     }
+
+    /// 仅关闭中央铃铛浮层，不影响独立倒计时条。
+    func dismissCenterBellReminderIfShowing() {
+        tearDownReminderUI()
+    }
+
+    var isCenterBellReminderVisible: Bool { reminderWindow != nil }
 
     private static func configuredDurationMinutes() -> Int {
         var v = UserDefaults.standard.integer(forKey: MalDazeDefaults.sevenMinuteReminderDurationMinutes)
@@ -79,7 +102,11 @@ final class SevenMinuteReminderController {
         stopTickTimer()
         tearDownCountdownUI()
         onRunningChanged?(false)
-        showReminderWindow(message: "\(startedDurationMinutes) 分钟计时结束")
+        let message = completionMessage.isEmpty
+            ? "\(startedDurationMinutes) 分钟计时结束"
+            : completionMessage
+        completionMessage = ""
+        showReminderWindow(message: message)
     }
 
     private func dismissReminder() {

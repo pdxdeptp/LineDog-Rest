@@ -54,10 +54,10 @@ final class PetStageView: NSView {
     private var breakRunPetLastClickAt: TimeInterval = 0
     private static let breakRunPetClickThreshold = 3
     private static let breakRunPetClickWindow: TimeInterval = 3.0
-    /// 跑屏模式：点击倒计时标签的累计次数（点20次提前结束）。
+    /// 跑屏模式：点击倒计时标签的累计次数（点 10 次提前结束）。
     private var breakRunCountdownClickCount = 0
     private var breakRunCountdownLastClickAt: TimeInterval = 0
-    private static let breakRunCountdownClickThreshold = 20
+    private static let breakRunCountdownClickThreshold = 10
     /// 从黑狗当前位置移到屏中并放大；固定 60s，与距离无关。
     private let growDuration: TimeInterval = 60
     private let fadeOutDuration: TimeInterval = 3
@@ -90,16 +90,16 @@ final class PetStageView: NSView {
 
     /// 常态小窗拖动结束后回写并持久化窗框（屏幕坐标）。
     var onIdlePetFramePersist: ((NSRect) -> Void)?
-    /// 休息全屏时：连续单击中央小狗 20 下提前结束休息（与菜单里结束休息的逻辑一致）。
+    /// 休息全屏时：连续单击中央小狗 10 下提前结束休息（与菜单里结束休息的逻辑一致）。
     var onRestPetDoubleClickEndRest: (() -> Void)?
     /// 每帧休息布局后由 `WindowManager` 同步 `NSWindow.ignoresMouseEvents`（仅靠根视图 `hitTest`→`nil` 在 `.screenSaver` 等层级上可能仍吞点击）。
     var onRestPhaseGeometryChanged: (() -> Void)?
 
     private var restSingleClickMenuWorkItem: DispatchWorkItem?
-    /// 休息期间在狗身上的累计单击次数；连续点击间隔 ≤ `restPetClickResetInterval` 时累加，达 20 下结束休息。
+    /// 休息期间在狗身上的累计单击次数；连续点击间隔 ≤ `restPetClickResetInterval` 时累加，达 10 下结束休息。
     private var restPetClickCount = 0
     private var restPetLastClickAt: TimeInterval = 0
-    private static let restPetClickThreshold = 20
+    private static let restPetClickThreshold = 10
     private static let restPetClickResetInterval: TimeInterval = 3.0
 
     private var idleMouseDownInWindow: NSPoint = .zero
@@ -302,7 +302,7 @@ final class PetStageView: NSView {
     override func mouseUp(with event: NSEvent) {
         guard deskMenuPresenter != nil else { return }
         let pt = convert(event.locationInWindow, from: nil)
-        // 跑屏休息模式：3秒内点桌宠3次，或点倒计时标签20次，提前结束
+        // 跑屏休息模式：3 秒内点桌宠 3 次，或点倒计时标签 10 次，提前结束
         if breakRunBeganAt != nil {
             let inPet = petHitRect.contains(pt)
             let inCountdown = !breakRunCountdownLabel.isHidden && breakRunCountdownLabel.frame.contains(pt)

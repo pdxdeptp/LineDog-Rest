@@ -58,4 +58,4 @@ pmset -g log | rg -i clamshell
 | 目标不对 | 晨报 🌙、`updatedAt` |
 | 合盖/推进 | `sleep_tracker.py`、`pmset -g log` |
 
-OpenSpec：`openspec/changes/add-sleep-schedule/`
+OpenSpec：`openspec/specs/sleep-reminder/spec.md` · `sleep-schedule-contract` · `hermes-sleep-tracker`（[archive/2026-06-08-add-sleep-schedule](../../openspec/changes/archive/2026-06-08-add-sleep-schedule/)）

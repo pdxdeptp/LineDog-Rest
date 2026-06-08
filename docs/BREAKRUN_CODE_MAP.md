@@ -63,7 +63,7 @@ BreakRunController.tick()
 > 会立即再次调用 `presentBreakRun()`，该调用内部执行 `breakRunController.stop()` +
 > `stageView?.cancelToIdle()`，直接覆盖/取消了下面的 `NSAnimationContext` 动画。
 
-### 2c. 结束跑屏——路径 B：用户提前结束（3 次点宠物 / 20 次点倒计时）
+### 2c. 结束跑屏——路径 B：用户提前结束（3 次点宠物 / 10 次点倒计时）
 
 ```
 PetStageView.mouseUp
@@ -105,7 +105,7 @@ PetStageView.mouseUp
 | `breakRunTotal` | `TimeInterval` | 总时长（仅 `cancelBreakRunToIdle` 时清零）|
 | `breakRunPetClickCount` | `Int` | 3 次点宠物退出：当前计数 |
 | `breakRunPetLastClickAt` | `TimeInterval` | 上次点宠物的时间戳 |
-| `breakRunCountdownClickCount` | `Int` | 20 次点倒计时标签退出：当前计数 |
+| `breakRunCountdownClickCount` | `Int` | 10 次点倒计时标签退出：当前计数 |
 | `breakRunCountdownLastClickAt` | `TimeInterval` | 上次点倒计时的时间戳 |
 | `breakRunCountdownLabel` | `NSTextField` | 跑屏倒计时标签（含约束） |
 
@@ -166,7 +166,7 @@ private var breakRunCountdownTextField: NSTextField?
 - `presentBreakRun()` 时创建全屏透明 panel，放 `NSTextField` 在左下角（leading 32, bottom 32）。
 - `startBreakRunCountdownTimer` 的 1Hz 回调同时更新 `breakRunCountdownTextField`。
 - `PetStageView.breakRunCountdownLabel` 恢复隐藏（或彻底移除）。
-- 面板加入 `hitTest` 逻辑（或在 `WindowManager.hitTest` 里处理点击计数到 20 次退出）。
+- 面板加入 `hitTest` 逻辑（或在 `WindowManager.hitTest` 里处理点击计数到 10 次退出）。
 - `hideBreakRunShield()` / `finishBreakRun()` / `dismissRestImmediately()` 中同步销毁该 panel。
 
 字体：`NSFont.monospacedDigitSystemFont(ofSize: 48, weight: .semibold)`，加深色背景/圆角。
@@ -213,5 +213,5 @@ private func finishBreakRun() {
 ## 6. 注意事项
 
 - `dismissRestImmediately()` 同时处理霸屏和跑屏，加回位动画时需用 `isApproximatelyIdleSized` 判断是否处于跑屏（窗口本就是小窗），避免对霸屏模式造成干扰。
-- 倒计时独立 panel 的点击计数（20 次退出）需要在 `WindowManager` 层处理，不再依赖 `PetStageView.hitTest`；`PetStageView` 中对应的 `breakRunCountdownLabel.frame.contains(local)` 逻辑可同步移除。
+- 倒计时独立 panel 的点击计数（10 次退出）需要在 `WindowManager` 层处理，不再依赖 `PetStageView.hitTest`；`PetStageView` 中对应的 `breakRunCountdownLabel.frame.contains(local)` 逻辑可同步移除。
 - 遮罩 `breakRunShieldWindow` 与倒计时 panel 应保持层级一致（或倒计时 panel 在遮罩之上）。

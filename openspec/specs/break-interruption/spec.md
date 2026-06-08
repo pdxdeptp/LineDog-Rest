@@ -62,14 +62,14 @@ MalDaze 在计时器进入休息阶段时展示桌宠打断体验。当前支持
 ### Requirement: 全屏休息提前结束
 系统 SHALL 支持连续点击桌宠提前结束全屏休息。
 
-#### Scenario: 20 下结束
-- **WHEN** 用户在休息期间连续点击中央小狗 20 下且每次间隔不超过 3 秒
-- **AND** “单击 20 下桌宠可提前结束休息”设置开启
+#### Scenario: 10 下结束
+- **WHEN** 用户在休息期间连续点击中央小狗 10 下且每次间隔不超过 3 秒
+- **AND** “单击 10 下桌宠可提前结束休息”设置开启
 - **THEN** 系统立即关闭休息窗口
 - **AND** 通知当前计时引擎跳过休息阶段
 
 #### Scenario: 设置关闭
-- **WHEN** “单击 20 下桌宠可提前结束休息”设置关闭
+- **WHEN** “单击 10 下桌宠可提前结束休息”设置关闭
 - **THEN** 连续点击不会提前结束休息
 
 ### Requirement: 跑屏休息
@@ -127,7 +127,7 @@ MalDaze 在计时器进入休息阶段时展示桌宠打断体验。当前支持
 - **THEN** 系统触发提前结束休息
 
 #### Scenario: 点击倒计时
-- **WHEN** 用户连续点击固定倒计时面板 20 次
+- **WHEN** 用户连续点击固定倒计时面板 10 次
 - **THEN** 系统触发提前结束休息
 
 ### Requirement: 计时器休息联动
@@ -173,3 +173,23 @@ MalDaze 在计时器进入休息阶段时展示桌宠打断体验。当前支持
 - **WHEN** 全屏休息的小狗已到达中央且背景变暗动画完成
 - **THEN** 系统 MUST NOT continue a high-frequency visual animation timer solely to refresh unchanged visuals
 - **AND** 倒计时 SHALL continue updating at whole-second granularity
+
+### Requirement: 睡眠霸屏入口
+
+系统 SHALL 支持由 `SleepReminderController` 在 `lockBedtime` 调用 `WindowManager.presentRest` 进入全屏霸屏，且该路径 MUST 使用 fullscreen 风格，不得路由到 `presentBreakRun`。
+
+#### Scenario: 睡眠 lockBedtime
+
+- **WHEN** `SleepReminderController` 在 `lockBedtime` 触发霸屏
+- **THEN** 系统调用 `presentRest`
+- **AND** 系统 MUST NOT 调用 `presentBreakRun`
+
+### Requirement: 睡眠霸屏生命周期独立
+
+睡眠链触发的霸屏 SHALL 使用独立结束回调，且 MUST NOT 在 `onDismissed` 中驱动 `ManualTimerEngine` 或 `AutoTimerEngine` 的休息跳过逻辑。
+
+#### Scenario: 睡眠霸屏结束
+
+- **WHEN** 睡眠霸屏通过合盖取消或时间结束而关闭
+- **THEN** 计时器引擎状态 MUST NOT 因睡眠霸屏结束而被误修改
+

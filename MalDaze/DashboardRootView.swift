@@ -3,6 +3,7 @@ import SwiftUI
 
 private enum DashboardLayout {
     static let remindersColumnWidth: CGFloat = 300
+    static let learningColumnMinWidth: CGFloat = 360
     static let controlsColumnWidth: CGFloat = 300
     static let horizontalPadding: CGFloat = 12
     static let dividerWidth: CGFloat = 1
@@ -12,9 +13,10 @@ private enum DashboardLayout {
 
     static var minimumContentWidth: CGFloat {
         remindersColumnWidth
+        + learningColumnMinWidth
         + controlsColumnWidth
-        + 4 * horizontalPadding
-        + dividerWidth
+        + 6 * horizontalPadding
+        + 2 * dividerWidth
     }
 
     static func preferredContentSize(screenVisibleFrame visibleFrame: NSRect?) -> NSSize {
@@ -215,7 +217,7 @@ private struct DashboardUtilityButton: View {
     }
 }
 
-/// Dashboard 主内容：提醒事项 + 桌宠控制，由桌宠 Dashboard Panel 展示。
+/// Dashboard 主内容：提醒事项 + 学习面板 + 桌宠控制，由桌宠 Dashboard Panel 展示。
 struct DashboardRootView: View {
     @ObservedObject var viewModel: AppViewModel
 
@@ -224,6 +226,12 @@ struct DashboardRootView: View {
     @AppStorage(MalDazeDefaults.hydrationQuietHoursEnabled) private var hydrationQuietHoursEnabled = false
     @AppStorage(MalDazeDefaults.hydrationQuietStartMinutes) private var hydrationQuietStartMinutes = 1260
     @AppStorage(MalDazeDefaults.hydrationQuietResumeMinutes) private var hydrationQuietResumeMinutes = 480
+
+    @AppStorage(MalDazeDefaults.sleepScheduleEnabled) private var sleepScheduleMasterEnabled = true
+    @AppStorage(MalDazeDefaults.sleepScheduleRemindersEnabled) private var sleepRemindersEnabled = true
+    @AppStorage(MalDazeDefaults.sleepScheduleLockScreenEnabled) private var sleepLockScreenEnabled = true
+    @AppStorage(MalDazeDefaults.sleepScheduleDismissOnClamshell) private var sleepDismissOnClamshell = true
+    @AppStorage(MalDazeDefaults.sleepScheduleShowerReminderEnabled) private var sleepShowerReminderEnabled = true
 
     @AppStorage(MalDazeDefaults.resetIdlePetShortcutKeyCode) private var resetPetKeyCode: Int = Int(ResetIdlePetPositionShortcut.defaultKeyCode)
     @AppStorage(MalDazeDefaults.resetIdlePetShortcutModifiers) private var resetPetModifiersRaw: Int = ResetIdlePetPositionShortcut.defaultModifiersStorageInt
@@ -246,6 +254,8 @@ struct DashboardRootView: View {
     @State private var petAppearanceExpanded = false
     @State private var t7SafeEjectExpanded = true
     @State private var hydrationSettingsExpanded = false
+    @State private var sleepSettingsExpanded = false
+    @State private var sleepReminderTestFeedback: String?
 
     init(viewModel: AppViewModel) {
         self.viewModel = viewModel
@@ -345,6 +355,13 @@ struct DashboardRootView: View {
                 remindersSidebar
                     .frame(width: DashboardLayout.remindersColumnWidth, alignment: .topLeading)
                     .padding(.trailing, MainPanelChrome.horizontalPadding)
+
+                Divider()
+
+                // 中栏：Hermes 学习面板
+                LearningDeskPanelView()
+                    .frame(minWidth: DashboardLayout.learningColumnMinWidth, maxWidth: .infinity, alignment: .topLeading)
+                    .padding(.horizontal, MainPanelChrome.horizontalPadding)
 
                 Divider()
 
@@ -602,6 +619,10 @@ struct DashboardRootView: View {
 
                 statusChip
 
+                if sleepScheduleMasterEnabled {
+                    dashboardSleepScheduleProminentCard
+                }
+
                 dashboardModeControl
 
                 controlsQuickActions
@@ -735,6 +756,136 @@ struct DashboardRootView: View {
         }
     }
 
+    private var dashboardSleepScheduleProminentCard: some View {
+        dashboardSleepScheduleStatusCard(compact: false)
+    }
+
+    private func dashboardSleepScheduleStatusCard(compact: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Label("睡眠提醒状态", systemImage: "moon.zzz.fill")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.primary)
+
+            if let err = viewModel.sleepScheduleError {
+                Text(err)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if let status = viewModel.sleepScheduleStatus {
+                Label {
+                    Text("桌宠读取：\(SleepScheduleTimestampFormatting.formatMalDazeReadTime(status.lastReadAt))")
+                } icon: {
+                    Image(systemName: "arrow.down.doc")
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+                if let hermesUpdated = status.contractUpdatedAt {
+                    Label {
+                        Text("Hermes 写入：\(SleepScheduleTimestampFormatting.formatHermesUpdatedAt(hermesUpdated))")
+                    } icon: {
+                        Image(systemName: "doc.badge.clock")
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                    if let target = status.targetBedtimeLabel,
+                       let lock = status.lockBedtimeLabel,
+                       let dayType = status.dayTypeLabel {
+                        Text("契约：目标 \(target) · 霸屏 \(lock) · \(dayType)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                if status.plannedEvents.isEmpty {
+                    Text("暂无待触发提醒（可能已过期或子开关关闭）")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                } else {
+                    Text(compact ? "待触发" : "待触发提醒")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+
+                    ForEach(status.plannedEvents) { event in
+                        HStack(alignment: .firstTextBaseline, spacing: 6) {
+                            Text(SleepScheduleTimestampFormatting.formatEventFireDate(event.fireDate))
+                                .font(.caption.monospacedDigit())
+                                .foregroundStyle(event.isNext ? .primary : .secondary)
+                            Text(event.title)
+                                .font(.caption)
+                                .foregroundStyle(event.isNext ? .primary : .secondary)
+                            if event.isNext {
+                                Text("下一项")
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundStyle(.blue)
+                            }
+                        }
+                    }
+                }
+            } else {
+                Text("正在等待首次读取 sleep_schedule.json…")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+
+            dashboardSleepReminderTestButton
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color.indigo.opacity(0.08))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(Color.indigo.opacity(0.18), lineWidth: 0.5)
+        )
+        .onAppear {
+            if sleepScheduleMasterEnabled {
+                sleepSettingsExpanded = true
+            }
+        }
+    }
+
+    private var dashboardSleepReminderTestButton: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Button {
+                sleepReminderTestFeedback = viewModel.testFireNextSleepReminder()
+            } label: {
+                Label("测试下一项提醒", systemImage: "bell.badge")
+                    .font(.caption.weight(.semibold))
+            }
+            .buttonStyle(.bordered)
+            .disabled(!sleepScheduleMasterEnabled)
+            .help("仅预览铃铛/霸屏 UI，不标记已触发，原计划到点仍会响。")
+
+            if let sleepReminderTestFeedback {
+                Text(sleepReminderTestFeedback)
+                    .font(.caption)
+                    .foregroundStyle(sleepReminderTestFeedback.hasPrefix("已预览") ? SwitchOnTrackTint.paleBlue : .orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(.top, 4)
+    }
+
+    private var dashboardSleepQuickAction: some View {
+        DashboardQuickActionButton(
+            title: sleepScheduleMasterEnabled ? "关闭睡眠提醒" : "开启睡眠提醒",
+            subtitle: sleepScheduleMasterEnabled
+                ? "读取 Hermes 今晚目标并调度提醒。"
+                : "需 Hermes 晨报写入 sleep_schedule.json。",
+            systemImage: sleepScheduleMasterEnabled ? "moon.zzz.fill" : "moon.fill"
+        ) {
+            let next = !sleepScheduleMasterEnabled
+            sleepScheduleMasterEnabled = next
+            viewModel.setSleepScheduleEnabled(next)
+        }
+    }
+
     private var dashboardT7ManualQuickAction: some View {
         DashboardQuickActionButton(
             title: viewModel.isT7EjectRunning ? "正在推出 T7" : "立即安全推出",
@@ -827,12 +978,12 @@ struct DashboardRootView: View {
                         get: { viewModel.restDoubleClickEndsRest },
                         set: { v in scheduleViewModelWork { viewModel.setRestDoubleClickEndsRest(v) } }
                     )) {
-                        Text("单击 20 下桌宠可提前结束休息")
+                        Text("单击 10 下桌宠可提前结束休息")
                             .font(.subheadline)
                     }
                     .toggleStyle(.switch)
                     .tint(SwitchOnTrackTint.paleBlue)
-                    .help("开启时休息霸屏期间连续单击屏幕中央小狗 20 下（每次间隔 ≤ 3 秒）即可提前结束休息（默认）；关闭后点击无效，只能等计时自然结束。")
+                    .help("开启时休息霸屏期间连续单击屏幕中央小狗 10 下（每次间隔 ≤ 3 秒）即可提前结束休息（默认）；关闭后点击无效，只能等计时自然结束。")
                 }
             }
 
@@ -978,6 +1129,61 @@ struct DashboardRootView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
+
+            DashboardControlDisclosureSection(
+                title: "睡眠提醒",
+                systemImage: "moon.zzz.fill",
+                isExpanded: $sleepSettingsExpanded
+            ) {
+                VStack(alignment: .leading, spacing: 8) {
+                    dashboardSleepQuickAction
+
+                    if sleepScheduleMasterEnabled {
+                        dashboardSleepScheduleStatusCard(compact: true)
+                    }
+
+                    Toggle(isOn: $sleepRemindersEnabled) {
+                        Text("睡前铃铛链")
+                            .font(.subheadline)
+                    }
+                    .toggleStyle(.switch)
+                    .tint(SwitchOnTrackTint.paleBlue)
+                    .disabled(!sleepScheduleMasterEnabled)
+                    .onChange(of: sleepRemindersEnabled) { viewModel.setSleepScheduleRemindersEnabled($0) }
+
+                    Toggle(isOn: $sleepLockScreenEnabled) {
+                        Text("截止后 5 分钟霸屏")
+                            .font(.subheadline)
+                    }
+                    .toggleStyle(.switch)
+                    .tint(SwitchOnTrackTint.paleBlue)
+                    .disabled(!sleepScheduleMasterEnabled)
+                    .onChange(of: sleepLockScreenEnabled) { viewModel.setSleepScheduleLockScreenEnabled($0) }
+
+                    Toggle(isOn: $sleepDismissOnClamshell) {
+                        Text("合盖自动取消挡屏")
+                            .font(.subheadline)
+                    }
+                    .toggleStyle(.switch)
+                    .tint(SwitchOnTrackTint.paleBlue)
+                    .disabled(!sleepScheduleMasterEnabled)
+                    .onChange(of: sleepDismissOnClamshell) { viewModel.setSleepScheduleDismissOnClamshell($0) }
+
+                    Toggle(isOn: $sleepShowerReminderEnabled) {
+                        Text("训练日洗澡提醒（T-90）")
+                            .font(.subheadline)
+                    }
+                    .toggleStyle(.switch)
+                    .tint(SwitchOnTrackTint.paleBlue)
+                    .disabled(!sleepScheduleMasterEnabled)
+                    .onChange(of: sleepShowerReminderEnabled) { viewModel.setSleepScheduleShowerReminderEnabled($0) }
+
+                    Text("目标时间由 Hermes 晨报更新；桌宠只读 ~/.hermes/data/sleep/sleep_schedule.json。")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
         }
     }
 
@@ -1103,10 +1309,22 @@ struct DashboardRootView: View {
                     viewModel.testFireHydrationReminder()
                 }
 
+                DashboardUtilityButton(title: "测试睡眠", systemImage: "moon.zzz") {
+                    sleepReminderTestFeedback = viewModel.testFireNextSleepReminder()
+                }
+                .help("预览下一项睡眠提醒，不影响定时计划。")
+
                 DashboardUtilityButton(title: "退出应用", systemImage: "power", role: .destructive) {
                     viewModel.quitApp()
                 }
                 .keyboardShortcut("q", modifiers: [.command])
+            }
+
+            if let sleepReminderTestFeedback {
+                Text(sleepReminderTestFeedback)
+                    .font(.caption)
+                    .foregroundStyle(sleepReminderTestFeedback.hasPrefix("已预览") ? SwitchOnTrackTint.paleBlue : .orange)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
