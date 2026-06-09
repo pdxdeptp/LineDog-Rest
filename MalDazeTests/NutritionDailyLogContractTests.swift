@@ -26,6 +26,7 @@ final class NutritionDailyLogContractTests: XCTestCase {
         let panel = try XCTUnwrap(log.panel)
         XCTAssertEqual(panel.schemaVersion, 1)
         XCTAssertEqual(panel.dayLabel, "休息日")
+        XCTAssertNil(panel.workoutLabel)
         XCTAssertEqual(panel.consumed.sodiumMg, 120)
         XCTAssertEqual(panel.targets.sodiumMg, 2300)
         XCTAssertEqual(panel.suggestions.count, 1)
@@ -46,6 +47,27 @@ final class NutritionDailyLogContractTests: XCTestCase {
         }
     }
 
+    func testReadTrainingDayWorkoutLabel() throws {
+        let url = tempDir.appendingPathComponent("daily_log.json")
+        try trainingFixtureJSON().write(to: url, atomically: true, encoding: .utf8)
+
+        let panel = try XCTUnwrap(try NutritionDailyLogContractReader(fileURL: url).read().panel)
+        XCTAssertEqual(panel.dayLabel, "训练日")
+        XCTAssertEqual(panel.workoutLabel, "练胸")
+    }
+
+    func testFlattenSkipsSuggestionsOutsideCalorieSlack() throws {
+        let url = tempDir.appendingPathComponent("daily_log.json")
+        var json = fixtureJSON()
+        json = json.replacingOccurrences(
+            of: "\"within_slack\": true",
+            with: "\"within_slack\": false"
+        )
+        try json.write(to: url, atomically: true, encoding: .utf8)
+        let panel = try XCTUnwrap(try NutritionDailyLogContractReader(fileURL: url).read().panel)
+        XCTAssertTrue(NutritionLoggableItem.flattened(from: panel).isEmpty)
+    }
+
     func testFlattenLoggableItems() throws {
         let url = tempDir.appendingPathComponent("daily_log.json")
         try fixtureJSON().write(to: url, atomically: true, encoding: .utf8)
@@ -55,6 +77,28 @@ final class NutritionDailyLogContractTests: XCTestCase {
         XCTAssertEqual(items[0].flatIndex, 1)
         XCTAssertEqual(items[1].flatIndex, 2)
         XCTAssertEqual(items[1].name, "蓝莓")
+    }
+
+    private func trainingFixtureJSON() -> String {
+        """
+        {
+          "date": "2099-01-02",
+          "day_type": "training",
+          "workout_split": "chest",
+          "records": [],
+          "panel": {
+            "schemaVersion": 1,
+            "updatedAt": "2099-01-02T08:00:00+08:00",
+            "dayLabel": "训练日",
+            "workoutLabel": "练胸",
+            "targets": { "kcal": 2200, "protein_g": 140, "carbs_g": 200, "fat_g": 70, "sodium_mg": 2300 },
+            "consumed": { "kcal": 0, "protein_g": 0, "carbs_g": 0, "fat_g": 0, "sodium_mg": 0 },
+            "remaining": { "kcal": 2200, "protein_g": 140, "carbs_g": 200, "fat_g": 70, "sodium_mg": 2300 },
+            "suggestions": [],
+            "calorieSlack": 50
+          }
+        }
+        """
     }
 
     private func fixtureJSON() -> String {

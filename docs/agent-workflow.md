@@ -191,6 +191,33 @@ Even when the exception applies:
 - Tests or the best available checks must pass before declaring completion.
 - If the fix grows beyond the bounds above, stop and re-enter the full flow.
 
+## SSOT And Intermediate Layers
+
+Project preference (MalDaze + Hermes integrations): **one fact, one authoritative store**. Do not add profile fields, UserDefaults mirrors, or parallel JSON blobs that duplicate data already living in the canonical file or log.
+
+### Do
+
+- Name the SSOT in design/spec (e.g. `training_log.json` for strength sessions, `daily_log.json` for today’s day type, `projects.json` for learning tasks).
+- **Derive** display or “next value” by reading the SSOT (latest record, today’s row, contract `panel`).
+- Use **derived views** only when clearly labeled (e.g. `daily_log.panel` for MalDaze UI)—never a second writable copy of the same fact.
+- When backfilling history, patch the SSOT (and optional archive), not a convenience cache elsewhere.
+
+### Do not
+
+- Add `profile.last_*` (or similar) when the event log already has the data—same class of mistake as removed `profile.last_training_date`.
+- Maintain the same field in profile + daily_log + training_log + history unless each has a **distinct** role (today vs history vs derived UI).
+- Introduce a client-side or agent-side “shadow list” to paper over SSOT recalculation (see § Hermes Read-Only UI).
+
+### Canonical example (nutrition · workout split)
+
+**Wrong**: `profile.last_workout_split` cached “last chest/back day” while `training_log` already records each `is_training=true` session with `workout_split`—three places to seed and drift.
+
+**Right**: alternation reads the latest strength record from `training_log` (exclude today when assigning); `daily_log.workout_split` holds **today only**; `panel.workoutLabel` is derived for MalDaze. Same pattern as `cmd_auto_day` reading last training **date** only from `training_log`, not profile.
+
+### When proposing a new field
+
+Ask: *Where is the SSOT?* If the answer is “profile for speed” but a log/contract already exists, **extend the log/contract** instead.
+
 ## Hermes Read-Only UI (MalDaze)
 
 MalDaze panels that consume Hermes file contracts (`daily_log.panel`, `sleep_schedule.json`, `schedule.py` via CLI, etc.) are **display + invoke CLI only**. Hermes owns computation, persistence, and recalculation.

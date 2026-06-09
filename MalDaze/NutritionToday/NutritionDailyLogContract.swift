@@ -50,6 +50,8 @@ struct NutritionPanel: Equatable, Codable {
     let schemaVersion: Int
     let updatedAt: String
     let dayLabel: String
+    /// 训练日部位文案（如「练胸」「练背和腿」）；休息日无此字段。
+    let workoutLabel: String?
     let targets: NutritionMacroBucket
     let consumed: NutritionMacroBucket
     let remaining: NutritionMacroBucket
@@ -57,7 +59,42 @@ struct NutritionPanel: Equatable, Codable {
     let calorieSlack: Int
 
     enum CodingKeys: String, CodingKey {
-        case schemaVersion, updatedAt, dayLabel, targets, consumed, remaining, suggestions, calorieSlack
+        case schemaVersion, updatedAt, dayLabel, workoutLabel, targets, consumed, remaining, suggestions, calorieSlack
+    }
+
+    init(
+        schemaVersion: Int,
+        updatedAt: String,
+        dayLabel: String,
+        workoutLabel: String? = nil,
+        targets: NutritionMacroBucket,
+        consumed: NutritionMacroBucket,
+        remaining: NutritionMacroBucket,
+        suggestions: [NutritionPanelSuggestion],
+        calorieSlack: Int
+    ) {
+        self.schemaVersion = schemaVersion
+        self.updatedAt = updatedAt
+        self.dayLabel = dayLabel
+        self.workoutLabel = workoutLabel
+        self.targets = targets
+        self.consumed = consumed
+        self.remaining = remaining
+        self.suggestions = suggestions
+        self.calorieSlack = calorieSlack
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        schemaVersion = try c.decode(Int.self, forKey: .schemaVersion)
+        updatedAt = try c.decode(String.self, forKey: .updatedAt)
+        dayLabel = try c.decode(String.self, forKey: .dayLabel)
+        workoutLabel = try c.decodeIfPresent(String.self, forKey: .workoutLabel)
+        targets = try c.decode(NutritionMacroBucket.self, forKey: .targets)
+        consumed = try c.decode(NutritionMacroBucket.self, forKey: .consumed)
+        remaining = try c.decode(NutritionMacroBucket.self, forKey: .remaining)
+        suggestions = try c.decodeIfPresent([NutritionPanelSuggestion].self, forKey: .suggestions) ?? []
+        calorieSlack = try c.decodeIfPresent(Int.self, forKey: .calorieSlack) ?? 50
     }
 }
 
@@ -186,6 +223,9 @@ struct NutritionLoggableItem: Equatable, Identifiable {
         var items: [NutritionLoggableItem] = []
         var index = 1
         for suggestion in panel.suggestions {
+            if suggestion.withinSlack == false {
+                continue
+            }
             for item in suggestion.items {
                 items.append(NutritionLoggableItem(
                     flatIndex: index,

@@ -6,18 +6,18 @@ struct NutritionTodayPanelView: View {
     @StateObject private var viewModel = NutritionTodayViewModel()
     @State private var digitMonitor: NutritionDigitKeyMonitor?
 
-    /// 饮食区正文：在原有语义字号上统一加大一档（caption2→caption，caption→footnote，subheadline→callout）。
+    /// 饮食区正文（不含「饮食」标题）：语义字号再加大一档。
     private enum NutritionBodyFont {
-        static let dayLabel = Font.callout.weight(.semibold)
-        static let kcalSummary = Font.footnote.monospacedDigit().weight(.medium)
-        static let macroLine = Font.caption.monospacedDigit()
-        static let section = Font.footnote.weight(.semibold)
-        static let body = Font.footnote
-        static let hint = Font.caption
-        static let suggestionIndex = Font.footnote.monospacedDigit().weight(.semibold)
-        static let suggestionMeta = Font.caption.monospacedDigit()
-        static let tableCell = Font.system(size: 11).monospacedDigit()
-        static let tableHeader = Font.system(size: 11, weight: .semibold).monospacedDigit()
+        static let dayLabel = Font.subheadline.weight(.semibold)
+        static let kcalSummary = Font.callout.monospacedDigit().weight(.medium)
+        static let macroLine = Font.footnote.monospacedDigit()
+        static let section = Font.callout.weight(.semibold)
+        static let body = Font.callout
+        static let hint = Font.footnote
+        static let suggestionIndex = Font.callout.monospacedDigit().weight(.semibold)
+        static let suggestionMeta = Font.footnote.monospacedDigit()
+        static let tableCell = Font.system(size: 12).monospacedDigit()
+        static let tableHeader = Font.system(size: 12, weight: .semibold).monospacedDigit()
     }
 
     private enum NutritionChrome {
@@ -76,6 +76,13 @@ struct NutritionTodayPanelView: View {
                     .font(NutritionBodyFont.dayLabel)
                     .foregroundStyle(.primary)
                     .lineLimit(1)
+
+                if let workoutLabel = panel.workoutLabel, !workoutLabel.isEmpty {
+                    Text(workoutLabel)
+                        .font(NutritionBodyFont.dayLabel)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
 
                 Spacer(minLength: 4)
 

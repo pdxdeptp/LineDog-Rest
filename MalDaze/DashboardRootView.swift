@@ -563,7 +563,7 @@ struct DashboardRootView: View {
     /// 左栏上段：提醒事项（系统 EventKit），按日分组类似系统「计划」。
     private var remindersSidebar: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
+            HStack(alignment: .lastTextBaseline, spacing: 8) {
                 Text("计划")
                     .font(.title2.bold())
                     .foregroundStyle(.red)
