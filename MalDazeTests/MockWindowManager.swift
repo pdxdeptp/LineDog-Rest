@@ -52,6 +52,10 @@ final class MockWindowManager: WindowManaging {
 
     func presentDeskMenuFromGlobalShortcut() {}
 
+    func toggleDashboardWindow() {}
+
+    func showOrFocusDashboardFromDock() {}
+
     func dismissSmartReminderInput() {}
 
     func showSmartReminderToast(

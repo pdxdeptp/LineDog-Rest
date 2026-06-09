@@ -8,38 +8,51 @@ private final class PetStageWindow: NSWindow {
     override var canBecomeMain: Bool { false }
 }
 
-private final class DeskPetDashboardPanel: NSPanel {
+private final class DeskPetDashboardWindow: NSWindow {
     override var canBecomeKey: Bool { true }
-    override var canBecomeMain: Bool { false }
+    override var canBecomeMain: Bool { true }
 }
 
-enum DeskPetDashboardPanelLayout {
+enum DeskPetDashboardWindowLayout {
     static let margin: CGFloat = 12
 
-    static func frame(anchorRectInScreen anchor: NSRect, visibleFrame: NSRect) -> NSRect {
+    static func centeredFrame(visibleFrame: NSRect) -> NSRect {
         let preferredSize = DeskPetDashboardView.preferredContentSize(screenVisibleFrame: visibleFrame)
         let width = min(preferredSize.width, max(visibleFrame.width - 2 * margin, 1))
         let height = min(preferredSize.height, max(visibleFrame.height - 2 * margin, 1))
+        let x = visibleFrame.midX - width / 2
+        let y = visibleFrame.midY - height / 2
+        return clampedFrame(NSRect(x: x, y: y, width: width, height: height), visibleFrame: visibleFrame)
+    }
 
-        var x = anchor.midX - width / 2
-        if x < visibleFrame.minX + margin {
-            x = visibleFrame.minX + margin
-        }
-        if x + width > visibleFrame.maxX - margin {
-            x = visibleFrame.maxX - margin - width
-        }
+    static func clampedFrame(_ frame: NSRect, visibleFrame: NSRect) -> NSRect {
+        let inset = visibleFrame.insetBy(dx: margin, dy: margin)
+        var f = frame
+        f.size.width = min(max(f.width, 1), inset.width)
+        f.size.height = min(max(f.height, 1), inset.height)
+        if f.minX < inset.minX { f.origin.x = inset.minX }
+        if f.minY < inset.minY { f.origin.y = inset.minY }
+        if f.maxX > inset.maxX { f.origin.x = inset.maxX - f.width }
+        if f.maxY > inset.maxY { f.origin.y = inset.maxY - f.height }
+        return f
+    }
+}
 
-        let aboveY = anchor.maxY + margin
-        let belowY = anchor.minY - margin - height
-        var y = aboveY + height <= visibleFrame.maxY - margin ? aboveY : belowY
-        if y < visibleFrame.minY + margin {
-            y = visibleFrame.minY + margin
-        }
-        if y + height > visibleFrame.maxY - margin {
-            y = visibleFrame.maxY - margin - height
-        }
+private final class DeskPetDashboardWindowDelegate: NSObject, NSWindowDelegate {
+    var onFrameChanged: (() -> Void)?
+    var onCloseRequest: (() -> Void)?
 
-        return NSRect(x: x, y: y, width: width, height: height)
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        onCloseRequest?()
+        return false
+    }
+
+    func windowDidMove(_ notification: Notification) {
+        onFrameChanged?()
+    }
+
+    func windowDidResize(_ notification: Notification) {
+        onFrameChanged?()
     }
 }
 
@@ -111,7 +124,7 @@ protocol WindowManaging: AnyObject {
     /// 跑屏休息模式（PawPal 风格）：桌宠小窗在屏幕工作区内弹跳漫游，不霸屏。
     func presentBreakRun(duration: TimeInterval, onDismissed: @escaping () -> Void)
     func applyIdlePetDisplayMode(_ mode: PetDisplayMode)
-    /// 绑定后右下角桌宠可点击打开 Dashboard Panel；单测用 `MockWindowManager` 空实现即可。
+    /// 绑定后右下角桌宠可点击 toggle Dashboard 标准窗口；单测用 `MockWindowManager` 空实现即可。
     func bindDeskPetMenu(viewModel: AppViewModel?)
     /// `true`（默认）：休息全屏时窗口接收鼠标，挡桌面；`false`：休息时鼠标穿透，不挡操作。
     func setRestBlocksClicks(_ blocks: Bool)
@@ -120,8 +133,12 @@ protocol WindowManaging: AnyObject {
     func presentSmartReminderInput(anchorRectInScreen: NSRect, onSubmit: @escaping (String) -> Void, onCancel: @escaping () -> Void)
     /// 无桌宠框时（或未安装窗）：用菜单栏屏可见区底部中点上方。
     func presentSmartReminderInputFromGlobalShortcut(onSubmit: @escaping (String) -> Void, onCancel: @escaping () -> Void)
-    /// 全局快捷键：锚在桌宠上与左键相同，打开 Dashboard Panel。
+    /// 全局快捷键：与左键点桌宠相同，toggle Dashboard 标准窗口。
     func presentDeskMenuFromGlobalShortcut()
+    /// 桌宠左键 / 快捷键：显示、聚焦或隐藏 Dashboard（策略 A：恢复 persisted frame）。
+    func toggleDashboardWindow()
+    /// Dock 再点：显示或前置 Dashboard，不因已 visible 而关闭。
+    func showOrFocusDashboardFromDock()
     func dismissSmartReminderInput()
     func showSmartReminderToast(
         message: String,
@@ -186,23 +203,20 @@ struct IdleCursorTrackingPolicy {
 /// 模块 2：常态为**仅桌宠大小**的透明小窗（可拖动，位置持久化）；休息时扩展为菜单栏屏全屏霸屏。同一只 `PetStageView`。
 @MainActor
 final class WindowManager: WindowManaging {
-    /// 桌宠 `NSWindow.identifier`，供 `NSApplicationDelegate.applicationShouldHandleReopen` 等前置窗口。
+    /// 桌宠 `NSWindow.identifier`。
     static let deskPetWindowIdentifier = "com.maldaze.deskPetStage"
+    /// Dashboard 标准窗口 identifier（Mission Control / 窗口列表）。
+    static let deskPetDashboardWindowIdentifier = "com.maldaze.deskPetDashboard"
 
     private var window: NSWindow?
     private var stageView: PetStageView?
     private weak var deskMenuViewModel: AppViewModel?
-    /// 桌宠旁浮动 Dashboard Panel；隐藏后保留 panel / host / SwiftUI 状态以便复用。
-    private var deskMenuPanel: DeskPetDashboardPanel?
+    /// Dashboard 标准窗口；隐藏后保留 window / host / SwiftUI 状态以便复用。
+    private var deskMenuWindow: DeskPetDashboardWindow?
     private var deskMenuHostingController: NSHostingController<AnyView>?
-    /// Dashboard Panel 外部点击 dismiss monitor。
-    private static let dashboardInternalClickDismissSuppressionDuration: TimeInterval = 0.35
-    private var dashboardInternalClickDismissSuppressionUntil: Date?
-    private var transientMonitor: Any?
-    private var localMouseDismissMonitor: Any?
-    /// 桌宠 Dashboard：Esc 关闭（与 `SmartReminder` 输入框的 Esc 监听同理，用本地监视器吃掉按键避免系统咚声）。
+    private let deskMenuWindowDelegate = DeskPetDashboardWindowDelegate()
+    /// 桌宠 Dashboard：Esc / Cmd+W 关闭（本地监视器吃掉 Esc 避免系统咚声）。
     private var deskMenuEscMonitor: Any?
-    private var dismissObservers: [NSObjectProtocol] = []
     private var pendingDismiss: (() -> Void)?
     private var screenObserver: NSObjectProtocol?
     private var primaryDisplayObserver: NSObjectProtocol?
@@ -422,6 +436,8 @@ final class WindowManager: WindowManaging {
         win.collectionBehavior = [.canJoinAllSpaces, .stationary]
         win.isReleasedWhenClosed = false
         win.hidesOnDeactivate = false
+        // App 级 hide（Cmd+H、部分切换器/启动器藏 App）时仍保留桌宠；Dashboard 保持默认 canHide。
+        win.canHide = false
 
         let view = PetStageView(frame: NSRect(origin: .zero, size: frame.size))
         wireDeskPetCallbacks(into: view)
@@ -466,17 +482,17 @@ final class WindowManager: WindowManaging {
 
     func bindDeskPetMenu(viewModel: AppViewModel?) {
         deskMenuViewModel = viewModel
-        tearDownDashboardDismissMonitors()
-        deskMenuPanel?.orderOut(nil)
+        tearDownDashboardEscMonitor()
+        deskMenuWindow?.orderOut(nil)
         if viewModel == nil {
-            deskMenuPanel = nil
+            deskMenuWindow = nil
             deskMenuHostingController = nil
         }
         if let v = stageView {
             wireDeskPetCallbacks(into: v)
         }
         if viewModel != nil {
-            _ = makeDeskMenuPanelIfNeeded(anchorRectInScreen: window?.frame ?? Self.defaultIdlePetWindowFrame())
+            _ = makeDeskMenuWindowIfNeeded()
         }
         applyMousePolicy()
     }
@@ -506,7 +522,6 @@ final class WindowManager: WindowManaging {
     }
 
     func presentRest(duration: TimeInterval, onDismissed: @escaping () -> Void) {
-        closeDeskMenuImmediate()
         installPetWindowIfNeeded()
         dismissRestImmediately()
         idleFrameBeforeRest = window?.frame
@@ -568,7 +583,6 @@ final class WindowManager: WindowManaging {
     }
 
     func dismissRestImmediately(bringIdlePetWindowToFront: Bool) {
-        closeDeskMenuImmediate()
         let callback = pendingDismiss
         pendingDismiss = nil
 
@@ -623,7 +637,6 @@ final class WindowManager: WindowManaging {
     }
 
     func presentBreakRun(duration: TimeInterval, onDismissed: @escaping () -> Void) {
-        closeDeskMenuImmediate()
         installPetWindowIfNeeded()
         // 清理任何可能残留的霸屏/跑屏状态（不触发 onDismissed 回调）
         hideBreakRunShield()
@@ -1079,9 +1092,29 @@ final class WindowManager: WindowManaging {
     }
 
     func presentDeskMenuFromGlobalShortcut() {
+        toggleDashboardWindow()
+    }
+
+    func toggleDashboardWindow() {
         installPetWindowIfNeeded()
-        guard let stage = stageView, deskMenuViewModel != nil else { return }
-        presentDeskMenu(from: stage, anchorRect: stage.deskMenuShortcutAnchorRect)
+        guard deskMenuViewModel != nil else { return }
+        if let dashboard = deskMenuWindow, dashboard.isVisible {
+            hideDashboardWindow()
+            return
+        }
+        showDashboardWindow()
+    }
+
+    func showOrFocusDashboardFromDock() {
+        installPetWindowIfNeeded()
+        guard deskMenuViewModel != nil else { return }
+        if let dashboard = deskMenuWindow, dashboard.isVisible {
+            NSApp.activate(ignoringOtherApps: true)
+            dashboard.makeKeyAndOrderFront(nil)
+            installDashboardEscMonitor()
+            return
+        }
+        showDashboardWindow()
     }
 
     func dismissSmartReminderInput() {
@@ -1137,7 +1170,7 @@ final class WindowManager: WindowManaging {
     }
 }
 
-// MARK: - 右下角桌宠 Dashboard Panel
+// MARK: - Dashboard 标准窗口
 
 extension WindowManager: PetStageDeskMenuPresenter {
     func presentSmartReminderInput(from stage: PetStageView, anchorRect: NSRect) {
@@ -1150,190 +1183,132 @@ extension WindowManager: PetStageDeskMenuPresenter {
         AnyView(DeskPetDashboardView(viewModel: vm))
     }
 
-    /// 创建或复用桌宠旁 Dashboard Panel。菜单栏入口只保留独立设置菜单；宽控制面板由桌宠入口展示。
-    private func makeDeskMenuPanelIfNeeded(anchorRectInScreen: NSRect) -> DeskPetDashboardPanel? {
+    private static func primaryVisibleFrame() -> NSRect {
+        NSScreen.main?.visibleFrame ?? NSScreen.screens.first?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1280, height: 800)
+    }
+
+    private static func resolvedDashboardWindowFrame() -> NSRect {
+        let visibleFrame = primaryVisibleFrame()
+        let d = UserDefaults.standard
+        guard d.object(forKey: MalDazeDefaults.dashboardWindowOriginX) != nil,
+              d.object(forKey: MalDazeDefaults.dashboardWindowOriginY) != nil,
+              d.object(forKey: MalDazeDefaults.dashboardWindowWidth) != nil,
+              d.object(forKey: MalDazeDefaults.dashboardWindowHeight) != nil
+        else {
+            return DeskPetDashboardWindowLayout.centeredFrame(visibleFrame: visibleFrame)
+        }
+        let frame = NSRect(
+            x: d.double(forKey: MalDazeDefaults.dashboardWindowOriginX),
+            y: d.double(forKey: MalDazeDefaults.dashboardWindowOriginY),
+            width: d.double(forKey: MalDazeDefaults.dashboardWindowWidth),
+            height: d.double(forKey: MalDazeDefaults.dashboardWindowHeight)
+        )
+        return DeskPetDashboardWindowLayout.clampedFrame(frame, visibleFrame: visibleFrame)
+    }
+
+    private func persistDashboardWindowFrame(_ frame: NSRect) {
+        let d = UserDefaults.standard
+        d.set(frame.origin.x, forKey: MalDazeDefaults.dashboardWindowOriginX)
+        d.set(frame.origin.y, forKey: MalDazeDefaults.dashboardWindowOriginY)
+        d.set(frame.size.width, forKey: MalDazeDefaults.dashboardWindowWidth)
+        d.set(frame.size.height, forKey: MalDazeDefaults.dashboardWindowHeight)
+    }
+
+    /// 创建或复用 Dashboard 标准窗口。
+    private func makeDeskMenuWindowIfNeeded() -> DeskPetDashboardWindow? {
         guard let vm = deskMenuViewModel else { return nil }
-        let frame = Self.dashboardPanelFrame(anchorRectInScreen: anchorRectInScreen)
-        if let existing = deskMenuPanel {
-            existing.setFrame(Self.dashboardPanelFrame(anchorRectInScreen: anchorRectInScreen), display: false)
+        if let existing = deskMenuWindow {
             return existing
         }
 
-        let panel = DeskPetDashboardPanel(
+        let frame = Self.resolvedDashboardWindowFrame()
+        let dashboardWindow = DeskPetDashboardWindow(
             contentRect: frame,
-            styleMask: [.borderless],
+            styleMask: [.borderless, .resizable],
             backing: .buffered,
             defer: false
         )
-        panel.backgroundColor = .clear
-        panel.isOpaque = false
-        panel.hasShadow = true
-        panel.level = .floating
-        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        panel.isReleasedWhenClosed = false
-        panel.hidesOnDeactivate = false
+        dashboardWindow.identifier = NSUserInterfaceItemIdentifier(Self.deskPetDashboardWindowIdentifier)
+        dashboardWindow.backgroundColor = .clear
+        dashboardWindow.isOpaque = false
+        dashboardWindow.hasShadow = true
+        dashboardWindow.level = .normal
+        dashboardWindow.collectionBehavior = [.managed, .fullScreenNone]
+        dashboardWindow.isReleasedWhenClosed = false
+        dashboardWindow.isMovableByWindowBackground = true
+        dashboardWindow.delegate = deskMenuWindowDelegate
+        deskMenuWindowDelegate.onFrameChanged = { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self, let win = self.deskMenuWindow, win.isVisible else { return }
+                self.persistDashboardWindowFrame(win.frame)
+            }
+        }
+        deskMenuWindowDelegate.onCloseRequest = { [weak self] in
+            Task { @MainActor [weak self] in
+                self?.hideDashboardWindow()
+            }
+        }
 
         let host = NSHostingController(rootView: makeDeskPetDashboardRootView(viewModel: vm))
-        panel.contentViewController = host
+        dashboardWindow.contentViewController = host
         deskMenuHostingController = host
-        deskMenuPanel = panel
-        return panel
-    }
-
-    private static func dashboardPanelFrame(anchorRectInScreen anchor: NSRect) -> NSRect {
-        let fallback = NSScreen.main ?? NSScreen.screens.first
-        let screen = NSScreen.screens.first { $0.visibleFrame.intersects(anchor) } ?? fallback
-        let visibleFrame = screen?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1280, height: 800)
-        return DeskPetDashboardPanelLayout.frame(anchorRectInScreen: anchor, visibleFrame: visibleFrame)
-    }
-
-    /// 立即隐藏桌宠 Dashboard；保留 panel / host 实例供复用。
-    private func closeDeskMenuImmediate() {
-        tearDownDashboardDismissMonitors()
-        if let panel = deskMenuPanel {
-            panel.orderOut(nil)
-        }
+        deskMenuWindow = dashboardWindow
+        return dashboardWindow
     }
 
     func presentDeskMenu(from stage: PetStageView, anchorRect: NSRect) {
-        guard deskMenuViewModel != nil, let win = stage.window else { return }
-        let anchorRectInScreen = win.convertToScreen(anchorRect)
-        guard let panel = makeDeskMenuPanelIfNeeded(anchorRectInScreen: anchorRectInScreen) else { return }
+        _ = stage
+        _ = anchorRect
+        toggleDashboardWindow()
+    }
 
-        if panel.isVisible {
-            closeDeskMenuPanelWithFade()
+    private func showDashboardWindow() {
+        guard let dashboardWindow = makeDeskMenuWindowIfNeeded() else { return }
+        dashboardWindow.setFrame(Self.resolvedDashboardWindowFrame(), display: false)
+        NSApp.activate(ignoringOtherApps: true)
+        dashboardWindow.makeKeyAndOrderFront(nil)
+        installDashboardEscMonitor()
+        persistDashboardWindowFrame(dashboardWindow.frame)
+        NotificationCenter.default.post(name: MalDazeBroadcastNotifications.deskPetDashboardDidOpen, object: nil)
+    }
+
+    private func hideDashboardWindow() {
+        tearDownDashboardEscMonitor()
+        deskMenuViewModel?.dashboardEscapeRouter.reset()
+        guard let dashboardWindow = deskMenuWindow, dashboardWindow.isVisible else {
+            deskMenuWindow?.orderOut(nil)
             return
         }
-
-        DispatchQueue.main.async { [weak self, weak panel] in
-            guard let self, let panel, !panel.isVisible else { return }
-            NSApp.activate(ignoringOtherApps: true)
-            panel.alphaValue = 0
-            panel.makeKeyAndOrderFront(nil)
-            NSAnimationContext.runAnimationGroup { ctx in
-                ctx.duration = 0.14
-                ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
-                panel.animator().alphaValue = 1
-            }
-            self.installDashboardDismissMonitors()
-            NotificationCenter.default.post(name: MalDazeBroadcastNotifications.deskPetDashboardDidOpen, object: nil)
-        }
+        persistDashboardWindowFrame(dashboardWindow.frame)
+        dashboardWindow.orderOut(nil)
     }
 
-    // MARK: - Dashboard Dismiss 监视器
-
-    /// 安装外部点击、Esc、App 失活监视器；Dashboard 隐藏后保留本地 SwiftUI 状态。
-    private func dashboardPanelContainsMouseLocation(_ mouse: NSPoint) -> Bool {
-        guard let panel = deskMenuPanel, panel.isVisible else { return false }
-        return panel.frame.contains(mouse)
-    }
-
-    private func recordDashboardInternalClickForDismissSuppression(now: Date = Date()) {
-        dashboardInternalClickDismissSuppressionUntil = now.addingTimeInterval(Self.dashboardInternalClickDismissSuppressionDuration)
-    }
-
-    private func shouldSuppressDashboardDeactivateDismissal(now: Date = Date()) -> Bool {
-        guard let suppressionUntil = dashboardInternalClickDismissSuppressionUntil else { return false }
-        if now < suppressionUntil {
-            dashboardInternalClickDismissSuppressionUntil = nil
-            return true
-        }
-        dashboardInternalClickDismissSuppressionUntil = nil
-        return false
-    }
-
-    private func installDashboardDismissMonitors() {
-        tearDownDashboardDismissMonitors()
-
-        transientMonitor = NSEvent.addGlobalMonitorForEvents(
-            matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]
-        ) { [weak self] _ in
-            guard let self, self.deskMenuPanel?.isVisible == true else {
-                self?.tearDownDashboardDismissMonitors()
-                return
-            }
-            let mouse = NSEvent.mouseLocation
-            if self.dashboardPanelContainsMouseLocation(mouse) {
-                self.recordDashboardInternalClickForDismissSuppression()
-                return
-            }
-            if let win = self.window, win.frame.contains(mouse) {
-                return
-            }
-            self.closeDeskMenuPanelWithFade()
-        }
-
-        localMouseDismissMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] event in
-            guard let self, self.deskMenuPanel?.isVisible == true else {
-                self?.tearDownDashboardDismissMonitors()
-                return event
-            }
-            let mouse = NSEvent.mouseLocation
-            if self.dashboardPanelContainsMouseLocation(mouse) {
-                self.recordDashboardInternalClickForDismissSuppression()
-                return event
-            }
-            if let win = self.window, win.frame.contains(mouse) {
-                return event
-            }
-            self.closeDeskMenuPanelWithFade()
-            return event
-        }
-
+    private func installDashboardEscMonitor() {
+        tearDownDashboardEscMonitor()
         deskMenuEscMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self else { return event }
+            let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            if flags.contains(.command),
+               event.charactersIgnoringModifiers?.lowercased() == "w",
+               self.deskMenuWindow?.isVisible == true {
+                self.hideDashboardWindow()
+                return nil
+            }
             guard event.keyCode == 53 else { return event }
-            guard let panel = self.deskMenuPanel, panel.isVisible else { return event }
-            // 智能输入面板自己处理 Esc；避免抢它的取消语义。
+            guard let dashboardWindow = self.deskMenuWindow, dashboardWindow.isVisible else { return event }
             guard self.smartInputPanel == nil else { return event }
-            self.closeDeskMenuPanelWithFade()
+            if self.deskMenuViewModel?.dashboardEscapeRouter.consumeEscape() == true {
+                return nil
+            }
+            self.hideDashboardWindow()
             return nil
         }
-
-        let nc = NotificationCenter.default
-        dismissObservers.append(nc.addObserver(
-            forName: NSApplication.didResignActiveNotification,
-            object: nil, queue: .main
-        ) { [weak self] _ in
-            guard let self else { return }
-            if self.shouldSuppressDashboardDeactivateDismissal() {
-                return
-            }
-            self.closeDeskMenuPanelWithFade()
-        })
     }
 
-    private func tearDownDashboardDismissMonitors() {
-        dashboardInternalClickDismissSuppressionUntil = nil
-        if let m = transientMonitor {
-            NSEvent.removeMonitor(m)
-            transientMonitor = nil
-        }
-        if let m = localMouseDismissMonitor {
-            NSEvent.removeMonitor(m)
-            localMouseDismissMonitor = nil
-        }
+    private func tearDownDashboardEscMonitor() {
         if let m = deskMenuEscMonitor {
             NSEvent.removeMonitor(m)
             deskMenuEscMonitor = nil
         }
-        dismissObservers.forEach { NotificationCenter.default.removeObserver($0) }
-        dismissObservers = []
-    }
-
-    private func closeDeskMenuPanelWithFade() {
-        tearDownDashboardDismissMonitors()
-        guard let panel = deskMenuPanel, panel.isVisible else {
-            deskMenuPanel?.orderOut(nil)
-            return
-        }
-        NSAnimationContext.runAnimationGroup({ ctx in
-            ctx.duration = 0.10
-            ctx.timingFunction = CAMediaTimingFunction(name: .easeIn)
-            panel.animator().alphaValue = 0
-        }, completionHandler: { [weak panel] in
-            panel?.orderOut(nil)
-            panel?.alphaValue = 1
-        })
     }
 }

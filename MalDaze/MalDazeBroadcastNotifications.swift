@@ -5,8 +5,10 @@ enum MalDazeBroadcastNotifications {
     static let idlePetScreenFrameChanged = Notification.Name("com.maldaze.idlePetScreenFrameChanged")
     /// 全局快捷键唤起智能提醒输入（Carbon 热键或 `MalDazeAppDelegate` 的 ⌥⌘R 监听投递）。
     static let openSmartReminderInput = Notification.Name("com.maldaze.openSmartReminderInput")
-    /// 全局快捷键弹出桌宠 Dashboard Panel（与左键点桌宠相同面板）。
+    /// 全局快捷键 toggle 桌宠 Dashboard（与左键点桌宠相同语义）。
     static let presentDeskPetMenu = Notification.Name("com.maldaze.presentDeskPetMenu")
+    /// Dock 图标再点：激活 App 并 show/focus Dashboard，不关已打开的窗口。
+    static let focusDashboardFromDock = Notification.Name("com.maldaze.focusDashboardFromDock")
     /// 桌宠 Dashboard Panel 已显示；长生命周期内容可据此做非阻塞刷新。
     static let deskPetDashboardDidOpen = Notification.Name("com.maldaze.deskPetDashboardDidOpen")
     /// 全局快捷键切换独立倒计时提醒（进行中则取消，否则按设置时长开始）。

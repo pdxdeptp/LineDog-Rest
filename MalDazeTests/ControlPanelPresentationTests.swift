@@ -137,7 +137,7 @@ final class ControlPanelPresentationTests: XCTestCase {
 
         XCTAssertTrue(
             rootSource.contains("DashboardPanelSurface"),
-            "DeskPetDashboardView should own a visible SwiftUI surface because its NSPanel shell is transparent."
+            "DeskPetDashboardView should own a visible SwiftUI surface because its window shell is transparent."
         )
         XCTAssertTrue(
             rootSource.contains(".background {"),
@@ -170,7 +170,21 @@ final class ControlPanelPresentationTests: XCTestCase {
         }
     }
 
-    func testDeskMenuUsesReusableNSPanelNotNSPopover() throws {
+    func testIdlePetWindowOptsOutOfApplicationHide() throws {
+        let source = try readProjectSource("MalDaze/WindowManager/WindowManager.swift")
+        let installSource = try functionSource(named: "installPetWindowIfNeeded", in: source)
+
+        XCTAssertTrue(
+            installSource.contains("win.canHide = false"),
+            "The idle desk pet window should remain visible when the application is hidden."
+        )
+        XCTAssertFalse(
+            installSource.contains("dashboardWindow.canHide = false"),
+            "The dashboard window should keep default application-hide behavior."
+        )
+    }
+
+    func testDeskMenuUsesStandardNSWindowNotNSPopover() throws {
         let source = try readProjectSource("MalDaze/WindowManager/WindowManager.swift")
 
         XCTAssertFalse(
@@ -182,50 +196,64 @@ final class ControlPanelPresentationTests: XCTestCase {
             "WindowManager should not show the desk pet dashboard with NSPopover.show(relativeTo:of:preferredEdge:)."
         )
         XCTAssertTrue(
-            source.contains("private final class DeskPetDashboardPanel: NSPanel"),
-            "WindowManager should use an NSPanel subclass for the desk pet dashboard."
+            source.contains("private final class DeskPetDashboardWindow: NSWindow"),
+            "WindowManager should use an NSWindow subclass for the desk pet dashboard."
         )
         XCTAssertTrue(
-            source.contains("private var deskMenuPanel: DeskPetDashboardPanel?"),
-            "WindowManager should retain the dashboard panel for repeat presentation."
+            source.contains("private var deskMenuWindow: DeskPetDashboardWindow?"),
+            "WindowManager should retain the dashboard window for repeat presentation."
         )
         XCTAssertTrue(
             source.contains("private var deskMenuHostingController: NSHostingController<AnyView>?"),
             "WindowManager should retain the SwiftUI host so local dashboard state survives hide/show."
         )
         XCTAssertTrue(
-            source.contains("makeDeskMenuPanelIfNeeded"),
-            "WindowManager should create or reuse the desk pet dashboard through a panel helper."
+            source.contains("func toggleDashboardWindow()"),
+            "WindowManager should expose a unified dashboard toggle entry."
+        )
+        XCTAssertTrue(
+            source.contains("makeDeskMenuWindowIfNeeded"),
+            "WindowManager should create or reuse the desk pet dashboard through a window helper."
         )
     }
 
-    func testDeskPetDashboardPanelChromeAndLifecycleAreConfigured() throws {
+    func testDeskPetDashboardWindowChromeAndLifecycleAreConfigured() throws {
         let source = try readProjectSource("MalDaze/WindowManager/WindowManager.swift")
 
-        XCTAssertTrue(source.contains("override var canBecomeKey: Bool { true }"))
-        XCTAssertTrue(source.contains("panel.backgroundColor = .clear"))
-        XCTAssertTrue(source.contains("panel.isOpaque = false"))
-        XCTAssertTrue(source.contains("panel.hasShadow = true"))
-        XCTAssertTrue(source.contains("panel.isReleasedWhenClosed = false"))
-        XCTAssertTrue(source.contains("existing.setFrame(Self.dashboardPanelFrame"))
-        XCTAssertTrue(source.contains("panel.orderOut(nil)"))
+        XCTAssertTrue(source.contains("override var canBecomeMain: Bool { true }"))
+        XCTAssertTrue(source.contains("dashboardWindow.backgroundColor = .clear"))
+        XCTAssertTrue(source.contains("dashboardWindow.isOpaque = false"))
+        XCTAssertTrue(source.contains("dashboardWindow.hasShadow = true"))
+        XCTAssertTrue(source.contains("dashboardWindow.isReleasedWhenClosed = false"))
+        XCTAssertTrue(source.contains("collectionBehavior = [.managed, .fullScreenNone]"))
+        XCTAssertTrue(source.contains("deskPetDashboardWindowIdentifier"))
+        XCTAssertTrue(source.contains("dashboardWindow.orderOut(nil)"))
     }
 
-    func testDeskPetLeftClickAndShortcutRouteThroughDashboardPanelHelper() throws {
+    func testDeskPetLeftClickAndShortcutRouteThroughDashboardToggle() throws {
         let source = try readProjectSource("MalDaze/WindowManager/WindowManager.swift")
         let presentRange = try XCTUnwrap(
             rangeOfFunction(named: "presentDeskMenu", in: source),
             "WindowManager should implement the desk pet presenter entry point."
         )
         let presentSource = String(source[presentRange])
+        let shortcutRange = try XCTUnwrap(
+            rangeOfFunction(named: "presentDeskMenuFromGlobalShortcut", in: source),
+            "WindowManager should implement the global shortcut dashboard entry."
+        )
+        let shortcutSource = String(source[shortcutRange])
 
         XCTAssertTrue(
-            presentSource.contains("makeDeskMenuPanelIfNeeded(anchorRectInScreen:"),
-            "Desk pet left-click should route through the dashboard panel helper."
+            presentSource.contains("toggleDashboardWindow()"),
+            "Desk pet left-click should route through the unified dashboard toggle."
+        )
+        XCTAssertFalse(
+            presentSource.contains("DeskPetDashboardPanelLayout"),
+            "Desk pet left-click should not re-anchor the dashboard with the legacy panel layout."
         )
         XCTAssertTrue(
-            presentSource.contains("panel.isVisible"),
-            "Desk pet left-click should toggle an already-visible dashboard panel closed."
+            shortcutSource.contains("toggleDashboardWindow()"),
+            "Global shortcut should use the same dashboard toggle entry."
         )
         XCTAssertFalse(
             presentSource.contains("show(relativeTo:"),
@@ -233,188 +261,100 @@ final class ControlPanelPresentationTests: XCTestCase {
         )
     }
 
-    func testDeskPetDashboardOwnsCustomDismissBehavior() throws {
+    func testDeskPetDashboardUsesEscAndCmdWDismissOnly() throws {
         let source = try readProjectSource("MalDaze/WindowManager/WindowManager.swift")
+        let escMonitorSource = try functionSource(named: "installDashboardEscMonitor", in: source)
 
-        XCTAssertTrue(source.contains("installDashboardDismissMonitors()"))
-        XCTAssertTrue(source.contains("tearDownDashboardDismissMonitors()"))
-        XCTAssertTrue(source.contains("NSEvent.addGlobalMonitorForEvents"))
-        XCTAssertTrue(
-            source.contains("NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown])"),
-            "Dashboard dismissal should include a local mouse monitor so clicks inside the current app but outside the panel close it."
+        XCTAssertTrue(source.contains("installDashboardEscMonitor()"))
+        XCTAssertTrue(source.contains("tearDownDashboardEscMonitor()"))
+        XCTAssertFalse(
+            source.contains("installDashboardDismissMonitors()"),
+            "Dashboard should not install legacy outside-click dismiss monitors."
         )
-        XCTAssertTrue(source.contains("NSEvent.addLocalMonitorForEvents(matching: .keyDown)"))
-        XCTAssertTrue(source.contains("panel.frame.contains(mouse)"))
-        XCTAssertTrue(source.contains("win.frame.contains(mouse)"))
-        XCTAssertTrue(source.contains("event.keyCode == 53"))
-        XCTAssertTrue(source.contains("smartInputPanel == nil"))
-        XCTAssertTrue(source.contains("NSApplication.didResignActiveNotification"))
+        XCTAssertFalse(
+            escMonitorSource.contains("NSApplication.didResignActiveNotification"),
+            "Dashboard should not auto-hide on app deactivation."
+        )
+        XCTAssertFalse(
+            escMonitorSource.contains("addGlobalMonitorForEvents"),
+            "Dashboard esc monitor should not use global mouse monitors for dismissal."
+        )
+        XCTAssertTrue(escMonitorSource.contains("NSEvent.addLocalMonitorForEvents(matching: .keyDown)"))
+        XCTAssertTrue(escMonitorSource.contains("event.keyCode == 53"))
+        XCTAssertTrue(escMonitorSource.contains("charactersIgnoringModifiers?.lowercased() == \"w\""))
+        XCTAssertTrue(escMonitorSource.contains("smartInputPanel == nil"))
     }
 
-    func testDeskPetDashboardDismissalUsesCentralInsidePanelGuard() throws {
+    func testPresentRestAndBreakRunDoNotHideDashboardOnEntry() throws {
         let source = try readProjectSource("MalDaze/WindowManager/WindowManager.swift")
-        let helperRange = try XCTUnwrap(
-            rangeOfFunction(named: "dashboardPanelContainsMouseLocation", in: source),
-            "WindowManager should centralize Dashboard Panel inside-click detection."
-        )
-        let helperSource = String(source[helperRange])
+        let presentRestSource = try functionSource(named: "presentRest", in: source)
+        let presentBreakRunSource = try functionSource(named: "presentBreakRun", in: source)
 
-        XCTAssertTrue(
-            source.contains("private func dashboardPanelContainsMouseLocation(_ mouse: NSPoint) -> Bool"),
-            "The inside-panel guard should be a private helper with an explicit NSPoint input."
+        XCTAssertFalse(
+            presentRestSource.contains("closeDeskMenuImmediate"),
+            "Starting fullscreen rest should not hide the dashboard window."
         )
-        XCTAssertTrue(
-            helperSource.contains("guard let panel = deskMenuPanel, panel.isVisible else"),
-            "The guard should only treat a visible Dashboard Panel as an internal click target."
+        XCTAssertFalse(
+            presentBreakRunSource.contains("closeDeskMenuImmediate"),
+            "Starting break-run rest should not hide the dashboard window."
         )
-        XCTAssertTrue(
-            helperSource.contains("return false"),
-            "When the Dashboard Panel is absent or hidden, the helper should report outside-panel."
-        )
-        XCTAssertTrue(
-            helperSource.contains("return panel.frame.contains(mouse)"),
-            "The helper should own the Dashboard Panel frame containment check."
-        )
-
-        let installSource = try functionSource(named: "installDashboardDismissMonitors", in: source)
-        let monitorSources: [(String, String)] = [
-            (
-                "global mouse monitor",
-                try XCTUnwrap(
-                    closureSource(
-                        assignedTo: "transientMonitor",
-                        containing: "NSEvent.addGlobalMonitorForEvents",
-                        in: installSource
-                    )
-                )
-            ),
-            (
-                "local mouse monitor",
-                try XCTUnwrap(
-                    closureSource(
-                        assignedTo: "localMouseDismissMonitor",
-                        containing: "NSEvent.addLocalMonitorForEvents",
-                        in: installSource
-                    )
-                )
-            )
-        ]
-
-        for (label, monitorSource) in monitorSources {
-            XCTAssertTrue(
-                monitorSource.contains("dashboardPanelContainsMouseLocation(mouse)"),
-                "\(label) should use the centralized Dashboard Panel inside-click guard."
-            )
-            XCTAssertFalse(
-                monitorSource.contains("panel.frame.contains(mouse)"),
-                "\(label) should not duplicate Dashboard Panel frame checks inline."
-            )
-            XCTAssertTrue(
-                monitorSource.contains("win.frame.contains(mouse)"),
-                "\(label) should keep desk-pet window clicks from dismissing the Dashboard Panel."
-            )
-            XCTAssertTrue(
-                monitorSource.contains("closeDeskMenuPanelWithFade()"),
-                "\(label) should retain the existing outside-click dismissal path."
-            )
-        }
     }
 
-    func testDeskPetDashboardInternalClicksSuppressImmediateDeactivateDismissal() throws {
-        let source = try readProjectSource("MalDaze/WindowManager/WindowManager.swift")
+    func testMalDazeDefaultsExposesDashboardWindowPersistenceKeys() throws {
+        let source = try readProjectSource("MalDaze/MalDazeDefaults.swift")
+
+        XCTAssertTrue(source.contains("static let dashboardWindowOriginX"))
+        XCTAssertTrue(source.contains("static let dashboardWindowOriginY"))
+        XCTAssertTrue(source.contains("static let dashboardWindowWidth"))
+        XCTAssertTrue(source.contains("static let dashboardWindowHeight"))
+    }
+
+    func testApplicationShouldHandleReopenFocusesDashboardWithoutToggle() throws {
+        let appDelegateSource = try readProjectSource("MalDaze/MalDazeAppDelegate.swift")
+        let appViewModelSource = try readProjectSource("MalDaze/AppViewModel.swift")
+        let windowManagerSource = try readProjectSource("MalDaze/WindowManager/WindowManager.swift")
+        let notificationsSource = try readProjectSource("MalDaze/MalDazeBroadcastNotifications.swift")
 
         XCTAssertTrue(
-            source.contains("private var dashboardInternalClickDismissSuppressionUntil: Date?"),
-            "WindowManager should keep short-lived state for internal Dashboard Panel clicks that may trigger app deactivation."
+            notificationsSource.contains("focusDashboardFromDock"),
+            "Broadcast notifications should define a dock-specific dashboard focus channel."
         )
         XCTAssertTrue(
-            source.contains("private static let dashboardInternalClickDismissSuppressionDuration: TimeInterval"),
-            "The deactivation suppression window should be named and scoped to WindowManager."
+            appDelegateSource.contains("MalDazeBroadcastNotifications.focusDashboardFromDock"),
+            "Dock reopen should post a dock-specific dashboard focus notification."
         )
-
-        let recordSource = try functionSource(
-            named: "recordDashboardInternalClickForDismissSuppression",
-            in: source
-        )
-        XCTAssertTrue(
-            recordSource.contains("dashboardInternalClickDismissSuppressionUntil = now.addingTimeInterval(Self.dashboardInternalClickDismissSuppressionDuration)"),
-            "Recording an internal panel click should arm a short suppression deadline."
-        )
-
-        let suppressionSource = try functionSource(
-            named: "shouldSuppressDashboardDeactivateDismissal",
-            in: source
+        XCTAssertFalse(
+            appDelegateSource.contains("presentDeskPetMenu"),
+            "Dock reopen should not reuse the desk pet menu toggle notification."
         )
         XCTAssertTrue(
-            suppressionSource.contains("guard let suppressionUntil = dashboardInternalClickDismissSuppressionUntil else { return false }"),
-            "Deactivate dismissal should only be suppressed after a recorded internal Dashboard Panel click."
-        )
-        XCTAssertOrdered(
-            [
-                "if now < suppressionUntil",
-                "dashboardInternalClickDismissSuppressionUntil = nil",
-                "return true"
-            ],
-            in: suppressionSource,
-            "An active suppression window should be consumed before the deactivation observer can close the panel."
+            appViewModelSource.contains("MalDazeBroadcastNotifications.focusDashboardFromDock"),
+            "AppViewModel should observe the dock-specific dashboard focus notification."
         )
         XCTAssertTrue(
-            suppressionSource.contains("return false"),
-            "Expired or absent suppression state should allow normal deactivation dismissal."
+            appViewModelSource.contains("windowManager.showOrFocusDashboardFromDock()"),
+            "AppViewModel should route dock reopen to a show/focus entry point."
         )
-
-        let installSource = try functionSource(named: "installDashboardDismissMonitors", in: source)
-        let monitorSources: [(String, String)] = [
-            (
-                "global mouse monitor",
-                try XCTUnwrap(
-                    closureSource(
-                        assignedTo: "transientMonitor",
-                        containing: "NSEvent.addGlobalMonitorForEvents",
-                        in: installSource
-                    )
-                )
-            ),
-            (
-                "local mouse monitor",
-                try XCTUnwrap(
-                    closureSource(
-                        assignedTo: "localMouseDismissMonitor",
-                        containing: "NSEvent.addLocalMonitorForEvents",
-                        in: installSource
-                    )
-                )
-            )
-        ]
-
-        for (label, monitorSource) in monitorSources {
-            XCTAssertOrdered(
-                [
-                    "if self.dashboardPanelContainsMouseLocation(mouse) {",
-                    "self.recordDashboardInternalClickForDismissSuppression()",
-                    "return"
-                ],
-                in: monitorSource,
-                "\(label) should record internal panel clicks before returning without outside-click dismissal."
-            )
-        }
-
-        let deactivateRange = try XCTUnwrap(
-            installSource.range(of: "NSApplication.didResignActiveNotification"),
-            "Dashboard dismissal should observe app deactivation."
+        XCTAssertTrue(
+            windowManagerSource.contains("func showOrFocusDashboardFromDock()"),
+            "WindowManager should expose a dock-specific show/focus entry point."
         )
-        let deactivateSource = String(installSource[deactivateRange.lowerBound...])
-
-        XCTAssertOrdered(
-            [
-                "NSApplication.didResignActiveNotification",
-                "guard let self else { return }",
-                "if self.shouldSuppressDashboardDeactivateDismissal()",
-                "return",
-                "self.closeDeskMenuPanelWithFade()"
-            ],
-            in: deactivateSource,
-            "App deactivation should honor a just-recorded internal Dashboard Panel click before closing."
+        XCTAssertTrue(
+            windowManagerSource.contains("dashboard.makeKeyAndOrderFront(nil)"),
+            "Dock focus should bring an already-visible dashboard window to the front."
+        )
+        XCTAssertTrue(
+            windowManagerSource.contains("func presentDeskMenu(from stage: PetStageView, anchorRect: NSRect)"),
+            "Desk pet left-click should keep its own presenter entry point."
+        )
+        let presentDeskMenuSource = try functionSource(
+            named: "presentDeskMenu",
+            in: windowManagerSource,
+            after: "// MARK: - Dashboard 标准窗口"
+        )
+        XCTAssertTrue(
+            presentDeskMenuSource.contains("toggleDashboardWindow()"),
+            "Desk pet left-click should still toggle the dashboard window."
         )
     }
 
@@ -430,9 +370,9 @@ final class ControlPanelPresentationTests: XCTestCase {
             "Global shortcut comments should describe the Dashboard Panel, not MenuBarContentView."
         )
         XCTAssertTrue(
-            source.contains("绑定后右下角桌宠可点击打开 Dashboard Panel")
-                && source.contains("全局快捷键：锚在桌宠上与左键相同，打开 Dashboard Panel"),
-            "WindowManaging comments should use Dashboard Panel semantics for the desk pet entry."
+            source.contains("绑定后右下角桌宠可点击 toggle Dashboard 标准窗口")
+                && source.contains("全局快捷键：与左键点桌宠相同，toggle Dashboard 标准窗口"),
+            "WindowManaging comments should use Dashboard window semantics for the desk pet entry."
         )
     }
 
@@ -474,36 +414,27 @@ final class ControlPanelPresentationTests: XCTestCase {
             "The sizing helper should clamp the preferred width so it never exceeds the visible screen width."
         )
         XCTAssertTrue(
-            source.contains("min(max(minimumContentWidth, clampedTargetWidth), visibleFrame.width)"),
+            source.contains("let width = min(layoutWidth * panelWidthScale, visibleFrame.width)"),
             "The sizing helper should keep the shell near full width while clamping it to the visible screen width."
         )
     }
 
-    func testDeskPetDashboardPreferredSizeUsesAnchorScreenVisibleFrame() throws {
+    func testDeskPetDashboardPreferredSizeUsesPrimaryVisibleFrame() throws {
         let windowManagerSource = try readProjectSource("MalDaze/WindowManager/WindowManager.swift")
         let dashboardSource = try readProjectSource("MalDaze/DashboardRootView.swift")
-        let helperRange = try XCTUnwrap(
-            rangeOfFunction(named: "makeDeskMenuPanelIfNeeded", in: windowManagerSource),
-            "WindowManager should create or reuse the dashboard panel through a single helper."
-        )
-        let helperSource = String(windowManagerSource[helperRange])
         let frameRange = try XCTUnwrap(
-            rangeOfFunction(named: "dashboardPanelFrame", in: windowManagerSource),
-            "WindowManager should calculate dashboard panel frame through a testable helper."
+            rangeOfFunction(named: "resolvedDashboardWindowFrame", in: windowManagerSource),
+            "WindowManager should calculate dashboard window frame through a testable helper."
         )
         let frameSource = String(windowManagerSource[frameRange])
 
-        XCTAssertFalse(
-            helperSource.contains("MenuBarContentView.controlPanelPreferredContentSize"),
-            "Desk pet dashboard sizing should not use the old menu-bar preferred-size shortcut."
+        XCTAssertTrue(
+            frameSource.contains("DeskPetDashboardWindowLayout.centeredFrame(visibleFrame:"),
+            "WindowManager should center the dashboard on the primary visible frame when no persistence exists."
         )
         XCTAssertTrue(
-            frameSource.contains("DeskPetDashboardPanelLayout.frame(anchorRectInScreen: anchor, visibleFrame: visibleFrame)"),
-            "WindowManager should delegate dashboard frame geometry to the testable panel layout helper."
-        )
-        XCTAssertTrue(
-            windowManagerSource.contains("DeskPetDashboardView.preferredContentSize(screenVisibleFrame: visibleFrame)"),
-            "Dashboard panel preferred size should be derived from the visibleFrame of the screen containing the anchor."
+            frameSource.contains("MalDazeDefaults.dashboardWindowOriginX"),
+            "WindowManager should restore persisted dashboard window origin."
         )
         XCTAssertTrue(
             dashboardSource.contains("static func preferredContentSize(screenVisibleFrame visibleFrame: NSRect?) -> NSSize"),
@@ -511,17 +442,17 @@ final class ControlPanelPresentationTests: XCTestCase {
         )
     }
 
-    func testDeskPetDashboardPanelLayoutClampsToSmallVisibleFrame() {
+    func testDeskPetDashboardWindowLayoutClampsToSmallVisibleFrame() {
         let visibleFrame = NSRect(x: 100, y: 200, width: 760, height: 520)
-        let anchor = NSRect(x: 420, y: 230, width: 80, height: 80)
+        let oversized = NSRect(x: 50, y: 50, width: 900, height: 700)
 
-        let frame = DeskPetDashboardPanelLayout.frame(
-            anchorRectInScreen: anchor,
+        let frame = DeskPetDashboardWindowLayout.clampedFrame(
+            oversized,
             visibleFrame: visibleFrame
         )
         let insetVisibleFrame = visibleFrame.insetBy(
-            dx: DeskPetDashboardPanelLayout.margin,
-            dy: DeskPetDashboardPanelLayout.margin
+            dx: DeskPetDashboardWindowLayout.margin,
+            dy: DeskPetDashboardWindowLayout.margin
         )
 
         XCTAssertLessThanOrEqual(frame.width, insetVisibleFrame.width)
@@ -532,23 +463,19 @@ final class ControlPanelPresentationTests: XCTestCase {
         XCTAssertLessThanOrEqual(frame.maxY, insetVisibleFrame.maxY)
     }
 
-    func testDeskPetDashboardPanelLayoutClampsNearRightEdgeAndFallsBelowWhenNoRoomAbove() {
+    func testDeskPetDashboardWindowLayoutCentersOnVisibleFrame() {
         let visibleFrame = NSRect(x: 0, y: 0, width: 1440, height: 900)
-        let anchor = NSRect(x: 1370, y: 820, width: 56, height: 56)
 
-        let frame = DeskPetDashboardPanelLayout.frame(
-            anchorRectInScreen: anchor,
-            visibleFrame: visibleFrame
-        )
+        let frame = DeskPetDashboardWindowLayout.centeredFrame(visibleFrame: visibleFrame)
         let insetVisibleFrame = visibleFrame.insetBy(
-            dx: DeskPetDashboardPanelLayout.margin,
-            dy: DeskPetDashboardPanelLayout.margin
+            dx: DeskPetDashboardWindowLayout.margin,
+            dy: DeskPetDashboardWindowLayout.margin
         )
 
         XCTAssertLessThanOrEqual(frame.maxX, insetVisibleFrame.maxX)
         XCTAssertGreaterThanOrEqual(frame.minX, insetVisibleFrame.minX)
-        XCTAssertLessThan(frame.maxY, anchor.minY)
-        XCTAssertGreaterThanOrEqual(frame.minY, insetVisibleFrame.minY)
+        XCTAssertEqual(frame.midX, insetVisibleFrame.midX, accuracy: 1)
+        XCTAssertEqual(frame.midY, insetVisibleFrame.midY, accuracy: 1)
     }
 
     func testWideDashboardShellKeepsRemindersAndControlsColumnsFixedWithLearningPanelColumn() throws {

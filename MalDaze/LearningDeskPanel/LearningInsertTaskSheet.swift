@@ -40,7 +40,10 @@ struct LearningInsertTaskSheet: View {
                 Form {
                     TextField("任务标题", text: $title)
                     Stepper("时长：\(duration) 分钟", value: $duration, in: 5...240, step: 5)
-                    DatePicker("日期", selection: $pickedDate, displayedComponents: .date)
+                    Section("日期") {
+                        ScrollMonthDatePicker(selection: $pickedDate, accessibilityLabel: "任务日期")
+                            .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+                    }
                     Picker("项目", selection: $projectId) {
                         ForEach(projects) { project in
                             Text(project.name).tag(project.id)
@@ -63,6 +66,7 @@ struct LearningInsertTaskSheet: View {
         }
         .padding(20)
         .frame(width: 360)
+        .frame(minHeight: 520)
         .onChange(of: projects.map(\.id)) { _ in
             if !projects.contains(where: { $0.id == projectId }) {
                 projectId = projects.first?.id ?? ""

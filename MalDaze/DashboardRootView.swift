@@ -69,6 +69,7 @@ struct DeskPetDashboardView: View {
 
     var body: some View {
         DashboardRootView(viewModel: viewModel)
+            .environmentObject(viewModel.dashboardEscapeRouter)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .background {
                 ZStack {
@@ -396,6 +397,11 @@ struct DashboardRootView: View {
         .sheet(item: $reminderUnderEdit) { item in
             DeskReminderEditSheet(item: item, deskReminders: deskReminders)
         }
+        .deskPetDashboardEscapeOverlay(
+            id: "reminders.edit",
+            isPresented: reminderUnderEdit != nil,
+            onDismiss: { reminderUnderEdit = nil }
+        )
         .confirmationDialog(
             "确认删除这条提醒？",
             isPresented: Binding(
@@ -416,6 +422,11 @@ struct DashboardRootView: View {
         } message: {
             Text("将从系统「提醒事项」中移除。")
         }
+        .deskPetDashboardEscapeOverlay(
+            id: "reminders.deleteConfirm",
+            isPresented: deleteConfirmationId != nil,
+            onDismiss: { deleteConfirmationId = nil }
+        )
         .task {
             await deskReminders.prepare()
         }

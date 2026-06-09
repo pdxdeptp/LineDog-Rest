@@ -53,6 +53,8 @@ final class AppViewModel: ObservableObject {
 
     /// 提醒事项同步（EventKit）；与菜单栏、桌宠 Dashboard 共用。
     let deskReminders: DeskRemindersModel
+    /// 桌宠 Dashboard Esc 分级：sheet / 对话框优先于关面板。
+    let dashboardEscapeRouter = DeskPetDashboardEscapeRouter()
 
     private static let restBlocksClicksDefaultsKey = "MalDaze.restBlocksClicksDuringRest"
     private static let restDoubleClickEndsRestDefaultsKey = MalDazeDefaults.restDoubleClickEndsRest
@@ -103,6 +105,7 @@ final class AppViewModel: ObservableObject {
     private var smartReminderThinkingActive = false
     private var smartReminderShortcutObserver: NSObjectProtocol?
     private var deskPetMenuShortcutObserver: NSObjectProtocol?
+    private var focusDashboardFromDockObserver: NSObjectProtocol?
     private var sevenMinuteShortcutObserver: NSObjectProtocol?
     private var resetIdlePetShortcutObserver: NSObjectProtocol?
     private var idlePetIconSidePointsObserver: NSObjectProtocol?
@@ -292,6 +295,14 @@ final class AppViewModel: ObservableObject {
             self?.presentDeskPetMenuFromGlobalShortcut()
         }
 
+        focusDashboardFromDockObserver = NotificationCenter.default.addObserver(
+            forName: MalDazeBroadcastNotifications.focusDashboardFromDock,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.showOrFocusDashboardFromDock()
+        }
+
         sevenMinuteShortcutObserver = NotificationCenter.default.addObserver(
             forName: MalDazeBroadcastNotifications.toggleSevenMinuteReminder,
             object: nil,
@@ -478,6 +489,9 @@ final class AppViewModel: ObservableObject {
         if let deskPetMenuShortcutObserver {
             NotificationCenter.default.removeObserver(deskPetMenuShortcutObserver)
         }
+        if let focusDashboardFromDockObserver {
+            NotificationCenter.default.removeObserver(focusDashboardFromDockObserver)
+        }
         if let sevenMinuteShortcutObserver {
             NotificationCenter.default.removeObserver(sevenMinuteShortcutObserver)
         }
@@ -497,6 +511,10 @@ final class AppViewModel: ObservableObject {
 
     private func presentDeskPetMenuFromGlobalShortcut() {
         windowManager.presentDeskMenuFromGlobalShortcut()
+    }
+
+    private func showOrFocusDashboardFromDock() {
+        windowManager.showOrFocusDashboardFromDock()
     }
 
     private static func validSuspendedTimerModeSnapshot(defaults: UserDefaults = .standard) -> Mode? {

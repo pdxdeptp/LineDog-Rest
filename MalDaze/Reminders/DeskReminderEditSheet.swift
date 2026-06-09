@@ -18,6 +18,8 @@ struct DeskReminderEditSheet: View {
     @State private var isSaving = false
     @State private var didLoad = false
 
+    private let calendar = ScrollMonthDatePickerLogic.pickerCalendar()
+
     var body: some View {
         NavigationStack {
             Group {
@@ -45,14 +47,18 @@ struct DeskReminderEditSheet: View {
                                 }
                             ))
                             if draft.dueDate != nil {
-                                DatePicker(
-                                    "日期",
-                                    selection: Binding(
-                                        get: { draft.dueDate ?? Date() },
-                                        set: { draft.dueDate = $0 }
-                                    ),
-                                    displayedComponents: draft.includesTimeInDueDate ? [.date, .hourAndMinute] : [.date]
+                                ScrollMonthDatePicker(
+                                    selection: dueDateBinding,
+                                    accessibilityLabel: "截止日期"
                                 )
+                                .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+                                if draft.includesTimeInDueDate {
+                                    DatePicker(
+                                        "时刻",
+                                        selection: dueTimeBinding,
+                                        displayedComponents: .hourAndMinute
+                                    )
+                                }
                                 Toggle("指定具体时刻", isOn: $draft.includesTimeInDueDate)
                             }
                         }
@@ -85,10 +91,48 @@ struct DeskReminderEditSheet: View {
                 }
             }
         }
-        .frame(minWidth: 420, minHeight: 380)
+        .frame(minWidth: 420, minHeight: 480)
         .task(id: item.id) {
             await load()
         }
+    }
+
+    private var dueDateBinding: Binding<Date> {
+        Binding(
+            get: { draft.dueDate ?? Date() },
+            set: { newDate in
+                guard let current = draft.dueDate else {
+                    draft.dueDate = ScrollMonthDatePickerLogic.normalizedSelection(newDate, calendar: calendar)
+                    return
+                }
+                if draft.includesTimeInDueDate {
+                    draft.dueDate = ScrollMonthDatePickerLogic.mergeCalendarDay(
+                        from: newDate,
+                        preservingTimeFrom: current,
+                        calendar: calendar
+                    )
+                } else {
+                    draft.dueDate = ScrollMonthDatePickerLogic.normalizedSelection(newDate, calendar: calendar)
+                }
+            }
+        )
+    }
+
+    private var dueTimeBinding: Binding<Date> {
+        Binding(
+            get: { draft.dueDate ?? Date() },
+            set: { newTime in
+                guard let current = draft.dueDate else {
+                    draft.dueDate = newTime
+                    return
+                }
+                draft.dueDate = ScrollMonthDatePickerLogic.mergeCalendarDay(
+                    from: current,
+                    preservingTimeFrom: newTime,
+                    calendar: calendar
+                )
+            }
+        )
     }
 
     private func load() async {

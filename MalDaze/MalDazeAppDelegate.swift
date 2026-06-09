@@ -49,12 +49,10 @@ final class MalDazeAppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// Dock 图标被再次点按时，激活应用并把桌宠窗提到前层（休息霸屏时仍为 `screenSaver` 层级，由 `WindowManager` 管理）。
+    /// Dock 图标被再次点按时，激活应用并 show/focus Dashboard（不关已打开的窗口）。
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         NSApp.activate(ignoringOtherApps: true)
-        if let w = sender.windows.first(where: { $0.identifier?.rawValue == WindowManager.deskPetWindowIdentifier }) {
-            w.orderFrontRegardless()
-        }
+        NotificationCenter.default.post(name: MalDazeBroadcastNotifications.focusDashboardFromDock, object: nil)
         return true
     }
 }

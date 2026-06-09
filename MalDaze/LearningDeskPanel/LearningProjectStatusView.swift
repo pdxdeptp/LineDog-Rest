@@ -254,13 +254,16 @@ struct LearningDeadlineEditSheet: View {
             Text(session.projectName)
                 .font(.subheadline.weight(.semibold))
 
-            DatePicker("新截止日", selection: $pickedDate, displayedComponents: .date)
-                .datePickerStyle(.graphical)
+            ScrollMonthDatePicker(
+                selection: $pickedDate,
+                accessibilityLabel: "新截止日",
+                onDoublePick: { _ in confirmIfAllowed() }
+            )
                 .onChange(of: pickedDate) { _ in
                     onDateChange(LearningDeskPanelViewModel.isoDate(pickedDate))
                 }
 
-            Text("未完成课程将从今天起重排到新截止日；已完成的课不变。")
+            Text("未完成课程将从今天起重排到新截止日；已完成的课不变。双击日期可直接确认。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
@@ -281,7 +284,7 @@ struct LearningDeadlineEditSheet: View {
                 Button("取消", action: onCancel)
                 Spacer()
                 Button("确认") {
-                    onConfirm(LearningDeskPanelViewModel.isoDate(pickedDate))
+                    confirmIfAllowed()
                 }
                 .keyboardShortcut(.defaultAction)
                 .disabled(!canConfirm)
@@ -289,6 +292,11 @@ struct LearningDeadlineEditSheet: View {
         }
         .padding(20)
         .frame(minWidth: 340)
+    }
+
+    private func confirmIfAllowed() {
+        guard canConfirm else { return }
+        onConfirm(LearningDeskPanelViewModel.isoDate(pickedDate))
     }
 
     private var canConfirm: Bool {

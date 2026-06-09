@@ -180,6 +180,12 @@ enum MalDazeDefaults {
         return min(max(raw, 0), 1)
     }
 
+    /// Dashboard 标准窗口 frame（origin + size），Dock / 桌宠入口恢复上次位置。
+    static let dashboardWindowOriginX = "MalDaze.dashboardWindowOriginX"
+    static let dashboardWindowOriginY = "MalDaze.dashboardWindowOriginY"
+    static let dashboardWindowWidth = "MalDaze.dashboardWindowWidth"
+    static let dashboardWindowHeight = "MalDaze.dashboardWindowHeight"
+
     /// Dashboard 左栏计划区高度占比（0.4–0.75），默认 0.6。
     static let dashboardLeftPlanFraction = "MalDaze.dashboard.leftPlanFraction"
     static let defaultDashboardLeftPlanFraction = 0.6

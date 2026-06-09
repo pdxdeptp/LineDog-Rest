@@ -15,6 +15,7 @@ struct LearningTaskRow: View {
     var onOpenSourceURL: (() -> Void)?
 
     @State private var pickedDate = Date()
+    @State private var showDatePopover = false
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
@@ -75,13 +76,9 @@ struct LearningTaskRow: View {
                     Divider()
                 }
                 Button("推迟到明天", action: onPostponeTomorrow)
-                DatePicker(
-                    "选择日期",
-                    selection: $pickedDate,
-                    displayedComponents: .date
-                )
-                .onChange(of: pickedDate) { newValue in
-                    onPickDate(newValue)
+                Button("选择日期…") {
+                    pickedDate = Date()
+                    showDatePopover = true
                 }
                 if let onDelete {
                     Divider()
@@ -93,6 +90,18 @@ struct LearningTaskRow: View {
             }
             .menuStyle(.borderlessButton)
             .disabled(isBusy)
+            .popover(isPresented: $showDatePopover, arrowEdge: .trailing) {
+                ScrollMonthDatePicker(
+                    selection: $pickedDate,
+                    accessibilityLabel: "改期日期",
+                    onSelect: { date in
+                        onPickDate(date)
+                        showDatePopover = false
+                    }
+                )
+                .padding(12)
+                .frame(width: ScrollMonthDatePickerLogic.popoverWidth)
+            }
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 4)

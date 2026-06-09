@@ -59,6 +59,11 @@ struct LearningDeskPanelView: View {
                 onCancel: { viewModel.cancelMovePreview() }
             )
         }
+        .deskPetDashboardEscapeOverlay(
+            id: "learning.movePreview",
+            isPresented: viewModel.movePreview != nil,
+            onDismiss: { viewModel.cancelMovePreview() }
+        )
         .sheet(isPresented: $viewModel.showInsertSheet) {
             LearningInsertTaskSheet(
                 projects: viewModel.insertProjectOptions,
@@ -76,6 +81,11 @@ struct LearningDeskPanelView: View {
                 onCancel: { viewModel.showInsertSheet = false }
             )
         }
+        .deskPetDashboardEscapeOverlay(
+            id: "learning.insertTask",
+            isPresented: viewModel.showInsertSheet,
+            onDismiss: { viewModel.showInsertSheet = false }
+        )
         .confirmationDialog(
             "删除任务？",
             isPresented: Binding(
@@ -95,6 +105,11 @@ struct LearningDeskPanelView: View {
                 Text("将删除「\(candidate.title)」，此操作不可撤销。")
             }
         }
+        .deskPetDashboardEscapeOverlay(
+            id: "learning.deleteTask",
+            isPresented: viewModel.deleteCandidate != nil,
+            onDismiss: { viewModel.deleteCandidate = nil }
+        )
         .sheet(item: $viewModel.completeDurationCandidate) { candidate in
             LearningCompleteDurationSheet(
                 title: candidate.title,
@@ -105,6 +120,11 @@ struct LearningDeskPanelView: View {
                 onCancel: { viewModel.cancelCompleteWithDuration() }
             )
         }
+        .deskPetDashboardEscapeOverlay(
+            id: "learning.completeDuration",
+            isPresented: viewModel.completeDurationCandidate != nil,
+            onDismiss: { viewModel.cancelCompleteWithDuration() }
+        )
         .sheet(item: $viewModel.deadlineEditSession) { session in
             LearningDeadlineEditSheet(
                 session: session,
@@ -123,6 +143,16 @@ struct LearningDeskPanelView: View {
                 onCancel: { viewModel.cancelDeadlineEdit() }
             )
         }
+        .deskPetDashboardEscapeOverlay(
+            id: "learning.deadlineEdit",
+            isPresented: viewModel.deadlineEditSession != nil,
+            onDismiss: { viewModel.cancelDeadlineEdit() }
+        )
+        .deskPetDashboardEscapeOverlay(
+            id: "learning.deleteProject",
+            isPresented: viewModel.deleteProjectCandidate != nil,
+            onDismiss: { viewModel.deleteProjectCandidate = nil }
+        )
     }
 
     @ViewBuilder
