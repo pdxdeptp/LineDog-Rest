@@ -48,9 +48,15 @@ MalDaze/
 | 睡眠提醒 | `data/sleep/sleep_schedule.json` | `sleep_tracker.py`, `morning-briefing.py` | `SleepReminder/` | [features/sleep.md](./features/sleep.md) | 已上线 |
 | 日待办 | 苹果提醒事项（无跨应用契约） | `day_reminders.py`, day-reminders skill | —（侧栏可选只读） | [features/day-reminders.md](./features/day-reminders.md) | 已上线 |
 | 到时强提醒 | `data/maldaze/intervention_request.json` | `intervention_request.py`, desk-intervention skill | `InterventionRequest/` | [features/desk-intervention.md](./features/desk-intervention.md) | 已上线 |
-| 学习 SSOT + 飞书完成 | `data/learning-assistant/projects.json` | `schedule.py`, learning skill | — | [learning-calendar.md](./features/learning-calendar.md) | 已上线 |
+| 学习 SSOT + 飞书完成 | `data/learning-assistant/projects.json` | `schedule.py`, learning skill | — | [learning-desk-panel.md](./features/learning-desk-panel.md) | 已上线 |
 | 学习桌宠面板 v1 | 同上（经 CLI） | `schedule.py` + `--dry-run` | `LearningDeskPanel/` | [learning-desk-panel.md](./features/learning-desk-panel.md) | 已上线 |
-| 学习面板 L3 / rollover | — | l3 / rollover changes | follow-up | [learning-desk-panel-followup.md](./features/learning-desk-panel-followup.md) | 文档就绪 |
+| 学习面板 L3 | `profile.json` `daily_capacity_minutes`（MalDaze 设置同步） | l3 CLI | `LearningDeskPanel/` + 设置 | [learning-desk-panel-followup.md](./features/learning-desk-panel-followup.md) | ✅ QA 通过 · 未归档 |
+| 新建学习项目 | 同上 SSOT | `create-project` + `plan` | —（仅对话入口） | [learning-desk-panel.md](./features/learning-desk-panel.md) | ✅ 已归档 2026-06-09 |
+| 学习面板 X7 项目 + deadline repack | 同上（`status` / `set-deadline`） | `set-deadline` 默认重排 | 项目 Tab US-10/12 | [learning-desk-panel.md](./features/learning-desk-panel.md) | ✅ 已归档 2026-06-09 |
+| 学习面板 X8 日程 | 同上（`schedule-range`） | `schedule-range` | 日程 Tab（月历 + Agenda） | [learning-desk-panel.md](./features/learning-desk-panel.md) | ✅ 已归档 2026-06-09 |
+| 学习面板 X9 今日核心 | `today.progress` | `today` | 双预算、进度、滚入区、实际时长、分组 | [learning-desk-panel.md](./features/learning-desk-panel.md) | 🟡 待 M-L12-core |
+| 学习面板 X10 今日导航 | `today.tomorrow_preview` · `pending.source_url` | `today` | 行动卡、明天预告、链接、repack 预览 | [learning-today-x9-x10.md](./features/learning-today-x9-x10.md) | 🟡 待 M-L12-nav |
+| 营养今日面板 X2 | `daily_log.json` → `panel` | `recommend.py` `refresh-panel` | `NutritionToday/` | [nutrition-today-panel.md](./features/nutrition-today-panel.md) | 🟡 待 M-N1 |
 | 晨报扩展 | — | `morning-briefing.py` | — | [ROADMAP.md](./ROADMAP.md) §5 | 已上线 |
 
 重构总目录：[ROADMAP.md](./ROADMAP.md) · OpenSpec：`openspec/specs/hermes-*` · `desk-intervention*`（change 已归档 2026-06-08）

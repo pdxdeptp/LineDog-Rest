@@ -1,10 +1,24 @@
 # 学习助手 v2 · 设计文档
 
-> **这是什么:** 学习助手 v2 重捋的设计捕获——用户故事、定盘星、已定决策、待解问题。
-> **这不是什么:** 不是 OpenSpec change,不是 PRD,不含实现。它是后续所有 v2 change 的母本。
-> **状态:** 设计定稿候选;全部 Open Question 已闭合(OQ1、OQ2、OQ3)。可 propose `study-plan`。
-> **来源:** explore 会话 2026-05-17(用户故事重捋)+ 2026-05-21(智能模式收尾、结构决定)+ 2026-05-22(OQ1 增删任务规则闭合 · 初始排布算法 · 对话路线 · D13 改写 · B 类一致性清理 · C1 放空日 · C2 取舍 · C3 滚动可视化 · C4 提议示例去单选钮 · C5 D7/D12 措辞圆角 · C6 D17 退役清单与方式)+ 2026-05-23(OQ3 开闭合 · parse 质量策略 · A decomposition pipeline + guided clarification 已定)。
-> **最后更新:** 2026-05-23
+> ## ⛔ DEPRECATED — 勿作实施依据
+>
+> **状态：** 已废弃（2026-06-09）。本文件为 2026-05 explore 阶段的历史草稿，**不得**再作为 propose / apply / scope 决策的母本或验收来源。
+>
+> **请以以下为准（按优先级）：**
+>
+> 1. 主 spec：`openspec/specs/learning-desk-panel/spec.md`、`openspec/specs/hermes-learning-calendar/spec.md`、`openspec/specs/hermes-morning-briefing/spec.md`
+> 2. Feature canonical：`docs/integrations/features/learning-desk-panel.md`、`docs/integrations/features/learning-calendar.md`
+> 3. 进行中的 change delta：`openspec/changes/<active-change>/specs/**/spec.md`
+> 4. 集成总览：`docs/integrations/ROADMAP.md`、`docs/integrations/hermes.md`
+>
+> 下文 US-* / D* 编号仅作考古参考；与主 spec 或已归档 change 冲突时，**以主 spec 为准**。
+
+---
+
+> **原说明（历史）:** 学习助手 v2 重捋的设计捕获——用户故事、定盘星、已定决策、待解问题。不是 OpenSpec change，不是 PRD，不含实现。
+> **原状态:** 设计定稿候选（已 superseded）。
+> **来源:** explore 会话 2026-05-17 ~ 2026-05-23。
+> **最后更新:** 2026-05-23 · **废弃标记:** 2026-06-09
 
 ---
 

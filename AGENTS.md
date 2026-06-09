@@ -4,6 +4,7 @@ This is the compact project contract. Full workflow detail lives in `docs/agent-
 
 ## Always
 - Cross-repo Hermes coupling (canonical, maintain here only): `docs/integrations/hermes.md`. Hermes side is pointer-only: `~/.hermes/docs/integrations/maldaze.md`.
+- **Hermes read-only UI (MalDaze)**: JSON/contract from Hermes is the only source of truth. Never add client-side suppression, optimistic hiding, shadow lists, or local filters to mask backend recalculation—fix Hermes/contract or document expected behavior. See `docs/agent-workflow.md` § Hermes read-only UI.
 - Output in Chinese; reason in English unless code or technical terms require English.
 - Protect user work: never reset, revert, overwrite, merge, or rebase user changes without explicit permission.
 - Before invoking any Superpowers skill, announce: `触发 skill: <skill-name>`.

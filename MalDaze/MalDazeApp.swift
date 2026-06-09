@@ -7,6 +7,7 @@ struct MalDazeApp: App {
 
     init() {
         MalDazeDefaults.migrateIdlePetAnimationIntensityFromLegacyIfNeeded()
+        MalDazeDefaults.ensureLearningCapacitySyncedToHermes()
     }
 
     var body: some Scene {

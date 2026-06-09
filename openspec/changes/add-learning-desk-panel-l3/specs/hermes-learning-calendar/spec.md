@@ -10,7 +10,7 @@ When `schedule.py today` builds the `pending` list, each pending row SHALL inclu
 
 ### Requirement: Week load CLI
 
-Hermes `schedule.py` SHALL provide a `week-load` subcommand that returns per-day scheduled study minutes for a forward date window and flags days exceeding `daily_capacity_minutes` from profile.
+Hermes `schedule.py` SHALL provide a `week-load` subcommand that returns per-day scheduled study minutes for a forward date window and flags days exceeding `daily_capacity_minutes` from profile (default fallback **300** minutes when unset).
 
 #### Scenario: Week load JSON output
 - **WHEN** MalDaze or tooling runs `schedule.py week-load --from <date> --days 28`

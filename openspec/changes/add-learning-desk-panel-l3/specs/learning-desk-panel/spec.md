@@ -25,12 +25,30 @@ MalDaze SHALL delete a single learning task by spawning `schedule.py remove --ta
 
 ### Requirement: Week load tab
 
-The learning desk panel SHALL provide a week-load tab that shows scheduled minutes per day for a forward window of 14 to 28 days and SHALL highlight days that exceed the daily study budget.
+The learning desk panel SHALL provide a week-load tab that shows scheduled study load per day for a forward window of up to 28 days, SHALL display values in **hours** (not minutes), and SHALL highlight days that exceed the user's configured daily study capacity.
 
 #### Scenario: Lazy load week data
 - **WHEN** the user switches to the week-load tab
 - **THEN** MalDaze loads week-load data via `schedule.py week-load` when available, or read-only aggregation from `projects.json`
+- **AND** each day shows load and capacity in hours such as `2.5 小时 / 5 小时`
 - **AND** over-capacity days are visually emphasized
+
+### Requirement: Configurable daily study capacity in settings
+
+MalDaze SHALL let the user configure daily study capacity in hours from Settings → Learning panel with a default of **5 hours**, range **1–12 hours**, step **0.5 hour**, and SHALL sync the value to Hermes `profile.json` as `daily_capacity_minutes`.
+
+#### Scenario: Change capacity in settings
+- **WHEN** the user adjusts the daily study capacity slider in Settings
+- **THEN** MalDaze saves the hours value locally and writes `daily_capacity_minutes = hours × 60` to Hermes profile
+- **AND** the learning panel refreshes today and week-load views to use the new capacity
+
+### Requirement: Insert task project picker uses active projects
+
+MalDaze SHALL populate the insert-task project picker from `schedule.py status` active projects, not only projects appearing in today's task list.
+
+#### Scenario: Project with no tasks today
+- **WHEN** the user opens the insert form and an active project has no tasks scheduled today
+- **THEN** that project still appears in the project picker
 
 ### Requirement: Auto refresh on projects.json changes
 

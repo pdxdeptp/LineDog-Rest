@@ -2,16 +2,21 @@ import AppKit
 import SwiftUI
 
 private enum DashboardLayout {
-    static let remindersColumnWidth: CGFloat = 300
+    /// 左栏基准 300pt；+15% 以容纳饮食宏量表（≈345pt）。
+    static let remindersColumnWidth: CGFloat = 300 * 1.15
     static let learningColumnMinWidth: CGFloat = 360
     static let controlsColumnWidth: CGFloat = 300
     static let horizontalPadding: CGFloat = 12
     static let dividerWidth: CGFloat = 1
     static let safeHorizontalMargin: CGFloat = 48
-    static let contentHeight: CGFloat = 664
+    static let baseContentHeight: CGFloat = 664
+    /// 整板相对基准尺寸的缩放（宽 +5%、高 +15%）。
+    static let panelWidthScale: CGFloat = 1.05
+    static let panelHeightScale: CGFloat = 1.15
+    static var contentHeight: CGFloat { baseContentHeight * panelHeightScale }
     static let fallbackVisibleFrame = NSRect(x: 0, y: 0, width: 1280, height: 800)
 
-    static var minimumContentWidth: CGFloat {
+    static var baseMinimumContentWidth: CGFloat {
         remindersColumnWidth
         + learningColumnMinWidth
         + controlsColumnWidth
@@ -19,11 +24,16 @@ private enum DashboardLayout {
         + 2 * dividerWidth
     }
 
+    static var minimumContentWidth: CGFloat {
+        baseMinimumContentWidth * panelWidthScale
+    }
+
     static func preferredContentSize(screenVisibleFrame visibleFrame: NSRect?) -> NSSize {
         let visibleFrame = visibleFrame ?? fallbackVisibleFrame
         let targetWidth = visibleFrame.width - 2 * safeHorizontalMargin
         let clampedTargetWidth = min(targetWidth, visibleFrame.width)
-        let width = min(max(minimumContentWidth, clampedTargetWidth), visibleFrame.width)
+        let layoutWidth = max(baseMinimumContentWidth, clampedTargetWidth)
+        let width = min(layoutWidth * panelWidthScale, visibleFrame.width)
         return NSSize(width: width, height: contentHeight)
     }
 }
@@ -242,6 +252,8 @@ struct DashboardRootView: View {
 
     @AppStorage(MalDazeDefaults.idlePetAnimationIntensity) private var idlePetAnimationIntensityStored = 1.0
     @AppStorage(MalDazeDefaults.idlePetIconSidePoints) private var idlePetIconSideStored = MalDazeDefaults.idlePetIconSideDefault
+    @AppStorage(MalDazeDefaults.dashboardLeftPlanFraction) private var dashboardLeftPlanFractionStored =
+        MalDazeDefaults.defaultDashboardLeftPlanFraction
 
     private var deskReminders: DeskRemindersModel { viewModel.deskReminders }
 
@@ -351,8 +363,8 @@ struct DashboardRootView: View {
     var body: some View {
         let chrome = VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top, spacing: 0) {
-                // 左栏：提醒事项
-                remindersSidebar
+                // 左栏：计划 + 饮食
+                leftColumnStack
                     .frame(width: DashboardLayout.remindersColumnWidth, alignment: .topLeading)
                     .padding(.trailing, MainPanelChrome.horizontalPadding)
 
@@ -526,16 +538,41 @@ struct DashboardRootView: View {
         Divider()
     }
 
-    /// 左栏：仅提醒事项（系统 EventKit），按日分组类似系统「计划」。
+    private var resolvedDashboardLeftPlanFraction: Double {
+        MalDazeDefaults.clampedDashboardLeftPlanFraction(dashboardLeftPlanFractionStored)
+    }
+
+    /// 左栏：计划（上）+ 饮食面板（下），比例来自设置。
+    private var leftColumnStack: some View {
+        GeometryReader { geo in
+            let planFraction = resolvedDashboardLeftPlanFraction
+            let planHeight = geo.size.height * planFraction
+            VStack(spacing: 0) {
+                remindersSidebar
+                    .frame(height: planHeight, alignment: .topLeading)
+                Divider()
+                NutritionTodayPanelView(
+                    digitKeysEnabled: reminderUnderEdit == nil && deleteConfirmationId == nil
+                )
+                .frame(maxHeight: .infinity, alignment: .topLeading)
+            }
+        }
+        .frame(maxHeight: .infinity)
+    }
+
+    /// 左栏上段：提醒事项（系统 EventKit），按日分组类似系统「计划」。
     private var remindersSidebar: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("计划")
-                .font(.title2.bold())
-                .foregroundStyle(.red)
-            Text("所选列表 · 今日「#日常」· 未来三个月 · 按日期分组 · 可编辑 / 推迟 / 删除；新建请用智能输入。")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
-                .fixedSize(horizontal: false, vertical: true)
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text("计划")
+                    .font(.title2.bold())
+                    .foregroundStyle(.red)
+                Text("今日「#日常」· 未来三个月 · 按日期分组 · 可编辑 / 推迟 / 删除；新建请用智能输入。")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
             if let mut = deskReminders.mutationMessage, !mut.isEmpty {
                 Text(mut)
@@ -549,27 +586,6 @@ struct DashboardRootView: View {
                     .font(.caption)
                     .foregroundStyle(.orange)
                     .fixedSize(horizontal: false, vertical: true)
-            }
-
-            if deskReminders.isAuthorized, !deskReminders.reminderLists.isEmpty {
-                Text("同步列表")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Picker("同步列表", selection: Binding(
-                    get: { deskReminders.selectedListIdentifier() ?? "" },
-                    set: { id in
-                        guard !id.isEmpty else { return }
-                        scheduleViewModelWork {
-                            deskReminders.selectList(calendarIdentifier: id)
-                        }
-                    }
-                )) {
-                    ForEach(deskReminders.reminderLists) { list in
-                        Text(list.title).tag(list.id)
-                    }
-                }
-                .labelsHidden()
-                .pickerStyle(.menu)
             }
 
             if deskReminders.isAuthorized {
@@ -601,11 +617,6 @@ struct DashboardRootView: View {
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-            } else {
-                Button("连接提醒事项…") {
-                    Task { await deskReminders.prepare() }
-                }
-                .buttonStyle(.borderedProminent)
             }
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -618,10 +629,6 @@ struct DashboardRootView: View {
                 mainPanelHeader
 
                 statusChip
-
-                if sleepScheduleMasterEnabled {
-                    dashboardSleepScheduleProminentCard
-                }
 
                 dashboardModeControl
 
@@ -754,10 +761,6 @@ struct DashboardRootView: View {
                 viewModel.setHydrationReminderEnabled(true)
             }
         }
-    }
-
-    private var dashboardSleepScheduleProminentCard: some View {
-        dashboardSleepScheduleStatusCard(compact: false)
     }
 
     private func dashboardSleepScheduleStatusCard(compact: Bool) -> some View {

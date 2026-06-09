@@ -16,13 +16,13 @@ The integration QA script SHALL simulate a Feishu day-reminder create flow by in
 
 ### Requirement: Feishu-proxy learning complete by index
 
-The integration QA script SHALL simulate「完成 1」by reading `schedule.py today` pending list in an isolated data directory, completing `pending[0]` by `task_id`, and verifying `calendar.action: delete` when Feishu calendar is enabled.
+The integration QA script SHALL simulate「完成 1」by reading `schedule.py today` pending list in an isolated data directory, completing `pending[0]` by `task_id`, and verifying JSON completion only (no external calendar projection).
 
 #### Scenario: Complete first pending task
-- **WHEN** isolated fixtures include one pending task with `feishu_event_id`
+- **WHEN** isolated fixtures include one pending task
 - **AND** the script runs `complete --task-id` for index 1
 - **THEN** task status becomes `completed` in JSON
-- **AND** calendar delete result is `ok: true`
+- **AND** the complete response does not include `calendar.action` or `calendar_errors`
 
 ### Requirement: Countdown bell uses contract title
 

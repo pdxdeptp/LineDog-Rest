@@ -33,6 +33,10 @@ struct MalDazeSettingsView: View {
     @AppStorage(MalDazeDefaults.sleepScheduleLockScreenEnabled) private var sleepLockScreenEnabled = true
     @AppStorage(MalDazeDefaults.sleepScheduleDismissOnClamshell) private var sleepDismissOnClamshell = true
     @AppStorage(MalDazeDefaults.sleepScheduleShowerReminderEnabled) private var sleepShowerReminderEnabled = true
+    @AppStorage(MalDazeDefaults.learningDailyCapacityHours) private var learningDailyCapacityHours =
+        MalDazeDefaults.defaultLearningDailyCapacityHours
+    @AppStorage(MalDazeDefaults.dashboardLeftPlanFraction) private var dashboardLeftPlanFraction =
+        MalDazeDefaults.defaultDashboardLeftPlanFraction
 
     @State private var isRecordingSmartShortcut = false
     @State private var isRecordingDeskShortcut = false
@@ -204,6 +208,8 @@ struct MalDazeSettingsView: View {
                 shortcutsSettingsPane
             case .sleepReminder:
                 sleepReminderSettingsPane
+            case .learningPanel:
+                learningPanelSettingsPane
             }
         }
     }
@@ -292,6 +298,78 @@ struct MalDazeSettingsView: View {
                         sevenKeyLabel = d.keyLabel
                     }
                 )
+            }
+        }
+    }
+
+    private var learningPanelSettingsPane: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SettingsGroup(
+                title: "学习面板",
+                subtitle: "每日正课上限用于今日预算与周负荷标红；会同步到 Hermes profile。",
+                systemImage: "book.closed",
+                trailing: "小时"
+            ) {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("每日学习上限")
+                        Spacer()
+                        Text(LearningCapacityFormatting.formatHours(learningDailyCapacityHours))
+                            .font(.body.monospacedDigit().weight(.semibold))
+                    }
+                    Slider(
+                        value: Binding(
+                            get: {
+                                MalDazeDefaults.clampedLearningDailyCapacityHours(learningDailyCapacityHours)
+                            },
+                            set: { newValue in
+                                let stepped = (newValue * 2).rounded() / 2
+                                learningDailyCapacityHours = MalDazeDefaults.clampedLearningDailyCapacityHours(stepped)
+                                MalDazeDefaults.syncLearningCapacityToHermesProfile()
+                                NotificationCenter.default.post(
+                                    name: MalDazeBroadcastNotifications.learningDailyCapacityChanged,
+                                    object: nil
+                                )
+                            }
+                        ),
+                        in: MalDazeDefaults.learningDailyCapacityHoursMin...MalDazeDefaults.learningDailyCapacityHoursMax,
+                        step: 0.5
+                    )
+                    Text("默认 5 小时。范围 \(Int(MalDazeDefaults.learningDailyCapacityHoursMin))–\(Int(MalDazeDefaults.learningDailyCapacityHoursMax)) 小时，步进 0.5 小时。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            SettingsGroup(
+                title: "Dashboard 左栏",
+                subtitle: "计划区与饮食区的垂直高度比例。",
+                systemImage: "rectangle.split.1x2",
+                trailing: "计划 %"
+            ) {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("计划区高度")
+                        Spacer()
+                        Text("\(Int((MalDazeDefaults.clampedDashboardLeftPlanFraction(dashboardLeftPlanFraction) * 100).rounded()))%")
+                            .font(.body.monospacedDigit().weight(.semibold))
+                    }
+                    Slider(
+                        value: Binding(
+                            get: {
+                                MalDazeDefaults.clampedDashboardLeftPlanFraction(dashboardLeftPlanFraction)
+                            },
+                            set: { newValue in
+                                dashboardLeftPlanFraction = MalDazeDefaults.clampedDashboardLeftPlanFraction(newValue)
+                            }
+                        ),
+                        in: MalDazeDefaults.dashboardLeftPlanFractionMin...MalDazeDefaults.dashboardLeftPlanFractionMax,
+                        step: 0.05
+                    )
+                    Text("默认计划 60% / 饮食 40%。范围 40%–75% 计划区。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
     }
@@ -413,6 +491,7 @@ private enum SettingsCategory: String, CaseIterable, Identifiable {
     case modelCredentials
     case shortcuts
     case sleepReminder
+    case learningPanel
 
     var id: Self { self }
 
@@ -421,6 +500,7 @@ private enum SettingsCategory: String, CaseIterable, Identifiable {
         case .modelCredentials: return "模型与密钥"
         case .shortcuts: return "快捷键"
         case .sleepReminder: return "睡眠提醒"
+        case .learningPanel: return "学习面板"
         }
     }
 
@@ -429,6 +509,7 @@ private enum SettingsCategory: String, CaseIterable, Identifiable {
         case .modelCredentials: return "LLM 凭据与默认模型"
         case .shortcuts: return "全局操作"
         case .sleepReminder: return "Hermes 契约与睡前链"
+        case .learningPanel: return "每日上限与周负荷"
         }
     }
 
@@ -437,6 +518,7 @@ private enum SettingsCategory: String, CaseIterable, Identifiable {
         case .modelCredentials: return "key.horizontal"
         case .shortcuts: return "keyboard"
         case .sleepReminder: return "moon.zzz.fill"
+        case .learningPanel: return "book.closed"
         }
     }
 
@@ -448,6 +530,8 @@ private enum SettingsCategory: String, CaseIterable, Identifiable {
             return "快捷键录制仅更新本机设置，恢复默认不会影响其他类别。"
         case .sleepReminder:
             return "目标时间由 Hermes 晨报写入 ~/.hermes/data/sleep/sleep_schedule.json；桌宠只读该文件。"
+        case .learningPanel:
+            return "每日学习上限写入 ~/.hermes/data/learning-assistant/profile.json，供排程与周负荷共用。"
         }
     }
 }

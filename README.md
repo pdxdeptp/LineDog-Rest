@@ -76,7 +76,8 @@ MalDaze 与个人 agent **Hermes**（`~/.hermes`）协作。总进度：**[docs/
 | 睡眠提醒 | `SleepReminder/` | `sleep_tracker.py` | [features/sleep.md](docs/integrations/features/sleep.md) |
 | 到时强提醒 | `InterventionRequest/` | `intervention_request.py` | [features/desk-intervention.md](docs/integrations/features/desk-intervention.md) |
 | 日待办 | —（侧栏只读） | `day_reminders.py` | [features/day-reminders.md](docs/integrations/features/day-reminders.md) |
-| 学习任务 | — | `schedule.py` | [features/learning-calendar.md](docs/integrations/features/learning-calendar.md) |
+| 学习 SSOT + 飞书 | — | `schedule.py` | [features/learning-calendar.md](docs/integrations/features/learning-calendar.md) |
+| 学习桌宠面板 | `LearningDeskPanel/` | `schedule.py` CLI | [features/learning-desk-panel.md](docs/integrations/features/learning-desk-panel.md) |
 
 Canonical hub：[docs/integrations/hermes.md](docs/integrations/hermes.md) · Hermes manifest：`~/.hermes/docs/integrations/README.md`
 
@@ -91,6 +92,7 @@ Canonical hub：[docs/integrations/hermes.md](docs/integrations/hermes.md) · He
 - **`SevenMinuteReminder/`**、**`FiveMinuteCat/`**：独立倒计时与小猫陪伴窗口。
 - **`SleepReminder/`**：只读 Hermes 睡眠契约，调度睡前提醒链。
 - **`InterventionRequest/`**：读 Hermes 强提醒契约，驱动倒计时与中央铃铛（与 `SevenMinuteReminder/` 共用 UI）。
+- **`LearningDeskPanel/`**：Dashboard 中栏学习面板（今日 / 周负荷、complete/move/insert/remove）；每日上限在 **设置 → 学习面板**（默认 5 小时）。
 
 ## 命令行编译（可选）
 

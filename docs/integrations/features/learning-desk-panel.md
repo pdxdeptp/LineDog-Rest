@@ -1,8 +1,8 @@
 # 学习助手桌宠面板（learning-desk-panel）
 
-Hub：[../hermes.md](../hermes.md) · SSOT 边界：[learning-calendar.md](./learning-calendar.md) · v2 母本：[../../openspec/learning-assistant-v2.md](../../openspec/learning-assistant-v2.md) · 总目录：[../ROADMAP.md](../ROADMAP.md) §7 Phase 6
+Hub：[../hermes.md](../hermes.md) · SSOT 边界：[learning-calendar.md](./learning-calendar.md) · 主 spec：`openspec/specs/learning-desk-panel/` · 总目录：[../ROADMAP.md](../ROADMAP.md) §7 Phase 6
 
-> **状态：** 设计定稿（2026-06-07）  
+> **状态：** v1 已归档 · L3 **MANUAL_QA 通过**（2026-06-08）· **未归档**  
 > **定位：** MalDaze **展示层 + 轻交互**；Hermes **`schedule.py` 执行引擎**；飞书 **重操作入口**（排课、对话、智能模式）  
 > **取代：** 嵌入版 `assistant_backend` + 全功能 `AssistantPanelView`；ROADMAP 原 M-C1「只读卡」/ M-C2「不做」
 
@@ -10,9 +10,12 @@ Hub：[../hermes.md](../hermes.md) · SSOT 边界：[learning-calendar.md](./lea
 
 | 档位 | OpenSpec | 范围 |
 |------|----------|------|
-| **v1 · 当前实施** | [`add-learning-desk-panel`](../../openspec/changes/add-learning-desk-panel/) | L1 Today + L2 complete/move + H-L2 dry-run |
-| **v1.1 · 延后** | [`add-learning-desk-panel-l3`](../../openspec/changes/add-learning-desk-panel-l3/) | 增删、Week、FSEvents、review、H-L3/H-L4 |
-| **日历 · 延后** | [`fix-learning-rollover-calendar`](../../openspec/changes/fix-learning-rollover-calendar/) | H-L1 rollover 日历 patch |
+| **v1** | [`archive/2026-06-08-add-learning-desk-panel`](../../openspec/changes/archive/2026-06-08-add-learning-desk-panel/) | L1 Today + L2 complete/move + H-L2 dry-run |
+| **v1.1 · L3** | [`add-learning-desk-panel-l3`](../../openspec/changes/add-learning-desk-panel-l3/) | 增删、Week、FSEvents、review、每日上限设置、H-L3/H-L4 |
+| **X7 · 项目** | [`add-learning-project-status`](../../openspec/changes/add-learning-project-status/) | 项目 Tab、`status`、`set-deadline`（US-10）、跨 Tab 刷新、标色、跳转今日 |
+| **X8 · 日程** | [`add-learning-calendar-view`](../../openspec/changes/add-learning-calendar-view/) | 日程 Tab（月历 + Agenda）、`schedule-range`、取代周负荷 |
+| **X9 · 今日核心** | [`extend-learning-today-core`](../../openspec/changes/extend-learning-today-core/) | 双预算、完成进度、`progress`、滚入置顶、实际时长、按项目分组 |
+| **X10 · 今日导航** | [`extend-learning-today-navigation`](../../openspec/changes/extend-learning-today-navigation/) | 行动卡、明天预告、warning 点击、源链接、repack 预览 |
 
 延后索引：[learning-desk-panel-followup.md](./learning-desk-panel-followup.md)
 
@@ -31,7 +34,7 @@ Hub：[../hermes.md](../hermes.md) · SSOT 边界：[learning-calendar.md](./lea
 | 入口 | 优点 | 缺口 |
 |------|------|------|
 | 飞书对话 | 排课、完成、move、晨报 | 无一屏纵览；要问才有列表 |
-| 飞书日历 | 扫周视图 | 与 JSON 易不同步；无时长/超容量；不能勾选完成 |
+| ~~飞书日历~~ | ~~扫周视图~~ | **已废弃**（2026-06-08）；学习域不再投影；旧 App 内格子需手动清理 |
 | 晨报 cron | 推送摘要 | 非实时；不能点完成 |
 
 你要的是 **Mac 前常驻可视化**，不是再建一套独立学习系统，也不是把日历当 SSOT。
@@ -48,11 +51,11 @@ Hub：[../hermes.md](../hermes.md) · SSOT 边界：[learning-calendar.md](./lea
 
 继承 v2 的 **体验纪律**（定盘星 D13、今日为主 D8、勾选 D7、滚入角标 D28、超额标红 D11、move 预览 D25），放弃 **数据与算法自治**。
 
-### 1.3 为什么不用飞书日历做面板数据源
+### 1.3 为什么不用外部日历做面板数据源
 
-- 日历是 **软投影**，`rollover` 等路径可能未 patch 事件 → 格子与 JSON 不一致  
-- 无 `duration_minutes`、日预算、复习链、`auto_roll_days`  
-- 面板读 JSON（经 `today`）与飞书对话 **同一路径**，避免第三套真相
+- 学习域 **已移除** 飞书日历投影（`remove-feishu-learning-calendar`）；SSOT 仅为 `projects.json`
+- 外部日历无 `duration_minutes`、日预算、复习链、`auto_roll_days`
+- 面板读 JSON（经 `today` / `schedule-range`）与飞书对话 **同一路径**，避免第二套真相
 
 ---
 
@@ -69,7 +72,6 @@ Hub：[../hermes.md](../hermes.md) · SSOT 边界：[learning-calendar.md](./lea
 ┌──────────────────────────────────────────────────────────────────┐
 │  Hermes 执行引擎                                                  │
 │  schedule.py · projects.json · profile.json · daily_log.json      │
-│  可选：飞书日历投影（complete delete / move patch）                  │
 └───────────────────────────────┬──────────────────────────────────┘
                                 │
                                 ▼
@@ -84,7 +86,7 @@ Hub：[../hermes.md](../hermes.md) · SSOT 边界：[learning-calendar.md](./lea
 | 层 | 做 | 不做 |
 |----|-----|------|
 | **MalDaze 面板** | 读 today、渲染、发起已存在子命令、错误展示 | 写 JSON、算级联、URL 拆解、LLM |
-| **schedule.py** | SSOT、rollover、级联、复习链、日历 patch | UI |
+| **schedule.py** | SSOT、rollover、级联、复习链 | UI、外部日历投影 |
 | **飞书** | 自然语言、plan、复杂批量、无 Mac 时的兜底 | 替代面板成为唯一可视化 |
 
 ---
@@ -95,16 +97,16 @@ Hub：[../hermes.md](../hermes.md) · SSOT 边界：[learning-calendar.md](./lea
 
 | US | 故事 | 面板 | Hermes 飞书 |
 |----|------|:----:|:-----------:|
-| US-1 | 每日学习上限 | 顶栏展示 `study.budget` | 改 `profile.json` |
+| US-1 | 每日学习上限 | 顶栏 + 日程（**小时**）；**MalDaze 设置 → 学习面板** 可调 | 同步写 `profile.json` `daily_capacity_minutes` |
 | US-2~5 | URL 排课、审阅、确认 | — | ✅ plan + 对话 |
 | **US-6** | 今日视图 | ✅ **主入口** | today 对话 |
 | **US-7** | 勾选完成 | ✅ complete | complete |
 | US-8 | 自动滚入次日 | 显示结果（rollover 后） | rollover |
 | **US-9** | 改日期 + 级联 | ✅ move + 预览 | move |
-| US-10 | 改项目截止日 | — | 对话 / 后续 CLI |
+| US-10 | 改项目截止日 | ✅ 项目 Tab（active only，`set-deadline`） | `set-deadline` / 飞书对话 |
 | **US-11** | 超额 / 落后标红 | ✅ 顶栏 + warnings | validate |
-| US-12 | 项目总览 | v1.1 `status` 只读 | status |
-| **US-13** | 周负荷 | v1.1 Week Tab | — |
+| US-12 | 项目总览 | 🟡 项目 Tab + US-10 deadline（待 MANUAL_QA） | `status` / `set-deadline` |
+| **US-13** | 日程 / 负荷 | ✅ **日程** Tab（月历 + Agenda；小时 + 可配置上限） | `schedule-range`（`week-load` 保留兼容） |
 | US-14 | 项目归档 | 只读展示 | 自动 |
 | **US-15** | 增删单任务 | L3 insert/remove | insert/remove |
 | US-16 | 对话调整 | — | ✅ |
@@ -134,7 +136,7 @@ Hub：[../hermes.md](../hermes.md) · SSOT 边界：[learning-calendar.md](./lea
 
 ```
 ┌─ 学习 · 6月7日 周六 ─────────────── [↻] ─┐
-│ 预算 148 / 90 min  ⚠ 超 58 min          │  ← study.total vs budget，红色
+│ 预算 2.5 小时 / 5 小时  ⚠ 超额            │  ← study.total vs 设置上限（小时），红色
 │ 休息日中栏显示「今日休息」时可弱化列表      │  ← is_rest_day
 ├─────────────────────────────────────────┤
 │ ⚠ lc_review 落后 3 天                    │  ← warnings[]
@@ -150,10 +152,31 @@ Hub：[../hermes.md](../hermes.md) · SSOT 边界：[learning-calendar.md](./lea
 │ 今日无任务 → 「去飞书 Hermes 排课」提示    │
 └─────────────────────────────────────────┘
 
-行内 [⋯]：推迟到明天 · 选日期 · 删除(L3)
+行内 [⋯]：记录时长并完成 · 推迟到明天 · 选日期 · 删除(L3)
+
+**X9/X10 今日增强**：功能清单、手工 QA、造数、JSON 对照、排障 → [learning-today-x9-x10.md](./learning-today-x9-x10.md)。简表勾选见 [MANUAL_QA.md](../MANUAL_QA.md) M-L12-core / M-L12-nav。
 ```
 
-**Week Tab（L3）**：未来 14–28 天每日已排分钟条形图；超 `daily_capacity` 标红。
+**Week Tab（L3）**：未来 28 天每日已排负荷条形图，文案为 **小时**（如 `2.5 小时 / 5 小时`）；超 MalDaze 设置的每日上限标红。上限默认 **5 小时**，在 **MalDaze 设置 → 学习面板** 调节（1–12 小时，步进 0.5），保存后写入 Hermes `profile.json` 的 `daily_capacity_minutes`。
+
+**项目 Tab（X7）**：
+
+```
+┌─ 今日 | 日程 | 项目 ──────────────── [↻] ─┐
+│ LC Review          active                  │
+│ 截止 [📅 6/30  修改] · 1/27 · 4%           │  ← 按钮打开 sheet；过期红 / 7 天内橙
+│ 待办 Ch4 · 6/8 · 45m                       │  ← Hermes next_task（队列首条 pending）
+├────────────────────────────────────────────┤
+│ Old Course         paused   （弱化）        │
+│ 无待办任务                                  │
+└────────────────────────────────────────────┘
+```
+
+- 展示 `status` 返回的 **全部** 项目；non-active 弱化，active 置顶。
+- `next_task` **不等于**「今日下一项」或「最近日期」—— 仅为 JSON 任务列表中第一条 `pending`。
+- 点行（非截止日控件）→ 切 **今日** Tab 并高亮同 `project_id` 首条 pending（若有）。
+- **active** 项目：点 **「📅 日期  修改」** → sheet 选新截止日 → 确认后 `set-deadline`：**从今日起重排**该项目未完成课程（已完成不变）；装不下则 `overflow` 提示（US-10）。
+- 今日 / 项目写操作成功后后台刷新 status，避免切 Tab 仍见旧进度。
 
 ### 4.3 中栏不做
 
@@ -203,7 +226,7 @@ python3 "$HERMES_HOME/scripts/schedule.py" today
   ],
   "study": {
     "total_minutes": 148,
-    "budget": 90
+    "budget": 300
   },
   "review": { "total_minutes": 30, "budget": 60 },
   "warnings": [
@@ -212,7 +235,9 @@ python3 "$HERMES_HOME/scripts/schedule.py" today
 }
 ```
 
-**`auto_roll_days`：** `pending` 行未含该字段；从 `study.tasks[].task.auto_roll_days` / `review.tasks` 按 `task_id` 合并（或 Hermes 小改：并入 `pending`，见 §9 H-L2）。
+**`auto_roll_days`：** L3 起 `pending[]` 可含 `auto_roll_days`；否则从 `study.tasks[].task` / `review.tasks` 按 `task_id` 合并。
+
+**每日上限：** CLI 仍输出 `study.budget` / `week-load` 的 `budget`（分钟）。MalDaze 面板以 **设置中的小时上限** 为准展示与标红，并与 `profile.json` 同步（默认 300 分钟 = 5 小时）。
 
 ### 5.3 不采用的路径（v1）
 
@@ -228,12 +253,13 @@ python3 "$HERMES_HOME/scripts/schedule.py" today
 
 | 用户动作 | UI | CLI | 备注 |
 |----------|-----|-----|------|
-| 勾选完成 | Checkbox | `complete --task-id <id>` | 复习链、日历 delete 在 Hermes |
+| 勾选完成 | Checkbox | `complete --task-id <id>` | 复习链在 Hermes |
 | 推迟到明天 | 菜单项 | `move --task-id <id> --new-date <tomorrow>` | 文案「推迟」，无 postpone 命令 |
 | 改日期 | DatePicker | `move --new-date YYYY-MM-DD` | 同项目后置级联 |
 | 删除 | 确认后 | `remove --task-id <id>` | 不级联 |
 | 插入 | 轻表单 | `insert --project-id … --title … --duration N --date …` | 不级联 |
 | 复习通过/失败 | L3 按钮 | `review --task-id … --result passed\|failed` | — |
+| 改项目截止日 | 项目 Tab · active | `set-deadline --project-id … --deadline YYYY-MM-DD` | **默认重排**未完成课；`--no-repack` 仅改日期 |
 
 环境：`HERMES_HOME=~/.hermes`；`python3` 路径与 Smart Reminder 子进程策略一致。
 
@@ -267,14 +293,22 @@ python3 "$HERMES_HOME/scripts/schedule.py" today
 
 ```
 MalDaze/LearningDeskPanel/
-  LearningDeskPanelView.swift      // 中栏容器 + Tab
-  LearningTodayView.swift          // 列表 + 顶栏
-  LearningTaskRow.swift            // 行 + 菜单
-  LearningMovePreviewSheet.swift   // move 确认
-  LearningDeskPanelViewModel.swift // @MainActor 状态
-  HermesScheduleCLI.swift          // 协议 + Process 实现
-  HermesScheduleModels.swift       // Codable：TodayResponse, MoveResponse…
+  LearningDeskPanelView.swift       // 中栏容器 + Today/Week/项目 Tab
+  LearningProjectStatusView.swift   // X7 项目 Tab（status + set-deadline）
+  LearningTaskRow.swift             // 行 + 菜单 + review 按钮
+  LearningScheduleView.swift        // 日程（月历 + Agenda）
+  LearningWeekLoadView.swift        // （遗留，Tab 已移除）
+  LearningInsertTaskSheet.swift     // 添加任务
+  LearningMovePreviewSheet.swift    // move 确认
+  LearningProjectsFileWatcher.swift // FSEvents
+  LearningCapacityFormatting.swift  // 分钟 ↔ 小时展示
+  HermesLearningProfileStore.swift  // 读写 profile daily_capacity_minutes
+  LearningDeskPanelViewModel.swift  // @MainActor 状态
+  HermesScheduleCLI.swift           // 协议 + Process 实现
+  HermesScheduleModels.swift        // Codable：TodayResponse, MoveResponse…
 ```
+
+**设置：** `MalDaze 设置 → 学习面板` · `MalDazeDefaults.learningDailyCapacityHours`（默认 5.0）→ 同步 `~/.hermes/data/learning-assistant/profile.json`。
 
 - `HermesScheduleCLI` 可注入 mock，供单元测试  
 - ViewModel **不** 持有 `projects.json` 写权限  
@@ -290,7 +324,7 @@ MalDaze/LearningDeskPanel/
 | `pending_count == 0` 且非休息日 | 「今日无学习任务」 |
 | `is_rest_day` | 「今日休息」+ 可选隐藏列表 |
 | move 拒绝（进过去 / 级联进过去） | 展示 `error` 原文 |
-| `calendar_errors` 非空 | 次要提示；以 JSON `ok` / 任务日期为准 |
+| 无学习项目 | 空状态指引「Hermes 对话发链接 / 帮我安排学习」（面板不提供建项目） |
 | 写操作中 | 行级 disabled + 进度 |
 
 ---
@@ -299,7 +333,7 @@ MalDaze/LearningDeskPanel/
 
 | ID | 项 | 阻塞面板？ |
 |----|-----|------------|
-| H-L1 | `rollover` 同步飞书日历 patch | 否（面板不读日历） |
+| H-L1 | `rollover` JSON 滚入 | 否 · **已实现**（无日历投影） |
 | H-L2 | `move --dry-run` | **阻塞 L2 完整预览** |
 | H-L3 | `pending[]` 带 `auto_roll_days` | 否（可从 study.tasks 合并） |
 | H-L4 | `week-load --days 28` JSON | 仅阻塞 Week Tab |
@@ -321,8 +355,9 @@ MalDaze/LearningDeskPanel/
 
 ### L3 · 增强（M-L3）
 
-- insert / remove；Week 负荷；FSEvents；review passed/failed  
-- 可选 `status` 项目条只读
+- insert / remove；Week 负荷（小时 + 可配置上限）；FSEvents；review passed/failed  
+- 每日学习上限：**MalDaze 设置**（默认 5h）→ `profile.json`  
+- insert 项目列表：`schedule.py status` 全部 `active` 项目（非仅今日任务）
 
 ### OpenSpec（实施前）
 
@@ -335,7 +370,7 @@ MalDaze/LearningDeskPanel/
 ## 11. 验收清单（L2 完成）
 
 1. 打开 Dashboard 中栏可见今日列表，与 `schedule.py today` 一致  
-2. 顶栏显示 `study.total_minutes / budget`，超额红色  
+2. 顶栏显示当日负荷 **小时 / 设置上限小时**，超额红色  
 3. `auto_roll_days ≥ 1` 显示「已滚 N 天」  
 4. `warnings` 展示落后项目  
 5. 勾选完成 → task `status: completed` → 刷新后消失  
@@ -361,7 +396,8 @@ MalDaze/LearningDeskPanel/
 | OQ-1 | 恢复三栏是否接受更宽 Dashboard？ | ✅ 是 |
 | OQ-2 | move 预览是否等 H-L2 `--dry-run`？ | ✅ 是 |
 | OQ-3 | Week Tab 是否进 L1？ | ❌ 放 L3 |
-| OQ-4 | insert 多项目时如何选 project？ | 默认唯一 active；否则行内 Picker |
+| OQ-4 | insert 多项目时如何选 project？ | `status` 拉全部 active；菜单 Picker |
+| OQ-6 | 每日上限改哪里？ | MalDaze 设置 → 学习面板；同步 Hermes profile |
 | OQ-5 | 是否做 `today_snapshot.json`？ | ❌ v1 子进程即可 |
 
 ---
@@ -370,9 +406,10 @@ MalDaze/LearningDeskPanel/
 
 | 文档 | 用途 |
 |------|------|
-| [learning-assistant-v2.md](../../openspec/learning-assistant-v2.md) | US、D 决策、定盘星 |
+| `openspec/specs/learning-desk-panel/spec.md` | 验收需求（canonical） |
+| [learning-assistant-v2.md](../../openspec/learning-assistant-v2.md) | **已废弃** — 历史 explore 草稿，勿引用 |
 | [remove-learning-assistant/design.md](../../openspec/changes/remove-learning-assistant/design.md) | 为何删掉嵌入版 |
-| [learning-calendar.md](./learning-calendar.md) | SSOT、日历策略 |
+| [learning-calendar.md](./learning-calendar.md) | JSON SSOT；飞书日历投影已移除 |
 | [ROADMAP.md](../ROADMAP.md) §7 | M-L* / H-L* 全表 |
 | `~/.hermes/skills/learning-assistant/SKILL.md` | 飞书编排 |
 | `~/.hermes/scripts/schedule.py` | 执行引擎 |

@@ -191,6 +191,26 @@ Even when the exception applies:
 - Tests or the best available checks must pass before declaring completion.
 - If the fix grows beyond the bounds above, stop and re-enter the full flow.
 
+## Hermes Read-Only UI (MalDaze)
+
+MalDaze panels that consume Hermes file contracts (`daily_log.panel`, `sleep_schedule.json`, `schedule.py` via CLI, etc.) are **display + invoke CLI only**. Hermes owns computation, persistence, and recalculation.
+
+### Do
+
+- Read the contract; render what is on disk after FSEvents/debounce/poll.
+- On user action that mutates Hermes data, call the documented subprocess/CLI (`recommend.py log`, `schedule.py complete`, …) and **reload** from the contract.
+- If displayed state looks wrong after reload, fix **Hermes** (`recommend.py`, `_attach_panel`, specs) or clarify product/spec—not MalDaze overlays.
+
+### Do not (anti-patterns)
+
+- **Suppression / shadow lists**: hide rows the contract still contains (e.g. `suppressedSuggestionKeys`, “filter out what user just logged”).
+- **Optimistic UI that diverges from contract**: show a trimmed menu before reload while the file still has the old `panel`.
+- **Client-side re-suggestion**: re-run nutrition/plan logic in Swift to “fix” stale Hermes output.
+
+### Canonical failure example (never repeat)
+
+`add-nutrition-today-panel`: after `log`, suggestions looked unchanged because Hermes often returns the same or empty menu post-recalc. The wrong fix was MalDaze-side “session suppression” of logged items. The right model: `log` → `_update_daily_log` → `_attach_panel` → MalDaze `loadToday()` shows the new `panel` as-is. If recalc behavior is wrong, change Hermes or the OpenSpec—not a second truth in the app.
+
 ## Language And Reasoning
 
 - Reasoning language: English for logical precision with technical docs.

@@ -8,7 +8,8 @@
 **Goals:**
 
 - 面板内 insert/remove（不级联，与 `schedule.py` 一致）。
-- Week Tab 只读负荷；优先 `week-load` CLI。
+- Week Tab 只读负荷（**小时**展示）；优先 `week-load` CLI；超额按 MalDaze 设置上限标红。
+- 每日学习上限：**MalDaze 设置 → 学习面板**，默认 **5 小时**，同步 Hermes `profile.json`。
 - FSEvents 监听 `projects.json`，debounce 1s 刷新 Today。
 - 复习任务行：通过/失败按钮。
 
@@ -16,7 +17,7 @@
 
 - 拖拽 Gantt、对话调整、智能模式。
 - `today_learning.json` 快照（ROADMAP X5）。
-- rollover 日历 patch（见 `fix-learning-rollover-calendar`）。
+- rollover 仅更新 JSON（`remove-feishu-learning-calendar` 已移除飞书日历投影）。
 
 ## Decisions
 
@@ -33,8 +34,14 @@
 
 ### D3: insert 项目选择
 
-- 单 active 项目：默认 `project_id`。
-- 多 active：行内 Picker；无 active 时引导飞书 plan。
+- 数据来源：`schedule.py status` 全部 `status == active` 项目（不要求今日有任务）。
+- 菜单式 Picker；无 active 时表单提示去 Hermes 创建项目。
+
+### D6: 每日上限展示与设置
+
+- CLI 仍用分钟（`total_minutes` / `budget`）；MalDaze 面板统一 **小时** 文案。
+- `MalDazeDefaults.learningDailyCapacityHours` 默认 5.0；设置页 1–12h、步进 0.5。
+- 保存时写 `profile.json` `daily_capacity_minutes`；启动时若 profile 与设置不一致则对齐。
 
 ### D4: remove 确认
 
