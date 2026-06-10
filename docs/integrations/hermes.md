@@ -59,7 +59,7 @@ MalDaze/
 | 营养今日面板 X2 | facts/metrics: `daily_log.json` → `panel`; recommendation: `recommendation.json` | `recommend.py` `refresh-panel`; Hermes recommendation writer | `NutritionToday/` | [nutrition-today-panel.md](./features/nutrition-today-panel.md) | 🟡 待 M-N1 |
 | 晨报扩展 | — | `morning-briefing.py` | — | [ROADMAP.md](./ROADMAP.md) §5 | 已上线 |
 
-营养 recommendation unavailable 契约：第一版不新增 `reason` 字段；`recommendation_store.py unavailable --reason` 将原因写入 `summary`，并写 `state: "unavailable"`、`suggestions: []`。MalDaze 可用 `summary` 作为 UI 状态文案，且不得 fallback 到 `panel.suggestions` 或 planner。
+营养 recommendation unavailable 契约：第一版不新增 `reason` 字段；`recommendation_store.py unavailable --reason` 将原因写入 `summary`，并写 `state: "unavailable"`、`suggestions: []`。该状态仅由 Hermes authoring 显式写入；确定性 `morning-briefing.py` 只刷新 facts，不得写 unavailable 占位。MalDaze 可用 `summary` 作为 UI 状态文案，且不得 fallback 到 `panel.suggestions` 或 planner。
 
 MalDaze 可以在功能契约明确允许时执行受控写操作，例如营养建议项点击后调用 `recommend.py log`。这不改变推荐来源边界：`recommendation.json` 仍由 Hermes authoring 写入，MalDaze 不本地生成、过滤、缓存或直接写入推荐。
 

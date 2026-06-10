@@ -23,48 +23,48 @@
 
 ## 4. Standalone Day Classification Implementation
 
-- [ ] 4.1 Create `/Users/cpt/.hermes/data/nutrition/day_classification.py` as the production entrypoint for `python3 day_classification.py`.
-- [ ] 4.2 Move or extract the current `cmd_auto_day` classification algorithm behind the new program boundary without duplicating the day-type SSOT in profile/defaults/cache.
-- [ ] 4.3 Preserve existing `training_log.json` behavior: read latest `is_training: true` date, ignore `is_training: false` activities for rhythm, create today's default 500 kcal strength record only on training days, and keep existing same-day strength records instead of duplicating them.
-- [ ] 4.4 Preserve existing `workout_split` behavior: training days alternate chest/back_legs from prior strength record; rest days clear `daily_log.workout_split`.
-- [ ] 4.5 Ensure `day_classification.py` uses the same locked/atomic daily-log update path and leaves a valid `daily_log.panel` after classification.
-- [ ] 4.6 Update `recommend.py auto` to be a compatibility wrapper around the standalone classifier instead of owning separate classification logic.
-- [ ] 4.7 Run `/Users/cpt/.hermes/tests/nutrition/test_day_classification.py` and make the new tests pass.
+- [x] 4.1 Create `/Users/cpt/.hermes/data/nutrition/day_classification.py` as the production entrypoint for `python3 day_classification.py`.
+- [x] 4.2 Move or extract the current `cmd_auto_day` classification algorithm behind the new program boundary without duplicating the day-type SSOT in profile/defaults/cache.
+- [x] 4.3 Preserve existing `training_log.json` behavior: read latest `is_training: true` date, ignore `is_training: false` activities for rhythm, create today's default 500 kcal strength record only on training days, and keep existing same-day strength records instead of duplicating them.
+- [x] 4.4 Preserve existing `workout_split` behavior: training days alternate chest/back_legs from prior strength record; rest days clear `daily_log.workout_split`.
+- [x] 4.5 Ensure `day_classification.py` uses the same locked/atomic daily-log update path and leaves a valid `daily_log.panel` after classification.
+- [x] 4.6 Update `recommend.py auto` to be a compatibility wrapper around the standalone classifier instead of owning separate classification logic.
+- [x] 4.7 Run `/Users/cpt/.hermes/tests/nutrition/test_day_classification.py` and make the new tests pass.
 
 ## 5. Morning Briefing Production Cleanup
 
-- [ ] 5.1 Update `/Users/cpt/.hermes/scripts/morning-briefing.py` so nutrition facts refresh invokes `day_classification.py` instead of `recommend.py auto`.
-- [ ] 5.2 Remove `write_unavailable_nutrition_recommendation()` and any `recommendation_store` import/use from `morning-briefing.py`.
-- [ ] 5.3 Remove `get_diet_plan()` and all deterministic Morning Briefing `plan_engine.py --full-day` planner code from `morning-briefing.py`.
-- [ ] 5.4 Keep Morning Briefing output focused on facts/status when no Hermes nutrition authoring step has run; do not emit "no-agent" domain language.
-- [ ] 5.5 Run the Morning Briefing regression tests and make them pass.
+- [x] 5.1 Update `/Users/cpt/.hermes/scripts/morning-briefing.py` so nutrition facts refresh invokes `day_classification.py` instead of `recommend.py auto`.
+- [x] 5.2 Remove `write_unavailable_nutrition_recommendation()` and any `recommendation_store` import/use from `morning-briefing.py`.
+- [x] 5.3 Remove `get_diet_plan()` and all deterministic Morning Briefing `plan_engine.py --full-day` planner code from `morning-briefing.py`.
+- [x] 5.4 Keep Morning Briefing output focused on facts/status when no Hermes nutrition authoring step has run; do not emit "no-agent" domain language.
+- [x] 5.5 Run the Morning Briefing regression tests and make them pass.
 
 ## 6. Hermes Authoring Workflow Documentation
 
-- [ ] 6.1 Update `/Users/cpt/.hermes/skills/nutrition/nutrition-menu/SKILL.md` so production Morning Briefing refresh uses `python3 day_classification.py` followed by facts refresh/status read.
-- [ ] 6.2 Update the nutrition skill so "重新跑晨报" plus any user-visible food advice requires Hermes to write the same `summary` and `suggestions` to `recommendation.json` with `source.kind: "morning_briefing"`.
-- [ ] 6.3 Update the nutrition skill so every Feishu nutrition reply containing next-step food advice writes `recommendation.json` with post-log `basedOn.dailyLogPanelUpdatedAt`.
-- [ ] 6.4 Remove production "no-agent" terminology from nutrition skill/docs; if a test needs that concept, rename it to deterministic-script/no-author terminology.
-- [ ] 6.5 Update `/Users/cpt/.hermes/data/nutrition/README.md` to document `day_classification.py`, deprecate production use of `recommend.py auto`, and clarify that deterministic scripts do not write recommendation snapshots.
+- [x] 6.1 Update `/Users/cpt/.hermes/skills/nutrition/nutrition-menu/SKILL.md` so production Morning Briefing refresh uses `python3 day_classification.py` followed by facts refresh/status read.
+- [x] 6.2 Update the nutrition skill so "重新跑晨报" plus any user-visible food advice requires Hermes to write the same `summary` and `suggestions` to `recommendation.json` with `source.kind: "morning_briefing"`.
+- [x] 6.3 Update the nutrition skill so every Feishu nutrition reply containing next-step food advice writes `recommendation.json` with post-log `basedOn.dailyLogPanelUpdatedAt`.
+- [x] 6.4 Remove production "no-agent" terminology from nutrition skill/docs; if a test needs that concept, rename it to deterministic-script/no-author terminology.
+- [x] 6.5 Update `/Users/cpt/.hermes/data/nutrition/README.md` to document `day_classification.py`, deprecate production use of `recommend.py auto`, and clarify that deterministic scripts do not write recommendation snapshots.
 
 ## 7. Integration QA And Contract Coverage
 
-- [ ] 7.1 Add or update Feishu nutrition QA tests so an authored nutrition reply writes an available `recommendation.json` snapshot in isolated fixtures.
-- [ ] 7.2 Add or update QA tests so a nutrition update without authored food advice does not fake a fresh available recommendation.
-- [ ] 7.3 Add a QA/source assertion that production Morning Briefing instructions reference `day_classification.py` and not `recommend.py auto`.
-- [ ] 7.4 Ensure tests never mutate live `/Users/cpt/.hermes/data/nutrition/*.json` while validating these flows.
+- [x] 7.1 Add or update Feishu nutrition QA tests so an authored nutrition reply writes an available `recommendation.json` snapshot in isolated fixtures.
+- [x] 7.2 Add or update QA tests so a nutrition update without authored food advice does not fake a fresh available recommendation.
+- [x] 7.3 Add a QA/source assertion that production Morning Briefing instructions reference `day_classification.py` and not `recommend.py auto`.
+- [x] 7.4 Ensure tests never mutate live `/Users/cpt/.hermes/data/nutrition/*.json` while validating these flows.
 
 ## 8. OpenSpec And Integration Docs
 
-- [ ] 8.1 Update active nutrition OpenSpec/docs that mention Morning Briefing unavailable placeholders so they match the new deterministic-script non-ownership model.
-- [ ] 8.2 Update `/Users/cpt/Public/MalDaze/docs/integrations/hermes.md` and related nutrition panel docs only if their described contract changes.
-- [ ] 8.3 Confirm MalDaze does not generate, cache, or directly write `recommendation.json`, and still treats missing/stale/unavailable states according to the contract.
+- [x] 8.1 Update active nutrition OpenSpec/docs that mention Morning Briefing unavailable placeholders so they match the new deterministic-script non-ownership model.
+- [x] 8.2 Update `/Users/cpt/Public/MalDaze/docs/integrations/hermes.md` and related nutrition panel docs only if their described contract changes.
+- [x] 8.3 Confirm MalDaze does not generate, cache, or directly write `recommendation.json`, and still treats missing/stale/unavailable states according to the contract.
 
 ## 9. Verification
 
-- [ ] 9.1 Run `openspec validate repair-nutrition-recommendation-authoring-flow --strict`.
-- [ ] 9.2 Run focused Hermes tests: `python3 -m pytest tests/nutrition/test_day_classification.py tests/nutrition/test_morning_briefing_nutrition.py tests/nutrition/test_recommendation_store.py -q`.
-- [ ] 9.3 Run relevant existing Hermes nutrition regression tests: `python3 -m pytest tests/nutrition/test_refresh_panel.py tests/nutrition/test_refresh_panel_cmd.py tests/nutrition/test_workout_split.py -q`.
-- [ ] 9.4 Run Python compilation checks: `python3 -m py_compile data/nutrition/day_classification.py data/nutrition/recommend.py data/nutrition/recommendation_store.py scripts/morning-briefing.py`.
-- [ ] 9.5 Run `git diff --check` in both `/Users/cpt/Public/MalDaze` and `/Users/cpt/.hermes`.
-- [ ] 9.6 Manually inspect live nutrition data after tests to confirm no fixture or smoke command modified the user's real `daily_log.json`, `training_log.json`, or `recommendation.json`.
+- [x] 9.1 Run `openspec validate repair-nutrition-recommendation-authoring-flow --strict`.
+- [x] 9.2 Run focused Hermes tests: `python3 -m pytest tests/nutrition/test_day_classification.py tests/nutrition/test_morning_briefing_nutrition.py tests/nutrition/test_recommendation_store.py -q`.
+- [x] 9.3 Run relevant existing Hermes nutrition regression tests: `python3 -m pytest tests/nutrition/test_refresh_panel.py tests/nutrition/test_refresh_panel_cmd.py tests/nutrition/test_workout_split.py -q`.
+- [x] 9.4 Run Python compilation checks: `python3 -m py_compile data/nutrition/day_classification.py data/nutrition/recommend.py data/nutrition/recommendation_store.py scripts/morning-briefing.py`.
+- [x] 9.5 Run `git diff --check` in both `/Users/cpt/Public/MalDaze` and `/Users/cpt/.hermes`.
+- [x] 9.6 Manually inspect live nutrition data after tests to confirm no fixture or smoke command modified the user's real `daily_log.json`, `training_log.json`, or `recommendation.json`.
