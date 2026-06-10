@@ -32,7 +32,6 @@ final class NutritionTodayViewModel: ObservableObject {
     private var fileWatcher: NutritionDailyLogFileWatcher?
     private var recommendationFileWatcher: NutritionDailyLogFileWatcher?
     private var fsDebounceTask: Task<Void, Never>?
-    private var stalePollTask: Task<Void, Never>?
     private var lastPanelUpdatedAt: String?
     private var lastRecommendationGeneratedAt: String?
     private var pendingRefreshAfterLogging = false
@@ -126,14 +125,11 @@ final class NutritionTodayViewModel: ObservableObject {
         }
         recommendationFileWatcher = recommendationWatcher
         recommendationWatcher.start()
-        startStalePollingIfNeeded()
     }
 
     func stopWatching() {
         fsDebounceTask?.cancel()
         fsDebounceTask = nil
-        stalePollTask?.cancel()
-        stalePollTask = nil
         fileWatcher?.stop()
         fileWatcher = nil
         recommendationFileWatcher?.stop()
@@ -154,21 +150,6 @@ final class NutritionTodayViewModel: ObservableObject {
             }
             guard !Task.isCancelled, !isLogging else { return }
             loadToday()
-        }
-    }
-
-    private func startStalePollingIfNeeded() {
-        stalePollTask?.cancel()
-        stalePollTask = Task {
-            while !Task.isCancelled {
-                do {
-                    try await Task.sleep(nanoseconds: 45_000_000_000)
-                } catch {
-                    return
-                }
-                guard !Task.isCancelled, !isLogging else { continue }
-                pollForExternalUpdates()
-            }
         }
     }
 

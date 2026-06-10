@@ -1664,6 +1664,28 @@ final class ControlPanelPresentationTests: XCTestCase {
         )
     }
 
+    func testDeskReminderDeleteConfirmationAcceptsReturnKey() throws {
+        let dashboardSource = try readProjectSource("MalDaze/DashboardRootView.swift")
+        let routerSource = try readProjectSource("MalDaze/WindowManager/DeskPetDashboardEscapeRouter.swift")
+
+        XCTAssertTrue(
+            dashboardSource.contains(".confirmationReturnKey(isPresented: deleteConfirmationId != nil)"),
+            "Reminder delete confirmation should wire Return-key confirmation."
+        )
+        XCTAssertTrue(
+            dashboardSource.contains("await deskReminders.deleteReminder(id: id)"),
+            "Return-key confirmation should invoke the same delete path as the destructive button."
+        )
+        XCTAssertTrue(
+            routerSource.contains("final class ConfirmationReturnKeyMonitor"),
+            "Return-key confirmation should use a local NSEvent monitor."
+        )
+        XCTAssertTrue(
+            routerSource.contains("event.keyCode == 36 || event.keyCode == 76"),
+            "Return-key confirmation should accept both Return and keypad Enter."
+        )
+    }
+
     func testDeskReminderRowRendersNotesUnderTitleOnlyWhenNonEmpty() throws {
         let source = try readProjectSource("MalDaze/DashboardRootView.swift")
         let rowSource = try functionSource(named: "deskReminderRow", in: source)

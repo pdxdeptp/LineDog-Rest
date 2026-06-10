@@ -683,6 +683,12 @@ struct DashboardRootView: View {
             isPresented: deleteConfirmationId != nil,
             onDismiss: { deleteConfirmationId = nil }
         )
+        .confirmationReturnKey(isPresented: deleteConfirmationId != nil) {
+            if let id = deleteConfirmationId {
+                Task { await deskReminders.deleteReminder(id: id) }
+            }
+            deleteConfirmationId = nil
+        }
         .task {
             await deskReminders.prepare()
         }

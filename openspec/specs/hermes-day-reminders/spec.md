@@ -59,14 +59,37 @@ Hermes SHALL create a single day todo from Feishu conversation without an extra 
 - **THEN** Hermes writes the reminder immediately
 - **AND** reports success in Feishu
 
-### Requirement: Batch or recurrence requires confirmation
+### Requirement: Single explicit recurrence without confirmation
 
-Hermes SHALL require explicit user confirmation before creating multiple reminders or reminders with recurrence rules in one operation.
+Hermes SHALL create a single day todo with an explicit recurrence rule without an extra confirmation step when title, schedule, and repeat mapping are unambiguous.
+
+#### Scenario: Weekly recurrence immediate create
+- **WHEN** the user asks for one recurring day todo with clear title and schedule (e.g. video call with parents every Friday at 18:00)
+- **THEN** Hermes writes the reminder with due and recurrence via `day_reminders.py create --repeat`
+- **AND** reports the recurring schedule in Feishu without asking for confirmation
+
+### Requirement: Batch or ambiguous recurrence requires confirmation
+
+Hermes SHALL require explicit user confirmation before creating multiple reminders in one operation, or a single reminder whose recurrence rule cannot be mapped to remindctl simple rules.
 
 #### Scenario: Batch create preview
-- **WHEN** the parsed intent contains multiple reminders or a recurrence rule
+- **WHEN** the parsed intent contains multiple reminders
 - **THEN** Hermes shows a preview in Feishu
 - **AND** writes only after the user confirms
+
+#### Scenario: Ambiguous recurrence preview
+- **WHEN** the user requests recurrence that cannot be mapped (e.g. weekdays only)
+- **THEN** Hermes shows a preview with the interpreted rule
+- **AND** writes only after the user confirms
+
+### Requirement: Recurrence via remindctl
+
+Hermes SHALL support optional `--repeat` on `day_reminders.py create` when remindctl exposes `--repeat` (≥ 0.3.0). When repeat is requested but unsupported, Hermes SHALL return an explicit error and SHALL NOT silently create a one-off reminder.
+
+#### Scenario: Repeat unsupported fails loud
+- **WHEN** the agent passes `--repeat` and remindctl does not support recurrence flags
+- **THEN** `day_reminders.py` returns `ok: false` with upgrade guidance
+- **AND** Feishu reports the error without claiming success
 
 ### Requirement: MalDaze dashboard remains optional glance only
 

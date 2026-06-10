@@ -20,7 +20,7 @@ MalDaze **不写** `recommendation.json`，也不在 recommendation 缺失或过
 
 ### 桌宠角色（当前倾向，可演进）
 
-- **展示 facts/metrics**：读磁盘上的 `daily_log.json` `panel` / `records`；FSEvents 与轻量轮询只在 Hermes **已改写文件** 后刷新 UI。
+- **展示 facts/metrics**：读磁盘上的 `daily_log.json` `panel` / `records`；FSEvents 只在 Hermes **已改写文件** 后刷新 UI。
 - **展示 recommendation**：读 `recommendation.json` 的 summary、rationale、warnings、items；只有 fresh 且 `loggable: true` 的 item 可点击或数字键记录。
 - **唯一 nutrition 写动作**：通过 `recommend.py log` 记一笔已吃。桌宠**不**调用 `refresh-panel`、`plan_engine`、LLM，也不本地重算营养。
 - **「现在可以吃」来源**：只来自 Hermes-authored `recommendation.json`。`daily_log.panel.suggestions` 第一版保留为空数组 `[]` 只作 schema 兼容；MalDaze 必须忽略它，即使 legacy 数据非空也不能展示。
@@ -34,7 +34,7 @@ MalDaze **不写** `recommendation.json`，也不在 recommendation 缺失或过
 | `targets` / `consumed` / `remaining` | 含 `sodium_mg` |
 | `suggestions` | 第一版固定 `[]`，仅 schema 兼容；不是推荐来源 |
 | `calorieSlack` | 固定 50 |
-| `updatedAt` | ISO；45s 轮询兜底 |
+| `updatedAt` | ISO；与 recommendation `basedOn` 对齐判定 fresh/stale |
 
 归档 `history/` **不含** `panel`。
 

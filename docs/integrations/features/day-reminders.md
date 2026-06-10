@@ -24,7 +24,9 @@ Hub：[../hermes.md](../hermes.md) · 总目录：[../ROADMAP.md](../ROADMAP.md)
 | Skill | `~/.hermes/skills/day-reminders/SKILL.md` |
 | CLI | `~/.hermes/scripts/day_reminders.py` |
 | 晨报段 | `~/.hermes/scripts/morning-briefing.py` → 📋 今日提醒 |
-| 写入方式 | `remindctl`（首选）或 `osascript`（见 skill references） |
+| 写入方式 | `remindctl` ≥ 0.3.0（首选，含 `--repeat`）或 `osascript` 回退（见 skill references） |
+
+重复提醒：`day_reminders.py create --repeat weekly`（需 `brew upgrade remindctl`）。`weekly` 锚定在 `--due` 的星期几。
 
 ### 提醒列表（与桌宠对齐 · D5）
 
@@ -41,7 +43,8 @@ defaults read com.maldaze.MalDaze MalDaze.remindersSelectedCalendarIdentifier
 | 意图 | 示例 | 确认 |
 |------|------|------|
 | 创建单条 | 「明天下午去银行」 | 直接写 |
-| 创建批量/重复 | 「每周一交周报」 | 先预览再确认 |
+| 创建单条 + 明确重复 | 「每周五 18:00 找爸妈视频」 | 直接写（`--due` + `--repeat weekly`） |
+| 创建批量 / 含糊重复 | 「加三个待办」「工作日早上九点」 | 先预览再确认 |
 | 列出今日 | 「今天有什么待办」 | — |
 | 完成 | 「银行那条完成了」 | — |
 | 推迟 | 「超市推迟到明天」 | — |
@@ -66,6 +69,7 @@ defaults read com.maldaze.MalDaze MalDaze.remindersSelectedCalendarIdentifier
 | 现象 | 查什么 |
 |------|--------|
 | 飞书创建失败 | Hermes skill 日志、`day_reminders.py` 退出码、提醒事项权限 |
+| 重复写不进去 | `day_reminders.py status` 看 `repeat_supported`；升级 `brew upgrade remindctl` |
 | 侧栏有、飞书没有 | 正常：侧栏读 EventKit，与 Hermes 无同步要求 |
 | 晨报无提醒段 | `morning-briefing.py` 是否调用 list-today |
 

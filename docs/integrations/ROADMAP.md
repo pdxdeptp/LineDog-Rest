@@ -113,7 +113,7 @@
 
 | ID | 项 | 说明 | 状态 |
 |----|-----|------|------|
-| A-DOC1 | `day-reminders` 示例 `--due "tomorrow 14:00"` | remindctl 0.1.1 无效；应写 `YYYY-MM-DD HH:mm` | ⬜ |
+| A-DOC1 | `day-reminders` 重复提醒 | remindctl ≥ 0.3.0 + `create --repeat`；D4 单条明确重复直接写 | ✅ |
 
 ---
 
