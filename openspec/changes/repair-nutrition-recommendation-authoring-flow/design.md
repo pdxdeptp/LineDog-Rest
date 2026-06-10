@@ -27,11 +27,13 @@ The implementation drifted in two ways:
 
 ## Decisions
 
-### Decision 1: Morning Briefing script refreshes facts only
+### Decision 1: Morning Briefing always completes the nutrition pipeline
 
-`~/.hermes/scripts/morning-briefing.py` SHALL run day classification and panel refresh, then print facts/status. It SHALL NOT import `recommendation_store`, SHALL NOT write `recommendation.json`, and SHALL NOT call `plan_engine.py`.
+`~/.hermes/scripts/morning-briefing.py` SHALL run day classification and panel refresh, then delegate to `morning_briefing_nutrition.py` to run `plan_engine`, assemble a user-visible recommendation snapshot, and write `recommendation.json` before finishing. Facts-only briefing output is not an acceptable completed run.
 
-Alternative considered: keep writing `state: "unavailable"` from the deterministic script with better wording. Rejected because it still makes a non-author script mutate the recommendation source of truth.
+`morning-briefing.py` SHALL NOT embed planner logic directly; planner ownership lives in `morning_briefing_nutrition.py`.
+
+Alternative considered: keep briefing facts-only and require a separate Feishu agent step to author recommendations. Rejected because users expect rerun Morning Briefing and scheduled 08:00 cron to deliver the full nutrition section for MalDaze.
 
 ### Decision 2: Hermes authoring writes recommendation snapshots
 

@@ -61,7 +61,7 @@ python3 recommend.py refresh-panel   # 仅重算 panel，不改 records
 python3 ~/.hermes/scripts/integration_smoke.py  # nutrition_panel 项
 ```
 
-晨报 `morning-briefing.py` 营养 facts 段先跑 `day_classification.py`，再 `refresh-panel`；确定性脚本不写 `recommendation.json`。若晨报包含用户可见饮食建议，Hermes authoring path 必须写 `recommendation.json`；planner-only 候选不得作为 fresh recommendation 发布。
+晨报 `morning-briefing.py` 必须跑完整营养链路：`day_classification.py` → `refresh-panel` → `morning_briefing_nutrition.py`，每次都写 fresh `recommendation.json`（`source.kind: morning_briefing`）。不允许 facts-only 晨报。
 
 ## 手动 QA
 

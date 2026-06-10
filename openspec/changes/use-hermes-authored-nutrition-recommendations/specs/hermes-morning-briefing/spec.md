@@ -4,7 +4,7 @@
 
 When the Hermes morning briefing includes a user-visible nutrition recommendation, Hermes SHALL write the same recommendation to `~/.hermes/data/nutrition/recommendation.json` before or during briefing delivery.
 
-The morning briefing nutrition recommendation MUST be authored through the Hermes recommendation path. Raw `plan_engine.py --full-day` output MAY be used as candidate context, but MUST NOT be written as a fresh recommendation snapshot unless Hermes has authored or approved the final user-visible recommendation.
+The morning briefing nutrition recommendation MUST be authored through the Hermes recommendation path. Raw `plan_engine.py` output MAY be used as candidate context, but MUST NOT be written as a fresh recommendation snapshot unless Hermes has authored or approved the final user-visible recommendation.
 
 #### Scenario: Briefing recommendation is shared with MalDaze
 

@@ -8,7 +8,8 @@ The day classification flow is also hidden behind `recommend.py auto`, which mak
 
 - Remove production "no-agent" recommendation behavior from Morning Briefing. Deterministic scripts may refresh facts, but MUST NOT write `recommendation.json` merely because an AI author step did not run.
 - Remove unused Morning Briefing diet planner helper code, including stale `get_diet_plan()` and any `plan_engine.py --full-day` call in `morning-briefing.py`.
-- Require Hermes nutrition authoring flows to write `recommendation.json` whenever they reply with a user-visible next-step food recommendation, including after "rerun morning briefing" and after Feishu nutrition updates.
+- Require every Morning Briefing run to complete the nutrition pipeline and write a fresh `recommendation.json`, including scheduled cron and manual "rerun morning briefing".
+- Require other Hermes nutrition authoring flows to write `recommendation.json` whenever they reply with a user-visible next-step food recommendation after Feishu nutrition updates.
 - Clarify that `recommendation.json state: "unavailable"` is reserved for an explicit Hermes-authored decision, not for deterministic-script placeholders.
 - Introduce a standalone day classification program that owns training/rest day classification and writes the daily facts needed by nutrition and sleep flows.
 - Deprecate direct use of `recommend.py auto` by Morning Briefing and Hermes skills; keep any old subcommand only as a compatibility wrapper during migration.
@@ -21,7 +22,7 @@ The day classification flow is also hidden behind `recommend.py auto`, which mak
 - `nutrition-recommendation-contract`: Additional ownership constraints for the active recommendation snapshot contract, especially deterministic-script non-ownership and authored unavailable states.
 
 ### Modified Capabilities
-- `hermes-morning-briefing`: Morning Briefing refreshes nutrition facts through explicit day classification and panel refresh, but does not publish recommendations unless Hermes authoring writes the same recommendation snapshot.
+- `hermes-morning-briefing`: Morning Briefing refreshes nutrition facts and always publishes a fresh recommendation snapshot through `morning_briefing_nutrition.py`.
 - `integration-feishu-qa`: Feishu/Hermes nutrition replies that include next-step food advice must write the same advice to `recommendation.json`.
 
 ## Impact

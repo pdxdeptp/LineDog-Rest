@@ -214,7 +214,9 @@ struct NutritionTodayPanelView: View {
         case .stale(let snapshot):
             VStack(alignment: .leading, spacing: 4) {
                 recommendationMessageView
-                recommendationSnapshotView(snapshot, actionsEnabled: false)
+                if !snapshot.suggestions.isEmpty {
+                    recommendationSnapshotView(snapshot, actionsEnabled: false)
+                }
             }
         case .missing, .invalid:
             recommendationMessageView
@@ -240,22 +242,8 @@ struct NutritionTodayPanelView: View {
         actionsEnabled: Bool
     ) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(snapshot.summary)
-                .font(NutritionBodyFont.body)
-                .foregroundStyle(actionsEnabled ? .primary : .secondary)
-                .fixedSize(horizontal: false, vertical: true)
-
             ForEach(snapshot.suggestions) { suggestion in
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(suggestion.label)
-                        .font(NutritionBodyFont.hint.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                    if let rationale = suggestion.rationale, !rationale.isEmpty {
-                        Text(rationale)
-                            .font(NutritionBodyFont.hint)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
                     ForEach(Array(suggestion.items.enumerated()), id: \.offset) { _, item in
                         recommendationItemRow(item, actionsEnabled: actionsEnabled)
                         Divider().opacity(0.35)

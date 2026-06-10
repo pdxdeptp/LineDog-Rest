@@ -68,3 +68,19 @@
 - [x] 9.4 Run Python compilation checks: `python3 -m py_compile data/nutrition/day_classification.py data/nutrition/recommend.py data/nutrition/recommendation_store.py scripts/morning-briefing.py`.
 - [x] 9.5 Run `git diff --check` in both `/Users/cpt/Public/MalDaze` and `/Users/cpt/.hermes`.
 - [x] 9.6 Manually inspect live nutrition data after tests to confirm no fixture or smoke command modified the user's real `daily_log.json`, `training_log.json`, or `recommendation.json`.
+
+## 10. Full Morning Briefing Nutrition Pipeline
+
+- [x] 10.1 Update repair OpenSpec/docs to require every Morning Briefing run to publish a fresh recommendation snapshot; remove facts-only rerun semantics.
+- [x] 10.2 Add `~/.hermes/data/nutrition/morning_briefing_nutrition.py` to run `plan_engine`, assemble snapshot, and write `recommendation.json`.
+- [x] 10.3 Update `morning-briefing.py` to delegate to `morning_briefing_nutrition.py` and print authored food lines.
+- [x] 10.4 Update nutrition skill/README/integration docs and model-router nutrition patterns for full briefing pipeline.
+- [x] 10.5 Replace morning briefing regression tests to require recommendation publish instead of forbidding it.
+- [x] 10.6 Run focused Hermes nutrition tests and `openspec validate repair-nutrition-recommendation-authoring-flow --strict`.
+
+## 11. Remove plan_engine --full-day
+
+- [x] 11.1 Remove `--full-day` parsing from `plan_engine.py`; always plan against `status.remaining`.
+- [x] 11.2 Update `morning_briefing_nutrition.py` and nutrition skill/docs to drop full-day references.
+- [x] 11.3 Add regression test asserting `plan_engine.py` no longer exposes `--full-day`.
+- [x] 11.4 Run focused Hermes nutrition tests.

@@ -2,9 +2,11 @@
 
 ### Requirement: Deterministic scripts do not own recommendation snapshots
 
-Deterministic Hermes scripts SHALL NOT write `~/.hermes/data/nutrition/recommendation.json` merely because no Hermes authoring step is running.
+Morning Briefing SHALL always complete nutrition recommendation publishing through `morning_briefing_nutrition.py`; a facts-only briefing run is invalid.
 
-`recommendation.json` SHALL be written only by Hermes nutrition authoring flows that either provide a user-visible food recommendation or explicitly author a user-visible unavailable recommendation state.
+Other deterministic Hermes scripts SHALL NOT write `~/.hermes/data/nutrition/recommendation.json` merely because no nutrition authoring step is running.
+
+`recommendation.json` SHALL be written by Hermes nutrition authoring flows that either provide a user-visible food recommendation or explicitly author a user-visible unavailable recommendation state.
 
 #### Scenario: Facts refresh leaves recommendation untouched
 - **WHEN** a deterministic script refreshes nutrition facts by running day classification or `recommend.py refresh-panel`
