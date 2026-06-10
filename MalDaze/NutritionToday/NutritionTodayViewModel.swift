@@ -175,7 +175,7 @@ final class NutritionTodayViewModel: ObservableObject {
         case .idle, .fresh:
             return nil
         case .stale:
-            return "Hermes 建议已过期，等待新的饮食建议。"
+            return "今日摄入已更新，Hermes 尚未写入匹配的饮食建议。"
         case .missing:
             return NutritionRecommendationContractReader.userFacingMessage(for: .fileNotFound)
         case .unavailable(let snapshot):
@@ -191,7 +191,8 @@ final class NutritionTodayViewModel: ObservableObject {
             lastRecommendationGeneratedAt = snapshot.generatedAt
 
             if snapshot.date == log.date,
-               snapshot.basedOn.dailyLogPanelUpdatedAt == panel.updatedAt {
+               snapshot.basedOn.dailyLogPanelUpdatedAt == panel.updatedAt,
+               snapshot.basedOn.recordsCount == log.records.count {
                 if snapshot.state == .unavailable {
                     recommendationState = .unavailable(snapshot)
                     loggableItems = []

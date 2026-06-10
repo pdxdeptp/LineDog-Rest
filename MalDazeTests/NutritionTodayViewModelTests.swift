@@ -94,7 +94,7 @@ final class NutritionTodayViewModelTests: XCTestCase {
         XCTAssertEqual(vm.recommendationState, .stale(StubRecommendationReader.staleSnapshot))
         XCTAssertTrue(vm.loggableItems.isEmpty)
         XCTAssertFalse(vm.canUseDigitShortcuts)
-        XCTAssertEqual(vm.recommendationMessage, "Hermes 建议已过期，等待新的饮食建议。")
+        XCTAssertEqual(vm.recommendationMessage, "今日摄入已更新，Hermes 尚未写入匹配的饮食建议。")
     }
 
     func testPollingReloadsWhenRecommendationAppearsOrGeneratedAtChangesWithoutPanelUpdate() {
@@ -147,7 +147,7 @@ final class NutritionTodayViewModelTests: XCTestCase {
         XCTAssertEqual(oldPanelVM.recommendationState, .stale(oldPanelUpdatedAt))
         XCTAssertTrue(oldPanelVM.loggableItems.isEmpty)
         XCTAssertFalse(oldPanelVM.canUseDigitShortcuts)
-        XCTAssertEqual(oldPanelVM.recommendationMessage, "Hermes 建议已过期，等待新的饮食建议。")
+        XCTAssertEqual(oldPanelVM.recommendationMessage, "今日摄入已更新，Hermes 尚未写入匹配的饮食建议。")
     }
 
     func testMissingUnavailableAndInvalidRecommendationStatesDisableActions() {

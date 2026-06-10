@@ -59,7 +59,7 @@ MalDaze/
 | 营养今日面板 X2 | facts/metrics: `daily_log.json` → `panel`; recommendation: `recommendation.json` | `recommend.py` `refresh-panel`; Hermes recommendation writer | `NutritionToday/` | [nutrition-today-panel.md](./features/nutrition-today-panel.md) | 🟡 待 M-N1 |
 | 晨报扩展 | — | `morning-briefing.py` | — | [ROADMAP.md](./ROADMAP.md) §5 | 已上线 |
 
-营养 recommendation unavailable 契约：第一版不新增 `reason` 字段；`recommendation_store.py unavailable --reason` 将原因写入 `summary`，并写 `state: "unavailable"`、`suggestions: []`。Morning Briefing 每次跑完应写 fresh available 快照；仅当 `plan_engine`/校验失败时写 unavailable。MalDaze 可用 `summary` 作为 UI 状态文案，且不得 fallback 到 `panel.suggestions` 或 planner。
+营养 recommendation unavailable 契约：第一版不新增 `reason` 字段；`recommendation_store.py unavailable --reason` 将原因写入 `summary`，并写 `state: "unavailable"`、`suggestions: []`。fresh 需 `date`、`basedOn.dailyLogPanelUpdatedAt == panel.updatedAt`、且 `basedOn.recordsCount == len(records)` 三者对齐。Morning Briefing 每次跑完应写 fresh available 快照（`source.kind: morning_briefing`）。Hermes agent **Menu Turn**（语义判定：本轮要给用户今日剩余怎么吃）须在 `publish --stdin` 后跑 `nutrition_authoring_publish.py status` 验收 `available`，写入 `source.kind: hermes_nutrition`；不得在 status 通过前对用户宣称桌宠已同步。不使用 gateway 自动补写 `recommendation.json`。仅当 `plan_engine`/校验失败时写 unavailable。`recommend.py status`/`log`/`refresh-panel` JSON 含 `recommendation` 状态信封。MalDaze 可用 `summary` 作为 UI 状态文案，且不得 fallback 到 `panel.suggestions` 或 planner。
 
 MalDaze 可以在功能契约明确允许时执行受控写操作，例如营养建议项点击后调用 `recommend.py log`。这不改变推荐来源边界：`recommendation.json` 仍由 Hermes authoring 写入，MalDaze 不本地生成、过滤、缓存或直接写入推荐。
 

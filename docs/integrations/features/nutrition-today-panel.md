@@ -7,10 +7,10 @@
 ## 数据流
 
 ```
-飞书 / nutrition-menu skill
-    → recommend.py log|auto|…（写 records + 重算 panel）
+Hermes agent / nutrition-menu skill（Menu Turn）
+    → recommend.py log|…（写 records + 重算 panel）
     → daily_log.json（facts/metrics）
-    → Hermes authoring path（当回复用户可见饮食建议时写 recommendation.json）
+    → nutrition_authoring_publish.py publish + status（Menu Turn 完成门槛）
     → FSEvents（MalDaze NutritionDailyLogFileWatcher）
     → Dashboard 左栏下段 NutritionTodayPanelView
 ```
@@ -72,5 +72,5 @@ python3 ~/.hermes/scripts/integration_smoke.py  # nutrition_panel 项
 桌宠刷新逻辑一般**没问题**——它展示 `daily_log.json` facts/metrics，并只展示 Hermes 已写入的 `recommendation.json`。如果看到等待/过期：
 
 - `recommendation.json` 不存在：显示 missing/waiting；MalDaze 不调用 `plan_engine` 或 `refresh-panel` 生成建议。
-- `daily_log.panel.updatedAt` 与 `recommendation.basedOn.dailyLogPanelUpdatedAt` 不一致：显示 stale；旧建议可作为上下文展示，但点击/数字键禁用。
+- `daily_log.panel.updatedAt` 与 `recommendation.basedOn.dailyLogPanelUpdatedAt` 不一致，或 `records` 条数与 `basedOn.recordsCount` 不一致：显示 stale（文案：「今日摄入已更新，Hermes 尚未写入匹配的饮食建议。」）；旧建议可作为上下文展示，但点击/数字键禁用。Hermes agent Menu Turn 须在 `nutrition_authoring_publish.py publish --stdin` + `status`（`ok: true`）通过后再对用户宣称已同步；不靠 gateway 自动补写。
 - Hermes 无法可靠推荐：写 `state: "unavailable"` 或保持 stale；unavailable payload 第一版不含单独 `reason` 字段，`recommendation_store.py unavailable --reason` 把原因写入 `summary`，且 `suggestions` 必须是 `[]`；MalDaze 可显示 `summary`，但不 fallback。
