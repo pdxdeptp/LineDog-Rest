@@ -547,6 +547,24 @@ final class ControlPanelPresentationTests: XCTestCase {
         )
     }
 
+    func testDashboardResizeHandleUsesWindowStableDragCoordinates() throws {
+        let source = try readProjectSource("MalDaze/DashboardRootView.swift")
+        let dragCoordinateSource = try functionSource(named: "dragCoordinate", in: source)
+
+        XCTAssertTrue(
+            dragCoordinateSource.contains("event.locationInWindow.x"),
+            "Column resize drags should use window x coordinates so handle relayout does not feed into the next delta."
+        )
+        XCTAssertTrue(
+            dragCoordinateSource.contains("-event.locationInWindow.y"),
+            "Row resize drags should use stable window y coordinates while preserving the flipped local downward-positive drag direction."
+        )
+        XCTAssertFalse(
+            dragCoordinateSource.contains("convert(event.locationInWindow, from: nil)"),
+            "Resize drag deltas must not derive from handle-local coordinates because the handle moves during live layout."
+        )
+    }
+
     func testDeskPetDashboardWindowLayoutClampsToSmallVisibleFrame() {
         let visibleFrame = NSRect(x: 100, y: 200, width: 760, height: 520)
         let oversized = NSRect(x: 50, y: 50, width: 900, height: 700)

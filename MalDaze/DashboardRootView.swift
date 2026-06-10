@@ -230,8 +230,12 @@ private final class DashboardColumnResizeHandleView: NSView {
     }
 
     private func dragCoordinate(for event: NSEvent) -> CGFloat {
-        let point = convert(event.locationInWindow, from: nil)
-        return axis == .columns ? point.x : point.y
+        switch axis {
+        case .columns:
+            return event.locationInWindow.x
+        case .rows:
+            return -event.locationInWindow.y
+        }
     }
 
     private func installTrackingAreaIfNeeded() {
