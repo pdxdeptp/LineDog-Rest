@@ -6,6 +6,7 @@ struct EnergyWakeupSourceTests {
         try testIdleCursorTrackingUsesAdaptiveFarAndNearIntervals()
         try testBreakRunTargetsThirtyHertzAndUsesElapsedSecondsForMovement()
         try testBreakRunShieldResolvesFromPetWindowFrame()
+        try testBreakRunHelperPanelsRemainVisibleDuringApplicationHideAndDeactivation()
         try testFullscreenRestUsesWholeSecondTicksAfterApproachCompletes()
         try testExtractedEnergyHelpersExercisePassThroughBounceTurnsAndRestCadence()
     }
@@ -145,6 +146,29 @@ struct EnergyWakeupSourceTests {
         """
 
         try compileAndRunSwiftFixture(fixture)
+    }
+
+    private func testBreakRunHelperPanelsRemainVisibleDuringApplicationHideAndDeactivation() throws {
+        let source = try readProjectSource("MalDaze/WindowManager/WindowManager.swift")
+        let showShield = try expectFunctionBody(named: "showBreakRunShield", in: source)
+        let showCountdown = try expectFunctionBody(named: "showBreakRunCountdownPanel", in: source)
+
+        try expect(
+            showShield.contains("panel.hidesOnDeactivate = false"),
+            "Delayed break-run shield panel should remain visible when MalDaze deactivates."
+        )
+        try expect(
+            showShield.contains("panel.canHide = false"),
+            "Delayed break-run shield panel should opt out of application hide."
+        )
+        try expect(
+            showCountdown.contains("panel.hidesOnDeactivate = false"),
+            "Fixed break-run countdown panel should remain visible when MalDaze deactivates."
+        )
+        try expect(
+            showCountdown.contains("panel.canHide = false"),
+            "Fixed break-run countdown panel should opt out of application hide."
+        )
     }
 
     private func testFullscreenRestUsesWholeSecondTicksAfterApproachCompletes() throws {

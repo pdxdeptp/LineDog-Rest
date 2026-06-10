@@ -768,6 +768,8 @@ final class WindowManager: WindowManaging {
         panel.backgroundColor = NSColor.black.withAlphaComponent(0.20)
         panel.isOpaque = false
         panel.hasShadow = false
+        panel.hidesOnDeactivate = false
+        panel.canHide = false
         panel.level = shieldLevel
         panel.ignoresMouseEvents = false
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
@@ -807,6 +809,8 @@ final class WindowManager: WindowManaging {
         panel.backgroundColor = .clear
         panel.isOpaque = false
         panel.hasShadow = false
+        panel.hidesOnDeactivate = false
+        panel.canHide = false
         // level = screenSaver-1（999）；遮罩在 screenSaver-2（998），pet 在 screenSaver（1000）
         panel.level = NSWindow.Level(rawValue: Int(NSWindow.Level.screenSaver.rawValue) - 1)
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
