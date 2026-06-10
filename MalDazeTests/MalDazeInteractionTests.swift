@@ -1,3 +1,4 @@
+import AppKit
 import XCTest
 @testable import MalDaze
 
@@ -39,6 +40,24 @@ final class MalDazeInteractionTests: XCTestCase {
             return mirror.children.first?.value as? Timer
         }
         return value as? Timer
+    }
+
+    private func localDate(
+        year: Int = 2026,
+        month: Int = 3,
+        day: Int = 19,
+        hour: Int,
+        minute: Int,
+        second: Int = 0
+    ) -> Date {
+        Calendar.current.date(from: DateComponents(
+            year: year,
+            month: month,
+            day: day,
+            hour: hour,
+            minute: minute,
+            second: second
+        ))!
     }
 
     private nonisolated static func clearSuspendedTimerModeSnapshot() {
@@ -308,6 +327,82 @@ final class MalDazeInteractionTests: XCTestCase {
         XCTAssertEqual(vm.petDisplayMode, .runningBlack)
     }
 
+    func testAppBecomeActiveRealignsActiveAutoTimerStatusLine() {
+        var now = localDate(hour: 10, minute: 25)
+        let autoEngine = AutoTimerEngine(restDuration: 60, now: { now })
+        let vm = AppViewModel(
+            windowManager: MockWindowManager(),
+            autoEngine: autoEngine,
+            bootstrapAutoEngine: true
+        )
+        yieldForMainActorEngineDelivery()
+        XCTAssertTrue(vm.statusLine.contains("10:30"))
+
+        now = localDate(hour: 10, minute: 49)
+        NotificationCenter.default.post(name: NSApplication.didBecomeActiveNotification, object: nil)
+        yieldForMainActorEngineDelivery()
+        yieldForMainActorEngineDelivery()
+
+        XCTAssertTrue(autoEngine.isTimerRunning)
+        XCTAssertFalse(autoEngine.isInScheduledRest)
+        XCTAssertTrue(vm.statusLine.contains("11:00"))
+    }
+
+    func testWakeNotificationRealignsActiveAutoTimerStatusLine() {
+        var now = localDate(hour: 10, minute: 25)
+        let autoEngine = AutoTimerEngine(restDuration: 60, now: { now })
+        let vm = AppViewModel(
+            windowManager: MockWindowManager(),
+            autoEngine: autoEngine,
+            bootstrapAutoEngine: true
+        )
+        yieldForMainActorEngineDelivery()
+        XCTAssertTrue(vm.statusLine.contains("10:30"))
+
+        now = localDate(hour: 10, minute: 49)
+        NSWorkspace.shared.notificationCenter.post(name: NSWorkspace.didWakeNotification, object: nil)
+        yieldForMainActorEngineDelivery()
+        yieldForMainActorEngineDelivery()
+
+        XCTAssertTrue(autoEngine.isTimerRunning)
+        XCTAssertFalse(autoEngine.isInScheduledRest)
+        XCTAssertTrue(vm.statusLine.contains("11:00"))
+    }
+
+    func testAppBecomeActiveDoesNotRestartUserStoppedAutoTimer() {
+        Self.clearSuspendedTimerModeSnapshot()
+        defer { Self.clearSuspendedTimerModeSnapshot() }
+
+        var now = localDate(hour: 10, minute: 25)
+        let autoEngine = AutoTimerEngine(restDuration: 60, now: { now })
+        let vm = AppViewModel(
+            windowManager: MockWindowManager(),
+            autoEngine: autoEngine,
+            bootstrapAutoEngine: true
+        )
+        yieldForMainActorEngineDelivery()
+        vm.stopTimers()
+        XCTAssertFalse(autoEngine.isTimerRunning)
+        XCTAssertTrue(vm.showResumeChronoButton)
+        XCTAssertEqual(
+            UserDefaults.standard.string(forKey: Self.suspendedTimerModeSnapshotKey),
+            Self.autoSuspendedTimerModeToken
+        )
+
+        now = localDate(hour: 10, minute: 49)
+        NotificationCenter.default.post(name: NSApplication.didBecomeActiveNotification, object: nil)
+        yieldForMainActorEngineDelivery()
+        yieldForMainActorEngineDelivery()
+
+        XCTAssertFalse(autoEngine.isTimerRunning)
+        XCTAssertTrue(vm.showResumeChronoButton)
+        XCTAssertEqual(vm.statusLine, "自动提醒已暂停。点击「恢复计时」重新对齐整点 / 半点。")
+        XCTAssertEqual(
+            UserDefaults.standard.string(forKey: Self.suspendedTimerModeSnapshotKey),
+            Self.autoSuspendedTimerModeToken
+        )
+    }
+
     // MARK: - 注入引擎状态（无 Timer）
 
     func testManualEngineEmit_enterRestPhase_deliversPresentAsync() {
@@ -454,6 +549,55 @@ final class MalDazeInteractionTests: XCTestCase {
 
     // MARK: - AutoTimerEngine.nextHalfHourAnchor
 
+    func testAutoAnchorTimerFiringMateriallyLateRealignsInsteadOfResting() throws {
+        var now = localDate(hour: 10, minute: 25)
+        let engine = AutoTimerEngine(restDuration: 60, now: { now })
+        var states: [TimeState] = []
+        engine.onStateChange = { states.append($0) }
+
+        engine.start()
+        defer { engine.stop() }
+
+        guard case .autoWatching(let initialAnchor) = try XCTUnwrap(states.last) else {
+            return XCTFail("Expected AutoTimerEngine to wait for the next anchor")
+        }
+        XCTAssertEqual(Calendar.current.component(.hour, from: initialAnchor), 10)
+        XCTAssertEqual(Calendar.current.component(.minute, from: initialAnchor), 30)
+
+        now = localDate(hour: 10, minute: 49)
+        try backingTimer(from: engine).fire()
+
+        XCTAssertFalse(engine.isInScheduledRest)
+        XCTAssertFalse(states.contains { state in
+            if case .resting = state { return true }
+            return false
+        })
+        guard case .autoWatching(let realignedAnchor) = try XCTUnwrap(states.last) else {
+            return XCTFail("Expected stale anchor fire to realign instead of rest")
+        }
+        XCTAssertEqual(Calendar.current.component(.hour, from: realignedAnchor), 11)
+        XCTAssertEqual(Calendar.current.component(.minute, from: realignedAnchor), 0)
+    }
+
+    func testAutoAnchorTimerFiringWithinGraceWindowBeginsScheduledRest() throws {
+        var now = localDate(hour: 10, minute: 25)
+        let engine = AutoTimerEngine(restDuration: 123, now: { now })
+        var states: [TimeState] = []
+        engine.onStateChange = { states.append($0) }
+
+        engine.start()
+        defer { engine.stop() }
+
+        now = localDate(hour: 10, minute: 30, second: 1)
+        try backingTimer(from: engine).fire()
+
+        XCTAssertTrue(engine.isInScheduledRest)
+        guard case .resting(let remaining) = try XCTUnwrap(states.last) else {
+            return XCTFail("Expected on-time anchor fire to enter scheduled rest")
+        }
+        XCTAssertEqual(remaining, 123, accuracy: 0.1)
+    }
+
     func testAutoStartSchedulesAnchorTimerInsteadOfQuarterSecondPolling() throws {
         let engine = AutoTimerEngine(restDuration: 1)
         var states: [TimeState] = []
@@ -477,12 +621,14 @@ final class MalDazeInteractionTests: XCTestCase {
     }
 
     func testAutoScheduledRestUsesOneSecondTimerAndSuppressesSameSecondCountdownDuplicates() throws {
-        let engine = AutoTimerEngine(restDuration: 2.4)
+        var now = localDate(hour: 10, minute: 25)
+        let engine = AutoTimerEngine(restDuration: 2.4, now: { now })
         var states: [TimeState] = []
         engine.onStateChange = { states.append($0) }
 
         engine.start()
         defer { engine.stop() }
+        now = localDate(hour: 10, minute: 30)
         try backingTimer(from: engine).fire()
 
         XCTAssertTrue(engine.isInScheduledRest)
@@ -502,7 +648,8 @@ final class MalDazeInteractionTests: XCTestCase {
     }
 
     func testAutoScheduledRestDoesNotSkipNextDisplayedSecondWhenOneSecondTickIsLate() throws {
-        let engine = AutoTimerEngine(restDuration: 3)
+        var now = localDate(hour: 10, minute: 25)
+        let engine = AutoTimerEngine(restDuration: 3, now: { now })
         var displayedSeconds: [Int] = []
         engine.onStateChange = { state in
             if case .resting(let remaining) = state {
@@ -512,11 +659,12 @@ final class MalDazeInteractionTests: XCTestCase {
 
         engine.start()
         defer { engine.stop() }
+        now = localDate(hour: 10, minute: 30)
         try backingTimer(from: engine).fire()
 
         XCTAssertEqual(displayedSeconds, [3])
         let firstRestTick = try backingTimer(from: engine)
-        Thread.sleep(forTimeInterval: 1.02)
+        now = localDate(hour: 10, minute: 30, second: 1).addingTimeInterval(0.02)
         firstRestTick.fire()
 
         XCTAssertEqual(displayedSeconds, [3, 2], "A slightly late one-second rest tick should still emit the next displayed second instead of skipping it")
