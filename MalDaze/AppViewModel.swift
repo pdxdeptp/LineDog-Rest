@@ -111,6 +111,8 @@ final class AppViewModel: ObservableObject {
     private var idlePetIconSidePointsObserver: NSObjectProtocol?
     private var idlePetAnimationIntensityObserver: NSObjectProtocol?
     private var sleepScheduleSettingsObserver: NSObjectProtocol?
+    private var autoTimerWakeObserver: NSObjectProtocol?
+    private var autoTimerBecomeActiveObserver: NSObjectProtocol?
     /// 智能提醒写入的 `EKAlarm` 到点后弹出与 7 分钟倒计时相同的中央铃铛。
     private var smartReminderBellTasks: [String: Task<Void, Never>] = [:]
 
@@ -342,6 +344,43 @@ final class AppViewModel: ObservableObject {
         ) { [weak self] _ in
             self?.syncSleepScheduleFromUserDefaults()
         }
+
+        installAutoTimerLifecycleObserversIfNeeded()
+    }
+
+    private func installAutoTimerLifecycleObserversIfNeeded() {
+        if autoTimerWakeObserver == nil {
+            autoTimerWakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
+                forName: NSWorkspace.didWakeNotification,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    self?.realignAutomaticTimerAfterLifecycleEvent()
+                }
+            }
+        }
+        if autoTimerBecomeActiveObserver == nil {
+            autoTimerBecomeActiveObserver = NotificationCenter.default.addObserver(
+                forName: NSApplication.didBecomeActiveNotification,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    self?.realignAutomaticTimerAfterLifecycleEvent()
+                }
+            }
+        }
+    }
+
+    private func realignAutomaticTimerAfterLifecycleEvent() {
+        guard
+            mode == .auto,
+            isChronoSessionActive,
+            !chronoSessionSuspendedByUser,
+            !autoEngine.isInScheduledRest
+        else { return }
+        autoEngine.realignWatching()
     }
 
     private func syncSleepScheduleFromUserDefaults() {
@@ -506,6 +545,12 @@ final class AppViewModel: ObservableObject {
         }
         if let sleepScheduleSettingsObserver {
             NotificationCenter.default.removeObserver(sleepScheduleSettingsObserver)
+        }
+        if let autoTimerWakeObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(autoTimerWakeObserver)
+        }
+        if let autoTimerBecomeActiveObserver {
+            NotificationCenter.default.removeObserver(autoTimerBecomeActiveObserver)
         }
     }
 

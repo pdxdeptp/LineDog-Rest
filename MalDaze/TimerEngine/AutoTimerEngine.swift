@@ -3,13 +3,16 @@ import Foundation
 /// 模式 B：每逢时钟 `:00` 与 `:30` 触发休息；其余时间处于等待下一锚点状态。
 final class AutoTimerEngine: TimerEngine {
     private static let restCountdownSlopTolerance: TimeInterval = 0.15
+    private static let anchorStaleGrace: TimeInterval = 5
 
     var onStateChange: ((TimeState) -> Void)?
 
     private var restDuration: TimeInterval
+    private let now: () -> Date
 
-    init(restDuration: TimeInterval = 5 * 60) {
+    init(restDuration: TimeInterval = 5 * 60, now: @escaping () -> Date = Date.init) {
         self.restDuration = restDuration
+        self.now = now
     }
 
     /// 更新下一次进入休息段时的时长（当前休息窗口仍按既有 `phaseEnd` 结束）。
@@ -18,6 +21,7 @@ final class AutoTimerEngine: TimerEngine {
     }
     private var tickTimer: Timer?
     private var phaseEnd: Date?
+    private var activeWaitingAnchor: Date?
     private var isResting = false
     /// 仅当剩余整秒变化时派发 `.resting`，避免重复 tick 触发 SwiftUI / WindowServer。
     private var lastRestingEmitWholeSeconds: Int?
@@ -30,7 +34,7 @@ final class AutoTimerEngine: TimerEngine {
     /// 若处于整点/半点休息窗口内，返回距该窗口结束剩余时间；否则为 0。
     var scheduledRestRemainingOrZero: TimeInterval {
         guard tickTimer != nil, isResting, let end = phaseEnd else { return 0 }
-        return max(0, end.timeIntervalSinceNow)
+        return max(0, end.timeIntervalSince(now()))
     }
 
     func start() {
@@ -43,7 +47,14 @@ final class AutoTimerEngine: TimerEngine {
         tickTimer?.invalidate()
         tickTimer = nil
         phaseEnd = nil
+        activeWaitingAnchor = nil
         isResting = false
+    }
+
+    /// 唤醒 / 激活后仅重排等待中的整点/半点锚点；停止或休息中不隐式重启。
+    func realignWatching() {
+        guard tickTimer != nil, activeWaitingAnchor != nil, !isResting else { return }
+        scheduleWatching()
     }
 
     /// 用户在休息霸屏上双击小狗：结束当前整点/半点休息窗口，回到等待下一锚点。
@@ -57,21 +68,40 @@ final class AutoTimerEngine: TimerEngine {
 
     private func scheduleWatching() {
         tickTimer?.invalidate()
-        let anchor = Self.nextHalfHourAnchor(after: Date())
+        let currentDate = now()
+        let anchor = Self.nextHalfHourAnchor(after: currentDate)
+        activeWaitingAnchor = anchor
         phaseEnd = anchor
         onStateChange?(.autoWatching(nextAnchor: anchor))
 
-        let delay = max(0, anchor.timeIntervalSinceNow)
+        let delay = max(0, anchor.timeIntervalSince(currentDate))
         let t = Timer(timeInterval: delay, repeats: false) { [weak self] _ in
-            self?.beginRest()
+            self?.handleAnchorTimerFire(expectedAnchor: anchor)
         }
         RunLoop.main.add(t, forMode: .common)
         tickTimer = t
     }
 
+    private func handleAnchorTimerFire(expectedAnchor: Date) {
+        let currentDate = now()
+        guard
+            activeWaitingAnchor == expectedAnchor,
+            currentDate >= expectedAnchor,
+            currentDate.timeIntervalSince(expectedAnchor) <= Self.anchorStaleGrace
+        else {
+            guard tickTimer != nil, activeWaitingAnchor != nil, !isResting else { return }
+            isResting = false
+            lastRestingEmitWholeSeconds = nil
+            scheduleWatching()
+            return
+        }
+        beginRest()
+    }
+
     private func beginRest() {
+        activeWaitingAnchor = nil
         isResting = true
-        phaseEnd = Date().addingTimeInterval(restDuration)
+        phaseEnd = now().addingTimeInterval(restDuration)
         lastRestingEmitWholeSeconds = max(0, Int(restDuration.rounded(.down)))
         onStateChange?(.resting(remaining: restDuration))
         scheduleRestTick()
@@ -80,7 +110,7 @@ final class AutoTimerEngine: TimerEngine {
     private func scheduleRestTick() {
         tickTimer?.invalidate()
         guard let end = phaseEnd, isResting else { return }
-        let remaining = end.timeIntervalSinceNow
+        let remaining = end.timeIntervalSince(now())
         guard remaining > 0 else {
             tickResting()
             return
@@ -96,7 +126,7 @@ final class AutoTimerEngine: TimerEngine {
 
     private func tickResting() {
         guard let end = phaseEnd, isResting else { return }
-        let remaining = end.timeIntervalSinceNow
+        let remaining = end.timeIntervalSince(now())
         if remaining > 0 {
             let whole = displayedRestWholeSeconds(for: remaining)
             if whole != lastRestingEmitWholeSeconds {
