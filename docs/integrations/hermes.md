@@ -7,7 +7,7 @@
 ## 关系模型
 
 Hermes = **本机数据/算法后端**（写 JSON、cron、晨报、pmset）  
-MalDaze = **前端展示与干预**（读 JSON、铃铛、霸屏、控制面板）
+MalDaze = **前端展示、干预与受控操作**（读契约 JSON、铃铛、霸屏、控制面板、按契约调用 Hermes 命令）
 
 耦合方式：**同机硬编码路径的文件契约**（非 HTTP API、无版本协商）。  
 原则：**fail-loud**——契约缺失或字段非法时 MalDaze 停止调度。
@@ -60,6 +60,8 @@ MalDaze/
 | 晨报扩展 | — | `morning-briefing.py` | — | [ROADMAP.md](./ROADMAP.md) §5 | 已上线 |
 
 营养 recommendation unavailable 契约：第一版不新增 `reason` 字段；`recommendation_store.py unavailable --reason` 将原因写入 `summary`，并写 `state: "unavailable"`、`suggestions: []`。MalDaze 可用 `summary` 作为 UI 状态文案，且不得 fallback 到 `panel.suggestions` 或 planner。
+
+MalDaze 可以在功能契约明确允许时执行受控写操作，例如营养建议项点击后调用 `recommend.py log`。这不改变推荐来源边界：`recommendation.json` 仍由 Hermes authoring 写入，MalDaze 不本地生成、过滤、缓存或直接写入推荐。
 
 重构总目录：[ROADMAP.md](./ROADMAP.md) · OpenSpec：`openspec/specs/hermes-*` · `desk-intervention*`（change 已归档 2026-06-08）
 

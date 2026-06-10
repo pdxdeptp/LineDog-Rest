@@ -1,6 +1,6 @@
 ## Context
 
-MalDaze is intended to be a read-only frontend for Hermes nutrition facts and Hermes-authored recommendations. The current active nutrition recommendation change established `daily_log.json` as the facts contract and `recommendation.json` as the only user-visible recommendation contract.
+MalDaze is intended to display Hermes nutrition facts and Hermes-authored recommendations while performing only the write actions explicitly defined by Hermes contracts. The current active nutrition recommendation change established `daily_log.json` as the facts contract and `recommendation.json` as the only user-visible recommendation contract.
 
 The implementation drifted in two ways:
 
@@ -21,7 +21,6 @@ The implementation drifted in two ways:
 
 **Non-Goals:**
 
-- Do not change MalDaze's read-only frontend architecture unless verification reveals a gap.
 - Do not redesign `plan_engine.py`; it remains a candidate/context tool for Hermes.
 - Do not remove `recommendation.json state: "unavailable"` entirely. The state remains valid when Hermes authoring explicitly decides not to recommend.
 - Do not change food logging, inventory deduction, undo, or macro target formulas beyond moving day classification ownership.
@@ -40,7 +39,7 @@ When Hermes sends text that tells the user what to eat next, the same authored c
 
 The deterministic script can provide facts for the authoring step, but the AI authoring step owns the recommendation write.
 
-Alternative considered: make MalDaze synthesize recommendations from remaining macros when the file is missing. Rejected because it violates Hermes read-only UI and would reintroduce shadow recommendation logic.
+Alternative considered: make MalDaze synthesize recommendations from remaining macros when the file is missing. Rejected because it would create client-side recommendation logic and reintroduce shadow recommendation state.
 
 ### Decision 3: Add `day_classification.py` as a first-class program
 

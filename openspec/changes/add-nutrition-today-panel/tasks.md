@@ -1,6 +1,6 @@
 # 实施任务索引 · add-nutrition-today-panel
 
-> ROADMAP X2 · explore 定稿：方案 A + 左栏 60/40 + 严格只读
+> ROADMAP X2 · explore 定稿：方案 A + 左栏 60/40 + 受控 log 交互
 
 | 文档 | 范围 |
 |------|------|

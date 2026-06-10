@@ -38,4 +38,4 @@ The day classification flow is also hidden behind `recommend.py auto`, which mak
 - Tests:
   - `~/.hermes/tests/nutrition/test_morning_briefing_nutrition.py`
   - new tests for standalone day classification
-- MalDaze frontend behavior remains read-only and should not need code changes unless tests reveal a freshness/display gap.
+- MalDaze frontend behavior should not need code changes unless tests reveal a freshness/display gap; existing nutrition write interactions remain limited to explicitly contracted Hermes commands.

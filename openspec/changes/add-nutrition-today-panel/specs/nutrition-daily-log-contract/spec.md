@@ -4,7 +4,7 @@
 
 系统 SHALL 使用 `~/.hermes/data/nutrition/daily_log.json` 作为 Hermes 与 MalDaze 之间的营养今日契约载体。
 
-Hermes SHALL 通过 `recommend.py` 独占写入 `daily_log.json`（含 `records` 与派生 facts/metrics `panel`）。MalDaze SHALL 只读 JSON 文件本体，写操作 MUST 仅通过调用 `recommend.py log` 等子进程完成。
+Hermes SHALL 通过 `recommend.py` 维护 `daily_log.json`（含 `records` 与派生 facts/metrics `panel`）。MalDaze SHALL NOT directly edit the JSON file; any write interaction MUST go through `recommend.py log` or another explicitly contracted Hermes command.
 
 `daily_log.json` is the nutrition facts and metrics contract. User-visible recommendations are owned by `~/.hermes/data/nutrition/recommendation.json`, not by `daily_log.panel.suggestions`.
 

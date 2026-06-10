@@ -28,7 +28,7 @@ Hermes 营养域（`nutrition-menu` skill + `recommend.py` + `plan_engine.py`）
 - **轻交互**：fresh `recommendation.json` 的 `loggable: true` 建议 `items[]` **点击或按 1–9** → `log`；stale/missing/unavailable/invalid 时禁用；**无** undo / 试算 / 改日型 / 手改文件。
 - 健身不单独视图，仅 `dayLabel` 一行。
 
-### 用户追加纳入（相对初版只读 scope）
+### 用户追加纳入（相对初版展示-only scope）
 
 | ID | 内容 |
 |----|------|

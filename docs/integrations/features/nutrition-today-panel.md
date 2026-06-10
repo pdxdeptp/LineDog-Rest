@@ -15,14 +15,14 @@
     → Dashboard 左栏下段 NutritionTodayPanelView
 ```
 
-MalDaze **不写** `daily_log.json`；点击/数字键仅子进程 `recommend.py log <name> <grams>`。
+MalDaze 不直接编辑 `daily_log.json`；点击/数字键仅通过子进程 `recommend.py log <name> <grams>` 记录已吃项。
 MalDaze **不写** `recommendation.json`，也不在 recommendation 缺失或过期时本地生成替代建议。
 
 ### 桌宠角色（当前倾向，可演进）
 
 - **展示 facts/metrics**：读磁盘上的 `daily_log.json` `panel` / `records`；FSEvents 与轻量轮询只在 Hermes **已改写文件** 后刷新 UI。
 - **展示 recommendation**：读 `recommendation.json` 的 summary、rationale、warnings、items；只有 fresh 且 `loggable: true` 的 item 可点击或数字键记录。
-- **唯一写操作**：`log`（记一笔已吃）。桌宠**不**调用 `refresh-panel`、`plan_engine`、LLM，也不本地重算营养。
+- **唯一 nutrition 写动作**：通过 `recommend.py log` 记一笔已吃。桌宠**不**调用 `refresh-panel`、`plan_engine`、LLM，也不本地重算营养。
 - **「现在可以吃」来源**：只来自 Hermes-authored `recommendation.json`。`daily_log.panel.suggestions` 第一版保留为空数组 `[]` 只作 schema 兼容；MalDaze 必须忽略它，即使 legacy 数据非空也不能展示。
 
 ## panel 字段（摘要）

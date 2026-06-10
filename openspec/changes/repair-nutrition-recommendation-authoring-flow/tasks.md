@@ -1,25 +1,25 @@
 ## 1. Git Safety And Baseline
 
-- [ ] 1.1 Run `git status --short --branch` in `/Users/cpt/Public/MalDaze` and `/Users/cpt/.hermes`; confirm no unrelated live changes will be overwritten.
-- [ ] 1.2 If applying in current checkout, create or confirm an appropriate checkpoint before editing Hermes production scripts.
-- [ ] 1.3 Run `openspec validate repair-nutrition-recommendation-authoring-flow --strict` before implementation and fix any proposal/spec issues first.
+- [x] 1.1 Run `git status --short --branch` in `/Users/cpt/Public/MalDaze` and `/Users/cpt/.hermes`; confirm no unrelated live changes will be overwritten.
+- [x] 1.2 If applying in current checkout, create or confirm an appropriate checkpoint before editing Hermes production scripts.
+- [x] 1.3 Run `openspec validate repair-nutrition-recommendation-authoring-flow --strict` before implementation and fix any proposal/spec issues first.
 
 ## 2. Morning Briefing Regression Tests
 
-- [ ] 2.1 Add a failing test in `/Users/cpt/.hermes/tests/nutrition/test_morning_briefing_nutrition.py` asserting `morning-briefing.py` source does not define `get_diet_plan`.
-- [ ] 2.2 Add a failing test asserting `morning-briefing.py` source does not reference `plan_engine.py` or Morning Briefing `--full-day` planner calls.
-- [ ] 2.3 Add a failing isolated execution test asserting deterministic `morning-briefing.py` does not create `recommendation.json` when none exists.
-- [ ] 2.4 Add a failing isolated execution test asserting deterministic `morning-briefing.py` leaves an existing `recommendation.json` byte-for-byte unchanged.
-- [ ] 2.5 Run the new Morning Briefing tests and confirm they fail for the current production code before implementation.
+- [x] 2.1 Add a failing test in `/Users/cpt/.hermes/tests/nutrition/test_morning_briefing_nutrition.py` asserting `morning-briefing.py` source does not define `get_diet_plan`.
+- [x] 2.2 Add a failing test asserting `morning-briefing.py` source does not reference `plan_engine.py` or Morning Briefing `--full-day` planner calls.
+- [x] 2.3 Add a failing isolated execution test asserting deterministic `morning-briefing.py` does not create `recommendation.json` when none exists.
+- [x] 2.4 Add a failing isolated execution test asserting deterministic `morning-briefing.py` leaves an existing `recommendation.json` byte-for-byte unchanged.
+- [x] 2.5 Run the new Morning Briefing tests and confirm they fail for the current production code before implementation.
 
 ## 3. Day Classification Tests
 
-- [ ] 3.1 Add `/Users/cpt/.hermes/tests/nutrition/test_day_classification.py` with isolated fixture helpers for `profile.json`, `daily_log.json`, `training_log.json`, and minimal `foods.json`.
-- [ ] 3.2 Add a failing test that `python3 day_classification.py` classifies first known day as `training`, writes `daily_log.day_type`, creates panel facts, and does not write `recommendation.json`.
-- [ ] 3.3 Add a failing test that rhythm day after yesterday's training classifies as `rest`, clears `daily_log.workout_split`, and does not create a same-day `is_training: true` record.
-- [ ] 3.4 Add a failing test that a training day alternates `workout_split` from the latest prior strength record and syncs the same split into today's `training_log` record.
-- [ ] 3.5 Add a failing compatibility test that `recommend.py auto` delegates to the standalone classifier and returns the same payload shape.
-- [ ] 3.6 Run the new day classification tests and confirm they fail before implementation.
+- [x] 3.1 Add `/Users/cpt/.hermes/tests/nutrition/test_day_classification.py` with isolated fixture helpers for `profile.json`, `daily_log.json`, `training_log.json`, and minimal `foods.json`.
+- [x] 3.2 Add a failing test that `python3 day_classification.py` classifies first known day as `training`, writes `daily_log.day_type`, creates panel facts, and does not write `recommendation.json`.
+- [x] 3.3 Add a failing test that rhythm day after yesterday's training classifies as `rest`, clears `daily_log.workout_split`, and does not create a same-day `is_training: true` record.
+- [x] 3.4 Add a failing test that a training day alternates `workout_split` from the latest prior strength record and syncs the same split into today's `training_log` record.
+- [x] 3.5 Add a failing compatibility test that `recommend.py auto` delegates to the standalone classifier and returns the same payload shape.
+- [x] 3.6 Run the new day classification tests and confirm they fail before implementation.
 
 ## 4. Standalone Day Classification Implementation
 
@@ -58,7 +58,7 @@
 
 - [ ] 8.1 Update active nutrition OpenSpec/docs that mention Morning Briefing unavailable placeholders so they match the new deterministic-script non-ownership model.
 - [ ] 8.2 Update `/Users/cpt/Public/MalDaze/docs/integrations/hermes.md` and related nutrition panel docs only if their described contract changes.
-- [ ] 8.3 Confirm MalDaze remains read-only for `recommendation.json` and still treats missing/stale/unavailable states according to the contract.
+- [ ] 8.3 Confirm MalDaze does not generate, cache, or directly write `recommendation.json`, and still treats missing/stale/unavailable states according to the contract.
 
 ## 9. Verification
 

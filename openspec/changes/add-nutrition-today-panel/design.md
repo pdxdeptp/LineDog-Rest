@@ -8,7 +8,7 @@
 > Superseded alignment: `use-hermes-authored-nutrition-recommendations` keeps `daily_log.json` as the facts/metrics contract and moves user-visible recommendations to `recommendation.json`. Any older mention of Python-generated `panel.suggestions` as the displayed recommendation source is superseded.
 
 - **Hermes 营养域已上线**：`daily_log.json`（SSOT 记录）、`recommend.py`、`plan_engine.py`（`CALORIE_SLACK = 50`）、`nutrition-menu` skill。
-- **MalDaze 集成先例**：睡眠 `sleep_schedule.json`（Hermes 写 · MalDaze 只读 · FSEvents）；学习 `projects.json` FSEvents。
+- **MalDaze 集成先例**：睡眠 `sleep_schedule.json` 单向契约 + FSEvents；学习 `projects.json` FSEvents。
 - **用户定稿**：方案 A（`daily_log.panel`）；左栏默认 60/40（**设置可调**）；建议项点击 `log`；钠展示；smoke + `refresh-panel`；健身仅一行日型。
 
 ## Goals / Non-Goals

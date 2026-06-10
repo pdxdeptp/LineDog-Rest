@@ -20,6 +20,6 @@ Use for changes involving Hermes contracts, SSOT rules, persistence migrations, 
 
 ## Non-Negotiables
 
-- Never add MalDaze-side shadow state for Hermes read-only UI.
+- Never add MalDaze-side shadow state or local fallback logic for Hermes-owned contracts.
 - Never duplicate an SSOT fact into profile/defaults/cache without a distinct role.
 - Never reset, overwrite, merge, rebase, or discard user work without explicit permission.

@@ -11,7 +11,7 @@
 | **D4** | 健身仅 `dayLabel` 一行 |
 | **D5** | Superseded by `use-hermes-authored-nutrition-recommendations`: v1 keeps `panel.suggestions: []` for schema compatibility; user-visible recommendations come from Hermes-authored `recommendation.json` |
 
-## 用户追加纳入（2026-06-09 · 覆盖初版「严格只读」）
+## 用户追加纳入（2026-06-09 · 覆盖初版展示-only）
 
 | ID | 决策 |
 |----|------|
@@ -37,4 +37,4 @@
 
 ## Final
 
-**KEEP CURRENT SCOPE + S3–S7**（不再严格只读；写路径仅 CLI `log`）
+**KEEP CURRENT SCOPE + S3–S7**（加入受控写交互；写路径仅 CLI `log`）

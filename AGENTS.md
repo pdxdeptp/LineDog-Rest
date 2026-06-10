@@ -4,7 +4,7 @@ Compact project contract. Expanded detail lives in `docs/agent-workflow.md`; mod
 
 ## Always
 - Cross-repo Hermes coupling (canonical, maintain here only): `docs/integrations/hermes.md`. Hermes side is pointer-only: `~/.hermes/docs/integrations/maldaze.md`.
-- **Hermes read-only UI (MalDaze)**: Hermes JSON/contract is the only source of truth. Never add client-side suppression, optimistic hiding, shadow lists, or local filters to mask backend recalculation.
+- **Hermes contract boundaries (MalDaze)**: Hermes JSON/contract remains the source of truth. MalDaze may perform explicitly contracted write actions through Hermes commands, but never add client-side suppression, optimistic hiding, shadow lists, or local filters to mask backend recalculation.
 - **SSOT, no shadow copies**: Prefer one authoritative store per fact; derive or read from it instead of caching the same field in profile/defaults/a second JSON.
 - Output in Chinese; reason in English unless code or technical terms require English.
 - Protect user work: never reset, revert, overwrite, merge, rebase, or discard user changes without explicit permission.
