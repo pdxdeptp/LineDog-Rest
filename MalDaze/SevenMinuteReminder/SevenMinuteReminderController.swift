@@ -223,13 +223,14 @@ final class SevenMinuteReminderController {
         observeScreensIfNeeded()
         let size = Self.contentSizeForReminder(message: message)
         let frame = Self.reminderFrame(contentSize: size)
-        let win = NSWindow(
+        let win = NSPanel(
             contentRect: frame,
-            styleMask: [.borderless],
+            styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false,
             screen: MenuBarNSScreen.screen ?? NSScreen.screens.first
         )
+        win.isFloatingPanel = true
         win.isOpaque = false
         win.backgroundColor = .clear
         win.level = .screenSaver

@@ -56,8 +56,10 @@ MalDaze/
 | 学习面板 X8 日程 | 同上（`schedule-range`） | `schedule-range` | 日程 Tab（月历 + Agenda） | [learning-desk-panel.md](./features/learning-desk-panel.md) | ✅ 已归档 2026-06-09 |
 | 学习面板 X9 今日核心 | `today.progress` | `today` | 双预算、进度、滚入区、实际时长、分组 | [learning-desk-panel.md](./features/learning-desk-panel.md) | 🟡 待 M-L12-core |
 | 学习面板 X10 今日导航 | `today.tomorrow_preview` · `pending.source_url` | `today` | 行动卡、明天预告、链接、repack 预览 | [learning-today-x9-x10.md](./features/learning-today-x9-x10.md) | 🟡 待 M-L12-nav |
-| 营养今日面板 X2 | `daily_log.json` → `panel` | `recommend.py` `refresh-panel` | `NutritionToday/` | [nutrition-today-panel.md](./features/nutrition-today-panel.md) | 🟡 待 M-N1 |
+| 营养今日面板 X2 | facts/metrics: `daily_log.json` → `panel`; recommendation: `recommendation.json` | `recommend.py` `refresh-panel`; Hermes recommendation writer | `NutritionToday/` | [nutrition-today-panel.md](./features/nutrition-today-panel.md) | 🟡 待 M-N1 |
 | 晨报扩展 | — | `morning-briefing.py` | — | [ROADMAP.md](./ROADMAP.md) §5 | 已上线 |
+
+营养 recommendation unavailable 契约：第一版不新增 `reason` 字段；`recommendation_store.py unavailable --reason` 将原因写入 `summary`，并写 `state: "unavailable"`、`suggestions: []`。MalDaze 可用 `summary` 作为 UI 状态文案，且不得 fallback 到 `panel.suggestions` 或 planner。
 
 重构总目录：[ROADMAP.md](./ROADMAP.md) · OpenSpec：`openspec/specs/hermes-*` · `desk-intervention*`（change 已归档 2026-06-08）
 

@@ -212,12 +212,14 @@ struct NutritionDailyLogContractReader: NutritionDailyLogReading {
 
 struct NutritionLoggableItem: Equatable, Identifiable {
     let flatIndex: Int
+    let displayName: String
     let name: String
     let grams: Double
     let kcal: Double?
     let suggestionLabel: String?
+    let sourceItemID: String?
 
-    var id: String { "\(flatIndex)|\(name)|\(grams)" }
+    var id: String { "\(flatIndex)|\(displayName)|\(name)|\(grams)" }
 
     static func flattened(from panel: NutritionPanel) -> [NutritionLoggableItem] {
         var items: [NutritionLoggableItem] = []
@@ -229,10 +231,35 @@ struct NutritionLoggableItem: Equatable, Identifiable {
             for item in suggestion.items {
                 items.append(NutritionLoggableItem(
                     flatIndex: index,
+                    displayName: item.name,
                     name: item.name,
                     grams: item.grams,
                     kcal: item.kcal,
-                    suggestionLabel: suggestion.label
+                    suggestionLabel: suggestion.label,
+                    sourceItemID: nil
+                ))
+                index += 1
+            }
+        }
+        return items
+    }
+
+    static func flattened(from snapshot: NutritionRecommendationSnapshot) -> [NutritionLoggableItem] {
+        guard snapshot.state == .available else { return [] }
+
+        var items: [NutritionLoggableItem] = []
+        var index = 1
+        for suggestion in snapshot.suggestions {
+            for item in suggestion.items where item.loggable {
+                guard let name = item.name, let grams = item.grams else { continue }
+                items.append(NutritionLoggableItem(
+                    flatIndex: index,
+                    displayName: item.displayName,
+                    name: name,
+                    grams: grams,
+                    kcal: nil,
+                    suggestionLabel: suggestion.label,
+                    sourceItemID: item.id
                 ))
                 index += 1
             }

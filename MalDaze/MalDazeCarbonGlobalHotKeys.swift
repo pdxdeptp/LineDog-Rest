@@ -97,6 +97,24 @@ enum MalDazeCarbonGlobalHotKeys {
         guard handlerRef != nil else { return }
 
         let desk = DeskPetMenuShortcut.load()
+        syncDeskHotKey(desk)
+
+        let smart = SmartReminderInputShortcut.load()
+        syncSmartInputHotKey(smart)
+
+        let seven = SevenMinuteReminderShortcut.load()
+        syncSevenMinuteHotKey(seven)
+
+        let resetPet = ResetIdlePetPositionShortcut.load()
+        syncResetIdlePetHotKey(resetPet)
+    }
+
+    private static func syncDeskHotKey(_ desk: DeskPetMenuShortcut) {
+        guard desk.isEnabled else {
+            unregisterDeskHotKey()
+            lastDeskInstalled = desk
+            return
+        }
         if desk != lastDeskInstalled || deskHotKeyRef == nil {
             unregisterDeskHotKey()
             var ref: EventHotKeyRef?
@@ -116,8 +134,14 @@ enum MalDazeCarbonGlobalHotKeys {
                 lastDeskInstalled = nil
             }
         }
+    }
 
-        let smart = SmartReminderInputShortcut.load()
+    private static func syncSmartInputHotKey(_ smart: SmartReminderInputShortcut) {
+        guard smart.isEnabled else {
+            unregisterSmartInputHotKey()
+            lastSmartInstalled = smart
+            return
+        }
         if smart != lastSmartInstalled || smartInputHotKeyRef == nil {
             unregisterSmartInputHotKey()
             var ref: EventHotKeyRef?
@@ -137,8 +161,14 @@ enum MalDazeCarbonGlobalHotKeys {
                 lastSmartInstalled = nil
             }
         }
+    }
 
-        let seven = SevenMinuteReminderShortcut.load()
+    private static func syncSevenMinuteHotKey(_ seven: SevenMinuteReminderShortcut) {
+        guard seven.isEnabled else {
+            unregisterSevenMinuteHotKey()
+            lastSevenMinuteInstalled = seven
+            return
+        }
         if seven != lastSevenMinuteInstalled || sevenMinuteHotKeyRef == nil {
             unregisterSevenMinuteHotKey()
             var ref: EventHotKeyRef?
@@ -158,8 +188,14 @@ enum MalDazeCarbonGlobalHotKeys {
                 lastSevenMinuteInstalled = nil
             }
         }
+    }
 
-        let resetPet = ResetIdlePetPositionShortcut.load()
+    private static func syncResetIdlePetHotKey(_ resetPet: ResetIdlePetPositionShortcut) {
+        guard resetPet.isEnabled else {
+            unregisterResetIdlePetHotKey()
+            lastResetIdlePetInstalled = resetPet
+            return
+        }
         if resetPet != lastResetIdlePetInstalled || resetIdlePetHotKeyRef == nil {
             unregisterResetIdlePetHotKey()
             var ref: EventHotKeyRef?

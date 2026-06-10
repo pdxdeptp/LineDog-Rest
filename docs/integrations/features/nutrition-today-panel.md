@@ -1,25 +1,29 @@
 # 营养今日面板（MalDaze × Hermes）
 
-> 契约：`~/.hermes/data/nutrition/daily_log.json` 顶层 **`panel`**（`schemaVersion: 1`）  
-> OpenSpec：`add-nutrition-today-panel`
+> Facts/metrics 契约：`~/.hermes/data/nutrition/daily_log.json` 顶层 **`panel`**（`schemaVersion: 1`）<br>
+> Recommendation 契约：`~/.hermes/data/nutrition/recommendation.json`（Hermes-authored user-visible recommendation）<br>
+> OpenSpec：`add-nutrition-today-panel` + `use-hermes-authored-nutrition-recommendations`
 
 ## 数据流
 
 ```
 飞书 / nutrition-menu skill
     → recommend.py log|auto|…（写 records + 重算 panel）
-    → daily_log.json
+    → daily_log.json（facts/metrics）
+    → Hermes authoring path（当回复用户可见饮食建议时写 recommendation.json）
     → FSEvents（MalDaze NutritionDailyLogFileWatcher）
     → Dashboard 左栏下段 NutritionTodayPanelView
 ```
 
 MalDaze **不写** `daily_log.json`；点击/数字键仅子进程 `recommend.py log <name> <grams>`。
+MalDaze **不写** `recommendation.json`，也不在 recommendation 缺失或过期时本地生成替代建议。
 
 ### 桌宠角色（当前倾向，可演进）
 
-- **展示**：读磁盘上的 `panel` / `records`；FSEvents 与轻量轮询只在 Hermes **已改写文件** 后刷新 UI。
+- **展示 facts/metrics**：读磁盘上的 `daily_log.json` `panel` / `records`；FSEvents 与轻量轮询只在 Hermes **已改写文件** 后刷新 UI。
+- **展示 recommendation**：读 `recommendation.json` 的 summary、rationale、warnings、items；只有 fresh 且 `loggable: true` 的 item 可点击或数字键记录。
 - **唯一写操作**：`log`（记一笔已吃）。桌宠**不**调用 `refresh-panel`、`plan_engine`、LLM，也不本地重算营养。
-- **「现在可以吃」来源**：不是飞书大模型实时菜单，而是 Hermes `recommend.py` 在每次 mutating 写入（含 `log`）末尾用 **`plan_engine` 默认候选食物** 生成的 Python 基线（OpenSpec D3）；飞书对话仍是更完整的推荐入口，v1.1 才可能 `set-suggestions` 覆盖 panel。
+- **「现在可以吃」来源**：只来自 Hermes-authored `recommendation.json`。`daily_log.panel.suggestions` 第一版保留为空数组 `[]` 只作 schema 兼容；MalDaze 必须忽略它，即使 legacy 数据非空也不能展示。
 
 ## panel 字段（摘要）
 
@@ -28,7 +32,7 @@ MalDaze **不写** `daily_log.json`；点击/数字键仅子进程 `recommend.py
 | `dayLabel` | 训练日 / 休息日 |
 | `workoutLabel` | 训练日可选：练胸 / 练背和腿（由 `daily_log.workout_split` 派生；轮换历史只读 `training_log`） |
 | `targets` / `consumed` / `remaining` | 含 `sodium_mg` |
-| `suggestions[].items[]` | 须含 `name` + `grams`（可点击记录） |
+| `suggestions` | 第一版固定 `[]`，仅 schema 兼容；不是推荐来源 |
 | `calorieSlack` | 固定 50 |
 | `updatedAt` | ISO；45s 轮询兜底 |
 
@@ -44,9 +48,10 @@ MalDaze **不写** `daily_log.json`；点击/数字键仅子进程 `recommend.py
 
 ## 快捷记录
 
-- 点击建议行，或主键盘 **1–9**（无修饰键）
-- 扁平序号：遍历 `suggestions` → `items`，从 1 编号
+- 点击 fresh `recommendation.json` 中 `loggable: true` 建议行，或主键盘 **1–9**（无修饰键）
+- 扁平序号：遍历 fresh recommendation `suggestions` → `loggable items`，从 1 编号
 - 文本框有焦点或 Sheet 打开时不响应数字键
+- stale / missing / unavailable / invalid recommendation 状态下不响应点击或数字键
 
 ## 调试
 
@@ -56,16 +61,16 @@ python3 recommend.py refresh-panel   # 仅重算 panel，不改 records
 python3 ~/.hermes/scripts/integration_smoke.py  # nutrition_panel 项
 ```
 
-晨报 `morning-briefing.py` 营养段结束后自动 `refresh-panel`。
+晨报 `morning-briefing.py` 营养 facts 段结束后可自动 `refresh-panel`。若晨报包含用户可见饮食建议，Hermes authoring path 必须写 `recommendation.json`；planner-only 候选不得作为 fresh recommendation 发布。
 
 ## 手动 QA
 
 见 [MANUAL_QA.md](../MANUAL_QA.md) § M-N1+。
 
-## 常见问题：建议热量/碳水与「剩余」对不上
+## 常见问题：推荐缺失或过期
 
-桌宠刷新逻辑一般**没问题**——它只是展示 Hermes 上次写入的 `panel`。若两行建议明显超出剩余额度，多半是 **Hermes 侧 `plan_engine` 在极小剩余窗口下的已知局限**，而非 MalDaze 又算了一遍：
+桌宠刷新逻辑一般**没问题**——它展示 `daily_log.json` facts/metrics，并只展示 Hermes 已写入的 `recommendation.json`。如果看到等待/过期：
 
-- `remaining.kcal` 很小时（例如只剩 ~80 kcal），食物 `min_g` / 库存离散克重（如酸奶 200g）会把组合**顶穿**剩余热量；`within_slack` 为 `false` 时桌宠**不展示**「现在可以吃」（走「暂无建议」空态），不在 Swift 侧改克重或过滤单行。
-- 宏量里**碳水列**是每行食物的碳水克数，不要和顶栏 **kcal 剩余**混读；应看 `remaining.carbs_g` 与建议 `total.carbs_g` 是否同量纲。
-- 钠、脂肪已超标（`remaining` 为负）时，引擎仍可能给出组合——属于 Hermes 规划层待收紧的行为，应在 `recommend.py` / `plan_engine` 或飞书侧改菜单，而不是桌宠过滤行。
+- `recommendation.json` 不存在：显示 missing/waiting；MalDaze 不调用 `plan_engine` 或 `refresh-panel` 生成建议。
+- `daily_log.panel.updatedAt` 与 `recommendation.basedOn.dailyLogPanelUpdatedAt` 不一致：显示 stale；旧建议可作为上下文展示，但点击/数字键禁用。
+- Hermes 无法可靠推荐：写 `state: "unavailable"` 或保持 stale；unavailable payload 第一版不含单独 `reason` 字段，`recommendation_store.py unavailable --reason` 把原因写入 `summary`，且 `suggestions` 必须是 `[]`；MalDaze 可显示 `summary`，但不 fallback。

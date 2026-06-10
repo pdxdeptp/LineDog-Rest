@@ -67,8 +67,10 @@
 		A2A4 /* NutritionTodayViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2A4 /* NutritionTodayViewModel.swift */; };
 		A2A5 /* NutritionDigitKeyMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2A5 /* NutritionDigitKeyMonitor.swift */; };
 		A2A6 /* NutritionTodayPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2A6 /* NutritionTodayPanelView.swift */; };
+		A2AA /* NutritionRecommendationContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2AA /* NutritionRecommendationContract.swift */; };
 		A2A7 /* NutritionDailyLogContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2A7 /* NutritionDailyLogContractTests.swift */; };
 		A2A8 /* NutritionTodayViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2A8 /* NutritionTodayViewModelTests.swift */; };
+		A2A9 /* NutritionRecommendationContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2A9 /* NutritionRecommendationContractTests.swift */; };
 		A31F /* InterventionRequestContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31F /* InterventionRequestContractTests.swift */; };
 		A31K /* LearningDeskPanelViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31K /* LearningDeskPanelViewModelTests.swift */; };
 		A2B2 /* ScrollMonthDatePickerLogicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2B2 /* ScrollMonthDatePickerLogicTests.swift */; };
@@ -218,8 +220,10 @@
 		B2A4 /* NutritionTodayViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionTodayViewModel.swift; sourceTree = "<group>"; };
 		B2A5 /* NutritionDigitKeyMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionDigitKeyMonitor.swift; sourceTree = "<group>"; };
 		B2A6 /* NutritionTodayPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionTodayPanelView.swift; sourceTree = "<group>"; };
+		B2AA /* NutritionRecommendationContract.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionRecommendationContract.swift; sourceTree = "<group>"; };
 		B2A7 /* NutritionDailyLogContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionDailyLogContractTests.swift; sourceTree = "<group>"; };
 		B2A8 /* NutritionTodayViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionTodayViewModelTests.swift; sourceTree = "<group>"; };
+		B2A9 /* NutritionRecommendationContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionRecommendationContractTests.swift; sourceTree = "<group>"; };
 		B31F /* InterventionRequestContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InterventionRequestContractTests.swift; sourceTree = "<group>"; };
 		B31K /* LearningDeskPanelViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningDeskPanelViewModelTests.swift; sourceTree = "<group>"; };
 		B2B1 /* ScrollMonthDatePicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScrollMonthDatePicker.swift; sourceTree = "<group>"; };
@@ -448,6 +452,7 @@
 					B31K /* LearningDeskPanelViewModelTests.swift */,
 					B2B2 /* ScrollMonthDatePickerLogicTests.swift */,
 					B2A7 /* NutritionDailyLogContractTests.swift */,
+					B2A9 /* NutritionRecommendationContractTests.swift */,
 					B2A8 /* NutritionTodayViewModelTests.swift */,
 				);
 				path = MalDazeTests;
@@ -507,6 +512,7 @@
 			isa = PBXGroup;
 			children = (
 				B2A1 /* NutritionDailyLogContract.swift */,
+				B2AA /* NutritionRecommendationContract.swift */,
 				B2A2 /* NutritionDailyLogFileWatcher.swift */,
 				B2A3 /* NutritionHermesCLI.swift */,
 				B2A4 /* NutritionTodayViewModel.swift */,
@@ -780,6 +786,7 @@
 				A2A1 /* NutritionDailyLogContract.swift in Sources */,
 				A2A2 /* NutritionDailyLogFileWatcher.swift in Sources */,
 				A2A3 /* NutritionHermesCLI.swift in Sources */,
+				A2AA /* NutritionRecommendationContract.swift in Sources */,
 				A2A4 /* NutritionTodayViewModel.swift in Sources */,
 				A2A5 /* NutritionDigitKeyMonitor.swift in Sources */,
 				A2A6 /* NutritionTodayPanelView.swift in Sources */,
@@ -865,6 +872,7 @@
 					A31K /* LearningDeskPanelViewModelTests.swift in Sources */,
 					A2B2 /* ScrollMonthDatePickerLogicTests.swift in Sources */,
 					A2A7 /* NutritionDailyLogContractTests.swift in Sources */,
+					A2A9 /* NutritionRecommendationContractTests.swift in Sources */,
 					A2A8 /* NutritionTodayViewModelTests.swift in Sources */,
 				);
 				runOnlyForDeploymentPostprocessing = 0;

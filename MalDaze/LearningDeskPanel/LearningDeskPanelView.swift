@@ -417,7 +417,7 @@ struct LearningDeskPanelView: View {
                 .padding(.vertical, 8)
         } else {
             ScrollViewReader { proxy in
-                ScrollView {
+                ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 12) {
                         todayTaskList(snapshot: displaySnapshot)
                         if let preview = response.tomorrowPreview {

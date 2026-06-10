@@ -1,10 +1,11 @@
 # Design · 饮食建议「一键记录」交互（点击 + 数字键）
 
-> 父文档：[design-maldaze.md](./design-maldaze.md) · Spec：`nutrition-today-panel` · 用户追加 **S7 / S7-K**
+> 父文档：[design-maldaze.md](./design-maldaze.md) · Spec：`nutrition-today-panel` · 用户追加 **S7 / S7-K**<br>
+> Superseded alignment: 可记录建议项来自 fresh `recommendation.json`，不是 `daily_log.panel.suggestions`。
 
 ## 1. 用户目标
 
-在桌宠 Dashboard 饮食区，用 **最少步数** 把「建议菜单里的某一格食物」记为已吃，等同飞书侧 `recommend.py log "<name>" <grams>`，且 **不** 打开确认框、不手改 JSON。
+在桌宠 Dashboard 饮食区，用 **最少步数** 把 Hermes-authored fresh 推荐里的某一格 `loggable` 食物记为已吃，等同飞书侧 `recommend.py log "<name>" <grams>`，且 **不** 打开确认框、不手改 JSON。
 
 两条入口 **等价**：
 
@@ -19,7 +20,7 @@
 
 ### 2.1 可记录对象
 
-仅 **`panel.suggestions[].items[]`**。每条 item 须含（Hermes 写入）：
+仅 fresh **`recommendation.json.suggestions[].items[]`** 中 `loggable: true` 的项。每条可记录 item 须含（Hermes recommendation writer 校验）：
 
 | 字段 | 用途 |
 |------|------|
@@ -27,7 +28,7 @@
 | `grams` | `log` 第二参数 |
 | （展示用）`kcal` 等 | UI 文案，不参与 CLI |
 
-**不可记录**：`records` 已吃列表（只读展示）。
+**不可记录**：`records` 已吃列表（只读展示）；`loggable: false` 文本建议；stale/missing/unavailable/invalid 推荐；legacy `daily_log.panel.suggestions`。
 
 ### 2.2 扁平序号 `flatIndex`（1-based）
 
@@ -35,9 +36,10 @@
 
 ```text
 flatIndex = 1
-for suggestion in panel.suggestions {          // v1 通常 length == 1
+for suggestion in recommendation.suggestions {
   for item in suggestion.items {
-    // flatIndex 对应该 item
+    if item.loggable != true { continue }
+    // flatIndex 只对应该 loggable item
     flatIndex += 1
   }
 }
@@ -49,10 +51,10 @@ for suggestion in panel.suggestions {          // v1 通常 length == 1
 
 ### 2.3 序号是「当前快照」临时的
 
-`log` 成功后 Hermes `_refresh_panel()` 会 **重算 suggestions**（items 列表常变）。因此：
+`log` 成功后 Hermes `_refresh_panel()` 会更新 facts/metrics，使现有 `recommendation.json` 因 `basedOn.dailyLogPanelUpdatedAt` 不匹配而变 stale，直到 Hermes 写入 fresh snapshot。因此：
 
 - 数字 **不** 持久绑定某个食物名；只绑定 **当前 panel 屏幕上这一帧** 的行序。
-- UI 须在每次 `loadToday()` 后根据最新 `panel` 重绘 `1.` `2.` 前缀。
+- UI 须在每次 `loadToday()` 后根据 fresh `recommendation.json` 重绘 `1.` `2.` 前缀；stale 时禁用。
 - `log` 进行中（`isLogging`）不重新编号，避免用户按到一半序号漂移。
 
 ---
@@ -61,7 +63,7 @@ for suggestion in panel.suggestions {          // v1 通常 length == 1
 
 ```mermaid
 stateDiagram-v2
-  [*] --> Idle: panel 加载成功
+  [*] --> Idle: facts + fresh recommendation 加载成功
   Idle --> Logging: 点击 / 数字键
   Logging --> Idle: CLI 成功 → FSEvents 刷新
   Logging --> Idle: CLI 失败 → 展示错误
@@ -70,8 +72,8 @@ stateDiagram-v2
 
 ### 3.1 Idle
 
-- 建议区每行：`[序号] 名称  克重  热量` + 行级 `Button`。
-- 页脚小字（有项且 ≤9 项时）：`按 1–9 快捷记录`。
+- 建议区每行：`[序号] 名称  克重` + 行级 `Button`；可显示 summary/rationale/warnings。
+- 页脚小字（fresh 且有 loggable 项且 ≤9 项时）：`按 1–9 快捷记录`。
 - 数字监听器 **按 §4 策略** 开启。
 
 ### 3.2 Logging（单笔飞行中）
@@ -85,7 +87,7 @@ stateDiagram-v2
 
 - **不**弹确认 Sheet。
 - 可选：该行 300ms 绿色高亮（轻反馈）。
-- 等待 FSEvents / 轮询 → 全面板刷新（剩余宏量、钠、新 suggestions、新序号）。
+- 等待 FSEvents / 轮询 → facts 刷新（剩余宏量、钠）；建议区显示 stale/等待 Hermes 更新，直到新的 `recommendation.json` 写入。
 
 ### 3.4 失败
 
@@ -105,7 +107,7 @@ stateDiagram-v2
 | E1 | 桌宠 Dashboard Panel **可见** |
 | E2 | 无 **Sheet** / `confirmationDialog` 盖住 Dashboard |
 | E3 | 键盘焦点 **不在** 任何 `TextField` / `TextEditor` / 提醒编辑态 |
-| E4 | `panel.suggestions` 扁平后至少 1 项 |
+| E4 | fresh `recommendation.json` 中 `loggable` 项扁平后至少 1 项 |
 | E5 | `!isLogging` |
 
 ### 4.2 禁用时的行为
@@ -149,7 +151,7 @@ stateDiagram-v2
 | 序号 | 等宽数字 + `.`；`flatIndex > 9` 不显示序号列（仅点击） |
 | 行 | 整行可点；hover `accentColor` 淡底 |
 | 按钮文案 | 行尾可选「吃了」或仅图标 `checkmark.circle`（实现时二选一，spec 不要求） |
-| 组合标题 | 若 `suggestion.label` 非空，在 items 上方一行小标题（如「酸奶燕麦蓝莓」） |
+| 组合标题 | 若 `suggestion.label` 非空，在 items 上方一行小标题；summary/rationale/warnings 来自 `recommendation.json` |
 
 ### 5.2 与钠、日型、已吃区关系
 
@@ -157,7 +159,7 @@ stateDiagram-v2
 
 ### 5.3 空建议
 
-- 文案：「暂无建议」+ 副文案「在飞书告诉 Hermes 吃了什么」。
+- 文案按状态区分：missing「等待 Hermes 更新建议」；stale「记录已更新，建议待刷新」；unavailable 显示 Hermes reason；invalid 显示契约错误。
 - 无数字提示。
 
 ---
@@ -170,7 +172,7 @@ stateDiagram-v2
 |------|------|------|
 | Model | `NutritionLoggableItem` | `flatIndex`, `name`, `grams`, 展示字段 |
 | VM | `NutritionTodayViewModel.logItem(flatIndex:)` | 扁平映射 → CLI |
-| VM | `loggableItems` | 每次 load 从 `panel` 算出 |
+| VM | `loggableItems` | 每次 load 从 fresh `recommendation.json` 算出 |
 | VM | `isLogging`, `loggingFlatIndex` | 飞行互斥 |
 | CLI | `NutritionHermesCLI.log(name:grams:)` | `python3 …/recommend.py log` |
 | View | `NutritionTodayPanelView` | 列表 + 行 Button |
@@ -210,7 +212,7 @@ return event
 ## 7. Hermes 侧（不变更 CLI 形状）
 
 - 仍用现有 `recommend.py log "<name>" <grams>`。
-- `_refresh_panel` 保证每个 `items[]` 有正确 `name`/`grams`（`foods.json` 键名，不是展示别名）。
+- recommendation writer 保证每个 `loggable: true` `items[]` 有正确 `name`/`grams`（`foods.json` 键名，不是展示别名）。
 - **不**新增 `log-by-index` 子命令；序号纯 MalDaze 本地映射。
 
 ---
@@ -223,7 +225,9 @@ return event
 | Unit | 10 items → 仅 1–9 在 `shortcutEnabledIndices` |
 | Unit | `isLogging` 时第二次 `logItem` 拒绝 |
 | Unit | CLI 失败保留 `actionNotice` |
+| Unit | stale / missing / unavailable 推荐不产生 `loggableItems` |
 | Manual | Dashboard 开 → 按 `2` → 第二行食物进已吃 → 钠/剩余更新 |
+| Manual | log 成功后 facts 更新，旧建议变 stale 且数字键禁用，直到 Hermes 写 fresh `recommendation.json` |
 | Manual | Smart Input 聚焦 → 按 `2` 输入字符而非 log |
 | Manual | log 中再按 `1` 无二次提交 |
 

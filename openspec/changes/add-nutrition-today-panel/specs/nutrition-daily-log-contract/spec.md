@@ -4,7 +4,9 @@
 
 系统 SHALL 使用 `~/.hermes/data/nutrition/daily_log.json` 作为 Hermes 与 MalDaze 之间的营养今日契约载体。
 
-Hermes SHALL 通过 `recommend.py` 独占写入 `daily_log.json`（含 `records` 与派生 `panel`）。MalDaze SHALL 只读 JSON 文件本体，写操作 MUST 仅通过调用 `recommend.py log` 等子进程完成。
+Hermes SHALL 通过 `recommend.py` 独占写入 `daily_log.json`（含 `records` 与派生 facts/metrics `panel`）。MalDaze SHALL 只读 JSON 文件本体，写操作 MUST 仅通过调用 `recommend.py log` 等子进程完成。
+
+`daily_log.json` is the nutrition facts and metrics contract. User-visible recommendations are owned by `~/.hermes/data/nutrition/recommendation.json`, not by `daily_log.panel.suggestions`.
 
 #### Scenario: Hermes 写入
 
@@ -31,15 +33,16 @@ Hermes SHALL 通过 `recommend.py` 独占写入 `daily_log.json`（含 `records`
 - `updatedAt`（ISO 8601，含时区）
 - `dayLabel`（字符串，如「训练日」「休息日」）
 - `targets`、`consumed`、`remaining`（各含 `kcal`、`protein_g`、`carbs_g`、`fat_g`、`sodium_mg`）
-- `suggestions`（数组，可为空）
+- `suggestions`（数组；第一版 SHALL 为空数组 `[]`，仅为 schema 兼容）
 - `calorieSlack`（整数，当前为 `50`）
 
-每个 `suggestions[]` 项 SHALL 含 `label`、`items[]`（`name`、`grams`、营养素）、`total`（营养素汇总）、`within_slack`（布尔）。
+MalDaze MUST ignore `panel.suggestions` as a recommendation source even if legacy data is present.
 
 #### Scenario: 完整 panel
 
 - **WHEN** MalDaze 读取到 `panel.schemaVersion == 1` 且上述字段齐全
 - **THEN** MalDaze 渲染饮食面板（含钠）
+- **AND** MalDaze does not use `panel.suggestions` to render user-visible recommendations
 
 #### Scenario: 缺 panel
 

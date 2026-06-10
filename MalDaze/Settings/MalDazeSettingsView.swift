@@ -81,6 +81,30 @@ struct MalDazeSettingsView: View {
         )
     }
 
+    private func disableSmartShortcut() {
+        smartKeyCode = 0
+        smartModifiersRaw = 0
+        smartKeyLabel = ""
+    }
+
+    private func disableDeskShortcut() {
+        deskKeyCode = 0
+        deskModifiersRaw = 0
+        deskKeyLabel = ""
+    }
+
+    private func disableSevenMinuteShortcut() {
+        sevenKeyCode = 0
+        sevenModifiersRaw = 0
+        sevenKeyLabel = ""
+    }
+
+    private func disableResetPetShortcut() {
+        resetPetKeyCode = 0
+        resetPetModifiersRaw = 0
+        resetPetKeyLabel = ""
+    }
+
     private var selectedSmartInputModel: Binding<String> {
         Binding(
             get: {
@@ -235,7 +259,7 @@ struct MalDazeSettingsView: View {
         VStack(alignment: .leading, spacing: 12) {
             SettingsGroup(
                 title: "全局快捷键",
-                subtitle: "录制时须带 ⌘ / ⌥ / ⌃ / ⇧ 之一；按 Esc 取消录制。",
+                subtitle: "录制时须带 ⌘ / ⌥ / ⌃ / ⇧ 之一；按 Esc 不输入并关闭当前快捷键。",
                 systemImage: "keyboard",
                 trailing: "须带修饰键"
             ) {
@@ -246,6 +270,7 @@ struct MalDazeSettingsView: View {
                     isRecording: isRecordingSmartShortcut,
                     shortcutRecorderBusy: shortcutRecorderBusy,
                     onRecord: { isRecordingSmartShortcut = true },
+                    onDisable: disableSmartShortcut,
                     onRestoreDefault: {
                         let d = SmartReminderInputShortcut.default
                         smartKeyCode = Int(d.keyCode)
@@ -261,6 +286,7 @@ struct MalDazeSettingsView: View {
                     isRecording: isRecordingDeskShortcut,
                     shortcutRecorderBusy: shortcutRecorderBusy,
                     onRecord: { isRecordingDeskShortcut = true },
+                    onDisable: disableDeskShortcut,
                     onRestoreDefault: {
                         let d = DeskPetMenuShortcut.default
                         deskKeyCode = Int(d.keyCode)
@@ -276,6 +302,7 @@ struct MalDazeSettingsView: View {
                     isRecording: isRecordingResetPetShortcut,
                     shortcutRecorderBusy: shortcutRecorderBusy,
                     onRecord: { isRecordingResetPetShortcut = true },
+                    onDisable: disableResetPetShortcut,
                     onRestoreDefault: {
                         let d = ResetIdlePetPositionShortcut.default
                         resetPetKeyCode = Int(d.keyCode)
@@ -291,6 +318,7 @@ struct MalDazeSettingsView: View {
                     isRecording: isRecordingSevenMinuteShortcut,
                     shortcutRecorderBusy: shortcutRecorderBusy,
                     onRecord: { isRecordingSevenMinuteShortcut = true },
+                    onDisable: disableSevenMinuteShortcut,
                     onRestoreDefault: {
                         let d = SevenMinuteReminderShortcut.default
                         sevenKeyCode = Int(d.keyCode)
@@ -438,7 +466,7 @@ struct MalDazeSettingsView: View {
                     smartModifiersRaw = Int(modRaw)
                     smartKeyLabel = label
                 },
-                onCancel: {}
+                onCancel: disableSmartShortcut
             )
 
             GlobalShortcutKeyRecorder(
@@ -448,7 +476,7 @@ struct MalDazeSettingsView: View {
                     deskModifiersRaw = Int(modRaw)
                     deskKeyLabel = label
                 },
-                onCancel: {}
+                onCancel: disableDeskShortcut
             )
 
             GlobalShortcutKeyRecorder(
@@ -458,7 +486,7 @@ struct MalDazeSettingsView: View {
                     resetPetModifiersRaw = Int(modRaw)
                     resetPetKeyLabel = label
                 },
-                onCancel: {}
+                onCancel: disableResetPetShortcut
             )
 
             GlobalShortcutKeyRecorder(
@@ -468,7 +496,7 @@ struct MalDazeSettingsView: View {
                     sevenModifiersRaw = Int(modRaw)
                     sevenKeyLabel = label
                 },
-                onCancel: {}
+                onCancel: disableSevenMinuteShortcut
             )
         }
         .frame(width: 0, height: 0)
@@ -909,6 +937,7 @@ private struct ShortcutSettingRow: View {
     let isRecording: Bool
     let shortcutRecorderBusy: Bool
     let onRecord: () -> Void
+    let onDisable: () -> Void
     let onRestoreDefault: () -> Void
 
     private var keycap: some View {
@@ -954,6 +983,12 @@ private struct ShortcutSettingRow: View {
             .buttonStyle(.borderedProminent)
             .tint(SettingsDesignPalette.paleBlueAccent)
             .disabled(shortcutRecorderBusy && !isRecording)
+
+            Button("关闭") {
+                onDisable()
+            }
+            .buttonStyle(.bordered)
+            .disabled(shortcutRecorderBusy)
 
             Button("恢复默认") {
                 onRestoreDefault()

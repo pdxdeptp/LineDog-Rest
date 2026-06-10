@@ -68,7 +68,7 @@ struct LearningScheduleView<TaskRow: View>: View {
 
     private var agendaList: some View {
         ScrollViewReader { proxy in
-            ScrollView {
+            ScrollView(showsIndicators: false) {
                 LazyVStack(alignment: .leading, spacing: 12) {
                     ForEach(days) { day in
                         agendaSection(day)

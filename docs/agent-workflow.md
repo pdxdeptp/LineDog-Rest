@@ -1,18 +1,31 @@
 # Agent Workflow Reference
 
-This document preserves the detailed workflow that used to live inline in `AGENTS.md`. Keep `AGENTS.md` as the short entry contract, ideally under 60 lines, and update this file when process detail, rationale, or examples need more space.
+This document preserves expanded workflow rationale and examples. Keep `AGENTS.md` as the short entry contract and workflow router, ideally under 60 lines. Mode-specific operating rules live in `docs/agent-modes/` and should be read on demand, not all at once.
 
-## Core Directive
+## Workflow Mode Router
 
-This project follows a strict pipeline:
+The project no longer treats the heaviest OpenSpec/Superpowers pipeline as the default for every task. Agents should choose the lightest mode that protects user work and produces verifiable evidence.
 
-`Design (OpenSpec) -> Plan Refinement (Superpowers) -> Git Safety Check -> Implementation (TDD + Subagents) -> Finalization`
+| Mode | Read | Use When |
+| --- | --- | --- |
+| Fast Path | `docs/agent-modes/fast-path.md` | Small, clear fixes; docs/config/copy; known-root-cause bugs |
+| Standard Path | `docs/agent-modes/standard-path.md` | Moderate user-visible changes or several-file edits |
+| Full Delivery | `docs/agent-modes/full-delivery.md` | User asks for end-to-end completion, full QA, or vibe coding |
+| High Risk | `docs/agent-modes/high-risk.md` | Hermes contracts, SSOT/persistence, data loss, window lifecycle, unclear root cause, architecture |
 
-Superpowers skills are mandatory gates when they apply. They are not optional suggestions.
+Do not read every mode file by default. `AGENTS.md` routes to one mode; that mode may escalate if risk appears.
+
+## OpenSpec / Full-Path Reference
+
+The strict pipeline still exists for modes that call for it, especially Standard Path product changes, Full Delivery, and High Risk work:
+
+`Design (OpenSpec) -> Plan Refinement (Superpowers) -> Git Safety Check -> Implementation (TDD/review as appropriate) -> Finalization`
+
+Superpowers skills are mandatory when the selected mode invokes them. They are not optional suggestions once that path is chosen.
 
 ## Phase 0: Design Refinement
 
-When a new feature is proposed or an idea needs exploration:
+When a selected mode requires OpenSpec, or when a new feature/product behavior needs exploration:
 
 1. Run `opsx:explore`.
    - Use OpenSpec-aware design discussion.
@@ -56,7 +69,7 @@ Before implementation:
 2. Identify existing user changes.
 3. Avoid touching overlapping files unless the user explicitly approves.
 4. For large, risky, or multi-step changes, recommend or create a checkpoint commit when appropriate.
-5. Before non-worktree `opsx:apply`, create a checkpoint commit when safe.
+5. Before non-worktree `opsx:apply`, create a checkpoint commit only when safe and useful; skip it when unrelated dirty changes would make the checkpoint misleading.
 6. Never include unrelated user changes in a checkpoint commit without approval.
 
 Default workflow:
@@ -64,7 +77,7 @@ Default workflow:
 1. Work in the current project directory.
 2. Keep changes scoped to the requested feature, fix, or OpenSpec task.
 3. Run relevant automated checks.
-4. Ask the user to manually verify UI/UX behavior in the running desktop app when visual or interaction behavior changes.
+4. Ask the user to manually verify UI/UX behavior in the running desktop app when visual or interaction behavior changes, unless Full Delivery calls for agent-side UI verification.
 5. Commit or prepare changes only after implementation and verification, unless the user requests an earlier checkpoint.
 
 ### When To Use A Worktree
@@ -85,11 +98,13 @@ If a worktree is used, tell the user before implementation:
 
 ## Phase 2: Subagent-Driven Implementation
 
-The entry point is `opsx:apply`. The execution chain is fixed:
+For modes that require delegated implementation, the entry point is `opsx:apply`. The full execution chain is:
 
 `opsx:apply -> superpowers:subagent-driven-development -> per-subagent superpowers:test-driven-development`
 
 `opsx:apply` owns the task list. `subagent-driven-development` owns dispatch. `test-driven-development` owns per-task discipline.
+
+Fast Path and many documentation-only tasks do not need subagents. If the active environment does not permit spawning subagents unless the user explicitly asks for them, follow the higher-priority environment rule and document the deviation.
 
 ### Dispatch Rules
 
@@ -98,8 +113,6 @@ The entry point is `opsx:apply`. The execution chain is fixed:
    - Shared files or strict dependencies run sequentially.
 2. Give each subagent only the relevant task, spec excerpt, and target files.
 3. The main agent orchestrates, reviews, and integrates; subagents write implementation code.
-
-System note: if the active environment does not permit spawning subagents unless the user explicitly asks for them, follow the higher-priority environment rule and document the deviation.
 
 ### Pre-Apply Dispatch Recheck
 
@@ -127,7 +140,7 @@ Configuration, copy-only, and documentation-only changes may not have meaningful
 
 ### Two-Stage Review
 
-Each task output receives:
+In Full Delivery and High Risk modes, each task output receives:
 
 1. Spec compliance review.
    - Does the code fulfill `openspec/changes/<change>/specs/` requirements?
@@ -168,28 +181,26 @@ When all tasks are complete:
 - Skill declaration before action: before invoking any Superpowers skill, announce `触发 skill: <skill-name>`.
 - Git safety before code: run `git status` before implementation.
 - Work in the current checkout by default for this desktop-pet project.
-- Checkpoint before non-worktree `opsx:apply` when safe; never commit unrelated user changes without approval.
-- Failing test before implementation code.
-- Spec compliance review after each task.
-- Spec sync when implementation and design diverge.
-- Spec targeting before proposal.
+- Use the selected mode file; do not default to the heaviest path.
+- Checkpoint before non-worktree `opsx:apply` only when safe and useful; never commit unrelated user changes without approval.
+- Failing test before implementation code when a meaningful behavior test can be written.
+- Spec compliance review after each task in Full Delivery and High Risk modes.
+- Spec sync when implementation and design diverge in OpenSpec-backed work.
+- Spec targeting before OpenSpec proposal.
 - Parallelism safety for shared files and tests.
-- Pre-apply dispatch recheck after artifact changes.
-- Manual QA awareness for UI/UX changes.
+- Pre-apply dispatch recheck after artifact changes when using OpenSpec apply.
+- Manual QA awareness for UI/UX changes; Computer Use is opt-in or mode-triggered.
 
-## Hotfix Exception
+## Fast-Path Exception
 
-All three conditions must be met to bypass Phase 0-1:
+Fast Path replaces the old narrow hotfix-only exception. Use it for small, clear fixes or docs/config/copy changes that do not alter high-risk contracts.
 
-1. Scope: one file and <=15 changed lines.
-2. Type: text, comment, config, or copy only; no logic changes.
-3. Trigger: the user explicitly says `hotfix` or `trivial`.
+Fast Path still requires:
 
-Even when the exception applies:
-
-- `superpowers:verification-before-completion` is still required.
-- Tests or the best available checks must pass before declaring completion.
-- If the fix grows beyond the bounds above, stop and re-enter the full flow.
+- Git status before editing.
+- Focused verification before declaring completion.
+- Clear manual QA steps for UI/UX behavior.
+- Escalation when root cause, scope, or risk grows.
 
 ## SSOT And Intermediate Layers
 

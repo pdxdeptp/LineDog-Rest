@@ -225,14 +225,122 @@ python3 ~/.hermes/scripts/integration_feishu_qa.py
 
 详述：[nutrition-today-panel.md](./features/nutrition-today-panel.md)
 
+**安全准备（M-N4/M-N5/M-N9/M-N10/M-N11 前必做）**
+
+备份 live nutrition JSON：
+
+```bash
+NUTRITION_DIR="$HOME/.hermes/data/nutrition"
+QA_BACKUP="$NUTRITION_DIR/qa-backups/$(date +%Y%m%d-%H%M%S)"
+mkdir -p "$QA_BACKUP"
+[ -f "$NUTRITION_DIR/daily_log.json" ] && cp -p "$NUTRITION_DIR/daily_log.json" "$QA_BACKUP/daily_log.json"
+[ -f "$NUTRITION_DIR/recommendation.json" ] && cp -p "$NUTRITION_DIR/recommendation.json" "$QA_BACKUP/recommendation.json"
+printf '%s\n' "$QA_BACKUP"
+```
+
+准备 fresh recommendation snapshot（用当前 `daily_log.panel.updatedAt` 对齐 fresh；自动取 `foods.json` 前两项作为可记录 item，覆盖 M-N4 点击第一项与 M-N5 数字 `2`）：
+
+```bash
+python3 - <<'PY' | python3 "$HOME/.hermes/data/nutrition/recommendation_store.py" write --stdin
+import datetime
+import json
+from pathlib import Path
+
+nutrition_dir = Path.home() / ".hermes/data/nutrition"
+daily_log = json.loads((nutrition_dir / "daily_log.json").read_text())
+foods = json.loads((nutrition_dir / "foods.json").read_text())
+food_names = list(foods)[:2]
+if not food_names:
+    raise SystemExit("foods.json is empty; cannot prepare loggable QA items")
+if len(food_names) == 1:
+    food_names.append(food_names[0])
+now = datetime.datetime.now().astimezone().isoformat(timespec="seconds")
+
+payload = {
+    "schemaVersion": 1,
+    "date": daily_log["date"],
+    "generatedAt": now,
+    "source": {"kind": "manual_qa", "channel": "local"},
+    "basedOn": {
+        "dailyLogDate": daily_log["date"],
+        "dailyLogPanelUpdatedAt": daily_log["panel"]["updatedAt"],
+        "recordsCount": len(daily_log.get("records", [])),
+    },
+    "state": "available",
+    "summary": "QA fresh recommendation",
+    "suggestions": [{
+        "label": "QA item",
+        "rationale": "Manual QA clickable/loggable item.",
+        "items": [
+            {
+                "displayName": f"{food_names[0]} 100g",
+                "name": food_names[0],
+                "grams": 100,
+                "loggable": True,
+            },
+            {
+                "displayName": f"{food_names[1]} 120g",
+                "name": food_names[1],
+                "grams": 120,
+                "loggable": True,
+            },
+        ],
+        "warnings": [],
+    }],
+}
+print(json.dumps(payload, ensure_ascii=False))
+PY
+```
+
+准备 unavailable snapshot（验证 `--reason` 映射到 `summary`，无单独 `reason` 字段，且 `suggestions: []`）：
+
+```bash
+python3 "$HOME/.hermes/data/nutrition/recommendation_store.py" unavailable --reason "QA 暂时无法可靠推荐"
+```
+
+准备 legacy `panel.suggestions` 非空（仅 M-N11；必须已完成上方备份，验证后立即恢复）：
+
+```bash
+python3 - <<'PY'
+import json
+from pathlib import Path
+
+path = Path.home() / ".hermes/data/nutrition/daily_log.json"
+daily_log = json.loads(path.read_text())
+panel = daily_log.setdefault("panel", {})
+panel["suggestions"] = [{
+    "label": "legacy suggestion must be ignored",
+    "items": [{"displayName": "legacy item", "loggable": False}],
+}]
+path.write_text(json.dumps(daily_log, ensure_ascii=False, indent=2) + "\n")
+PY
+```
+
+恢复 live JSON（M-N10/M-N11 删除或修改 live 文件后必须执行；若备份时没有 `recommendation.json`，恢复时删除测试文件）：
+
+```bash
+NUTRITION_DIR="$HOME/.hermes/data/nutrition"
+cp -p "$QA_BACKUP/daily_log.json" "$NUTRITION_DIR/daily_log.json"
+if [ -f "$QA_BACKUP/recommendation.json" ]; then
+  cp -p "$QA_BACKUP/recommendation.json" "$NUTRITION_DIR/recommendation.json"
+else
+  rm -f "$NUTRITION_DIR/recommendation.json"
+fi
+```
+
 | # | 步骤 | 预期 |
 |---|------|------|
 | M-N1 | 打开桌宠 Dashboard | 左栏上计划、下饮食；默认约 60/40 |
 | M-N2 | `python3 ~/.hermes/scripts/integration_smoke.py` | `nutrition_panel.ok` 为 true |
 | M-N3 | 饮食区 | 日型一行；kcal 条；蛋白/碳水/脂肪/**钠**；已吃只读 |
-| M-N4 | 点击建议第一项 | `recommend.py log`；约 1s 内 FSEvents 刷新 |
-| M-N5 | 按主键盘 `2`（无修饰） | 与点击第二项等效；文本框聚焦时不触发 |
+| M-N4 | 准备 fresh `recommendation.json` 后点击建议第一项 | `recommend.py log`；约 1s 内 facts 刷新；旧 recommendation 变 stale 且记录动作禁用 |
+| M-N5 | 准备 fresh `recommendation.json` 后按主键盘 `2`（无修饰） | 与点击第二个 fresh loggable item 等效；文本框聚焦时不触发 |
 | M-N6 | 设置 → Dashboard 左栏比例 50% | 重开 Dashboard 计划/饮食约各半 |
+| M-N7 | Morning Briefing 发送用户可见饮食建议 | `~/.hermes/data/nutrition/recommendation.json` 同步写入；`source.kind == "morning_briefing"`；`basedOn.dailyLogPanelUpdatedAt` 对齐当前 `daily_log.panel.updatedAt` |
+| M-N8 | 飞书/Hermes 对话记录食物后回复下一步饮食建议 | 先通过 `recommend.py log` 更新 `daily_log.json` facts；随后写 fresh `recommendation.json`；`source.kind` 标识飞书营养流程 |
+| M-N9 | 飞书/Hermes 只记录食物但无法可靠推荐；可用上方 unavailable 命令模拟 | 不写 fresh available planner-only 建议；若写 unavailable，则 `summary` 是 UI 文案、无 `reason` 字段、`suggestions: []`；MalDaze 显示 stale、missing 或 unavailable |
+| M-N10 | 先按上方备份；删除或移走 live `recommendation.json`（如 `mv "$NUTRITION_DIR/recommendation.json" "$QA_BACKUP/recommendation.json.hidden"`），保留 `daily_log.json`；结束立即按上方恢复 | 饮食 facts 仍显示；建议区显示等待 Hermes 更新；不调用 `plan_engine`、不调用 `refresh-panel`、不读 `panel.suggestions` fallback |
+| M-N11 | 先按上方备份；临时把 live `daily_log.panel.suggestions` 填入非空，同时缺少/过期 `recommendation.json`；结束立即按上方恢复 | MalDaze 仍不展示 legacy suggestions；建议区保持 missing/stale/unavailable 状态 |
 
 **ROADMAP**：§8 X2
 

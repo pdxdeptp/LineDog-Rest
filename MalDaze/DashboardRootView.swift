@@ -21,7 +21,7 @@ private enum DashboardLayout {
         + learningColumnMinWidth
         + controlsColumnWidth
         + 6 * horizontalPadding
-        + 2 * dividerWidth
+        + DashboardColumnLayout.resizeHandleWidth * 2
     }
 
     static var minimumContentWidth: CGFloat {
@@ -113,7 +113,16 @@ struct DeskPetDashboardView: View {
 private enum DashboardColumnLayout {
     static let resizeHandleWidth: CGFloat = 8
     static var chromeWidth: CGFloat {
-        DashboardLayout.dividerWidth * 2 + resizeHandleWidth * 2
+        resizeHandleWidth * 2
+    }
+}
+
+private enum DashboardResizeHandleLineLayout {
+    static let thickness: CGFloat = 3
+    static let opacity: CGFloat = 0.55
+
+    static func centeredLineOrigin(in extent: CGFloat) -> CGFloat {
+        floor((extent - thickness) / 2)
     }
 }
 
@@ -194,15 +203,15 @@ private final class DashboardColumnResizeHandleView: NSView {
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        NSColor.separatorColor.withAlphaComponent(0.35).setFill()
+        NSColor.separatorColor.withAlphaComponent(DashboardResizeHandleLineLayout.opacity).setFill()
+        let thickness = DashboardResizeHandleLineLayout.thickness
         switch axis {
         case .columns:
-            let lineX = floor((bounds.width - 1) / 2)
-            NSRect(x: lineX, y: 0, width: 1, height: bounds.height).fill()
+            let x = DashboardResizeHandleLineLayout.centeredLineOrigin(in: bounds.width)
+            NSRect(x: x, y: 0, width: thickness, height: bounds.height).fill()
         case .rows:
-            let midY = floor(bounds.height / 2)
-            NSRect(x: 0, y: midY - 1, width: bounds.width, height: 1).fill()
-            NSRect(x: 0, y: midY + 1, width: bounds.width, height: 1).fill()
+            let y = DashboardResizeHandleLineLayout.centeredLineOrigin(in: bounds.height)
+            NSRect(x: 0, y: y, width: bounds.width, height: thickness).fill()
         }
     }
 
@@ -619,13 +628,9 @@ struct DashboardRootView: View {
                     )
                     .id("dashboard-left-column-resize")
 
-                    Divider()
-
                     LearningDeskPanelView()
                         .frame(minWidth: DashboardLayout.learningColumnMinWidth, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                         .padding(.horizontal, MainPanelChrome.horizontalPadding)
-
-                    Divider()
 
                     DashboardColumnResizeHandleChrome(
                         onDragChanged: { updateRightColumnWidthDrag(delta: $0, contentWidth: contentWidth) },
@@ -963,7 +968,7 @@ struct DashboardRootView: View {
                         .frame(maxWidth: .infinity, alignment: .topLeading)
                         .padding(.vertical, 8)
                 } else {
-                    ScrollView {
+                    ScrollView(showsIndicators: false) {
                         VStack(alignment: .leading, spacing: 0) {
                             ForEach(Array(reminderDaySections.enumerated()), id: \.element.id) { idx, section in
                                 VStack(alignment: .leading, spacing: 0) {
@@ -991,7 +996,7 @@ struct DashboardRootView: View {
 
     /// 右栏：番茄钟、小猫、7 分钟提醒等原有控制（内容可滚动，高度随面板伸缩）。
     private var mainControlsColumn: some View {
-        ScrollView {
+        ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 10) {
                 mainPanelHeader
 

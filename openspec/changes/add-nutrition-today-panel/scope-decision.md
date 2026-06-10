@@ -9,7 +9,7 @@
 | **D1** | 方案 A：`daily_log.json` + `panel` |
 | **D2** | 左栏计划 + 饮食垂直分栏（默认 60/40） |
 | **D4** | 健身仅 `dayLabel` 一行 |
-| **D5** | v1 Python `plan_engine` 1 条建议；±50 kcal |
+| **D5** | Superseded by `use-hermes-authored-nutrition-recommendations`: v1 keeps `panel.suggestions: []` for schema compatibility; user-visible recommendations come from Hermes-authored `recommendation.json` |
 
 ## 用户追加纳入（2026-06-09 · 覆盖初版「严格只读」）
 
@@ -26,14 +26,14 @@
 
 | ID | 决策 |
 |----|------|
-| **S1** | `plan_engine` 脚本内常量食物集 |
+| **S1** | `plan_engine` 脚本内常量食物集仅作 candidate-only 上下文；不发布到 `panel.suggestions` 或 MalDaze |
 | **S2** | 45s `updatedAt` 轮询兜底 |
 
 ## 仍排除
 
 - 面板 undo / 试算 / 改日型
-- LLM 多方案、`set-suggestions`
-- 中栏学习饮食 Tab、P3 健身助手、飞书深链、第二 JSON 文件
+- Python/Swift 本地生成、过滤或重排用户可见建议
+- 中栏学习饮食 Tab、P3 健身助手、飞书深链
 
 ## Final
 

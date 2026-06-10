@@ -53,7 +53,7 @@ struct LearningProjectStatusView: View {
                 .padding(.vertical, 12)
         } else {
             ScrollViewReader { proxy in
-                ScrollView {
+                ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 10) {
                         ForEach(projects, id: \.projectId) { project in
                             projectCard(project)

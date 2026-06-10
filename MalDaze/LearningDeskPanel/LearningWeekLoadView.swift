@@ -22,7 +22,7 @@ struct LearningWeekLoadView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             } else {
-                ScrollView {
+                ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 8) {
                         ForEach(days) { day in
                             dayRow(day)

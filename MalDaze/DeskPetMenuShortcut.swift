@@ -21,6 +21,10 @@ struct DeskPetMenuShortcut: Equatable {
         Int(Self.default.modifiers.intersection(.deviceIndependentFlagsMask).rawValue)
     }
 
+    var isEnabled: Bool {
+        !modifiers.intersection(Self.requiredModifiers).isEmpty
+    }
+
     static func load(from defaults: UserDefaults = .standard) -> DeskPetMenuShortcut {
         guard defaults.object(forKey: MalDazeDefaults.deskPetMenuShortcutKeyCode) != nil else {
             return .default
@@ -40,6 +44,7 @@ struct DeskPetMenuShortcut: Equatable {
     }
 
     func matches(_ event: NSEvent) -> Bool {
+        guard isEnabled else { return false }
         guard event.type == .keyDown else { return false }
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         let want = modifiers.intersection(.deviceIndependentFlagsMask)
@@ -47,6 +52,7 @@ struct DeskPetMenuShortcut: Equatable {
     }
 
     var displayString: String {
+        guard isEnabled else { return "已关闭" }
         var s = ""
         let m = modifiers.intersection(.deviceIndependentFlagsMask)
         if m.contains(.control) { s += "⌃" }
@@ -59,6 +65,10 @@ struct DeskPetMenuShortcut: Equatable {
             s += keyLabel
         }
         return s
+    }
+
+    private static var requiredModifiers: NSEvent.ModifierFlags {
+        [.command, .option, .control, .shift]
     }
 
     private static func fallbackSymbol(for keyCode: UInt16) -> String {

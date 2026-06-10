@@ -2,6 +2,8 @@
 
 路径：`data/nutrition/`
 
+> Superseded alignment: `use-hermes-authored-nutrition-recommendations` changes `_refresh_panel` to facts/metrics only. `panel.suggestions` remains `[]` for schema compatibility; user-visible recommendations are written to `recommendation.json` by Hermes authoring flows.
+
 ## `_refresh_panel(daily_log) -> dict`
 
 在 `_update_daily_log` 的 `updater` 返回前或写盘后调用：
@@ -9,7 +11,7 @@
 1. `targets = get_targets(daily_log)`
 2. `total, consumed, remaining = calc_remaining(daily_log, targets)`
 3. `day_label = {"training": "训练日", "rest": "休息日"}[daily_log["day_type"]]`
-4. `suggestions = _build_panel_suggestions(remaining, foods_db)` — 见下
+4. `suggestions = []` — compatibility only; do not generate user-visible recommendations here
 5. 返回附加到 `data["panel"]`：
 
 ```json
@@ -20,17 +22,16 @@
   "targets": { "kcal", "protein_g", "carbs_g", "fat_g", "sodium_mg" },
   "consumed": { ... },
   "remaining": { ... },
-  "suggestions": [ { "label", "items", "total", "within_slack" } ],
+  "suggestions": [],
   "calorieSlack": 50
 }
 ```
 
-## `_build_panel_suggestions`
+## `_build_panel_suggestions`（superseded）
 
-- 调用 `plan_engine`（子进程或 import `NutritionPlanner`）对 **默认食物集** 跑一轮。
-- v1 默认集（可配置常量）：与 skill 常用一致，如希腊酸奶变体、燕麦、蓝莓、坚果、水煮蛋、甜玉米等；**排除** `inventory == []`。
-- 输出 1 条 suggestion：`label` 取首食物组合名或 `"建议菜单"`；`items[]` 含 `name`、`grams`、各营养素；`total` 汇总；`within_slack = abs(remaining.kcal - total.kcal) <= 50`。
-- 失败（无食物/优化失败）→ `suggestions: []`。
+- 不再作为 MalDaze 推荐来源实现或调用。
+- `plan_engine` 可继续为 Hermes authoring path 产生候选上下文，但候选必须经过 Hermes 推荐流程写入 `recommendation.json` 后才可展示。
+- `recommend.py refresh-panel` 和 mutating 写入只维护 `targets` / `consumed` / `remaining` / `dayLabel` / `updatedAt` 等 facts/metrics，并保持 `panel.suggestions: []`。
 
 ## Mutating 命令挂钩
 
@@ -59,14 +60,15 @@ python3 recommend.py refresh-panel
 
 ## 晨报
 
-`morning-briefing.py` 营养段后调用 `refresh-panel` 或 `_refresh_panel`。
+`morning-briefing.py` 营养 facts 段后可调用 `refresh-panel` 或 `_refresh_panel` 更新 metrics。若晨报包含用户可见饮食建议，Hermes authoring path 必须同时写入 `recommendation.json`；planner-only 候选不得作为 fresh recommendation 发布。
 
 ## Skill 规则（`nutrition-menu/SKILL.md`）
 
 - 新增：**禁止**手改 `daily_log.json`；`panel` 由脚本维护。
-- 「吃了 X」流程不变；`log` 成功后 `panel` 自动更新，无需额外命令。
+- 「吃了 X」流程不变；`log` 成功后 `panel` facts 自动更新，无需额外命令。
+- 若飞书回复给出下一步饮食建议，必须通过 recommendation writer 写入 `recommendation.json`；不能把 `plan_engine` 或 `panel.suggestions` 作为 fresh 推荐。
 
 ## 测试
 
-- `tests/nutrition/test_refresh_panel.py`：log 后 `panel` 存在；remaining 正确；归档无 `panel`。
+- `tests/nutrition/test_refresh_panel.py`：log 后 `panel` 存在；remaining 正确；`panel.suggestions == []`；归档无 `panel`。
 - 可选 `integration_smoke.check_nutrition_panel`。

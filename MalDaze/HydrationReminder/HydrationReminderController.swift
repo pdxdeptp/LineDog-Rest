@@ -2,7 +2,7 @@ import AppKit
 import QuartzCore
 
 /// 周期性喝水提醒：按用户设定间隔（默认 90 分钟）弹出中央浮层，提供「已喝水 💧」/「稍后提醒」操作。
-/// 结构仿照 SevenMinuteReminderController：独立 NSWindow，不经 WindowManager，通过回调汇报调度状态。
+/// 结构仿照 SevenMinuteReminderController：独立浮窗，不经 WindowManager，通过回调汇报调度状态。
 /// start()/cancel() 的调用权完全归 AppViewModel，控制器本身不读取 enabled 状态。
 /// 弹窗外壳：顶部淡蓝渐变 + 圆角描边阴影（方案 A）。
 private final class HydrationReminderCardView: NSView {
@@ -234,13 +234,14 @@ final class HydrationReminderController: NSObject {
         let size = Self.contentSizeForReminder(message: message)
         let frame = Self.reminderFrame(contentSize: size)
 
-        let win = NSWindow(
+        let win = NSPanel(
             contentRect: frame,
-            styleMask: [.borderless],
+            styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false,
             screen: MenuBarNSScreen.screen ?? NSScreen.screens.first
         )
+        win.isFloatingPanel = true
         win.isOpaque = false
         win.backgroundColor = .clear
         win.level = .screenSaver
@@ -339,8 +340,6 @@ final class HydrationReminderController: NSObject {
 
         win.contentView = container
         reminderWindow = win
-        // 仅菜单栏 / accessory 时，不激活常导致浮层在其它 App 背后或事件链异常。
-        NSApp.activate(ignoringOtherApps: true)
         win.orderFrontRegardless()
     }
 

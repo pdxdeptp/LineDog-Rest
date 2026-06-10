@@ -131,7 +131,7 @@ struct NutritionTodayPanelView: View {
 
     @ViewBuilder
     private func loadedPanel(log: NutritionDailyLog, panel: NutritionPanel) -> some View {
-        ScrollView {
+        ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 8) {
                 calorieBar(consumed: panel.consumed.kcal, target: panel.targets.kcal)
 
@@ -149,19 +149,8 @@ struct NutritionTodayPanelView: View {
                     .foregroundStyle(.secondary)
                     .padding(.top, 4)
 
-                if viewModel.loggableItems.isEmpty {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("暂无建议")
-                            .font(NutritionBodyFont.body)
-                            .foregroundStyle(.tertiary)
-                        Text("在飞书告诉 Hermes 吃了什么")
-                            .font(NutritionBodyFont.hint)
-                            .foregroundStyle(.tertiary)
-                    }
-                } else {
-                    suggestionList
-                        .id(panel.updatedAt + "-\(viewModel.loggableItems.count)")
-                }
+                recommendationSection
+                    .id(panel.updatedAt + "-\(viewModel.loggableItems.count)")
 
                 Text("已吃")
                     .font(NutritionBodyFont.section)
@@ -213,18 +202,106 @@ struct NutritionTodayPanelView: View {
         )
     }
 
-    private var suggestionList: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ForEach(viewModel.loggableItems) { item in
-                suggestionRow(item)
-                Divider().opacity(0.35)
+    @ViewBuilder
+    private var recommendationSection: some View {
+        switch viewModel.recommendationState {
+        case .idle:
+            Text("等待 Hermes 更新建议。")
+                .font(NutritionBodyFont.body)
+                .foregroundStyle(.tertiary)
+        case .fresh(let snapshot):
+            recommendationSnapshotView(snapshot, actionsEnabled: true)
+        case .stale(let snapshot):
+            VStack(alignment: .leading, spacing: 4) {
+                recommendationMessageView
+                recommendationSnapshotView(snapshot, actionsEnabled: false)
             }
-            if viewModel.loggableItems.count <= 9, !viewModel.loggableItems.isEmpty {
+        case .missing, .invalid:
+            recommendationMessageView
+        case .unavailable(let snapshot):
+            VStack(alignment: .leading, spacing: 4) {
+                recommendationMessageView
+                if !snapshot.suggestions.isEmpty {
+                    recommendationSnapshotView(snapshot, actionsEnabled: false)
+                }
+            }
+        }
+    }
+
+    private var recommendationMessageView: some View {
+        Text(viewModel.recommendationMessage ?? "等待 Hermes 更新建议。")
+            .font(NutritionBodyFont.body)
+            .foregroundStyle(.orange)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func recommendationSnapshotView(
+        _ snapshot: NutritionRecommendationSnapshot,
+        actionsEnabled: Bool
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(snapshot.summary)
+                .font(NutritionBodyFont.body)
+                .foregroundStyle(actionsEnabled ? .primary : .secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            ForEach(snapshot.suggestions) { suggestion in
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(suggestion.label)
+                        .font(NutritionBodyFont.hint.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    if let rationale = suggestion.rationale, !rationale.isEmpty {
+                        Text(rationale)
+                            .font(NutritionBodyFont.hint)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    ForEach(Array(suggestion.items.enumerated()), id: \.offset) { _, item in
+                        recommendationItemRow(item, actionsEnabled: actionsEnabled)
+                        Divider().opacity(0.35)
+                    }
+                    ForEach(suggestion.warnings, id: \.self) { warning in
+                        Text(warning)
+                            .font(NutritionBodyFont.hint)
+                            .foregroundStyle(.orange)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+
+            if actionsEnabled, viewModel.loggableItems.count <= 9, !viewModel.loggableItems.isEmpty {
                 Text("按 1–9 快捷记录")
                     .font(NutritionBodyFont.hint)
                     .foregroundStyle(.tertiary)
-                    .padding(.top, 4)
             }
+        }
+    }
+
+    @ViewBuilder
+    private func recommendationItemRow(
+        _ item: NutritionRecommendationItem,
+        actionsEnabled: Bool
+    ) -> some View {
+        if actionsEnabled,
+           item.loggable,
+           let loggable = viewModel.loggableItems.first(where: { $0.sourceItemID == item.id }) {
+            suggestionRow(loggable)
+        } else {
+            HStack(alignment: .center, spacing: 6) {
+                Color.clear.frame(width: 18, height: 1)
+                Text(item.displayName)
+                    .font(NutritionBodyFont.body)
+                    .foregroundStyle(actionsEnabled ? .primary : .secondary)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                if item.loggable, let grams = item.grams {
+                    Text("\(formatG(grams))g")
+                        .font(NutritionBodyFont.suggestionMeta)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(.vertical, 6)
         }
     }
 
@@ -243,7 +320,7 @@ struct NutritionTodayPanelView: View {
                     Color.clear.frame(width: 18, height: 1)
                 }
 
-                Text(item.name)
+                Text(item.displayName)
                     .font(NutritionBodyFont.body)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)

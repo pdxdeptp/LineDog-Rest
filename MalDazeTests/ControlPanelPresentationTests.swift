@@ -356,6 +356,46 @@ final class ControlPanelPresentationTests: XCTestCase {
         )
     }
 
+    func testCenterBellReminderDismissalUsesNonActivatingPanel() throws {
+        let source = try readProjectSource("MalDaze/SevenMinuteReminder/SevenMinuteReminderController.swift")
+        let reminderSource = try functionSource(named: "showReminderWindow", in: source)
+
+        XCTAssertTrue(
+            reminderSource.contains("NSPanel("),
+            "The click-to-dismiss center bell should use a panel, not an ordinary app-activating window."
+        )
+        XCTAssertTrue(
+            reminderSource.contains(".nonactivatingPanel"),
+            "Dismissing the center bell should not activate MalDaze and surface the Dashboard."
+        )
+        XCTAssertFalse(
+            reminderSource.contains("NSWindow("),
+            "The center bell dismissal surface should not be an ordinary NSWindow."
+        )
+    }
+
+    func testHydrationReminderActionsUseNonActivatingPanel() throws {
+        let source = try readProjectSource("MalDaze/HydrationReminder/HydrationReminderController.swift")
+        let reminderSource = try functionSource(named: "showReminderWindow", in: source)
+
+        XCTAssertTrue(
+            reminderSource.contains("NSPanel("),
+            "The hydration reminder should use a panel, not an ordinary app-activating window."
+        )
+        XCTAssertTrue(
+            reminderSource.contains(".nonactivatingPanel"),
+            "Clicking hydration reminder actions should not activate MalDaze and surface the Dashboard."
+        )
+        XCTAssertFalse(
+            reminderSource.contains("NSApp.activate(ignoringOtherApps: true)"),
+            "Showing the hydration reminder should not activate MalDaze because that can foreground Dashboard."
+        )
+        XCTAssertFalse(
+            reminderSource.contains("NSWindow("),
+            "The hydration reminder action surface should not be an ordinary NSWindow."
+        )
+    }
+
     func testMalDazeDefaultsExposesDashboardWindowPersistenceKeys() throws {
         let source = try readProjectSource("MalDaze/MalDazeDefaults.swift")
 
@@ -522,11 +562,11 @@ final class ControlPanelPresentationTests: XCTestCase {
             right: 300,
             totalInnerWidth: 1200,
             middleMin: 360,
-            chromeWidth: 12
+            chromeWidth: 16
         )
         XCTAssertEqual(widths.left, 345, accuracy: 0.5)
         XCTAssertEqual(widths.right, 300, accuracy: 0.5)
-        XCTAssertGreaterThanOrEqual(1200 - widths.left - widths.right - 12, 360)
+        XCTAssertGreaterThanOrEqual(1200 - widths.left - widths.right - 16, 360)
     }
 
     func testDashboardRootUsesResizableThreeColumnChrome() throws {
@@ -1211,6 +1251,57 @@ final class ControlPanelPresentationTests: XCTestCase {
         XCTAssertTrue(shortcutRowSource.contains("恢复默认"))
         XCTAssertTrue(shortcutRowSource.contains("shortcutRecorderBusy && !isRecording"))
         XCTAssertTrue(shortcutRowSource.contains("font(.system(.body, design: .monospaced))"))
+    }
+
+    func testShortcutModelsDisplayEmptyInputAsDisabled() throws {
+        XCTAssertEqual(
+            SmartReminderInputShortcut(keyCode: 0, modifiers: [], keyLabel: "").displayString,
+            "已关闭"
+        )
+        XCTAssertEqual(
+            DeskPetMenuShortcut(keyCode: 0, modifiers: [], keyLabel: "").displayString,
+            "已关闭"
+        )
+        XCTAssertEqual(
+            ResetIdlePetPositionShortcut(keyCode: 0, modifiers: [], keyLabel: "").displayString,
+            "已关闭"
+        )
+        XCTAssertEqual(
+            SevenMinuteReminderShortcut(keyCode: 0, modifiers: [], keyLabel: "").displayString,
+            "已关闭"
+        )
+    }
+
+    func testShortcutSettingsExposeDisableActionForEveryRecorder() throws {
+        let settingsSource = try readProjectSource("MalDaze/Settings/MalDazeSettingsView.swift")
+        let shortcutsSource = try propertySource(named: "shortcutsSettingsPane", in: settingsSource)
+        let shortcutRowSource = try structSource(named: "ShortcutSettingRow", in: settingsSource)
+        let recorderSource = try structSource(named: "GlobalShortcutKeyRecorder", in: settingsSource)
+
+        XCTAssertEqual(
+            shortcutsSource.ranges(of: "onDisable:").count,
+            4,
+            "Every shortcut row should expose a no-input/disable path."
+        )
+        XCTAssertTrue(shortcutRowSource.contains("关闭"))
+        XCTAssertTrue(shortcutRowSource.contains("onDisable"))
+        XCTAssertTrue(
+            recorderSource.contains("self.onCancel()"),
+            "Pressing Esc while recording should commit the empty-input path instead of only leaving the shortcut unchanged."
+        )
+    }
+
+    func testCarbonGlobalHotKeysSkipDisabledShortcuts() throws {
+        let source = try readProjectSource("MalDaze/MalDazeCarbonGlobalHotKeys.swift")
+
+        for token in [
+            "guard desk.isEnabled else",
+            "guard smart.isEnabled else",
+            "guard seven.isEnabled else",
+            "guard resetPet.isEnabled else"
+        ] {
+            XCTAssertTrue(source.contains(token), "Carbon hot key sync should skip disabled shortcut token: \(token)")
+        }
     }
 
     func testMalDazeSettingsPreserveStorageHooksAndPanelBlueAccent() throws {
