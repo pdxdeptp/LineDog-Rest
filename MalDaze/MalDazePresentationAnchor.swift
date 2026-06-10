@@ -66,12 +66,36 @@ enum MalDazePresentationAnchor {
         return best ?? MenuBarNSScreen.screen ?? NSScreen.main
     }
 
+    /// 桌宠所在屏的可见工作区；尚无桌宠记录时退回菜单栏主屏。
+    static func preferredVisibleFrameForAuxiliaryUI() -> NSRect {
+        if let vf = preferredScreenForMalDazeAuxiliaryUI()?.visibleFrame {
+            return vf
+        }
+        return NSScreen.screens.first?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1280, height: 800)
+    }
+
+    /// 包含给定屏幕坐标矩形的显示器可见工作区；无法解析时退回桌宠屏。
+    static func visibleFrameContainingScreenRect(_ rect: NSRect) -> NSRect {
+        let point = NSPoint(x: rect.midX, y: rect.midY)
+        if let screen = NSScreen.screens.first(where: { $0.frame.contains(point) }) {
+            return screen.visibleFrame
+        }
+        var best: NSScreen?
+        var bestArea: CGFloat = 0
+        for screen in NSScreen.screens {
+            let inter = screen.frame.intersection(rect)
+            let area = inter.width * inter.height
+            if area > bestArea {
+                bestArea = area
+                best = screen
+            }
+        }
+        return best?.visibleFrame ?? preferredVisibleFrameForAuxiliaryUI()
+    }
+
     /// 在首选屏的可见区内居中放置给定内容尺寸的窗口 frame（屏幕坐标）。
     static func centeredFrame(forWindowContent size: NSSize, padding: CGFloat = 16) -> NSRect {
-        guard let screen = preferredScreenForMalDazeAuxiliaryUI() ?? NSScreen.main else {
-            return NSRect(origin: .zero, size: size)
-        }
-        let vf = screen.visibleFrame
+        let vf = preferredVisibleFrameForAuxiliaryUI()
         var x = vf.midX - size.width / 2
         var y = vf.midY - size.height / 2
         x = min(max(x, vf.minX + padding), vf.maxX - size.width - padding)

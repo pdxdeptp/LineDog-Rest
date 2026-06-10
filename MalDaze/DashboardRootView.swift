@@ -40,7 +40,9 @@ private enum DashboardLayout {
 
 extension DashboardRootView {
     static var dashboardPreferredContentSize: NSSize {
-        DashboardLayout.preferredContentSize(screenVisibleFrame: NSScreen.main?.visibleFrame)
+        DashboardLayout.preferredContentSize(
+            screenVisibleFrame: MalDazePresentationAnchor.preferredVisibleFrameForAuxiliaryUI()
+        )
     }
 }
 
@@ -50,16 +52,32 @@ struct DeskPetDashboardView: View {
         static let cornerRadius: CGFloat = 14
         static let fillOpacity = 0.94
         static let borderOpacity = 0.36
+        /// 面板顶缘内嵌系统交通灯的行高（非额外窗体外框）。
+        static let trafficLightRowHeight: CGFloat = 28
 
         static func shape() -> RoundedRectangle {
             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        }
+
+        @ViewBuilder
+        static func background() -> some View {
+            ZStack {
+                shape()
+                    .fill(.regularMaterial)
+                shape()
+                    .fill(Color(.windowBackgroundColor).opacity(fillOpacity))
+            }
         }
     }
 
     @ObservedObject var viewModel: AppViewModel
 
     static func preferredContentSize(screenVisibleFrame visibleFrame: NSRect?) -> NSSize {
-        DashboardLayout.preferredContentSize(screenVisibleFrame: visibleFrame)
+        let content = DashboardLayout.preferredContentSize(screenVisibleFrame: visibleFrame)
+        return NSSize(
+            width: content.width,
+            height: content.height + DashboardPanelSurface.trafficLightRowHeight
+        )
     }
 
     @MainActor
@@ -68,22 +86,236 @@ struct DeskPetDashboardView: View {
     }
 
     var body: some View {
-        DashboardRootView(viewModel: viewModel)
-            .environmentObject(viewModel.dashboardEscapeRouter)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .background {
-                ZStack {
-                    DashboardPanelSurface.shape()
-                        .fill(.regularMaterial)
-                    DashboardPanelSurface.shape()
-                        .fill(Color(.windowBackgroundColor).opacity(DashboardPanelSurface.fillOpacity))
-                }
+        ZStack(alignment: .top) {
+            DashboardPanelSurface.background()
+
+            VStack(spacing: 0) {
+                DashboardWindowDragStrip()
+                    .frame(height: DashboardPanelSurface.trafficLightRowHeight)
+                    .frame(maxWidth: .infinity)
+
+                DashboardRootView(viewModel: viewModel)
+                    .environmentObject(viewModel.dashboardEscapeRouter)
             }
-            .clipShape(DashboardPanelSurface.shape())
-            .overlay(
-                DashboardPanelSurface.shape()
-                    .strokeBorder(Color(.separatorColor).opacity(DashboardPanelSurface.borderOpacity), lineWidth: 0.5)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .clipShape(DashboardPanelSurface.shape())
+        .overlay(
+            DashboardPanelSurface.shape()
+                .strokeBorder(Color(.separatorColor).opacity(DashboardPanelSurface.borderOpacity), lineWidth: 0.5)
+        )
+        .ignoresSafeArea(.container, edges: .top)
+    }
+}
+
+// MARK: - 分栏拖拽（列宽 / 计划·饮食行高）
+
+private enum DashboardColumnLayout {
+    static let resizeHandleWidth: CGFloat = 8
+    static var chromeWidth: CGFloat {
+        DashboardLayout.dividerWidth * 2 + resizeHandleWidth * 2
+    }
+}
+
+private enum DashboardResizeHandleAxis {
+    case columns
+    case rows
+}
+
+/// 透明标题栏区拖窗；`isMovableByWindowBackground == false` 时由 AppKit 显式 `performDrag`。
+private final class DashboardWindowDragStripView: NSView {
+    override var isFlipped: Bool { true }
+    override var isOpaque: Bool { false }
+
+    override func mouseDown(with event: NSEvent) {
+        window?.performDrag(with: event)
+    }
+}
+
+private struct DashboardWindowDragStrip: NSViewRepresentable {
+    func makeNSView(context: Context) -> DashboardWindowDragStripView {
+        DashboardWindowDragStripView()
+    }
+
+    func updateNSView(_ nsView: DashboardWindowDragStripView, context: Context) {}
+}
+
+private final class DashboardColumnResizeHandleView: NSView {
+    var axis: DashboardResizeHandleAxis = .columns
+    var onDragChanged: ((CGFloat) -> Void)?
+    var onDragEnded: (() -> Void)?
+    private var lastDragValue: CGFloat = 0
+    private var isDragging = false
+    private var trackingArea: NSTrackingArea?
+
+    override var isFlipped: Bool { true }
+    override var isOpaque: Bool { false }
+
+    private var resizeCursor: NSCursor {
+        axis == .columns ? .resizeLeftRight : .resizeUpDown
+    }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        bounds.contains(point) ? self : nil
+    }
+
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    override func resetCursorRects() {
+        discardCursorRects()
+        addCursorRect(bounds, cursor: resizeCursor)
+    }
+
+    override func layout() {
+        super.layout()
+        installTrackingAreaIfNeeded()
+        resetCursorRects()
+        needsDisplay = true
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        installTrackingAreaIfNeeded()
+        resetCursorRects()
+    }
+
+    override func cursorUpdate(with event: NSEvent) {
+        resizeCursor.set()
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        resizeCursor.push()
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        if !isDragging {
+            NSCursor.pop()
+        }
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        NSColor.separatorColor.withAlphaComponent(0.35).setFill()
+        switch axis {
+        case .columns:
+            let lineX = floor((bounds.width - 1) / 2)
+            NSRect(x: lineX, y: 0, width: 1, height: bounds.height).fill()
+        case .rows:
+            let midY = floor(bounds.height / 2)
+            NSRect(x: 0, y: midY - 1, width: bounds.width, height: 1).fill()
+            NSRect(x: 0, y: midY + 1, width: bounds.width, height: 1).fill()
+        }
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        lastDragValue = dragCoordinate(for: event)
+        isDragging = true
+        resizeCursor.set()
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        guard isDragging else { return }
+        let value = dragCoordinate(for: event)
+        let delta = value - lastDragValue
+        lastDragValue = value
+        guard abs(delta) > 0.01 else { return }
+        onDragChanged?(delta)
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        guard isDragging else { return }
+        isDragging = false
+        lastDragValue = 0
+        onDragEnded?()
+        NSCursor.pop()
+    }
+
+    private func dragCoordinate(for event: NSEvent) -> CGFloat {
+        let point = convert(event.locationInWindow, from: nil)
+        return axis == .columns ? point.x : point.y
+    }
+
+    private func installTrackingAreaIfNeeded() {
+        if let trackingArea {
+            removeTrackingArea(trackingArea)
+        }
+        let options: NSTrackingArea.Options = [
+            .activeInKeyWindow,
+            .mouseEnteredAndExited,
+            .cursorUpdate,
+            .inVisibleRect,
+        ]
+        let area = NSTrackingArea(rect: bounds, options: options, owner: self, userInfo: nil)
+        addTrackingArea(area)
+        trackingArea = area
+    }
+}
+
+private struct DashboardResizeHandleChrome: NSViewRepresentable {
+    var axis: DashboardResizeHandleAxis
+    var onDragChanged: (CGFloat) -> Void
+    var onDragEnded: () -> Void
+
+    func makeNSView(context: Context) -> DashboardColumnResizeHandleView {
+        let view = DashboardColumnResizeHandleView()
+        view.axis = axis
+        view.onDragChanged = onDragChanged
+        view.onDragEnded = onDragEnded
+        return view
+    }
+
+    func updateNSView(_ nsView: DashboardColumnResizeHandleView, context: Context) {
+        nsView.axis = axis
+        nsView.onDragChanged = onDragChanged
+        nsView.onDragEnded = onDragEnded
+    }
+
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: DashboardColumnResizeHandleView, context: Context) -> CGSize? {
+        switch axis {
+        case .columns:
+            return CGSize(
+                width: DashboardColumnLayout.resizeHandleWidth,
+                height: proposal.height ?? nsView.bounds.height
             )
+        case .rows:
+            return CGSize(
+                width: proposal.width ?? nsView.bounds.width,
+                height: DashboardColumnLayout.resizeHandleWidth
+            )
+        }
+    }
+}
+
+private struct DashboardColumnResizeHandleChrome: View {
+    var onDragChanged: (CGFloat) -> Void
+    var onDragEnded: () -> Void
+
+    var body: some View {
+        DashboardResizeHandleChrome(
+            axis: .columns,
+            onDragChanged: onDragChanged,
+            onDragEnded: onDragEnded
+        )
+        .frame(width: DashboardColumnLayout.resizeHandleWidth)
+        .frame(maxHeight: .infinity)
+        .accessibilityLabel(Text("调整分栏宽度"))
+        .accessibilityAddTraits(.isButton)
+    }
+}
+
+private struct DashboardRowResizeHandleChrome: View {
+    var onDragChanged: (CGFloat) -> Void
+    var onDragEnded: () -> Void
+
+    var body: some View {
+        DashboardResizeHandleChrome(
+            axis: .rows,
+            onDragChanged: onDragChanged,
+            onDragEnded: onDragEnded
+        )
+        .frame(height: DashboardColumnLayout.resizeHandleWidth)
+        .frame(maxWidth: .infinity)
+        .accessibilityLabel(Text("调整计划与饮食区高度"))
+        .accessibilityAddTraits(.isButton)
     }
 }
 
@@ -255,6 +487,8 @@ struct DashboardRootView: View {
     @AppStorage(MalDazeDefaults.idlePetIconSidePoints) private var idlePetIconSideStored = MalDazeDefaults.idlePetIconSideDefault
     @AppStorage(MalDazeDefaults.dashboardLeftPlanFraction) private var dashboardLeftPlanFractionStored =
         MalDazeDefaults.defaultDashboardLeftPlanFraction
+    @AppStorage(MalDazeDefaults.dashboardLeftColumnWidth) private var leftColumnWidthStored: Double = 0
+    @AppStorage(MalDazeDefaults.dashboardRightColumnWidth) private var rightColumnWidthStored: Double = 0
 
     private var deskReminders: DeskRemindersModel { viewModel.deskReminders }
 
@@ -262,6 +496,9 @@ struct DashboardRootView: View {
     @State private var deleteConfirmationId: String?
     /// 拖动中预览；松手后写入 `@AppStorage` 并发帖，避免拖动每一帧写偏好。
     @State private var idlePetIconSideSliderLive = Double(MalDazeDefaults.idlePetIconSideDefault)
+    @State private var leftColumnWidthDragLive: CGFloat?
+    @State private var rightColumnWidthDragLive: CGFloat?
+    @State private var planFractionDragLive: Double?
     @State private var focusSettingsExpanded = true
     @State private var restBehaviorExpanded = false
     @State private var petAppearanceExpanded = false
@@ -362,38 +599,48 @@ struct DashboardRootView: View {
     }
 
     var body: some View {
-        let chrome = VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .top, spacing: 0) {
-                // 左栏：计划 + 饮食
-                leftColumnStack
-                    .frame(width: DashboardLayout.remindersColumnWidth, alignment: .topLeading)
-                    .padding(.trailing, MainPanelChrome.horizontalPadding)
+        GeometryReader { geo in
+            let contentWidth = max(geo.size.width - 2 * MainPanelChrome.horizontalPadding, 1)
+            let columnWidths = resolvedColumnWidths(for: contentWidth)
 
-                Divider()
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(alignment: .top, spacing: 0) {
+                    leftColumnStack
+                        .frame(width: columnWidths.left, alignment: .topLeading)
+                        .padding(.trailing, MainPanelChrome.horizontalPadding)
 
-                // 中栏：Hermes 学习面板
-                LearningDeskPanelView()
-                    .frame(minWidth: DashboardLayout.learningColumnMinWidth, maxWidth: .infinity, alignment: .topLeading)
-                    .padding(.horizontal, MainPanelChrome.horizontalPadding)
+                    DashboardColumnResizeHandleChrome(
+                        onDragChanged: { updateLeftColumnWidthDrag(delta: $0, contentWidth: contentWidth) },
+                        onDragEnded: { commitLeftColumnWidthDrag(contentWidth: contentWidth) }
+                    )
+                    .id("dashboard-left-column-resize")
 
-                Divider()
+                    Divider()
 
-                // 右栏：番茄钟、小猫等原有控制
-                mainControlsColumn
-                    .frame(width: DashboardLayout.controlsColumnWidth, alignment: .leading)
-                    .padding(.leading, MainPanelChrome.horizontalPadding)
+                    LearningDeskPanelView()
+                        .frame(minWidth: DashboardLayout.learningColumnMinWidth, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                        .padding(.horizontal, MainPanelChrome.horizontalPadding)
+
+                    Divider()
+
+                    DashboardColumnResizeHandleChrome(
+                        onDragChanged: { updateRightColumnWidthDrag(delta: $0, contentWidth: contentWidth) },
+                        onDragEnded: { commitRightColumnWidthDrag(contentWidth: contentWidth) }
+                    )
+                    .id("dashboard-right-column-resize")
+
+                    mainControlsColumn
+                        .frame(width: columnWidths.right, alignment: .leading)
+                        .padding(.leading, MainPanelChrome.horizontalPadding)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
             .padding(.horizontal, MainPanelChrome.horizontalPadding)
             .padding(.top, MainPanelChrome.topPadding)
             .padding(.bottom, MainPanelChrome.bottomPadding)
+            .frame(width: geo.size.width, height: geo.size.height, alignment: .topLeading)
         }
-        .frame(
-            minWidth: DashboardLayout.minimumContentWidth,
-            maxWidth: .infinity,
-            minHeight: DashboardLayout.contentHeight
-        )
-
-        chrome
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .sheet(item: $reminderUnderEdit) { item in
             DeskReminderEditSheet(item: item, deskReminders: deskReminders)
         }
@@ -434,6 +681,88 @@ struct DashboardRootView: View {
 
     private func openMalDazeSettingsWindow() {
         MalDazeSettingsWindowPresenter.present()
+    }
+
+    private func resolvedColumnWidths(for contentWidth: CGFloat) -> (left: CGFloat, right: CGFloat) {
+        let leftBase = leftColumnWidthDragLive
+            ?? MalDazeDefaults.resolvedDashboardLeftColumnWidth(
+                stored: leftColumnWidthStored,
+                defaultWidth: DashboardLayout.remindersColumnWidth
+            )
+        let rightBase = rightColumnWidthDragLive
+            ?? MalDazeDefaults.resolvedDashboardRightColumnWidth(
+                stored: rightColumnWidthStored,
+                defaultWidth: DashboardLayout.controlsColumnWidth
+            )
+        return MalDazeDefaults.clampedDashboardColumnWidths(
+            left: leftBase,
+            right: rightBase,
+            totalInnerWidth: contentWidth,
+            middleMin: DashboardLayout.learningColumnMinWidth,
+            chromeWidth: DashboardColumnLayout.chromeWidth
+        )
+    }
+
+    private func updateLeftColumnWidthDrag(delta: CGFloat, contentWidth: CGFloat) {
+        let leftBase = leftColumnWidthDragLive
+            ?? MalDazeDefaults.resolvedDashboardLeftColumnWidth(
+                stored: leftColumnWidthStored,
+                defaultWidth: DashboardLayout.remindersColumnWidth
+            )
+        let rightBase = rightColumnWidthDragLive
+            ?? MalDazeDefaults.resolvedDashboardRightColumnWidth(
+                stored: rightColumnWidthStored,
+                defaultWidth: DashboardLayout.controlsColumnWidth
+            )
+        let clamped = MalDazeDefaults.clampedDashboardColumnWidths(
+            left: leftBase + delta,
+            right: rightBase,
+            totalInnerWidth: contentWidth,
+            middleMin: DashboardLayout.learningColumnMinWidth,
+            chromeWidth: DashboardColumnLayout.chromeWidth
+        )
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            leftColumnWidthDragLive = clamped.left
+        }
+    }
+
+    private func commitLeftColumnWidthDrag(contentWidth: CGFloat) {
+        let widths = resolvedColumnWidths(for: contentWidth)
+        leftColumnWidthStored = Double(widths.left)
+        leftColumnWidthDragLive = nil
+    }
+
+    private func updateRightColumnWidthDrag(delta: CGFloat, contentWidth: CGFloat) {
+        let leftBase = leftColumnWidthDragLive
+            ?? MalDazeDefaults.resolvedDashboardLeftColumnWidth(
+                stored: leftColumnWidthStored,
+                defaultWidth: DashboardLayout.remindersColumnWidth
+            )
+        let rightBase = rightColumnWidthDragLive
+            ?? MalDazeDefaults.resolvedDashboardRightColumnWidth(
+                stored: rightColumnWidthStored,
+                defaultWidth: DashboardLayout.controlsColumnWidth
+            )
+        let clamped = MalDazeDefaults.clampedDashboardColumnWidths(
+            left: leftBase,
+            right: rightBase - delta,
+            totalInnerWidth: contentWidth,
+            middleMin: DashboardLayout.learningColumnMinWidth,
+            chromeWidth: DashboardColumnLayout.chromeWidth
+        )
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            rightColumnWidthDragLive = clamped.right
+        }
+    }
+
+    private func commitRightColumnWidthDrag(contentWidth: CGFloat) {
+        let widths = resolvedColumnWidths(for: contentWidth)
+        rightColumnWidthStored = Double(widths.right)
+        rightColumnWidthDragLive = nil
     }
 
     /// 与下方 `statusLine`、表单等解耦：只负责本行在右栏内的垂直居中与留白。
@@ -550,18 +879,24 @@ struct DashboardRootView: View {
     }
 
     private var resolvedDashboardLeftPlanFraction: Double {
-        MalDazeDefaults.clampedDashboardLeftPlanFraction(dashboardLeftPlanFractionStored)
+        planFractionDragLive
+            ?? MalDazeDefaults.clampedDashboardLeftPlanFraction(dashboardLeftPlanFractionStored)
     }
 
     /// 左栏：计划（上）+ 饮食面板（下），比例来自设置。
     private var leftColumnStack: some View {
         GeometryReader { geo in
-            let planFraction = resolvedDashboardLeftPlanFraction
-            let planHeight = geo.size.height * planFraction
+            let rowHandleHeight = DashboardColumnLayout.resizeHandleWidth
+            let stackHeight = max(geo.size.height - rowHandleHeight, 1)
+            let planHeight = stackHeight * resolvedDashboardLeftPlanFraction
             VStack(spacing: 0) {
                 remindersSidebar
                     .frame(height: planHeight, alignment: .topLeading)
-                Divider()
+                DashboardRowResizeHandleChrome(
+                    onDragChanged: { updatePlanFractionDrag(delta: $0, stackHeight: stackHeight) },
+                    onDragEnded: commitPlanFractionDrag
+                )
+                .id("dashboard-plan-nutrition-resize")
                 NutritionTodayPanelView(
                     digitKeysEnabled: reminderUnderEdit == nil && deleteConfirmationId == nil
                 )
@@ -569,6 +904,23 @@ struct DashboardRootView: View {
             }
         }
         .frame(maxHeight: .infinity)
+    }
+
+    private func updatePlanFractionDrag(delta: CGFloat, stackHeight: CGFloat) {
+        let current = resolvedDashboardLeftPlanFraction
+        let updated = MalDazeDefaults.clampedDashboardLeftPlanFraction(
+            current + Double(delta / max(stackHeight, 1))
+        )
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            planFractionDragLive = updated
+        }
+    }
+
+    private func commitPlanFractionDrag() {
+        dashboardLeftPlanFractionStored = resolvedDashboardLeftPlanFraction
+        planFractionDragLive = nil
     }
 
     /// 左栏上段：提醒事项（系统 EventKit），按日分组类似系统「计划」。
@@ -633,7 +985,7 @@ struct DashboardRootView: View {
         .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 
-    /// 右栏：番茄钟、小猫、7 分钟提醒等原有控制（内容可滚动，高度由左栏决定）。
+    /// 右栏：番茄钟、小猫、7 分钟提醒等原有控制（内容可滚动，高度随面板伸缩）。
     private var mainControlsColumn: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {

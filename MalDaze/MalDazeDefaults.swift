@@ -185,6 +185,54 @@ enum MalDazeDefaults {
     static let dashboardWindowOriginY = "MalDaze.dashboardWindowOriginY"
     static let dashboardWindowWidth = "MalDaze.dashboardWindowWidth"
     static let dashboardWindowHeight = "MalDaze.dashboardWindowHeight"
+    /// `true` 表示已按带标题栏窗口的外框尺寸持久化；`false`/缺失时按旧无边框内容区迁移一次。
+    static let dashboardWindowFrameUsesTitledOuterSize = "MalDaze.dashboardWindowFrameUsesTitledOuterSize"
+
+    /// Dashboard 左 / 右分栏宽度（pt）；未写入或 ≤0 时使用布局默认值。
+    static let dashboardLeftColumnWidth = "MalDaze.dashboard.leftColumnWidth"
+    static let dashboardRightColumnWidth = "MalDaze.dashboard.rightColumnWidth"
+    static let dashboardColumnWidthMin: CGFloat = 240
+    static let dashboardMiddleColumnWidthMin: CGFloat = 280
+
+    static func resolvedDashboardLeftColumnWidth(
+        stored: Double,
+        defaultWidth: CGFloat
+    ) -> CGFloat {
+        stored > 0 ? CGFloat(stored) : defaultWidth
+    }
+
+    static func resolvedDashboardRightColumnWidth(
+        stored: Double,
+        defaultWidth: CGFloat
+    ) -> CGFloat {
+        stored > 0 ? CGFloat(stored) : defaultWidth
+    }
+
+    static func clampedDashboardColumnWidths(
+        left: CGFloat,
+        right: CGFloat,
+        totalInnerWidth: CGFloat,
+        middleMin: CGFloat = dashboardMiddleColumnWidthMin,
+        columnMin: CGFloat = dashboardColumnWidthMin,
+        chromeWidth: CGFloat = 0
+    ) -> (left: CGFloat, right: CGFloat) {
+        let available = max(totalInnerWidth - chromeWidth, columnMin * 2 + middleMin)
+        var leftW = min(max(left, columnMin), available - columnMin - middleMin)
+        var rightW = min(max(right, columnMin), available - leftW - middleMin)
+        let middleW = available - leftW - rightW
+        if middleW < middleMin {
+            let deficit = middleMin - middleW
+            if rightW > columnMin {
+                let shave = min(deficit, rightW - columnMin)
+                rightW -= shave
+            }
+            let remaining = middleMin - (available - leftW - rightW)
+            if remaining > 0, leftW > columnMin {
+                leftW = max(columnMin, leftW - remaining)
+            }
+        }
+        return (leftW, rightW)
+    }
 
     /// Dashboard 左栏计划区高度占比（0.4–0.75），默认 0.6。
     static let dashboardLeftPlanFraction = "MalDaze.dashboard.leftPlanFraction"

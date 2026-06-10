@@ -16,13 +16,20 @@ private final class DeskPetDashboardWindow: NSWindow {
 enum DeskPetDashboardWindowLayout {
     static let margin: CGFloat = 12
 
+    static let windowStyleMask: NSWindow.StyleMask = [
+        .titled, .closable, .miniaturizable, .resizable, .fullSizeContentView,
+    ]
+
     static func centeredFrame(visibleFrame: NSRect) -> NSRect {
         let preferredSize = DeskPetDashboardView.preferredContentSize(screenVisibleFrame: visibleFrame)
         let width = min(preferredSize.width, max(visibleFrame.width - 2 * margin, 1))
         let height = min(preferredSize.height, max(visibleFrame.height - 2 * margin, 1))
         let x = visibleFrame.midX - width / 2
         let y = visibleFrame.midY - height / 2
-        return clampedFrame(NSRect(x: x, y: y, width: width, height: height), visibleFrame: visibleFrame)
+        return clampedFrame(
+            NSRect(x: x, y: y, width: width, height: height),
+            visibleFrame: visibleFrame
+        )
     }
 
     static func clampedFrame(_ frame: NSRect, visibleFrame: NSRect) -> NSRect {
@@ -36,6 +43,7 @@ enum DeskPetDashboardWindowLayout {
         if f.maxY > inset.maxY { f.origin.y = inset.maxY - f.height }
         return f
     }
+
 }
 
 private final class DeskPetDashboardWindowDelegate: NSObject, NSWindowDelegate {
@@ -491,9 +499,6 @@ final class WindowManager: WindowManaging {
         if let v = stageView {
             wireDeskPetCallbacks(into: v)
         }
-        if viewModel != nil {
-            _ = makeDeskMenuWindowIfNeeded()
-        }
         applyMousePolicy()
     }
 
@@ -533,6 +538,7 @@ final class WindowManager: WindowManaging {
             self?.finishRestCycle()
         }
         applyMousePolicy()
+        scheduleDemoteVisibleDashboardBelowOtherApplicationsIfNeeded()
     }
 
     /// 右下角桌宠在非休息时的配色（计时中黑 / 停止白边）。
@@ -662,6 +668,7 @@ final class WindowManager: WindowManaging {
         showBreakRunCountdownPanel(duration: duration)
         applyMousePolicy()
         win.orderFrontRegardless()
+        scheduleDemoteVisibleDashboardBelowOtherApplicationsIfNeeded()
     }
 
     private func finishBreakRun() {
@@ -775,6 +782,7 @@ final class WindowManager: WindowManaging {
         window?.ignoresMouseEvents = false
         // 确保倒计时面板在遮罩之上（level 已是 screenSaver-1 > 遮罩 screenSaver-2）
         breakRunCountdownPanel?.orderFrontRegardless()
+        scheduleDemoteVisibleDashboardBelowOtherApplicationsIfNeeded()
     }
 
     private func hideBreakRunShield() {
@@ -1183,27 +1191,46 @@ extension WindowManager: PetStageDeskMenuPresenter {
         AnyView(DeskPetDashboardView(viewModel: vm))
     }
 
-    private static func primaryVisibleFrame() -> NSRect {
-        NSScreen.main?.visibleFrame ?? NSScreen.screens.first?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1280, height: 800)
+    private static func dashboardDefaultVisibleFrame() -> NSRect {
+        MalDazePresentationAnchor.preferredVisibleFrameForAuxiliaryUI()
+    }
+
+    private static func configureDashboardWindowChrome(_ window: NSWindow) {
+        window.title = "MalDaze"
+        window.backgroundColor = .clear
+        window.isOpaque = false
+        window.hasShadow = true
+        window.level = .normal
+        window.collectionBehavior = [.managed, .fullScreenNone]
+        window.isReleasedWhenClosed = false
+        window.titlebarAppearsTransparent = true
+        window.titleVisibility = .hidden
+        window.titlebarSeparatorStyle = .none
+        // 仅标题栏区可拖窗；面板内由分栏 NSView 接管鼠标，避免与列宽拖拽抢手势。
+        window.isMovableByWindowBackground = false
+        window.toolbar = nil
+        window.contentMinSize = NSSize(width: 480, height: 360)
     }
 
     private static func resolvedDashboardWindowFrame() -> NSRect {
-        let visibleFrame = primaryVisibleFrame()
         let d = UserDefaults.standard
         guard d.object(forKey: MalDazeDefaults.dashboardWindowOriginX) != nil,
               d.object(forKey: MalDazeDefaults.dashboardWindowOriginY) != nil,
               d.object(forKey: MalDazeDefaults.dashboardWindowWidth) != nil,
               d.object(forKey: MalDazeDefaults.dashboardWindowHeight) != nil
         else {
-            return DeskPetDashboardWindowLayout.centeredFrame(visibleFrame: visibleFrame)
+            return DeskPetDashboardWindowLayout.centeredFrame(
+                visibleFrame: dashboardDefaultVisibleFrame()
+            )
         }
-        let frame = NSRect(
+        let storedFrame = NSRect(
             x: d.double(forKey: MalDazeDefaults.dashboardWindowOriginX),
             y: d.double(forKey: MalDazeDefaults.dashboardWindowOriginY),
             width: d.double(forKey: MalDazeDefaults.dashboardWindowWidth),
             height: d.double(forKey: MalDazeDefaults.dashboardWindowHeight)
         )
-        return DeskPetDashboardWindowLayout.clampedFrame(frame, visibleFrame: visibleFrame)
+        let visibleFrame = MalDazePresentationAnchor.visibleFrameContainingScreenRect(storedFrame)
+        return DeskPetDashboardWindowLayout.clampedFrame(storedFrame, visibleFrame: visibleFrame)
     }
 
     private func persistDashboardWindowFrame(_ frame: NSRect) {
@@ -1212,6 +1239,7 @@ extension WindowManager: PetStageDeskMenuPresenter {
         d.set(frame.origin.y, forKey: MalDazeDefaults.dashboardWindowOriginY)
         d.set(frame.size.width, forKey: MalDazeDefaults.dashboardWindowWidth)
         d.set(frame.size.height, forKey: MalDazeDefaults.dashboardWindowHeight)
+        d.set(true, forKey: MalDazeDefaults.dashboardWindowFrameUsesTitledOuterSize)
     }
 
     /// 创建或复用 Dashboard 标准窗口。
@@ -1221,21 +1249,15 @@ extension WindowManager: PetStageDeskMenuPresenter {
             return existing
         }
 
-        let frame = Self.resolvedDashboardWindowFrame()
+        let panelFrame = Self.resolvedDashboardWindowFrame()
         let dashboardWindow = DeskPetDashboardWindow(
-            contentRect: frame,
-            styleMask: [.borderless, .resizable],
+            contentRect: NSRect(origin: .zero, size: panelFrame.size),
+            styleMask: DeskPetDashboardWindowLayout.windowStyleMask,
             backing: .buffered,
-            defer: false
+            defer: true
         )
+        Self.configureDashboardWindowChrome(dashboardWindow)
         dashboardWindow.identifier = NSUserInterfaceItemIdentifier(Self.deskPetDashboardWindowIdentifier)
-        dashboardWindow.backgroundColor = .clear
-        dashboardWindow.isOpaque = false
-        dashboardWindow.hasShadow = true
-        dashboardWindow.level = .normal
-        dashboardWindow.collectionBehavior = [.managed, .fullScreenNone]
-        dashboardWindow.isReleasedWhenClosed = false
-        dashboardWindow.isMovableByWindowBackground = true
         dashboardWindow.delegate = deskMenuWindowDelegate
         deskMenuWindowDelegate.onFrameChanged = { [weak self] in
             Task { @MainActor [weak self] in
@@ -1250,7 +1272,15 @@ extension WindowManager: PetStageDeskMenuPresenter {
         }
 
         let host = NSHostingController(rootView: makeDeskPetDashboardRootView(viewModel: vm))
+        if #available(macOS 13.3, *) {
+            host.safeAreaRegions = []
+        }
+        if #available(macOS 14.0, *) {
+            host.sizingOptions = [.intrinsicContentSize]
+        }
         dashboardWindow.contentViewController = host
+        dashboardWindow.setFrame(panelFrame, display: false)
+        dashboardWindow.contentMinSize = NSSize(width: 480, height: 360)
         deskMenuHostingController = host
         deskMenuWindow = dashboardWindow
         return dashboardWindow
@@ -1262,9 +1292,23 @@ extension WindowManager: PetStageDeskMenuPresenter {
         toggleDashboardWindow()
     }
 
+    /// 桌宠休息/跑屏 `orderFrontRegardless` 会把整个 App 激活，连带抬高已打开的 Dashboard；压回全局栈底且保持可见。
+    private func demoteVisibleDashboardBelowOtherApplicationsIfNeeded() {
+        guard let dashboard = deskMenuWindow, dashboard.isVisible else { return }
+        dashboard.order(.below, relativeTo: 0)
+    }
+
+    private func scheduleDemoteVisibleDashboardBelowOtherApplicationsIfNeeded() {
+        DispatchQueue.main.async { [weak self] in
+            self?.demoteVisibleDashboardBelowOtherApplicationsIfNeeded()
+        }
+    }
+
     private func showDashboardWindow() {
         guard let dashboardWindow = makeDeskMenuWindowIfNeeded() else { return }
-        dashboardWindow.setFrame(Self.resolvedDashboardWindowFrame(), display: false)
+        if !dashboardWindow.isVisible {
+            dashboardWindow.setFrame(Self.resolvedDashboardWindowFrame(), display: false)
+        }
         NSApp.activate(ignoringOtherApps: true)
         dashboardWindow.makeKeyAndOrderFront(nil)
         installDashboardEscMonitor()

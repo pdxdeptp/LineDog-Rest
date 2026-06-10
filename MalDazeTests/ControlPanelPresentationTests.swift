@@ -137,11 +137,19 @@ final class ControlPanelPresentationTests: XCTestCase {
 
         XCTAssertTrue(
             rootSource.contains("DashboardPanelSurface"),
-            "DeskPetDashboardView should own a visible SwiftUI surface because its window shell is transparent."
+            "DeskPetDashboardView should own a visible SwiftUI surface under the transparent titled window chrome."
         )
         XCTAssertTrue(
-            rootSource.contains(".background {"),
-            "DeskPetDashboardView should draw an actual background instead of relying on transparent NSPanel chrome."
+            rootSource.contains("DashboardPanelSurface.background()"),
+            "DeskPetDashboardView should draw a full-bleed panel background instead of a separate transparent titlebar."
+        )
+        XCTAssertTrue(
+            rootSource.contains("trafficLightRowHeight"),
+            "DeskPetDashboardView should reserve in-panel space for embedded traffic lights."
+        )
+        XCTAssertTrue(
+            rootSource.contains("ignoresSafeArea(.container, edges: .top)"),
+            "DeskPetDashboardView should extend the panel surface under the transparent titlebar."
         )
         XCTAssertTrue(
             rootSource.contains(".clipShape("),
@@ -219,15 +227,31 @@ final class ControlPanelPresentationTests: XCTestCase {
 
     func testDeskPetDashboardWindowChromeAndLifecycleAreConfigured() throws {
         let source = try readProjectSource("MalDaze/WindowManager/WindowManager.swift")
+        let chromeSource = try functionSource(named: "configureDashboardWindowChrome", in: source)
 
         XCTAssertTrue(source.contains("override var canBecomeMain: Bool { true }"))
-        XCTAssertTrue(source.contains("dashboardWindow.backgroundColor = .clear"))
-        XCTAssertTrue(source.contains("dashboardWindow.isOpaque = false"))
-        XCTAssertTrue(source.contains("dashboardWindow.hasShadow = true"))
-        XCTAssertTrue(source.contains("dashboardWindow.isReleasedWhenClosed = false"))
-        XCTAssertTrue(source.contains("collectionBehavior = [.managed, .fullScreenNone]"))
+        XCTAssertTrue(source.contains("static let windowStyleMask: NSWindow.StyleMask"))
+        XCTAssertTrue(source.contains(".titled, .closable, .miniaturizable, .resizable, .fullSizeContentView"))
+        XCTAssertTrue(chromeSource.contains("titlebarAppearsTransparent = true"))
+        XCTAssertTrue(chromeSource.contains("isMovableByWindowBackground = false"))
+        XCTAssertTrue(chromeSource.contains("titleVisibility = .hidden"))
+        XCTAssertTrue(chromeSource.contains("collectionBehavior = [.managed, .fullScreenNone]"))
         XCTAssertTrue(source.contains("deskPetDashboardWindowIdentifier"))
         XCTAssertTrue(source.contains("dashboardWindow.orderOut(nil)"))
+        XCTAssertTrue(source.contains("windowShouldClose"))
+        XCTAssertTrue(
+            source.contains("safeAreaRegions = []"),
+            "Dashboard hosting controller should extend SwiftUI under the transparent titlebar."
+        )
+        XCTAssertTrue(
+            source.contains("sizingOptions = [.intrinsicContentSize]"),
+            "Dashboard hosting controller should not push SwiftUI minSize back onto the window frame."
+        )
+        let bindSource = try functionSource(named: "bindDeskPetMenu", in: source)
+        XCTAssertFalse(
+            bindSource.contains("makeDeskMenuWindowIfNeeded"),
+            "bindDeskPetMenu should not eagerly create the dashboard before first open."
+        )
     }
 
     func testDeskPetLeftClickAndShortcutRouteThroughDashboardToggle() throws {
@@ -283,6 +307,38 @@ final class ControlPanelPresentationTests: XCTestCase {
         XCTAssertTrue(escMonitorSource.contains("event.keyCode == 53"))
         XCTAssertTrue(escMonitorSource.contains("charactersIgnoringModifiers?.lowercased() == \"w\""))
         XCTAssertTrue(escMonitorSource.contains("smartInputPanel == nil"))
+    }
+
+    func testRestPresentationDemotesVisibleDashboardBelowOtherApplications() throws {
+        let source = try readProjectSource("MalDaze/WindowManager/WindowManager.swift")
+        let presentRestSource = try functionSource(
+            named: "presentRest",
+            in: source,
+            after: "final class WindowManager"
+        )
+        let presentBreakRunSource = try functionSource(
+            named: "presentBreakRun",
+            in: source,
+            after: "final class WindowManager"
+        )
+        let demoteSource = try functionSource(
+            named: "demoteVisibleDashboardBelowOtherApplicationsIfNeeded",
+            in: source,
+            after: "// MARK: - Dashboard 标准窗口"
+        )
+
+        XCTAssertTrue(
+            presentRestSource.contains("scheduleDemoteVisibleDashboardBelowOtherApplicationsIfNeeded()"),
+            "Fullscreen rest should demote a visible dashboard after bringing the pet overlay forward."
+        )
+        XCTAssertTrue(
+            presentBreakRunSource.contains("scheduleDemoteVisibleDashboardBelowOtherApplicationsIfNeeded()"),
+            "Break-run rest should demote a visible dashboard after bringing the pet overlay forward."
+        )
+        XCTAssertTrue(
+            demoteSource.contains("dashboard.order(.below, relativeTo: 0)"),
+            "Dashboard demotion should keep the window visible without closing it."
+        )
     }
 
     func testPresentRestAndBreakRunDoNotHideDashboardOnEntry() throws {
@@ -385,15 +441,16 @@ final class ControlPanelPresentationTests: XCTestCase {
         let preferredSizeSource = String(source[preferredSizeRange])
 
         XCTAssertTrue(
-            preferredSizeSource.contains("NSScreen.main?.visibleFrame"),
-            "dashboardPreferredContentSize should derive the dashboard width from the current screen visibleFrame."
+            preferredSizeSource.contains("MalDazePresentationAnchor.preferredVisibleFrameForAuxiliaryUI()"),
+            "dashboardPreferredContentSize should derive the dashboard width from the desk pet screen visibleFrame."
         )
         XCTAssertTrue(
             source.contains("static let safeHorizontalMargin"),
             "dashboardPreferredContentSize should reserve a named horizontal safety margin."
         )
         XCTAssertTrue(
-            preferredSizeSource.contains("DashboardLayout.preferredContentSize(screenVisibleFrame:"),
+            preferredSizeSource.contains("DashboardLayout.preferredContentSize")
+                && preferredSizeSource.contains("screenVisibleFrame:"),
             "dashboardPreferredContentSize should delegate screen-aware sizing to a testable layout helper."
         )
     }
@@ -419,7 +476,7 @@ final class ControlPanelPresentationTests: XCTestCase {
         )
     }
 
-    func testDeskPetDashboardPreferredSizeUsesPrimaryVisibleFrame() throws {
+    func testDeskPetDashboardPreferredSizeUsesPetAnchoredVisibleFrame() throws {
         let windowManagerSource = try readProjectSource("MalDaze/WindowManager/WindowManager.swift")
         let dashboardSource = try readProjectSource("MalDaze/DashboardRootView.swift")
         let frameRange = try XCTUnwrap(
@@ -429,8 +486,16 @@ final class ControlPanelPresentationTests: XCTestCase {
         let frameSource = String(windowManagerSource[frameRange])
 
         XCTAssertTrue(
-            frameSource.contains("DeskPetDashboardWindowLayout.centeredFrame(visibleFrame:"),
-            "WindowManager should center the dashboard on the primary visible frame when no persistence exists."
+            frameSource.contains("dashboardDefaultVisibleFrame()"),
+            "WindowManager should center the dashboard on the desk pet screen when no persistence exists."
+        )
+        XCTAssertTrue(
+            frameSource.contains("MalDazePresentationAnchor.visibleFrameContainingScreenRect(storedFrame)"),
+            "Persisted dashboard frames should clamp against the screen that already contains them."
+        )
+        XCTAssertTrue(
+            dashboardSource.contains("MalDazePresentationAnchor.preferredVisibleFrameForAuxiliaryUI()"),
+            "Dashboard preferred size should follow the desk pet screen, not the mouse-focused display."
         )
         XCTAssertTrue(
             frameSource.contains("MalDazeDefaults.dashboardWindowOriginX"),
@@ -439,6 +504,46 @@ final class ControlPanelPresentationTests: XCTestCase {
         XCTAssertTrue(
             dashboardSource.contains("static func preferredContentSize(screenVisibleFrame visibleFrame: NSRect?) -> NSSize"),
             "DeskPetDashboardView should expose a screen-aware preferred size helper for WindowManager."
+        )
+        let dashboardViewRange = try XCTUnwrap(
+            rangeOfType(named: "DeskPetDashboardView", in: dashboardSource),
+            "DeskPetDashboardView should define preferredContentSize."
+        )
+        let dashboardViewSource = String(dashboardSource[dashboardViewRange])
+        XCTAssertTrue(
+            dashboardViewSource.contains("trafficLightRowHeight"),
+            "Dashboard window height should include the in-panel traffic light row."
+        )
+    }
+
+    func testDashboardColumnWidthsKeepSidesFixedWhileMiddleFlexes() {
+        let widths = MalDazeDefaults.clampedDashboardColumnWidths(
+            left: 345,
+            right: 300,
+            totalInnerWidth: 1200,
+            middleMin: 360,
+            chromeWidth: 12
+        )
+        XCTAssertEqual(widths.left, 345, accuracy: 0.5)
+        XCTAssertEqual(widths.right, 300, accuracy: 0.5)
+        XCTAssertGreaterThanOrEqual(1200 - widths.left - widths.right - 12, 360)
+    }
+
+    func testDashboardRootUsesResizableThreeColumnChrome() throws {
+        let source = try readProjectSource("MalDaze/DashboardRootView.swift")
+
+        XCTAssertTrue(source.contains("GeometryReader"))
+        XCTAssertTrue(source.contains("final class DashboardColumnResizeHandleView"))
+        XCTAssertTrue(source.contains("override func mouseDragged(with event: NSEvent)"))
+        XCTAssertTrue(source.contains("DashboardWindowDragStrip"))
+        XCTAssertTrue(source.contains("performDrag(with:"))
+        XCTAssertFalse(
+            source.contains("ScrollView([.horizontal, .vertical])"),
+            "Dashboard should fill the window instead of pinning a fixed-size scroll document."
+        )
+        XCTAssertTrue(
+            source.contains("maxWidth: .infinity, maxHeight: .infinity"),
+            "Middle column should absorb horizontal resize slack."
         )
     }
 
