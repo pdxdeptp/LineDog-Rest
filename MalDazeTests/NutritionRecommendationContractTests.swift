@@ -38,11 +38,13 @@ final class NutritionRecommendationContractTests: XCTestCase {
         XCTAssertEqual(snapshot.suggestions[0].items[0].displayName, "去脂希腊酸奶 250g")
         XCTAssertEqual(snapshot.suggestions[0].items[0].name, "希腊酸奶·去脂")
         XCTAssertEqual(snapshot.suggestions[0].items[0].grams, 250)
+        XCTAssertEqual(snapshot.suggestions[0].items[0].kcal, 150)
         XCTAssertTrue(snapshot.suggestions[0].items[0].loggable)
         XCTAssertEqual(snapshot.suggestions[0].items[1].displayName, "再喝一杯水")
         XCTAssertFalse(snapshot.suggestions[0].items[1].loggable)
         XCTAssertNil(snapshot.suggestions[0].items[1].name)
         XCTAssertNil(snapshot.suggestions[0].items[1].grams)
+        XCTAssertNil(snapshot.suggestions[0].items[1].kcal)
     }
 
     func testUnsupportedSchemaVersionFails() throws {
@@ -115,6 +117,7 @@ final class NutritionRecommendationContractTests: XCTestCase {
                   "displayName": "去脂希腊酸奶 250g",
                   "name": "希腊酸奶·去脂",
                   "grams": 250,
+                  "kcal": 150,
                   "loggable": true
                 },
                 {

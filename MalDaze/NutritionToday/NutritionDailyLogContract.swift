@@ -257,7 +257,7 @@ struct NutritionLoggableItem: Equatable, Identifiable {
                     displayName: item.displayName,
                     name: name,
                     grams: grams,
-                    kcal: nil,
+                    kcal: item.kcal,
                     suggestionLabel: suggestion.label,
                     sourceItemID: item.id
                 ))

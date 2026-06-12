@@ -24,6 +24,7 @@ MalDaze **不写** `recommendation.json`，也不在 recommendation 缺失或过
 - **展示 recommendation**：读 `recommendation.json` 的 summary、rationale、warnings、items；只有 fresh 且 `loggable: true` 的 item 可点击或数字键记录。
 - **唯一 nutrition 写动作**：通过 `recommend.py log` 记一笔已吃。桌宠**不**调用 `refresh-panel`、`plan_engine`、LLM，也不本地重算营养。
 - **「现在可以吃」来源**：只来自 Hermes-authored `recommendation.json`。`daily_log.panel.suggestions` 第一版保留为空数组 `[]` 只作 schema 兼容；MalDaze 必须忽略它，即使 legacy 数据非空也不能展示。
+- **推荐 item 展示字段**：`displayName` 是 Hermes author 的完整可见食物/数量/单位文案；`kcal` 是可选的 per-item 热量字段，存在时桌宠展示，缺失时桌宠不从 `foods.json` 或 planner 本地推算。
 
 ## panel 字段（摘要）
 

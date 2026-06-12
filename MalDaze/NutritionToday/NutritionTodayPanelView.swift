@@ -1,5 +1,17 @@
 import SwiftUI
 
+enum NutritionRecommendationRowDisplay {
+    static func trailingGramsMeta(displayName: String, grams: Double) -> String? {
+        let gramsText = "\(formatG(grams))g"
+        return displayName.contains(gramsText) ? nil : gramsText
+    }
+
+    private static func formatG(_ value: Double) -> String {
+        if value.rounded() == value { return String(Int(value.rounded())) }
+        return String(format: "%.1f", value)
+    }
+}
+
 struct NutritionTodayPanelView: View {
     let digitKeysEnabled: Bool
 
@@ -283,10 +295,20 @@ struct NutritionTodayPanelView: View {
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                if item.loggable, let grams = item.grams {
-                    Text("\(formatG(grams))g")
+                if item.loggable,
+                   let grams = item.grams,
+                   let gramsMeta = NutritionRecommendationRowDisplay.trailingGramsMeta(
+                       displayName: item.displayName,
+                       grams: grams
+                   ) {
+                    Text(gramsMeta)
                         .font(NutritionBodyFont.suggestionMeta)
                         .foregroundStyle(.secondary)
+                }
+                if let kcal = item.kcal {
+                    Text("\(Int(kcal.rounded())) kcal")
+                        .font(NutritionBodyFont.suggestionMeta)
+                        .foregroundStyle(.tertiary)
                 }
             }
             .padding(.vertical, 6)
@@ -314,9 +336,14 @@ struct NutritionTodayPanelView: View {
                     .multilineTextAlignment(.leading)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                Text("\(formatG(item.grams))g")
-                    .font(NutritionBodyFont.suggestionMeta)
-                    .foregroundStyle(.secondary)
+                if let gramsMeta = NutritionRecommendationRowDisplay.trailingGramsMeta(
+                    displayName: item.displayName,
+                    grams: item.grams
+                ) {
+                    Text(gramsMeta)
+                        .font(NutritionBodyFont.suggestionMeta)
+                        .foregroundStyle(.secondary)
+                }
 
                 if let kcal = item.kcal {
                     Text("\(Int(kcal.rounded())) kcal")

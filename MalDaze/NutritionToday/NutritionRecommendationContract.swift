@@ -20,6 +20,7 @@ struct NutritionRecommendationItem: Equatable, Codable, Identifiable {
     let displayName: String
     let name: String?
     let grams: Double?
+    let kcal: Double?
     let loggable: Bool
     private let occurrenceID: String?
 
@@ -29,23 +30,26 @@ struct NutritionRecommendationItem: Equatable, Codable, Identifiable {
 
     private var contentID: String {
         let gramsText = grams.map { String($0) } ?? ""
-        return "\(displayName)|\(name ?? "")|\(gramsText)|\(loggable)"
+        let kcalText = kcal.map { String($0) } ?? ""
+        return "\(displayName)|\(name ?? "")|\(gramsText)|\(kcalText)|\(loggable)"
     }
 
     enum CodingKeys: String, CodingKey {
-        case displayName, name, grams, loggable
+        case displayName, name, grams, kcal, loggable
     }
 
     init(
         displayName: String,
         name: String?,
         grams: Double?,
+        kcal: Double? = nil,
         loggable: Bool
     ) {
         self.init(
             displayName: displayName,
             name: name,
             grams: grams,
+            kcal: kcal,
             loggable: loggable,
             occurrenceID: nil
         )
@@ -55,12 +59,14 @@ struct NutritionRecommendationItem: Equatable, Codable, Identifiable {
         displayName: String,
         name: String?,
         grams: Double?,
+        kcal: Double?,
         loggable: Bool,
         occurrenceID: String?
     ) {
         self.displayName = displayName
         self.name = name
         self.grams = grams
+        self.kcal = kcal
         self.loggable = loggable
         self.occurrenceID = occurrenceID
     }
@@ -71,6 +77,7 @@ struct NutritionRecommendationItem: Equatable, Codable, Identifiable {
             displayName: try c.decode(String.self, forKey: .displayName),
             name: try c.decodeIfPresent(String.self, forKey: .name),
             grams: try c.decodeIfPresent(Double.self, forKey: .grams),
+            kcal: try c.decodeIfPresent(Double.self, forKey: .kcal),
             loggable: try c.decode(Bool.self, forKey: .loggable)
         )
     }
@@ -80,6 +87,7 @@ struct NutritionRecommendationItem: Equatable, Codable, Identifiable {
         try c.encode(displayName, forKey: .displayName)
         try c.encodeIfPresent(name, forKey: .name)
         try c.encodeIfPresent(grams, forKey: .grams)
+        try c.encodeIfPresent(kcal, forKey: .kcal)
         try c.encode(loggable, forKey: .loggable)
     }
 
@@ -88,6 +96,7 @@ struct NutritionRecommendationItem: Equatable, Codable, Identifiable {
             displayName: displayName,
             name: name,
             grams: grams,
+            kcal: kcal,
             loggable: loggable,
             occurrenceID: "\(suggestionLabel)|\(suggestionRationale ?? "")|\(occurrenceIndex)|\(contentID)"
         )
@@ -235,6 +244,7 @@ struct NutritionRecommendationContractReader: NutritionRecommendationReading {
             guard !suggestion.label.isEmpty else { return false }
             for item in suggestion.items {
                 guard !item.displayName.isEmpty else { return false }
+                if let kcal = item.kcal, kcal < 0 { return false }
                 if item.loggable {
                     guard let name = item.name, !name.isEmpty,
                           let grams = item.grams, grams > 0

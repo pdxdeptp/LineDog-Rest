@@ -22,6 +22,34 @@ final class NutritionTodayViewModelTests: XCTestCase {
         XCTAssertFalse(vm.isLogging)
     }
 
+    func testServingUnitRecommendationDisplayNameIsPreservedForDisplayAndLogging() async {
+        let reader = StubNutritionReader()
+        let recommendationReader = StubRecommendationReader(snapshot: .servingUnitLabel())
+        let cli = MockNutritionCLI()
+        let vm = NutritionTodayViewModel(reader: reader, recommendationReader: recommendationReader, cli: cli)
+
+        vm.loadToday()
+
+        XCTAssertEqual(vm.loggableItems.count, 1)
+        XCTAssertEqual(vm.loggableItems[0].displayName, "香蕉 1 根 (120g)")
+        XCTAssertEqual(vm.loggableItems[0].name, "香蕉")
+        XCTAssertEqual(vm.loggableItems[0].grams, 120)
+        XCTAssertEqual(vm.loggableItems[0].kcal, 107)
+        XCTAssertNil(NutritionRecommendationRowDisplay.trailingGramsMeta(displayName: vm.loggableItems[0].displayName, grams: 120))
+
+        await vm.logItem(flatIndex: 1)
+
+        XCTAssertEqual(cli.lastName, "香蕉")
+        XCTAssertEqual(cli.lastGrams, 120)
+    }
+
+    func testRecommendationDisplayProvidesGramsFallbackWhenAuthoredLabelOmitsGrams() {
+        XCTAssertEqual(
+            NutritionRecommendationRowDisplay.trailingGramsMeta(displayName: "香蕉", grams: 120),
+            "120g"
+        )
+    }
+
     func testSuccessfulLogReloadsFactsAndLeavesRecommendationStale() async {
         let reader = ReloadingStubNutritionReader()
         let recommendationReader = StubRecommendationReader(snapshot: .available())
@@ -356,6 +384,35 @@ private extension NutritionRecommendationSnapshot {
             state: .unavailable,
             summary: "Hermes 暂时无法给出饮食建议。",
             suggestions: []
+        )
+    }
+
+    static func servingUnitLabel() -> NutritionRecommendationSnapshot {
+        let snapshot = available()
+        return NutritionRecommendationSnapshot(
+            schemaVersion: snapshot.schemaVersion,
+            date: snapshot.date,
+            generatedAt: snapshot.generatedAt,
+            source: snapshot.source,
+            basedOn: snapshot.basedOn,
+            state: snapshot.state,
+            summary: snapshot.summary,
+            suggestions: [
+                NutritionRecommendationSuggestion(
+                    label: "现在最合适",
+                    rationale: nil,
+                    items: [
+                        NutritionRecommendationItem(
+                            displayName: "香蕉 1 根 (120g)",
+                            name: "香蕉",
+                            grams: 120,
+                            kcal: 107,
+                            loggable: true
+                        ),
+                    ],
+                    warnings: []
+                ),
+            ]
         )
     }
 
