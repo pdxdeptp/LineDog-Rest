@@ -13,8 +13,8 @@
 - [x] 2.2 Add focused tests or source-level verification for shared watcher filtering and lifecycle behavior.
 - [x] 2.3 Consolidate global shortcut value modeling into one descriptor/value type while preserving existing defaults keys.
 - [x] 2.4 Add shortcut load/save/display/enabled tests covering smart input, desk menu, seven-minute reminder, and pet reset shortcuts.
-- [ ] 2.5 Convert Carbon global hotkey registration to table-driven registration while preserving current NotificationCenter command names.
-- [ ] 2.6 Verify disabled shortcuts remain unregistered and existing shortcut behavior remains unchanged.
+- [x] 2.5 Convert Carbon global hotkey registration to table-driven registration while preserving current NotificationCenter command names.
+- [x] 2.6 Verify disabled shortcuts remain unregistered and existing shortcut behavior remains unchanged.
 
 ## 3. Hermes Runtime Boundary
 

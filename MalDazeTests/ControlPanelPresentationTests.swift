@@ -1295,19 +1295,6 @@ final class ControlPanelPresentationTests: XCTestCase {
         )
     }
 
-    func testCarbonGlobalHotKeysSkipDisabledShortcuts() throws {
-        let source = try readProjectSource("MalDaze/MalDazeCarbonGlobalHotKeys.swift")
-
-        for token in [
-            "guard desk.isEnabled else",
-            "guard smart.isEnabled else",
-            "guard seven.isEnabled else",
-            "guard resetPet.isEnabled else"
-        ] {
-            XCTAssertTrue(source.contains(token), "Carbon hot key sync should skip disabled shortcut token: \(token)")
-        }
-    }
-
     func testMalDazeSettingsPreserveStorageHooksAndPanelBlueAccent() throws {
         let settingsSource = try readProjectSource("MalDaze/Settings/MalDazeSettingsView.swift")
 

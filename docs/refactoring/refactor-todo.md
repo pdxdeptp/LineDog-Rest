@@ -14,7 +14,7 @@ Status legend:
 
 ## Current Recommended Next Step
 
-Continue with **R3: Table-drive Carbon hotkey registration** when that task is explicitly in scope. **R2: Consolidate global shortcut value model** is complete; four shortcut wrappers now delegate load/save/display/enabled behavior to a shared descriptor/value model while keeping their existing defaults keys.
+Continue with **R4: Extract Hermes path and process runtime helpers** only when Hermes runtime work is explicitly in scope. **R3: Table-drive Carbon hotkey registration** is complete; Carbon global shortcuts now share a slot table and pure registration plan while keeping the existing hotkey IDs, `LDOG` signature, and NotificationCenter command names.
 
 Do not start by splitting `AppViewModel` or `WindowManager`; both are high-impact and should wait until tests and lower-level helpers are stronger.
 
@@ -32,7 +32,7 @@ Do not start by splitting `AppViewModel` or `WindowManager`; both are high-impac
 | --- | --- | --- | --- | --- | --- |
 | R1 | Done | Low | Extract shared FSEvent file watcher | `LearningProjectsFileWatcher`, `SleepScheduleFileWatcher`, `NutritionDailyLogFileWatcher`, `InterventionRequestFileWatcher`, `FileChangeWatcher` | `xcodebuild test -scheme MalDaze -only-testing:MalDazeTests/FileChangeWatcherTests` passed on 2026-06-13; tests cover filename/flag filtering, single callback per event batch, and source-level delegation from domain wrappers |
 | R2 | Done | Low-Medium | Consolidate global shortcut value model | `SmartReminderInputShortcut`, `DeskPetMenuShortcut`, `SevenMinuteReminderShortcut`, `ResetIdlePetPositionShortcut`, `GlobalShortcut` | `xcodebuild test -scheme MalDaze -only-testing:MalDazeTests/GlobalShortcutModelTests` passed on 2026-06-13; tests cover missing-key defaults, save/load round trip through existing defaults keys, modifier masking, disabled display, fallback labels, and source-level delegation from all four wrappers |
-| R3 | Todo | Medium | Table-drive Carbon hotkey registration | `MalDazeCarbonGlobalHotKeys.swift` | Existing shortcut tests pass; disabled shortcuts remain unregistered; notifications unchanged |
+| R3 | Done | Medium | Table-drive Carbon hotkey registration | `MalDazeCarbonGlobalHotKeys.swift`, `CarbonGlobalHotKeyRegistrationTests` | `xcodebuild test -scheme MalDaze -only-testing:MalDazeTests/CarbonGlobalHotKeyRegistrationTests` passed on 2026-06-13; tests cover hotkey IDs 1/2/3/4, `LDOG` signature, NotificationCenter command names, disabled no-register/unregister state, unchanged retain behavior, changed replacement, and register failure/success state transitions |
 | R4 | Todo | Medium | Extract Hermes path and process runtime helpers | `HermesScheduleCLI`, `NutritionHermesCLI`, Hermes contract readers | CLI timeout behavior is consistent; existing Hermes model/contract tests pass |
 
 ## Wave 2: Settings and Defaults Boundaries

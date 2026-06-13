@@ -76,6 +76,7 @@
 		A31K /* LearningDeskPanelViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31K /* LearningDeskPanelViewModelTests.swift */; };
 		A31L /* FileChangeWatcherTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31L /* FileChangeWatcherTests.swift */; };
 		A31M /* GlobalShortcutModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31M /* GlobalShortcutModelTests.swift */; };
+		A31N /* CarbonGlobalHotKeyRegistrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31N /* CarbonGlobalHotKeyRegistrationTests.swift */; };
 		A2B2 /* ScrollMonthDatePickerLogicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2B2 /* ScrollMonthDatePickerLogicTests.swift */; };
 		A2B1 /* ScrollMonthDatePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2B1 /* ScrollMonthDatePicker.swift */; };
 		A31J /* HermesScheduleModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31J /* HermesScheduleModelsTests.swift */; };
@@ -233,6 +234,7 @@
 		B31K /* LearningDeskPanelViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningDeskPanelViewModelTests.swift; sourceTree = "<group>"; };
 		B31L /* FileChangeWatcherTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileChangeWatcherTests.swift; sourceTree = "<group>"; };
 		B31M /* GlobalShortcutModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalShortcutModelTests.swift; sourceTree = "<group>"; };
+		B31N /* CarbonGlobalHotKeyRegistrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarbonGlobalHotKeyRegistrationTests.swift; sourceTree = "<group>"; };
 		B2B1 /* ScrollMonthDatePicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScrollMonthDatePicker.swift; sourceTree = "<group>"; };
 		B2B2 /* ScrollMonthDatePickerLogicTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScrollMonthDatePickerLogicTests.swift; sourceTree = "<group>"; };
 		B31J /* HermesScheduleModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HermesScheduleModelsTests.swift; sourceTree = "<group>"; };
@@ -462,6 +464,7 @@
 					B31K /* LearningDeskPanelViewModelTests.swift */,
 					B31L /* FileChangeWatcherTests.swift */,
 					B31M /* GlobalShortcutModelTests.swift */,
+					B31N /* CarbonGlobalHotKeyRegistrationTests.swift */,
 					B2B2 /* ScrollMonthDatePickerLogicTests.swift */,
 					B2A7 /* NutritionDailyLogContractTests.swift */,
 					B2A9 /* NutritionRecommendationContractTests.swift */,
@@ -886,6 +889,7 @@
 					A31K /* LearningDeskPanelViewModelTests.swift in Sources */,
 					A31L /* FileChangeWatcherTests.swift in Sources */,
 					A31M /* GlobalShortcutModelTests.swift in Sources */,
+					A31N /* CarbonGlobalHotKeyRegistrationTests.swift in Sources */,
 					A2B2 /* ScrollMonthDatePickerLogicTests.swift in Sources */,
 					A2A7 /* NutritionDailyLogContractTests.swift in Sources */,
 					A2A9 /* NutritionRecommendationContractTests.swift in Sources */,

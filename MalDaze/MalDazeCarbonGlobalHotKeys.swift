@@ -3,22 +3,40 @@ import Carbon.HIToolbox
 
 /// Carbon `RegisterEventHotKey`：桌宠菜单（id 1）、智能输入（id 2）、独立倒计时（id 3）、桌宠复位（id 4）。不依赖「辅助功能」。
 enum MalDazeCarbonGlobalHotKeys {
-    private static let signature: OSType = 0x4C44_4F47 // 'LDOG'
-    private static let deskHotKeyID: UInt32 = 1
-    private static let smartInputHotKeyID: UInt32 = 2
-    private static let sevenMinuteHotKeyID: UInt32 = 3
-    private static let resetIdlePetHotKeyID: UInt32 = 4
+    static let signature: OSType = 0x4C44_4F47 // 'LDOG'
 
-    private static var deskHotKeyRef: EventHotKeyRef?
-    private static var smartInputHotKeyRef: EventHotKeyRef?
-    private static var sevenMinuteHotKeyRef: EventHotKeyRef?
-    private static var resetIdlePetHotKeyRef: EventHotKeyRef?
-    private static var handlerRef: EventHandlerRef?
-    private static var defaultsObserver: NSObjectProtocol?
-    private static var lastDeskInstalled: DeskPetMenuShortcut?
-    private static var lastSmartInstalled: SmartReminderInputShortcut?
-    private static var lastSevenMinuteInstalled: SevenMinuteReminderShortcut?
-    private static var lastResetIdlePetInstalled: ResetIdlePetPositionShortcut?
+    static var registrationSlots: [CarbonHotKeyRegistrationSlot] {
+        [
+            CarbonHotKeyRegistrationSlot(
+                id: 1,
+                notificationName: MalDazeBroadcastNotifications.presentDeskPetMenu,
+                loadShortcut: { CarbonHotKeyShortcut(DeskPetMenuShortcut.load()) }
+            ),
+            CarbonHotKeyRegistrationSlot(
+                id: 2,
+                notificationName: MalDazeBroadcastNotifications.openSmartReminderInput,
+                loadShortcut: { CarbonHotKeyShortcut(SmartReminderInputShortcut.load()) }
+            ),
+            CarbonHotKeyRegistrationSlot(
+                id: 3,
+                notificationName: MalDazeBroadcastNotifications.toggleSevenMinuteReminder,
+                loadShortcut: { CarbonHotKeyShortcut(SevenMinuteReminderShortcut.load()) }
+            ),
+            CarbonHotKeyRegistrationSlot(
+                id: 4,
+                notificationName: MalDazeBroadcastNotifications.resetIdlePetPositionToDefault,
+                loadShortcut: { CarbonHotKeyShortcut(ResetIdlePetPositionShortcut.load()) }
+            )
+        ]
+    }
+
+    static var registrationSlotDescriptors: [CarbonHotKeyRegistrationSlotDescriptor] {
+        registrationSlots.map(\.descriptor)
+    }
+
+    nonisolated(unsafe) private static var registrationStates: [UInt32: CarbonHotKeyRuntimeState] = [:]
+    nonisolated(unsafe) private static var handlerRef: EventHandlerRef?
+    nonisolated(unsafe) private static var defaultsObserver: NSObjectProtocol?
 
     static func start() {
         installHandlerIfNeeded()
@@ -38,18 +56,14 @@ enum MalDazeCarbonGlobalHotKeys {
             NotificationCenter.default.removeObserver(defaultsObserver)
         }
         defaultsObserver = nil
-        unregisterDeskHotKey()
-        unregisterSmartInputHotKey()
-        unregisterSevenMinuteHotKey()
-        unregisterResetIdlePetHotKey()
+        for slot in registrationSlots {
+            unregisterHotKey(slot.id)
+        }
+        registrationStates.removeAll()
         if let handlerRef {
             RemoveEventHandler(handlerRef)
         }
         Self.handlerRef = nil
-        lastDeskInstalled = nil
-        lastSmartInstalled = nil
-        lastSevenMinuteInstalled = nil
-        lastResetIdlePetInstalled = nil
     }
 
     private static func installHandlerIfNeeded() {
@@ -64,157 +78,207 @@ enum MalDazeCarbonGlobalHotKeys {
         }
     }
 
-    private static func unregisterDeskHotKey() {
-        if let deskHotKeyRef {
-            UnregisterEventHotKey(deskHotKeyRef)
+    private static func unregisterHotKey(_ id: UInt32) {
+        if let ref = registrationStates[id]?.ref {
+            UnregisterEventHotKey(ref)
         }
-        deskHotKeyRef = nil
-    }
-
-    private static func unregisterSmartInputHotKey() {
-        if let smartInputHotKeyRef {
-            UnregisterEventHotKey(smartInputHotKeyRef)
-        }
-        smartInputHotKeyRef = nil
-    }
-
-    private static func unregisterSevenMinuteHotKey() {
-        if let sevenMinuteHotKeyRef {
-            UnregisterEventHotKey(sevenMinuteHotKeyRef)
-        }
-        sevenMinuteHotKeyRef = nil
-    }
-
-    private static func unregisterResetIdlePetHotKey() {
-        if let resetIdlePetHotKeyRef {
-            UnregisterEventHotKey(resetIdlePetHotKeyRef)
-        }
-        resetIdlePetHotKeyRef = nil
+        registrationStates[id, default: CarbonHotKeyRuntimeState()].ref = nil
     }
 
     private static func syncRegistration() {
         installHandlerIfNeeded()
         guard handlerRef != nil else { return }
 
-        let desk = DeskPetMenuShortcut.load()
-        syncDeskHotKey(desk)
-
-        let smart = SmartReminderInputShortcut.load()
-        syncSmartInputHotKey(smart)
-
-        let seven = SevenMinuteReminderShortcut.load()
-        syncSevenMinuteHotKey(seven)
-
-        let resetPet = ResetIdlePetPositionShortcut.load()
-        syncResetIdlePetHotKey(resetPet)
+        for slot in registrationSlots {
+            syncHotKey(slot)
+        }
     }
 
-    private static func syncDeskHotKey(_ desk: DeskPetMenuShortcut) {
-        guard desk.isEnabled else {
-            unregisterDeskHotKey()
-            lastDeskInstalled = desk
-            return
+    private static func syncHotKey(_ slot: CarbonHotKeyRegistrationSlot) {
+        let loadedShortcut = slot.loadShortcut()
+        var runtimeState = registrationStates[slot.id] ?? CarbonHotKeyRuntimeState()
+        let plan = slot.plan(for: loadedShortcut, state: runtimeState.registrationState)
+
+        if plan.shouldUnregister, let ref = runtimeState.ref {
+            UnregisterEventHotKey(ref)
+            runtimeState.ref = nil
         }
-        if desk != lastDeskInstalled || deskHotKeyRef == nil {
-            unregisterDeskHotKey()
+
+        if let request = plan.registrationRequest {
             var ref: EventHotKeyRef?
-            let hid = EventHotKeyID(signature: signature, id: deskHotKeyID)
             let status = RegisterEventHotKey(
-                UInt32(desk.keyCode),
-                malDazeCarbonModifierMask(for: desk.modifiers),
-                hid,
+                UInt32(request.keyCode),
+                malDazeCarbonModifierMask(for: request.modifiers),
+                request.hotKeyID,
                 GetApplicationEventTarget(),
                 0,
                 &ref
             )
-            if status == noErr {
-                deskHotKeyRef = ref
-                lastDeskInstalled = desk
-            } else {
-                lastDeskInstalled = nil
+            let nextState = plan.stateAfterRegistration(succeeded: status == noErr)
+            runtimeState.installedShortcut = nextState.installedShortcut
+            runtimeState.ref = nextState.hasHotKeyRef ? ref : nil
+        } else if let nextState = plan.stateWithoutRegistration {
+            runtimeState.installedShortcut = nextState.installedShortcut
+            if !nextState.hasHotKeyRef {
+                runtimeState.ref = nil
             }
         }
+
+        registrationStates[slot.id] = runtimeState
     }
 
-    private static func syncSmartInputHotKey(_ smart: SmartReminderInputShortcut) {
-        guard smart.isEnabled else {
-            unregisterSmartInputHotKey()
-            lastSmartInstalled = smart
-            return
-        }
-        if smart != lastSmartInstalled || smartInputHotKeyRef == nil {
-            unregisterSmartInputHotKey()
-            var ref: EventHotKeyRef?
-            let hid = EventHotKeyID(signature: signature, id: smartInputHotKeyID)
-            let status = RegisterEventHotKey(
-                UInt32(smart.keyCode),
-                malDazeCarbonModifierMask(for: smart.modifiers),
-                hid,
-                GetApplicationEventTarget(),
-                0,
-                &ref
-            )
-            if status == noErr {
-                smartInputHotKeyRef = ref
-                lastSmartInstalled = smart
-            } else {
-                lastSmartInstalled = nil
-            }
-        }
+    static func notificationName(forHotKeyID id: UInt32) -> Notification.Name? {
+        registrationSlots.first { $0.id == id }?.notificationName
+    }
+}
+
+struct CarbonHotKeyRegistrationSlotDescriptor: Equatable {
+    let id: UInt32
+    let signature: OSType
+    let notificationName: Notification.Name
+}
+
+struct CarbonHotKeyRegistrationSlot {
+    let id: UInt32
+    let signature: OSType
+    let notificationName: Notification.Name
+    let loadShortcut: () -> CarbonHotKeyShortcut
+
+    var descriptor: CarbonHotKeyRegistrationSlotDescriptor {
+        CarbonHotKeyRegistrationSlotDescriptor(
+            id: id,
+            signature: signature,
+            notificationName: notificationName
+        )
     }
 
-    private static func syncSevenMinuteHotKey(_ seven: SevenMinuteReminderShortcut) {
-        guard seven.isEnabled else {
-            unregisterSevenMinuteHotKey()
-            lastSevenMinuteInstalled = seven
-            return
-        }
-        if seven != lastSevenMinuteInstalled || sevenMinuteHotKeyRef == nil {
-            unregisterSevenMinuteHotKey()
-            var ref: EventHotKeyRef?
-            let hid = EventHotKeyID(signature: signature, id: sevenMinuteHotKeyID)
-            let status = RegisterEventHotKey(
-                UInt32(seven.keyCode),
-                malDazeCarbonModifierMask(for: seven.modifiers),
-                hid,
-                GetApplicationEventTarget(),
-                0,
-                &ref
-            )
-            if status == noErr {
-                sevenMinuteHotKeyRef = ref
-                lastSevenMinuteInstalled = seven
-            } else {
-                lastSevenMinuteInstalled = nil
-            }
-        }
+    init(
+        id: UInt32,
+        signature: OSType = MalDazeCarbonGlobalHotKeys.signature,
+        notificationName: Notification.Name,
+        loadShortcut: @escaping () -> CarbonHotKeyShortcut
+    ) {
+        self.id = id
+        self.signature = signature
+        self.notificationName = notificationName
+        self.loadShortcut = loadShortcut
     }
 
-    private static func syncResetIdlePetHotKey(_ resetPet: ResetIdlePetPositionShortcut) {
-        guard resetPet.isEnabled else {
-            unregisterResetIdlePetHotKey()
-            lastResetIdlePetInstalled = resetPet
-            return
-        }
-        if resetPet != lastResetIdlePetInstalled || resetIdlePetHotKeyRef == nil {
-            unregisterResetIdlePetHotKey()
-            var ref: EventHotKeyRef?
-            let hid = EventHotKeyID(signature: signature, id: resetIdlePetHotKeyID)
-            let status = RegisterEventHotKey(
-                UInt32(resetPet.keyCode),
-                malDazeCarbonModifierMask(for: resetPet.modifiers),
-                hid,
-                GetApplicationEventTarget(),
-                0,
-                &ref
+    func plan(
+        for loadedShortcut: CarbonHotKeyShortcut,
+        state: CarbonHotKeyRegistrationState
+    ) -> CarbonHotKeyRegistrationPlan {
+        guard loadedShortcut.isEnabled else {
+            return CarbonHotKeyRegistrationPlan(
+                shouldUnregister: state.hasHotKeyRef,
+                registrationRequest: nil,
+                stateWithoutRegistration: CarbonHotKeyRegistrationState(
+                    installedShortcut: loadedShortcut,
+                    hasHotKeyRef: false
+                )
             )
-            if status == noErr {
-                resetIdlePetHotKeyRef = ref
-                lastResetIdlePetInstalled = resetPet
-            } else {
-                lastResetIdlePetInstalled = nil
-            }
         }
+
+        guard loadedShortcut != state.installedShortcut || !state.hasHotKeyRef else {
+            return CarbonHotKeyRegistrationPlan(
+                shouldUnregister: false,
+                registrationRequest: nil,
+                stateWithoutRegistration: state
+            )
+        }
+
+        return CarbonHotKeyRegistrationPlan(
+            shouldUnregister: state.hasHotKeyRef,
+            registrationRequest: CarbonHotKeyRegistrationRequest(
+                hotKeyID: EventHotKeyID(signature: signature, id: id),
+                keyCode: loadedShortcut.keyCode,
+                modifiers: loadedShortcut.modifiers
+            ),
+            stateWithoutRegistration: nil
+        )
+    }
+}
+
+struct CarbonHotKeyShortcut: Equatable {
+    var keyCode: UInt16
+    var modifiers: NSEvent.ModifierFlags
+
+    var isEnabled: Bool {
+        !modifiers.intersection([.command, .option, .control, .shift]).isEmpty
+    }
+
+    init(keyCode: UInt16, modifiers: NSEvent.ModifierFlags) {
+        self.keyCode = keyCode
+        self.modifiers = modifiers.intersection(.deviceIndependentFlagsMask)
+    }
+
+    init(_ shortcut: DeskPetMenuShortcut) {
+        self.init(keyCode: shortcut.keyCode, modifiers: shortcut.modifiers)
+    }
+
+    init(_ shortcut: SmartReminderInputShortcut) {
+        self.init(keyCode: shortcut.keyCode, modifiers: shortcut.modifiers)
+    }
+
+    init(_ shortcut: SevenMinuteReminderShortcut) {
+        self.init(keyCode: shortcut.keyCode, modifiers: shortcut.modifiers)
+    }
+
+    init(_ shortcut: ResetIdlePetPositionShortcut) {
+        self.init(keyCode: shortcut.keyCode, modifiers: shortcut.modifiers)
+    }
+}
+
+struct CarbonHotKeyRegistrationState: Equatable {
+    var installedShortcut: CarbonHotKeyShortcut?
+    var hasHotKeyRef: Bool
+}
+
+struct CarbonHotKeyRegistrationRequest: Equatable {
+    var hotKeyID: EventHotKeyID
+    var keyCode: UInt16
+    var modifiers: NSEvent.ModifierFlags
+
+    var shortcut: CarbonHotKeyShortcut {
+        CarbonHotKeyShortcut(keyCode: keyCode, modifiers: modifiers)
+    }
+
+    static func == (
+        lhs: CarbonHotKeyRegistrationRequest,
+        rhs: CarbonHotKeyRegistrationRequest
+    ) -> Bool {
+        lhs.hotKeyID.signature == rhs.hotKeyID.signature
+            && lhs.hotKeyID.id == rhs.hotKeyID.id
+            && lhs.keyCode == rhs.keyCode
+            && lhs.modifiers == rhs.modifiers
+    }
+}
+
+struct CarbonHotKeyRegistrationPlan: Equatable {
+    var shouldUnregister: Bool
+    var registrationRequest: CarbonHotKeyRegistrationRequest?
+    var stateWithoutRegistration: CarbonHotKeyRegistrationState?
+
+    func stateAfterRegistration(succeeded: Bool) -> CarbonHotKeyRegistrationState {
+        guard succeeded, let registrationRequest else {
+            return CarbonHotKeyRegistrationState(installedShortcut: nil, hasHotKeyRef: false)
+        }
+        return CarbonHotKeyRegistrationState(
+            installedShortcut: registrationRequest.shortcut,
+            hasHotKeyRef: true
+        )
+    }
+}
+
+private struct CarbonHotKeyRuntimeState {
+    var ref: EventHotKeyRef?
+    var installedShortcut: CarbonHotKeyShortcut?
+
+    var registrationState: CarbonHotKeyRegistrationState {
+        CarbonHotKeyRegistrationState(
+            installedShortcut: installedShortcut,
+            hasHotKeyRef: ref != nil
+        )
     }
 }
 
@@ -249,40 +313,14 @@ private func malDazeCarbonGlobalHotKeysCallback(
         &hkCom
     )
     guard err == noErr else { return err }
-    guard hkCom.signature == 0x4C44_4F47 else {
+    guard hkCom.signature == MalDazeCarbonGlobalHotKeys.signature else {
         return OSStatus(eventNotHandledErr)
     }
-    switch hkCom.id {
-    case 1:
-        DispatchQueue.main.async {
-            NotificationCenter.default.post(
-                name: MalDazeBroadcastNotifications.presentDeskPetMenu,
-                object: nil
-            )
-        }
-    case 2:
-        DispatchQueue.main.async {
-            NotificationCenter.default.post(
-                name: MalDazeBroadcastNotifications.openSmartReminderInput,
-                object: nil
-            )
-        }
-    case 3:
-        DispatchQueue.main.async {
-            NotificationCenter.default.post(
-                name: MalDazeBroadcastNotifications.toggleSevenMinuteReminder,
-                object: nil
-            )
-        }
-    case 4:
-        DispatchQueue.main.async {
-            NotificationCenter.default.post(
-                name: MalDazeBroadcastNotifications.resetIdlePetPositionToDefault,
-                object: nil
-            )
-        }
-    default:
+    guard let notificationName = MalDazeCarbonGlobalHotKeys.notificationName(forHotKeyID: hkCom.id) else {
         return OSStatus(eventNotHandledErr)
+    }
+    DispatchQueue.main.async {
+        NotificationCenter.default.post(name: notificationName, object: nil)
     }
     return noErr
 }
