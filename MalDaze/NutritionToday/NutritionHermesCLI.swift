@@ -14,19 +14,22 @@ struct ProcessNutritionHermesCLI: NutritionHermesCLI {
     var hermesHome: URL
     var pythonExecutable: String
     var timeoutSeconds: TimeInterval
+    var processRunner: HermesProcessRunner
 
     init(
         hermesHome: URL = ProcessNutritionHermesCLI.defaultHermesHome(),
         pythonExecutable: String = "/usr/bin/python3",
-        timeoutSeconds: TimeInterval = 60
+        timeoutSeconds: TimeInterval = 60,
+        processRunner: HermesProcessRunner = HermesProcessRunner()
     ) {
         self.hermesHome = hermesHome
         self.pythonExecutable = pythonExecutable
         self.timeoutSeconds = timeoutSeconds
+        self.processRunner = processRunner
     }
 
     static func defaultHermesHome() -> URL {
-        URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent(".hermes", isDirectory: true)
+        HermesRuntimePaths.defaultHermesHome()
     }
 
     func logFood(name: String, grams: Double) async throws {
@@ -41,59 +44,46 @@ struct ProcessNutritionHermesCLI: NutritionHermesCLI {
     }
 
     private func runRecommend(arguments: [String]) async throws -> String {
-        let script = hermesHome.appendingPathComponent("data/nutrition/recommend.py")
-        guard FileManager.default.isExecutableFile(atPath: pythonExecutable),
-              FileManager.default.fileExists(atPath: script.path)
-        else {
+        let paths = HermesRuntimePaths(hermesHome: hermesHome)
+        let script = paths.nutritionRecommendScriptURL
+        let result: HermesProcessResult
+        do {
+            result = try await processRunner.run(
+                executablePath: pythonExecutable,
+                scriptURL: script,
+                arguments: arguments,
+                environment: ["NUTRITION_DATA_DIR": paths.nutritionDataDirectoryURL.path],
+                timeoutSeconds: timeoutSeconds
+            )
+        } catch HermesProcessRunnerError.missingExecutable,
+                HermesProcessRunnerError.missingScript {
             throw NutritionCLIError(
                 message: "未找到 Hermes 营养脚本：\(script.path)"
             )
+        } catch {
+            throw error
         }
 
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: pythonExecutable)
-        process.arguments = [script.path] + arguments
-        var env = ProcessInfo.processInfo.environment
-        env["NUTRITION_DATA_DIR"] = script.deletingLastPathComponent().path
-        process.environment = env
-
-        let stdoutPipe = Pipe()
-        let stderrPipe = Pipe()
-        process.standardOutput = stdoutPipe
-        process.standardError = stderrPipe
-
-        try process.run()
-
-        let deadline = Date().addingTimeInterval(timeoutSeconds)
-        while process.isRunning, Date() < deadline {
-            try await Task.sleep(nanoseconds: 50_000_000)
-        }
-        if process.isRunning {
-            process.terminate()
+        if result.timedOut {
             throw NutritionCLIError(message: "记录饮食超时（\(Int(timeoutSeconds))s）")
         }
 
-        let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-        let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
-        let stdout = String(data: stdoutData, encoding: .utf8) ?? ""
-        let stderr = String(data: stderrData, encoding: .utf8) ?? ""
-
-        if process.terminationStatus != 0 {
-            if let message = NutritionHermesCLIFormatting.errorMessage(from: stdout) {
+        if result.terminationStatus != 0 {
+            if let message = NutritionHermesCLIFormatting.errorMessage(from: result.stdout) {
                 throw NutritionCLIError(message: message)
             }
-            let detail = stderr.trimmingCharacters(in: .whitespacesAndNewlines)
+            let detail = result.stderr.trimmingCharacters(in: .whitespacesAndNewlines)
             if !detail.isEmpty {
                 throw NutritionCLIError(message: detail)
             }
-            throw NutritionCLIError(message: "recommend.py 退出码 \(process.terminationStatus)")
+            throw NutritionCLIError(message: "recommend.py 退出码 \(result.terminationStatus)")
         }
 
-        if let message = NutritionHermesCLIFormatting.errorMessage(from: stdout) {
+        if let message = NutritionHermesCLIFormatting.errorMessage(from: result.stdout) {
             throw NutritionCLIError(message: message)
         }
 
-        return stdout
+        return result.stdout
     }
 }
 

@@ -19,17 +19,20 @@ protocol HermesScheduleCLI: Sendable {
 struct ProcessHermesScheduleCLI: HermesScheduleCLI {
     var hermesHome: URL
     var pythonExecutable: String
+    var processRunner: HermesProcessRunner
 
     init(
         hermesHome: URL = ProcessHermesScheduleCLI.defaultHermesHome(),
-        pythonExecutable: String = "/usr/bin/python3"
+        pythonExecutable: String = "/usr/bin/python3",
+        processRunner: HermesProcessRunner = HermesProcessRunner()
     ) {
         self.hermesHome = hermesHome
         self.pythonExecutable = pythonExecutable
+        self.processRunner = processRunner
     }
 
     static func defaultHermesHome() -> URL {
-        URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent(".hermes", isDirectory: true)
+        HermesRuntimePaths.defaultHermesHome()
     }
 
     func runRollover() async throws {
@@ -134,52 +137,42 @@ struct ProcessHermesScheduleCLI: HermesScheduleCLI {
     }
 
     var projectsFileURL: URL {
-        hermesHome
-            .appendingPathComponent("data/learning-assistant/projects.json", isDirectory: false)
+        HermesRuntimePaths(hermesHome: hermesHome).learningProjectsFileURL
     }
 
     private func runSchedule(arguments: [String]) async throws -> String {
-        let script = hermesHome.appendingPathComponent("scripts/schedule.py")
-        guard FileManager.default.isExecutableFile(atPath: pythonExecutable),
-              FileManager.default.fileExists(atPath: script.path)
-        else {
+        let paths = HermesRuntimePaths(hermesHome: hermesHome)
+        let script = paths.scheduleScriptURL
+        let result: HermesProcessResult
+        do {
+            result = try await processRunner.run(
+                executablePath: pythonExecutable,
+                scriptURL: script,
+                arguments: arguments,
+                environment: ["HERMES_HOME": hermesHome.path],
+                timeoutSeconds: nil
+            )
+        } catch HermesProcessRunnerError.missingExecutable,
+                HermesProcessRunnerError.missingScript {
             throw HermesCLIError(
                 message: "未找到 Hermes：请确认 \(script.path) 存在且 python3 可执行。"
             )
+        } catch {
+            throw error
         }
 
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: pythonExecutable)
-        process.arguments = [script.path] + arguments
-        var env = ProcessInfo.processInfo.environment
-        env["HERMES_HOME"] = hermesHome.path
-        process.environment = env
-
-        let stdoutPipe = Pipe()
-        let stderrPipe = Pipe()
-        process.standardOutput = stdoutPipe
-        process.standardError = stderrPipe
-
-        try process.run()
-        process.waitUntilExit()
-
-        let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-        let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
-        let stdout = String(data: stdoutData, encoding: .utf8) ?? ""
-        let stderr = String(data: stderrData, encoding: .utf8) ?? ""
-
-        guard process.terminationStatus == 0 else {
-            if let err = try? HermesScheduleJSON.decode(HermesErrorOnly.self, from: stdout), let message = err.error {
+        guard result.terminationStatus == 0 else {
+            if let err = try? HermesScheduleJSON.decode(HermesErrorOnly.self, from: result.stdout), let message = err.error {
                 throw HermesCLIError(message: message)
             }
-            let detail = stderr.trimmingCharacters(in: .whitespacesAndNewlines)
+            let detail = result.stderr.trimmingCharacters(in: .whitespacesAndNewlines)
             if !detail.isEmpty {
                 throw HermesCLIError(message: detail)
             }
-            throw HermesCLIError(message: "schedule.py 退出码 \(process.terminationStatus)")
+            throw HermesCLIError(message: "schedule.py 退出码 \(result.terminationStatus)")
         }
 
-        return stdout
+        return result.stdout
     }
 }
 
