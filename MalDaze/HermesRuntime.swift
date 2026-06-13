@@ -27,6 +27,22 @@ struct HermesRuntimePaths: Sendable {
     var nutritionDataDirectoryURL: URL {
         hermesHome.appendingPathComponent("data/nutrition", isDirectory: true)
     }
+
+    var sleepScheduleFileURL: URL {
+        hermesHome.appendingPathComponent("data/sleep/sleep_schedule.json", isDirectory: false)
+    }
+
+    var interventionRequestFileURL: URL {
+        hermesHome.appendingPathComponent("data/maldaze/intervention_request.json", isDirectory: false)
+    }
+
+    var nutritionDailyLogFileURL: URL {
+        hermesHome.appendingPathComponent("data/nutrition/daily_log.json", isDirectory: false)
+    }
+
+    var nutritionRecommendationFileURL: URL {
+        hermesHome.appendingPathComponent("data/nutrition/recommendation.json", isDirectory: false)
+    }
 }
 
 struct HermesProcessResult: Equatable, Sendable {

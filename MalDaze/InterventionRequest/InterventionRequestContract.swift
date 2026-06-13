@@ -46,8 +46,7 @@ struct InterventionRequestContractReader {
     let fileURL: URL
 
     static var defaultHermesPendingFileURL: URL {
-        FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".hermes/data/maldaze/intervention_request.json")
+        HermesRuntimePaths().interventionRequestFileURL
     }
 
     init(fileURL: URL = InterventionRequestContractReader.defaultHermesPendingFileURL) {

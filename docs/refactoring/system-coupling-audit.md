@@ -133,18 +133,16 @@ Refactor direction:
 
 Evidence:
 
-- `MalDaze/LearningDeskPanel/HermesScheduleCLI.swift:19` through `MalDaze/LearningDeskPanel/HermesScheduleCLI.swift:33` defines its own Hermes home and Python executable defaults.
-- `MalDaze/LearningDeskPanel/HermesScheduleCLI.swift:141` through `MalDaze/LearningDeskPanel/HermesScheduleCLI.swift:156` constructs and runs `scripts/schedule.py`.
-- `MalDaze/NutritionToday/NutritionHermesCLI.swift:13` through `MalDaze/NutritionToday/NutritionHermesCLI.swift:30` repeats Hermes home and Python defaults.
-- `MalDaze/NutritionToday/NutritionHermesCLI.swift:67` through `MalDaze/NutritionToday/NutritionHermesCLI.swift:74` has timeout behavior not mirrored in the learning CLI.
-- `MalDaze/SleepReminder/SleepScheduleContract.swift:50` through `MalDaze/SleepReminder/SleepScheduleContract.swift:53` hardcodes the sleep schedule JSON path.
-- `MalDaze/InterventionRequest/InterventionRequestContract.swift:48` through `MalDaze/InterventionRequest/InterventionRequestContract.swift:51` hardcodes the intervention request JSON path.
-- `MalDaze/NutritionToday/NutritionDailyLogContract.swift:142` through `MalDaze/NutritionToday/NutritionDailyLogContract.swift:145` hardcodes the nutrition daily log JSON path.
-- `MalDaze/NutritionToday/NutritionRecommendationContract.swift:185` through `MalDaze/NutritionToday/NutritionRecommendationContract.swift:188` hardcodes the nutrition recommendation JSON path.
+- `MalDaze/LearningDeskPanel/HermesScheduleCLI.swift:19` through `MalDaze/LearningDeskPanel/HermesScheduleCLI.swift:36` still owns the learning CLI wrapper and Python executable default, while Hermes home delegates to `HermesRuntimePaths`.
+- `MalDaze/LearningDeskPanel/HermesScheduleCLI.swift:139` through `MalDaze/LearningDeskPanel/HermesScheduleCLI.swift:156` delegates project/script paths and process execution to shared Hermes runtime helpers.
+- `MalDaze/NutritionToday/NutritionHermesCLI.swift:13` through `MalDaze/NutritionToday/NutritionHermesCLI.swift:33` still owns the nutrition CLI timeout and Python executable default, while Hermes home delegates to `HermesRuntimePaths`.
+- `MalDaze/NutritionToday/NutritionHermesCLI.swift:46` through `MalDaze/NutritionToday/NutritionHermesCLI.swift:68` delegates script/data-directory paths and process execution to shared Hermes runtime helpers while preserving nutrition-specific timeout behavior.
+- `MalDaze/HermesRuntime.swift:31` through `MalDaze/HermesRuntime.swift:45` now centralizes sleep schedule, intervention request, nutrition daily log, and nutrition recommendation JSON locations.
+- `MalDaze/SleepReminder/SleepScheduleContract.swift:50` through `MalDaze/SleepReminder/SleepScheduleContract.swift:52`, `MalDaze/InterventionRequest/InterventionRequestContract.swift:48` through `MalDaze/InterventionRequest/InterventionRequestContract.swift:50`, `MalDaze/NutritionToday/NutritionDailyLogContract.swift:142` through `MalDaze/NutritionToday/NutritionDailyLogContract.swift:144`, and `MalDaze/NutritionToday/NutritionRecommendationContract.swift:185` through `MalDaze/NutritionToday/NutritionRecommendationContract.swift:187` delegate reader defaults to `HermesRuntimePaths`.
 
 Risk:
 
-- Inconsistent path resolution, timeout behavior, and error formatting make Hermes failures harder to reason about.
+- Inconsistent timeout behavior and error formatting still make Hermes failures harder to reason about.
 - The project contract requires Hermes to remain the source of truth, but the boundary is spread across many files.
 
 Refactor direction:

@@ -22,8 +22,8 @@
 - [x] 3.2 Extract a shared Hermes process runner with explicit timeout and stderr/stdout handling.
 - [x] 3.3 Migrate learning schedule CLI to the shared Hermes runtime helper.
 - [x] 3.4 Migrate nutrition CLI to the shared Hermes runtime helper while preserving current timeout behavior.
-- [ ] 3.5 Inject shared Hermes path helpers into sleep, intervention, nutrition daily log, and nutrition recommendation contract readers.
-- [ ] 3.6 Verify existing Hermes model, CLI, and contract tests pass; update audit/todo with any discovered contract risk.
+- [x] 3.5 Inject shared Hermes path helpers into sleep, intervention, nutrition daily log, and nutrition recommendation contract readers.
+- [x] 3.6 Verify existing Hermes model, CLI, and contract tests pass; update audit/todo with any discovered contract risk.
 
 ## 4. Settings And Defaults Boundary
 

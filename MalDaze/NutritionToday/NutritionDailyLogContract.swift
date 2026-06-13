@@ -140,8 +140,7 @@ struct NutritionDailyLogContractReader: NutritionDailyLogReading {
     let fileURL: URL
 
     static var defaultHermesFileURL: URL {
-        FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".hermes/data/nutrition/daily_log.json")
+        HermesRuntimePaths().nutritionDailyLogFileURL
     }
 
     init(fileURL: URL = NutritionDailyLogContractReader.defaultHermesFileURL) {

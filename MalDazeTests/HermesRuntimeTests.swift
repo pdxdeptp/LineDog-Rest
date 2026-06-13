@@ -21,6 +21,10 @@ final class HermesRuntimeTests: XCTestCase {
         XCTAssertEqual(paths.learningProjectsFileURL.path, home.appendingPathComponent("data/learning-assistant/projects.json").path)
         XCTAssertEqual(paths.nutritionRecommendScriptURL.path, home.appendingPathComponent("data/nutrition/recommend.py").path)
         XCTAssertEqual(paths.nutritionDataDirectoryURL.path, home.appendingPathComponent("data/nutrition", isDirectory: true).path)
+        XCTAssertEqual(paths.sleepScheduleFileURL.path, home.appendingPathComponent("data/sleep/sleep_schedule.json").path)
+        XCTAssertEqual(paths.interventionRequestFileURL.path, home.appendingPathComponent("data/maldaze/intervention_request.json").path)
+        XCTAssertEqual(paths.nutritionDailyLogFileURL.path, home.appendingPathComponent("data/nutrition/daily_log.json").path)
+        XCTAssertEqual(paths.nutritionRecommendationFileURL.path, home.appendingPathComponent("data/nutrition/recommendation.json").path)
     }
 
     func testRunnerCapturesStdoutStderrAndTerminationStatus() async throws {
@@ -288,6 +292,22 @@ final class HermesRuntimeTests: XCTestCase {
         let nutritionCLI = try String(contentsOf: sourceRoot.appendingPathComponent("NutritionToday/NutritionHermesCLI.swift"))
         XCTAssertTrue(nutritionCLI.contains("HermesRuntimePaths"))
         XCTAssertTrue(nutritionCLI.contains("HermesProcessRunner"))
+    }
+
+    func testContractReaderDefaultsDelegateToSharedHermesRuntimePaths() {
+        let paths = HermesRuntimePaths()
+
+        XCTAssertEqual(SleepScheduleContractReader.defaultHermesFileURL.path, paths.sleepScheduleFileURL.path)
+        XCTAssertEqual(SleepScheduleContractReader().fileURL.path, paths.sleepScheduleFileURL.path)
+
+        XCTAssertEqual(InterventionRequestContractReader.defaultHermesPendingFileURL.path, paths.interventionRequestFileURL.path)
+        XCTAssertEqual(InterventionRequestContractReader().fileURL.path, paths.interventionRequestFileURL.path)
+
+        XCTAssertEqual(NutritionDailyLogContractReader.defaultHermesFileURL.path, paths.nutritionDailyLogFileURL.path)
+        XCTAssertEqual(NutritionDailyLogContractReader().fileURL.path, paths.nutritionDailyLogFileURL.path)
+
+        XCTAssertEqual(NutritionRecommendationContractReader.defaultHermesFileURL.path, paths.nutritionRecommendationFileURL.path)
+        XCTAssertEqual(NutritionRecommendationContractReader().fileURL.path, paths.nutritionRecommendationFileURL.path)
     }
 
     func testPipeHandlersDrainThroughSynchronizedCapture() throws {

@@ -48,8 +48,7 @@ struct SleepScheduleContractReader {
     let fileURL: URL
 
     static var defaultHermesFileURL: URL {
-        FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".hermes/data/sleep/sleep_schedule.json")
+        HermesRuntimePaths().sleepScheduleFileURL
     }
 
     init(fileURL: URL = SleepScheduleContractReader.defaultHermesFileURL) {

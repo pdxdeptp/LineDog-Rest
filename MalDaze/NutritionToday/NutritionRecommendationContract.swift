@@ -183,8 +183,7 @@ struct NutritionRecommendationContractReader: NutritionRecommendationReading {
     let fileURL: URL
 
     static var defaultHermesFileURL: URL {
-        FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".hermes/data/nutrition/recommendation.json")
+        HermesRuntimePaths().nutritionRecommendationFileURL
     }
 
     init(fileURL: URL = NutritionRecommendationContractReader.defaultHermesFileURL) {
