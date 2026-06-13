@@ -75,6 +75,7 @@
 		A31F /* InterventionRequestContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31F /* InterventionRequestContractTests.swift */; };
 		A31K /* LearningDeskPanelViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31K /* LearningDeskPanelViewModelTests.swift */; };
 		A31L /* FileChangeWatcherTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31L /* FileChangeWatcherTests.swift */; };
+		A31M /* GlobalShortcutModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31M /* GlobalShortcutModelTests.swift */; };
 		A2B2 /* ScrollMonthDatePickerLogicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2B2 /* ScrollMonthDatePickerLogicTests.swift */; };
 		A2B1 /* ScrollMonthDatePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2B1 /* ScrollMonthDatePicker.swift */; };
 		A31J /* HermesScheduleModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31J /* HermesScheduleModelsTests.swift */; };
@@ -99,6 +100,7 @@
 		A227 /* MalDazeDefaults.swift in Sources */ = {isa = PBXBuildFile; fileRef = B227 /* MalDazeDefaults.swift */; };
 		A228 /* MalDazeSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B228 /* MalDazeSettingsView.swift */; };
 		A229 /* MalDazePresentationAnchor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B229 /* MalDazePresentationAnchor.swift */; };
+		A23E /* GlobalShortcut.swift in Sources */ = {isa = PBXBuildFile; fileRef = B23E /* GlobalShortcut.swift */; };
 		A230 /* SmartReminderNotesComposer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B230 /* SmartReminderNotesComposer.swift */; };
 		A231 /* DeskReminderSidebarFormatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = B231 /* DeskReminderSidebarFormatting.swift */; };
 		A232 /* SmartReminderModelDebugLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = B232 /* SmartReminderModelDebugLog.swift */; };
@@ -230,6 +232,7 @@
 		B31F /* InterventionRequestContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InterventionRequestContractTests.swift; sourceTree = "<group>"; };
 		B31K /* LearningDeskPanelViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningDeskPanelViewModelTests.swift; sourceTree = "<group>"; };
 		B31L /* FileChangeWatcherTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileChangeWatcherTests.swift; sourceTree = "<group>"; };
+		B31M /* GlobalShortcutModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalShortcutModelTests.swift; sourceTree = "<group>"; };
 		B2B1 /* ScrollMonthDatePicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScrollMonthDatePicker.swift; sourceTree = "<group>"; };
 		B2B2 /* ScrollMonthDatePickerLogicTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScrollMonthDatePickerLogicTests.swift; sourceTree = "<group>"; };
 		B31J /* HermesScheduleModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HermesScheduleModelsTests.swift; sourceTree = "<group>"; };
@@ -254,6 +257,7 @@
 		B227 /* MalDazeDefaults.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MalDazeDefaults.swift; sourceTree = "<group>"; };
 		B228 /* MalDazeSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MalDazeSettingsView.swift; sourceTree = "<group>"; };
 		B229 /* MalDazePresentationAnchor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MalDazePresentationAnchor.swift; sourceTree = "<group>"; };
+		B23E /* GlobalShortcut.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalShortcut.swift; sourceTree = "<group>"; };
 		B230 /* SmartReminderNotesComposer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartReminderNotesComposer.swift; sourceTree = "<group>"; };
 		B231 /* DeskReminderSidebarFormatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeskReminderSidebarFormatting.swift; sourceTree = "<group>"; };
 		B232 /* SmartReminderModelDebugLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartReminderModelDebugLog.swift; sourceTree = "<group>"; };
@@ -376,6 +380,7 @@
 				E20E /* T7Eject */,
 				E20B /* Settings */,
 				B227 /* MalDazeDefaults.swift */,
+				B23E /* GlobalShortcut.swift */,
 				B233 /* DeskPetMenuShortcut.swift */,
 				B234 /* MalDazeCarbonGlobalHotKeys.swift */,
 				B236 /* SmartReminderInputShortcut.swift */,
@@ -456,6 +461,7 @@
 					B31J /* HermesScheduleModelsTests.swift */,
 					B31K /* LearningDeskPanelViewModelTests.swift */,
 					B31L /* FileChangeWatcherTests.swift */,
+					B31M /* GlobalShortcutModelTests.swift */,
 					B2B2 /* ScrollMonthDatePickerLogicTests.swift */,
 					B2A7 /* NutritionDailyLogContractTests.swift */,
 					B2A9 /* NutritionRecommendationContractTests.swift */,
@@ -816,6 +822,7 @@
 				A237 /* SmartReminderInferredTime.swift in Sources */,
 				A226 /* SmartReminderUIPanels.swift in Sources */,
 				A227 /* MalDazeDefaults.swift in Sources */,
+				A23E /* GlobalShortcut.swift in Sources */,
 				A233 /* DeskPetMenuShortcut.swift in Sources */,
 				A234 /* MalDazeCarbonGlobalHotKeys.swift in Sources */,
 				A236 /* SmartReminderInputShortcut.swift in Sources */,
@@ -878,6 +885,7 @@
 					A31J /* HermesScheduleModelsTests.swift in Sources */,
 					A31K /* LearningDeskPanelViewModelTests.swift in Sources */,
 					A31L /* FileChangeWatcherTests.swift in Sources */,
+					A31M /* GlobalShortcutModelTests.swift in Sources */,
 					A2B2 /* ScrollMonthDatePickerLogicTests.swift in Sources */,
 					A2A7 /* NutritionDailyLogContractTests.swift in Sources */,
 					A2A9 /* NutritionRecommendationContractTests.swift in Sources */,
