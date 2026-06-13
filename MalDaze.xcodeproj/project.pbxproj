@@ -23,6 +23,7 @@
 		A20D /* PetStageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20D /* PetStageView.swift */; };
 		A20E /* PetDisplayMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20E /* PetDisplayMode.swift */; };
 		A20F /* MenuBarDogLabel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20F /* MenuBarDogLabel.swift */; };
+		A23D /* FileChangeWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = B23D /* FileChangeWatcher.swift */; };
 		A210 /* MalDazeAppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = B210 /* MalDazeAppDelegate.swift */; };
 		A211 /* MenuBarNSScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = B211 /* MenuBarNSScreen.swift */; };
 		A212 /* SevenMinuteReminderController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B212 /* SevenMinuteReminderController.swift */; };
@@ -73,6 +74,7 @@
 		A2A9 /* NutritionRecommendationContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2A9 /* NutritionRecommendationContractTests.swift */; };
 		A31F /* InterventionRequestContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31F /* InterventionRequestContractTests.swift */; };
 		A31K /* LearningDeskPanelViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31K /* LearningDeskPanelViewModelTests.swift */; };
+		A31L /* FileChangeWatcherTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31L /* FileChangeWatcherTests.swift */; };
 		A2B2 /* ScrollMonthDatePickerLogicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2B2 /* ScrollMonthDatePickerLogicTests.swift */; };
 		A2B1 /* ScrollMonthDatePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2B1 /* ScrollMonthDatePicker.swift */; };
 		A31J /* HermesScheduleModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31J /* HermesScheduleModelsTests.swift */; };
@@ -176,6 +178,7 @@
 		B20D /* PetStageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetStageView.swift; sourceTree = "<group>"; };
 		B20E /* PetDisplayMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetDisplayMode.swift; sourceTree = "<group>"; };
 		B20F /* MenuBarDogLabel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarDogLabel.swift; sourceTree = "<group>"; };
+		B23D /* FileChangeWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileChangeWatcher.swift; sourceTree = "<group>"; };
 		B210 /* MalDazeAppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MalDazeAppDelegate.swift; sourceTree = "<group>"; };
 		B211 /* MenuBarNSScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarNSScreen.swift; sourceTree = "<group>"; };
 		B212 /* SevenMinuteReminderController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SevenMinuteReminderController.swift; sourceTree = "<group>"; };
@@ -226,6 +229,7 @@
 		B2A9 /* NutritionRecommendationContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionRecommendationContractTests.swift; sourceTree = "<group>"; };
 		B31F /* InterventionRequestContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InterventionRequestContractTests.swift; sourceTree = "<group>"; };
 		B31K /* LearningDeskPanelViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningDeskPanelViewModelTests.swift; sourceTree = "<group>"; };
+		B31L /* FileChangeWatcherTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileChangeWatcherTests.swift; sourceTree = "<group>"; };
 		B2B1 /* ScrollMonthDatePicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScrollMonthDatePicker.swift; sourceTree = "<group>"; };
 		B2B2 /* ScrollMonthDatePickerLogicTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScrollMonthDatePickerLogicTests.swift; sourceTree = "<group>"; };
 		B31J /* HermesScheduleModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HermesScheduleModelsTests.swift; sourceTree = "<group>"; };
@@ -354,6 +358,7 @@
 				B203 /* DashboardRootView.swift */,
 				B20F /* MenuBarDogLabel.swift */,
 				B20E /* PetDisplayMode.swift */,
+				B23D /* FileChangeWatcher.swift */,
 				B213 /* MalDazeBroadcastNotifications.swift */,
 				E203 /* TimerEngine */,
 				E204 /* PetRenderer */,
@@ -450,6 +455,7 @@
 					B31F /* InterventionRequestContractTests.swift */,
 					B31J /* HermesScheduleModelsTests.swift */,
 					B31K /* LearningDeskPanelViewModelTests.swift */,
+					B31L /* FileChangeWatcherTests.swift */,
 					B2B2 /* ScrollMonthDatePickerLogicTests.swift */,
 					B2A7 /* NutritionDailyLogContractTests.swift */,
 					B2A9 /* NutritionRecommendationContractTests.swift */,
@@ -739,6 +745,7 @@
 				A203 /* DashboardRootView.swift in Sources */,
 				A20F /* MenuBarDogLabel.swift in Sources */,
 				A20E /* PetDisplayMode.swift in Sources */,
+				A23D /* FileChangeWatcher.swift in Sources */,
 				A204 /* TimeState.swift in Sources */,
 				A205 /* TimerEngine.swift in Sources */,
 				A206 /* ManualTimerEngine.swift in Sources */,
@@ -870,6 +877,7 @@
 					A31F /* InterventionRequestContractTests.swift in Sources */,
 					A31J /* HermesScheduleModelsTests.swift in Sources */,
 					A31K /* LearningDeskPanelViewModelTests.swift in Sources */,
+					A31L /* FileChangeWatcherTests.swift in Sources */,
 					A2B2 /* ScrollMonthDatePickerLogicTests.swift in Sources */,
 					A2A7 /* NutritionDailyLogContractTests.swift in Sources */,
 					A2A9 /* NutritionRecommendationContractTests.swift in Sources */,

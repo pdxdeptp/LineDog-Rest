@@ -9,8 +9,8 @@
 
 ## 2. Low-Risk Duplicate Infrastructure
 
-- [ ] 2.1 Extract a shared FSEvent file watcher used by learning projects, sleep schedule, nutrition daily log, and intervention request watchers.
-- [ ] 2.2 Add focused tests or source-level verification for shared watcher filtering and lifecycle behavior.
+- [x] 2.1 Extract a shared FSEvent file watcher used by learning projects, sleep schedule, nutrition daily log, and intervention request watchers.
+- [x] 2.2 Add focused tests or source-level verification for shared watcher filtering and lifecycle behavior.
 - [ ] 2.3 Consolidate global shortcut value modeling into one descriptor/value type while preserving existing defaults keys.
 - [ ] 2.4 Add shortcut load/save/display/enabled tests covering smart input, desk menu, seven-minute reminder, and pet reset shortcuts.
 - [ ] 2.5 Convert Carbon global hotkey registration to table-driven registration while preserving current NotificationCenter command names.

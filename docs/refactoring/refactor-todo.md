@@ -14,7 +14,7 @@ Status legend:
 
 ## Current Recommended Next Step
 
-Start with **R1: Shared FSEvent file watcher**. It is the lowest-risk extraction because multiple watcher files are nearly identical and behavior can be preserved with minimal surface-area change.
+Continue with **R2: Consolidate global shortcut value model**. **R1: Shared FSEvent file watcher** is complete; four domain watchers now delegate filtering and lifecycle to a shared helper.
 
 Do not start by splitting `AppViewModel` or `WindowManager`; both are high-impact and should wait until tests and lower-level helpers are stronger.
 
@@ -30,7 +30,7 @@ Do not start by splitting `AppViewModel` or `WindowManager`; both are high-impac
 
 | ID | Status | Risk | Task | Targets | Verification |
 | --- | --- | --- | --- | --- | --- |
-| R1 | Ready | Low | Extract shared FSEvent file watcher | `LearningProjectsFileWatcher`, `SleepScheduleFileWatcher`, `NutritionDailyLogFileWatcher`, `InterventionRequestFileWatcher` | Unit-test event filtering if practical; existing watcher-dependent tests pass |
+| R1 | Done | Low | Extract shared FSEvent file watcher | `LearningProjectsFileWatcher`, `SleepScheduleFileWatcher`, `NutritionDailyLogFileWatcher`, `InterventionRequestFileWatcher`, `FileChangeWatcher` | `xcodebuild test -scheme MalDaze -only-testing:MalDazeTests/FileChangeWatcherTests` passed on 2026-06-13; tests cover filename/flag filtering, single callback per event batch, and source-level delegation from domain wrappers |
 | R2 | Todo | Low-Medium | Consolidate global shortcut value model | `SmartReminderInputShortcut`, `DeskPetMenuShortcut`, `SevenMinuteReminderShortcut`, `ResetIdlePetPositionShortcut` | Shortcut load/save/display tests cover all four descriptors |
 | R3 | Todo | Medium | Table-drive Carbon hotkey registration | `MalDazeCarbonGlobalHotKeys.swift` | Existing shortcut tests pass; disabled shortcuts remain unregistered; notifications unchanged |
 | R4 | Todo | Medium | Extract Hermes path and process runtime helpers | `HermesScheduleCLI`, `NutritionHermesCLI`, Hermes contract readers | CLI timeout behavior is consistent; existing Hermes model/contract tests pass |
