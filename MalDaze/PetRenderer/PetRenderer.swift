@@ -36,6 +36,21 @@ final class PetRenderer: PetRendering {
     private static let intensityStaticThreshold = 0.001
     private static var decodedGIFFrameCache: [URL: [(NSImage, TimeInterval)]] = [:]
 
+    private enum PlaybackMode: Equatable {
+        case staticFirstFrame
+        case intermediate(Double)
+        case nativeAnimated
+    }
+
+    private struct RenderStateKey: Equatable {
+        let mode: PetDisplayMode
+        let urls: [URL]
+        let playbackMode: PlaybackMode
+        let allowsVariantRotationWhenAnimated: Bool
+    }
+
+    private var renderedStateKey: RenderStateKey?
+
     init() {
         animationIntensity = MalDazeDefaults.resolvedIdlePetAnimationIntensity()
         imageView.imageScaling = .scaleProportionallyUpOrDown
@@ -91,11 +106,28 @@ final class PetRenderer: PetRendering {
         let urls = gifURLsByMode[mode] ?? []
         let allowsVariantRotation = mode == .runningBlack || mode == .thinking
         let effectiveIntensity = mode == .breakRunning ? 1 : animationIntensity
+        let key = RenderStateKey(
+            mode: mode,
+            urls: urls,
+            playbackMode: Self.playbackMode(for: effectiveIntensity),
+            allowsVariantRotationWhenAnimated: allowsVariantRotation
+        )
+        if renderedStateKey == key, imageView.image != nil {
+            return
+        }
+        renderedStateKey = key
         startGIFCycle(
             urls: urls,
             effectiveIntensity: effectiveIntensity,
             allowsVariantRotationWhenAnimated: allowsVariantRotation
         )
+    }
+
+    private static func playbackMode(for intensity: Double) -> PlaybackMode {
+        let s = clampedIntensity(intensity)
+        if s <= intensityStaticThreshold { return .staticFirstFrame }
+        if s >= intensityFullNativeThreshold { return .nativeAnimated }
+        return .intermediate(s)
     }
 
     private func startGIFCycle(urls: [URL], effectiveIntensity: Double, allowsVariantRotationWhenAnimated: Bool) {

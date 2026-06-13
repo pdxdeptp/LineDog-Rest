@@ -103,38 +103,6 @@ final class EventKitRemindersBacking: NSObject, RemindersEventStoreBacking {
         let todayRems = try await fetchReminders(matching: predToday)
         let upcomingWindowRems = try await fetchReminders(matching: predUpcomingWindow)
 
-        // #region agent log
-        for (label, rems) in [("overdue", overdueRems), ("today", todayRems), ("upcomingWindow", upcomingWindowRems)] {
-            for rem in rems {
-                let dc = rem.dueDateComponents
-                let hasTime = dc?.hour != nil || dc?.minute != nil
-                MalDazeAgentDebugNDJSON.log(
-                    hypothesisId: "H-A/B/C",
-                    location: "EventKitRemindersBacking.swift:fetchDeskSidebarReminders",
-                    message: "fetched_reminder",
-                    data: [
-                        "bucket": label,
-                        "title": rem.title ?? "nil",
-                        "hasTime": "\(hasTime)",
-                        "y": "\(dc?.year ?? -1)", "m": "\(dc?.month ?? -1)", "d": "\(dc?.day ?? -1)",
-                        "h": "\(dc?.hour as Any)", "min": "\(dc?.minute as Any)",
-                        "dateFromDC": "\(dc.flatMap { Calendar.current.date(from: $0) } as Any)"
-                    ],
-                    runId: "h-abcd"
-                )
-            }
-            if rems.isEmpty {
-                MalDazeAgentDebugNDJSON.log(
-                    hypothesisId: "H-A",
-                    location: "EventKitRemindersBacking.swift:fetchDeskSidebarReminders",
-                    message: "bucket_empty",
-                    data: ["bucket": label],
-                    runId: "h-abcd"
-                )
-            }
-        }
-        // #endregion
-
         let overdueRoutine = overdueRems
             .filter { MalDazeRoutineTag.notesContainRoutineMarker($0.notes) }
             .map(Self.mapReminder)

@@ -99,6 +99,24 @@ final class PetRendererTests: XCTestCase {
         }
     }
 
+    func testFullMotionSameDisplayModeDoesNotReloadImage() throws {
+        try Self.requirePausedWhiteOutlineGIF()
+        let pet = PetRenderer()
+        let container = NSView(frame: NSRect(x: 0, y: 0, width: 400, height: 400))
+        pet.install(in: container)
+        pet.setAnimationIntensity(1)
+
+        pet.setDisplayMode(.pausedWhiteOutline)
+        let firstImage = try Self.currentImage(from: pet)
+
+        pet.setDisplayMode(.pausedWhiteOutline)
+        let secondImage = try Self.currentImage(from: pet)
+
+        XCTAssertTrue(firstImage === secondImage)
+        XCTAssertTrue(pet.testing_imageViewAnimates)
+        XCTAssertFalse(pet.testing_variantCycleTimerExists)
+    }
+
     func testBreakRunDisplayRestoresPreviousNonRestModeWhenCancelled() throws {
         let stage = PetStageView(frame: NSRect(x: 0, y: 0, width: 240, height: 240))
         stage.applyNonRestPetDisplayMode(.pausedWhiteOutline)

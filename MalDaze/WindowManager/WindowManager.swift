@@ -604,10 +604,6 @@ final class WindowManager: WindowManaging {
         stageView?.cancelToIdle()
         setWindowLevel(resting: false)
 
-        // #region agent log
-        MalDazeAgentDebugNDJSON.log(hypothesisId: "H-dismiss", location: "WindowManager.dismissRestImmediately", message: "dismiss_branch", data: ["wasBreakRun": "\(wasBreakRun)", "savedIdleFrame": "\(savedIdleFrame as Any)", "window_frame": "\(window?.frame ?? .zero)"])
-        // #endregion
-
         if let wf = window?.frame, !Self.isApproximatelyIdleSized(wf) {
             // 霸屏模式：先通知 AppViewModel，再缩回小窗
             callback?()
@@ -621,9 +617,6 @@ final class WindowManager: WindowManaging {
                 self.window?.animator().setFrame(target, display: true)
             }, completionHandler: { [weak self] in
                 guard let self else { return }
-                // #region agent log
-                MalDazeAgentDebugNDJSON.log(hypothesisId: "H-dismiss", location: "WindowManager.dismissRestImmediately.completion", message: "breakrun_animation_done", data: ["final_frame": "\(self.window?.frame ?? .zero)"])
-                // #endregion
                 syncContentViewToWindowLayout()
                 stageView?.needsLayout = true
                 stageView?.layoutSubtreeIfNeeded()
@@ -692,18 +685,12 @@ final class WindowManager: WindowManaging {
             target = Self.resolvedIdlePetFrameForInstall()
         }
         idleFrameBeforeRest = nil
-        // #region agent log
-        MalDazeAgentDebugNDJSON.log(hypothesisId: "H-animate", location: "WindowManager.finishBreakRun", message: "animation_start", data: ["target": "\(target)", "window_frame": "\(window?.frame ?? .zero)"])
-        // #endregion
         NSAnimationContext.runAnimationGroup({ ctx in
             ctx.duration = 1.0
             ctx.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
             window?.animator().setFrame(target, display: true)
         }, completionHandler: { [weak self] in
             guard let self else { return }
-            // #region agent log
-            MalDazeAgentDebugNDJSON.log(hypothesisId: "H-animate", location: "WindowManager.finishBreakRun.completion", message: "animation_done", data: ["final_frame": "\(self.window?.frame ?? .zero)"])
-            // #endregion
             syncContentViewToWindowLayout()
             stageView?.needsLayout = true
             stageView?.layoutSubtreeIfNeeded()

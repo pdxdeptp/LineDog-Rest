@@ -1046,6 +1046,31 @@ final class ControlPanelPresentationTests: XCTestCase {
         }
     }
 
+    func testProductionSourcesDoNotContainAgentDebugFileLogging() throws {
+        let sourcePaths = [
+            "MalDaze/MalDazePresentationAnchor.swift",
+            "MalDaze/Reminders/DeskRemindersModel.swift",
+            "MalDaze/Reminders/EventKitRemindersBacking.swift",
+            "MalDaze/WindowManager/PetStageView.swift",
+            "MalDaze/WindowManager/WindowManager.swift",
+        ]
+        let forbiddenTokens = [
+            "MalDazeAgentDebugNDJSON",
+            "#region agent log",
+            ".cursor/debug-",
+        ]
+
+        for sourcePath in sourcePaths {
+            let source = try readProjectSource(sourcePath)
+            for token in forbiddenTokens {
+                XCTAssertFalse(
+                    source.contains(token),
+                    "\(sourcePath) should not keep production debug file logging token: \(token)"
+                )
+            }
+        }
+    }
+
     func testMalDazeSettingsUsesCategorizedDetailShell() throws {
         let settingsSource = try readProjectSource("MalDaze/Settings/MalDazeSettingsView.swift")
         let viewSource = try structSource(named: "MalDazeSettingsView", in: settingsSource)

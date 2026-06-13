@@ -246,19 +246,6 @@ final class PetStageView: NSView {
         guard deskMenuPresenter != nil else { return }
         let pt = convert(event.locationInWindow, from: nil)
         if restBeganAt != nil {
-            // #region agent log
-            if let w = window {
-                MalDazeAgentDebugNDJSON.log(
-                    hypothesisId: "H3",
-                    location: "PetStageView.swift:mouseDown(rest)",
-                    message: "before_petWindow_makeKeyAndOrderFront",
-                    data: [
-                        "windowClass": "\(type(of: w))",
-                        "canBecomeKey": "\(w.canBecomeKey)"
-                    ]
-                )
-            }
-            // #endregion
             window?.makeKeyAndOrderFront(nil)
             guard petHitRect.contains(pt) else { return }
             return

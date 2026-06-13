@@ -65,13 +65,6 @@ final class DeskRemindersModel: ObservableObject {
     private func performPrepare() async {
         statusMessage = nil
         do {
-            // #region agent log
-            MalDazeAgentDebugNDJSON.log(
-                hypothesisId: "H2",
-                location: "DeskRemindersModel.swift:performPrepare",
-                message: "before_activateEphemeralKeyWindow"
-            )
-            // #endregion
             MalDazeModalKeyWindowAnchor.activateEphemeralKeyWindowForSystemModal()
             defer { MalDazeModalKeyWindowAnchor.removeEphemeralKeyWindow() }
             let ok = try await backing.requestAccess()

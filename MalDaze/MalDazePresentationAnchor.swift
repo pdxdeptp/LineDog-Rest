@@ -1,37 +1,5 @@
 import AppKit
 
-// #region agent log
-enum MalDazeAgentDebugNDJSON {
-    static let sessionId = "b74a09"
-    static let path = "/Users/cpt/Public/MalDaze/.cursor/debug-b74a09.log"
-
-    static func log(hypothesisId: String, location: String, message: String, data: [String: String] = [:], runId: String = "run1") {
-        let ts = Int(Date().timeIntervalSince1970 * 1000)
-        var dict: [String: Any] = [
-            "sessionId": sessionId,
-            "runId": runId,
-            "hypothesisId": hypothesisId,
-            "location": location,
-            "message": message,
-            "timestamp": ts
-        ]
-        if !data.isEmpty { dict["data"] = data }
-        guard let j = try? JSONSerialization.data(withJSONObject: dict),
-              let line = String(data: j, encoding: .utf8) else { return }
-        let bytes = (line + "\n").data(using: .utf8) ?? Data()
-        if FileManager.default.fileExists(atPath: path) {
-            if let h = FileHandle(forUpdatingAtPath: path) {
-                h.seekToEndOfFile()
-                h.write(bytes)
-                h.closeFile()
-            }
-        } else {
-            FileManager.default.createFile(atPath: path, contents: bytes, attributes: nil)
-        }
-    }
-}
-// #endregion
-
 /// 桌宠常态小窗在**屏幕坐标**下的 frame，供设置窗、系统权限 sheet 等与小狗同屏显示。
 /// 由 `WindowManager` 在常态小窗位置变化时更新（休息全屏阶段不更新，沿用上次常态位置）。
 @MainActor
@@ -149,28 +117,7 @@ enum MalDazeModalKeyWindowAnchor {
             window = w
         }
         window?.setFrame(r, display: true)
-        // #region agent log
-        MalDazeAgentDebugNDJSON.log(
-            hypothesisId: "H1-postfix",
-            location: "MalDazePresentationAnchor.swift:activateEphemeralKeyWindowForSystemModal",
-            message: "before_makeKeyAndOrderFront",
-            data: [
-                "canBecomeKey": "\(window?.canBecomeKey ?? false)",
-                "windowClass": "\(type(of: window as AnyObject))"
-            ],
-            runId: "post-fix"
-        )
-        // #endregion
         window?.makeKeyAndOrderFront(nil)
-        // #region agent log
-        MalDazeAgentDebugNDJSON.log(
-            hypothesisId: "H1-postfix",
-            location: "MalDazePresentationAnchor.swift:activateEphemeralKeyWindowForSystemModal",
-            message: "after_makeKeyAndOrderFront",
-            data: ["isKeyWindow": "\(window?.isKeyWindow ?? false)"],
-            runId: "post-fix"
-        )
-        // #endregion
     }
 
     static func removeEphemeralKeyWindow() {
