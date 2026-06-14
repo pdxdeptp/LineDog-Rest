@@ -58,6 +58,7 @@
 		A298 /* LearningInsertTaskSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B298 /* LearningInsertTaskSheet.swift */; };
 		A299 /* LearningCapacityFormatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = B299 /* LearningCapacityFormatting.swift */; };
 		A29A /* HermesLearningProfileStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B29A /* HermesLearningProfileStore.swift */; };
+		A29G /* LearningSettingsSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B29G /* LearningSettingsSyncService.swift */; };
 		A29B /* LearningProjectStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B29B /* LearningProjectStatusView.swift */; };
 		A29C /* LearningScheduleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B29C /* LearningScheduleView.swift */; };
 		A29D /* LearningTodayRolloverStrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = B29D /* LearningTodayRolloverStrip.swift */; };
@@ -80,6 +81,7 @@
 		A31M /* GlobalShortcutModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31M /* GlobalShortcutModelTests.swift */; };
 		A31N /* CarbonGlobalHotKeyRegistrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31N /* CarbonGlobalHotKeyRegistrationTests.swift */; };
 		A31O /* HermesRuntimeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31O /* HermesRuntimeTests.swift */; };
+		A31P /* LearningSettingsSyncServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31P /* LearningSettingsSyncServiceTests.swift */; };
 		A2B2 /* ScrollMonthDatePickerLogicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2B2 /* ScrollMonthDatePickerLogicTests.swift */; };
 		A2B1 /* ScrollMonthDatePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2B1 /* ScrollMonthDatePicker.swift */; };
 		A31J /* HermesScheduleModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31J /* HermesScheduleModelsTests.swift */; };
@@ -220,6 +222,7 @@
 		B298 /* LearningInsertTaskSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningInsertTaskSheet.swift; sourceTree = "<group>"; };
 		B299 /* LearningCapacityFormatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningCapacityFormatting.swift; sourceTree = "<group>"; };
 		B29A /* HermesLearningProfileStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HermesLearningProfileStore.swift; sourceTree = "<group>"; };
+		B29G /* LearningSettingsSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningSettingsSyncService.swift; sourceTree = "<group>"; };
 		B29B /* LearningProjectStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningProjectStatusView.swift; sourceTree = "<group>"; };
 		B29C /* LearningScheduleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningScheduleView.swift; sourceTree = "<group>"; };
 		B29D /* LearningTodayRolloverStrip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningTodayRolloverStrip.swift; sourceTree = "<group>"; };
@@ -242,6 +245,7 @@
 		B31M /* GlobalShortcutModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalShortcutModelTests.swift; sourceTree = "<group>"; };
 		B31N /* CarbonGlobalHotKeyRegistrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarbonGlobalHotKeyRegistrationTests.swift; sourceTree = "<group>"; };
 		B31O /* HermesRuntimeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HermesRuntimeTests.swift; sourceTree = "<group>"; };
+		B31P /* LearningSettingsSyncServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningSettingsSyncServiceTests.swift; sourceTree = "<group>"; };
 		B2B1 /* ScrollMonthDatePicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScrollMonthDatePicker.swift; sourceTree = "<group>"; };
 		B2B2 /* ScrollMonthDatePickerLogicTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScrollMonthDatePickerLogicTests.swift; sourceTree = "<group>"; };
 		B31J /* HermesScheduleModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HermesScheduleModelsTests.swift; sourceTree = "<group>"; };
@@ -477,6 +481,7 @@
 					B31M /* GlobalShortcutModelTests.swift */,
 					B31N /* CarbonGlobalHotKeyRegistrationTests.swift */,
 					B31O /* HermesRuntimeTests.swift */,
+					B31P /* LearningSettingsSyncServiceTests.swift */,
 					B2B2 /* ScrollMonthDatePickerLogicTests.swift */,
 					B2A7 /* NutritionDailyLogContractTests.swift */,
 					B2A9 /* NutritionRecommendationContractTests.swift */,
@@ -563,6 +568,7 @@
 				B298 /* LearningInsertTaskSheet.swift */,
 				B299 /* LearningCapacityFormatting.swift */,
 				B29A /* HermesLearningProfileStore.swift */,
+				B29G /* LearningSettingsSyncService.swift */,
 				B29B /* LearningProjectStatusView.swift */,
 				B29C /* LearningScheduleView.swift */,
 				B29D /* LearningTodayRolloverStrip.swift */,
@@ -806,6 +812,7 @@
 				A298 /* LearningInsertTaskSheet.swift in Sources */,
 				A299 /* LearningCapacityFormatting.swift in Sources */,
 				A29A /* HermesLearningProfileStore.swift in Sources */,
+				A29G /* LearningSettingsSyncService.swift in Sources */,
 				A29B /* LearningProjectStatusView.swift in Sources */,
 				A29C /* LearningScheduleView.swift in Sources */,
 				A29D /* LearningTodayRolloverStrip.swift in Sources */,
@@ -906,6 +913,7 @@
 					A31M /* GlobalShortcutModelTests.swift in Sources */,
 					A31N /* CarbonGlobalHotKeyRegistrationTests.swift in Sources */,
 					A31O /* HermesRuntimeTests.swift in Sources */,
+					A31P /* LearningSettingsSyncServiceTests.swift in Sources */,
 					A2B2 /* ScrollMonthDatePickerLogicTests.swift in Sources */,
 					A2A7 /* NutritionDailyLogContractTests.swift in Sources */,
 					A2A9 /* NutritionRecommendationContractTests.swift in Sources */,

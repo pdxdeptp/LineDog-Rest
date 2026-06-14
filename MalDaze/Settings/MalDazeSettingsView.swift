@@ -353,7 +353,7 @@ struct MalDazeSettingsView: View {
                             set: { newValue in
                                 let stepped = (newValue * 2).rounded() / 2
                                 learningDailyCapacityHours = MalDazeDefaults.clampedLearningDailyCapacityHours(stepped)
-                                MalDazeDefaults.syncLearningCapacityToHermesProfile()
+                                LearningSettingsSyncService().syncDailyCapacityToHermesProfile()
                                 NotificationCenter.default.post(
                                     name: MalDazeBroadcastNotifications.learningDailyCapacityChanged,
                                     object: nil

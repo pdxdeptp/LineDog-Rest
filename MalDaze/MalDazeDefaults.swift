@@ -242,43 +242,34 @@ enum MalDazeDefaults {
 
     /// 学习面板每日正课上限（小时），默认 5；同步到 Hermes `daily_capacity_minutes`。
     static let learningTodayGrouping = MalDazeDefaultsKeys.Learning.todayGrouping
-    static let learningDailyCapacityHours = MalDazeDefaultsKeys.Learning.dailyCapacityHours
-    static let defaultLearningDailyCapacityHours = 5.0
-    static let learningDailyCapacityHoursMin = 1.0
-    static let learningDailyCapacityHoursMax = 12.0
+    static let learningDailyCapacityHours = LearningSettingsSyncService.dailyCapacityHoursKey
+    static let defaultLearningDailyCapacityHours = LearningSettingsSyncService.defaultDailyCapacityHours
+    static let learningDailyCapacityHoursMin = LearningSettingsSyncService.dailyCapacityHoursMin
+    static let learningDailyCapacityHoursMax = LearningSettingsSyncService.dailyCapacityHoursMax
 
     static func clampedLearningDailyCapacityHours(_ hours: Double) -> Double {
-        let base = hours == 0 ? defaultLearningDailyCapacityHours : hours
-        return min(max(base, learningDailyCapacityHoursMin), learningDailyCapacityHoursMax)
+        LearningSettingsSyncService.clampedDailyCapacityHours(hours)
     }
 
     static func resolvedLearningDailyCapacityHours(defaults: UserDefaults = .standard) -> Double {
-        migrateLearningDailyCapacityIfNeeded(defaults: defaults)
-        return clampedLearningDailyCapacityHours(defaults.double(forKey: learningDailyCapacityHours))
+        LearningSettingsSyncService(defaults: defaults).resolvedDailyCapacityHours()
     }
 
     static func resolvedLearningDailyCapacityMinutes(defaults: UserDefaults = .standard) -> Int {
-        LearningCapacityFormatting.minutes(fromHours: resolvedLearningDailyCapacityHours(defaults: defaults))
+        LearningSettingsSyncService(defaults: defaults).resolvedDailyCapacityMinutes()
     }
 
     /// 首次启动：写入默认 5 小时并同步 Hermes profile。
     static func migrateLearningDailyCapacityIfNeeded(defaults: UserDefaults = .standard) {
-        guard defaults.object(forKey: learningDailyCapacityHours) == nil else { return }
-        defaults.set(defaultLearningDailyCapacityHours, forKey: learningDailyCapacityHours)
-        syncLearningCapacityToHermesProfile(defaults: defaults)
+        LearningSettingsSyncService(defaults: defaults).migrateDailyCapacityIfNeeded()
     }
 
     static func syncLearningCapacityToHermesProfile(defaults: UserDefaults = .standard) {
-        let minutes = resolvedLearningDailyCapacityMinutes(defaults: defaults)
-        try? HermesLearningProfileStore().writeDailyCapacityMinutes(minutes)
+        LearningSettingsSyncService(defaults: defaults).syncDailyCapacityToHermesProfile()
     }
 
     /// 启动时对齐 Hermes profile（例如从 90 分迁移到设置中的 5 小时）。
     static func ensureLearningCapacitySyncedToHermes(defaults: UserDefaults = .standard) {
-        migrateLearningDailyCapacityIfNeeded(defaults: defaults)
-        let target = resolvedLearningDailyCapacityMinutes(defaults: defaults)
-        if HermesLearningProfileStore().readDailyCapacityMinutes() != target {
-            syncLearningCapacityToHermesProfile(defaults: defaults)
-        }
+        LearningSettingsSyncService(defaults: defaults).ensureDailyCapacitySyncedToHermes()
     }
 }

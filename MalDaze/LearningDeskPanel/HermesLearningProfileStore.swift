@@ -1,7 +1,7 @@
 import Foundation
 
 /// 读写 Hermes `profile.json` 中的 `daily_capacity_minutes`（学习日上限 SSOT）。
-struct HermesLearningProfileStore {
+struct HermesLearningProfileStore: LearningCapacityProfileStoring {
     let profileURL: URL
 
     init(hermesHome: URL = ProcessHermesScheduleCLI.defaultHermesHome()) {

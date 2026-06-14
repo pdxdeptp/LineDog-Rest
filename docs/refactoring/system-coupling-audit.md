@@ -202,18 +202,22 @@ Evidence:
 - `MalDaze/MalDazeDefaults.swift:3` through `MalDaze/MalDazeDefaults.swift:153` preserves the existing `MalDazeDefaults.*` key API as compatibility aliases and keeps provider/default fallback resolvers.
 - `MalDaze/MalDazeDefaults.swift:163` through `MalDaze/MalDazeDefaults.swift:180` still performs animation intensity migration and direct UserDefaults reads.
 - `MalDaze/DashboardLayout.swift:3` through `MalDaze/DashboardLayout.swift:104` now owns dashboard column width and left-plan fraction policy in `DashboardLayout`; `MalDazeDefaults` keeps the old dashboard layout API names only as compatibility aliases/wrappers.
-- `MalDaze/MalDazeDefaults.swift:264` through `MalDaze/MalDazeDefaults.swift:273` still writes learning capacity back to Hermes profile.
+- `MalDaze/LearningDeskPanel/LearningSettingsSyncService.swift` now owns learning capacity default/clamp/resolution, missing-default migration, fail-soft Hermes profile writes, and startup ensure behavior.
+- `MalDaze/LearningDeskPanel/HermesLearningProfileStore.swift` remains the concrete Hermes profile adapter for `data/learning-assistant/profile.json` and still writes the contracted `daily_capacity_minutes` JSON key with pretty/sorted output.
+- `MalDaze/MalDazeDefaults.swift:245` through `MalDaze/MalDazeDefaults.swift:274` now preserves the old learning capacity key/API names as compatibility wrappers and no longer instantiates `HermesLearningProfileStore` or calls `writeDailyCapacityMinutes` directly.
+- `MalDaze/MalDazeApp.swift`, `MalDaze/Settings/MalDazeSettingsView.swift`, and `MalDaze/LearningDeskPanel/LearningDeskPanelView.swift` now call `LearningSettingsSyncService` explicitly for startup and UI-triggered sync.
 
 Risk:
 
-- A global defaults facade still has provider fallback behavior, migration logic, and cross-system learning side effects even though raw key strings and dashboard layout policy have been split out.
+- A global defaults facade still has provider fallback behavior, animation migration logic, and compatibility wrappers even though raw key strings, dashboard layout policy, and learning capacity Hermes sync have been split out.
 - It encourages more unrelated settings to accumulate in one file.
 
 Refactor direction:
 
 - Keep the key namespace split stable and route new key strings through `MalDazeDefaultsKeys`.
 - Keep dashboard layout policy in dashboard layout types while preserving existing defaults compatibility names.
-- Move Hermes profile sync into an explicit learning settings sync service in R7.
+- Keep learning capacity Hermes profile sync in `LearningSettingsSyncService` while preserving existing defaults compatibility names.
+- Continue toward typed settings domains in R8 so views bind through narrower settings boundaries instead of accumulating more `MalDazeDefaults` wrappers.
 
 ### P2: Reminder Controllers Duplicate Timer, Panel, and Screen Observer Patterns
 

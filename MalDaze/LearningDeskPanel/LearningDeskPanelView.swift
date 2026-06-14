@@ -37,7 +37,7 @@ struct LearningDeskPanelView: View {
         }
         .onChange(of: dailyCapacityHours) { _ in
             Task {
-                MalDazeDefaults.syncLearningCapacityToHermesProfile()
+                LearningSettingsSyncService().syncDailyCapacityToHermesProfile()
                 if viewModel.selectedTab == .schedule {
                     await viewModel.loadSchedule(force: true)
                 }
