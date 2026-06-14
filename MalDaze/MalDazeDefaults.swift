@@ -191,21 +191,21 @@ enum MalDazeDefaults {
     /// Dashboard 左 / 右分栏宽度（pt）；未写入或 ≤0 时使用布局默认值。
     static let dashboardLeftColumnWidth = MalDazeDefaultsKeys.DashboardLayout.leftColumnWidth
     static let dashboardRightColumnWidth = MalDazeDefaultsKeys.DashboardLayout.rightColumnWidth
-    static let dashboardColumnWidthMin: CGFloat = 240
-    static let dashboardMiddleColumnWidthMin: CGFloat = 280
+    static let dashboardColumnWidthMin = DashboardLayout.columnWidthMin
+    static let dashboardMiddleColumnWidthMin = DashboardLayout.middleColumnWidthMin
 
     static func resolvedDashboardLeftColumnWidth(
         stored: Double,
         defaultWidth: CGFloat
     ) -> CGFloat {
-        stored > 0 ? CGFloat(stored) : defaultWidth
+        DashboardLayout.resolvedLeftColumnWidth(stored: stored, defaultWidth: defaultWidth)
     }
 
     static func resolvedDashboardRightColumnWidth(
         stored: Double,
         defaultWidth: CGFloat
     ) -> CGFloat {
-        stored > 0 ? CGFloat(stored) : defaultWidth
+        DashboardLayout.resolvedRightColumnWidth(stored: stored, defaultWidth: defaultWidth)
     }
 
     static func clampedDashboardColumnWidths(
@@ -216,40 +216,28 @@ enum MalDazeDefaults {
         columnMin: CGFloat = dashboardColumnWidthMin,
         chromeWidth: CGFloat = 0
     ) -> (left: CGFloat, right: CGFloat) {
-        let available = max(totalInnerWidth - chromeWidth, columnMin * 2 + middleMin)
-        var leftW = min(max(left, columnMin), available - columnMin - middleMin)
-        var rightW = min(max(right, columnMin), available - leftW - middleMin)
-        let middleW = available - leftW - rightW
-        if middleW < middleMin {
-            let deficit = middleMin - middleW
-            if rightW > columnMin {
-                let shave = min(deficit, rightW - columnMin)
-                rightW -= shave
-            }
-            let remaining = middleMin - (available - leftW - rightW)
-            if remaining > 0, leftW > columnMin {
-                leftW = max(columnMin, leftW - remaining)
-            }
-        }
-        return (leftW, rightW)
+        DashboardLayout.clampedColumnWidths(
+            left: left,
+            right: right,
+            totalInnerWidth: totalInnerWidth,
+            middleMin: middleMin,
+            columnMin: columnMin,
+            chromeWidth: chromeWidth
+        )
     }
 
     /// Dashboard 左栏计划区高度占比（0.4–0.75），默认 0.6。
     static let dashboardLeftPlanFraction = MalDazeDefaultsKeys.DashboardLayout.leftPlanFraction
-    static let defaultDashboardLeftPlanFraction = 0.6
-    static let dashboardLeftPlanFractionMin = 0.4
-    static let dashboardLeftPlanFractionMax = 0.75
+    static let defaultDashboardLeftPlanFraction = DashboardLayout.defaultLeftPlanFraction
+    static let dashboardLeftPlanFractionMin = DashboardLayout.leftPlanFractionMin
+    static let dashboardLeftPlanFractionMax = DashboardLayout.leftPlanFractionMax
 
     static func clampedDashboardLeftPlanFraction(_ value: Double) -> Double {
-        let base = value == 0 ? defaultDashboardLeftPlanFraction : value
-        return min(max(base, dashboardLeftPlanFractionMin), dashboardLeftPlanFractionMax)
+        DashboardLayout.clampedLeftPlanFraction(value)
     }
 
     static func resolvedDashboardLeftPlanFraction(defaults: UserDefaults = .standard) -> Double {
-        guard defaults.object(forKey: dashboardLeftPlanFraction) != nil else {
-            return defaultDashboardLeftPlanFraction
-        }
-        return clampedDashboardLeftPlanFraction(defaults.double(forKey: dashboardLeftPlanFraction))
+        DashboardLayout.resolvedLeftPlanFraction(defaults: defaults)
     }
 
     /// 学习面板每日正课上限（小时），默认 5；同步到 Hermes `daily_capacity_minutes`。

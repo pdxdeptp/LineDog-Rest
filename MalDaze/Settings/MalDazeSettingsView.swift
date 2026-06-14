@@ -36,7 +36,7 @@ struct MalDazeSettingsView: View {
     @AppStorage(MalDazeDefaults.learningDailyCapacityHours) private var learningDailyCapacityHours =
         MalDazeDefaults.defaultLearningDailyCapacityHours
     @AppStorage(MalDazeDefaults.dashboardLeftPlanFraction) private var dashboardLeftPlanFraction =
-        MalDazeDefaults.defaultDashboardLeftPlanFraction
+        DashboardLayout.defaultLeftPlanFraction
 
     @State private var isRecordingSmartShortcut = false
     @State private var isRecordingDeskShortcut = false
@@ -379,19 +379,19 @@ struct MalDazeSettingsView: View {
                     HStack {
                         Text("计划区高度")
                         Spacer()
-                        Text("\(Int((MalDazeDefaults.clampedDashboardLeftPlanFraction(dashboardLeftPlanFraction) * 100).rounded()))%")
+                        Text("\(Int((DashboardLayout.clampedLeftPlanFraction(dashboardLeftPlanFraction) * 100).rounded()))%")
                             .font(.body.monospacedDigit().weight(.semibold))
                     }
                     Slider(
                         value: Binding(
                             get: {
-                                MalDazeDefaults.clampedDashboardLeftPlanFraction(dashboardLeftPlanFraction)
+                                DashboardLayout.clampedLeftPlanFraction(dashboardLeftPlanFraction)
                             },
                             set: { newValue in
-                                dashboardLeftPlanFraction = MalDazeDefaults.clampedDashboardLeftPlanFraction(newValue)
+                                dashboardLeftPlanFraction = DashboardLayout.clampedLeftPlanFraction(newValue)
                             }
                         ),
-                        in: MalDazeDefaults.dashboardLeftPlanFractionMin...MalDazeDefaults.dashboardLeftPlanFractionMax,
+                        in: DashboardLayout.leftPlanFractionMin...DashboardLayout.leftPlanFractionMax,
                         step: 0.05
                     )
                     Text("默认计划 60% / 饮食 40%。范围 40%–75% 计划区。")

@@ -201,19 +201,19 @@ Evidence:
 - `MalDaze/MalDazeDefaultsKeys.swift:3` through `MalDaze/MalDazeDefaultsKeys.swift:108` now owns the UserDefaults key-string namespaces for smart input, legacy Gemini, shortcuts, timer, reminders, T7, sleep, pet appearance, dashboard, and learning.
 - `MalDaze/MalDazeDefaults.swift:3` through `MalDaze/MalDazeDefaults.swift:153` preserves the existing `MalDazeDefaults.*` key API as compatibility aliases and keeps provider/default fallback resolvers.
 - `MalDaze/MalDazeDefaults.swift:163` through `MalDaze/MalDazeDefaults.swift:180` still performs animation intensity migration and direct UserDefaults reads.
-- `MalDaze/MalDazeDefaults.swift:211` through `MalDaze/MalDazeDefaults.swift:253` still contains dashboard layout clamp policy.
-- `MalDaze/MalDazeDefaults.swift:276` through `MalDaze/MalDazeDefaults.swift:295` still writes learning capacity back to Hermes profile.
+- `MalDaze/DashboardLayout.swift:3` through `MalDaze/DashboardLayout.swift:104` now owns dashboard column width and left-plan fraction policy in `DashboardLayout`; `MalDazeDefaults` keeps the old dashboard layout API names only as compatibility aliases/wrappers.
+- `MalDaze/MalDazeDefaults.swift:264` through `MalDaze/MalDazeDefaults.swift:273` still writes learning capacity back to Hermes profile.
 
 Risk:
 
-- A global defaults facade still has business logic and cross-system side effects even though raw key strings have been split out.
+- A global defaults facade still has provider fallback behavior, migration logic, and cross-system learning side effects even though raw key strings and dashboard layout policy have been split out.
 - It encourages more unrelated settings to accumulate in one file.
 
 Refactor direction:
 
 - Keep the key namespace split stable and route new key strings through `MalDazeDefaultsKeys`.
-- Move layout policy to dashboard layout types.
-- Move Hermes profile sync into an explicit learning settings sync service.
+- Keep dashboard layout policy in dashboard layout types while preserving existing defaults compatibility names.
+- Move Hermes profile sync into an explicit learning settings sync service in R7.
 
 ### P2: Reminder Controllers Duplicate Timer, Panel, and Screen Observer Patterns
 

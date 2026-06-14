@@ -783,6 +783,7 @@ final class ControlPanelPresentationTests: XCTestCase {
 
     func testDashboardPreferredContentSizeUsesVisibleScreenWidthWithSafetyMargin() throws {
         let source = try readProjectSource("MalDaze/DashboardRootView.swift")
+        let layoutSource = try readProjectSource("MalDaze/DashboardLayout.swift")
         let preferredSizeRange = try XCTUnwrap(
             rangeOfMember(named: "dashboardPreferredContentSize", in: source),
             "DashboardRootView should expose a screen-aware preferred content size."
@@ -794,7 +795,7 @@ final class ControlPanelPresentationTests: XCTestCase {
             "dashboardPreferredContentSize should derive the dashboard width from the desk pet screen visibleFrame."
         )
         XCTAssertTrue(
-            source.contains("static let safeHorizontalMargin"),
+            layoutSource.contains("static let safeHorizontalMargin"),
             "dashboardPreferredContentSize should reserve a named horizontal safety margin."
         )
         XCTAssertTrue(
@@ -805,11 +806,11 @@ final class ControlPanelPresentationTests: XCTestCase {
     }
 
     func testDashboardLayoutHelperClampsWidthAndProvidesFallback() throws {
-        let source = try readProjectSource("MalDaze/DashboardRootView.swift")
+        let source = try readProjectSource("MalDaze/DashboardLayout.swift")
 
         XCTAssertTrue(
             source.contains("static func preferredContentSize(screenVisibleFrame visibleFrame: NSRect?) -> NSSize"),
-            "DashboardRootView should keep sizing in a deterministic helper that accepts an optional visibleFrame."
+            "DashboardLayout should keep sizing in a deterministic helper that accepts an optional visibleFrame."
         )
         XCTAssertTrue(
             source.contains("fallbackVisibleFrame"),
@@ -865,8 +866,19 @@ final class ControlPanelPresentationTests: XCTestCase {
         )
     }
 
-    func testDashboardColumnWidthsKeepSidesFixedWhileMiddleFlexes() {
-        let widths = MalDazeDefaults.clampedDashboardColumnWidths(
+    func testDashboardLayoutPolicyResolvesStoredWidthsAndKeepsMiddleFlexible() {
+        XCTAssertEqual(
+            DashboardLayout.resolvedLeftColumnWidth(stored: 0, defaultWidth: 345),
+            345,
+            accuracy: 0.5
+        )
+        XCTAssertEqual(
+            DashboardLayout.resolvedRightColumnWidth(stored: -12, defaultWidth: 300),
+            300,
+            accuracy: 0.5
+        )
+
+        let widths = DashboardLayout.clampedColumnWidths(
             left: 345,
             right: 300,
             totalInnerWidth: 1200,
@@ -876,6 +888,126 @@ final class ControlPanelPresentationTests: XCTestCase {
         XCTAssertEqual(widths.left, 345, accuracy: 0.5)
         XCTAssertEqual(widths.right, 300, accuracy: 0.5)
         XCTAssertGreaterThanOrEqual(1200 - widths.left - widths.right - 16, 360)
+    }
+
+    func testDashboardLayoutPolicyClampsMinAndOverflowByShavingRightBeforeLeft() {
+        let tooNarrow = DashboardLayout.clampedColumnWidths(
+            left: 10,
+            right: 20,
+            totalInnerWidth: 400,
+            middleMin: 360,
+            chromeWidth: 16
+        )
+        XCTAssertEqual(tooNarrow.left, DashboardLayout.columnWidthMin, accuracy: 0.5)
+        XCTAssertEqual(tooNarrow.right, DashboardLayout.columnWidthMin, accuracy: 0.5)
+        XCTAssertEqual(
+            max(400 - 16, DashboardLayout.columnWidthMin * 2 + 360)
+                - tooNarrow.left
+                - tooNarrow.right,
+            360,
+            accuracy: 0.5
+        )
+
+        let rightShavedFirst = DashboardLayout.clampedColumnWidths(
+            left: 500,
+            right: 480,
+            totalInnerWidth: 1116,
+            middleMin: 360,
+            chromeWidth: 16
+        )
+        XCTAssertEqual(rightShavedFirst.left, 500, accuracy: 0.5)
+        XCTAssertEqual(rightShavedFirst.right, DashboardLayout.columnWidthMin, accuracy: 0.5)
+        XCTAssertEqual(1116 - 16 - rightShavedFirst.left - rightShavedFirst.right, 360, accuracy: 0.5)
+
+        let leftShavedAfterRightReachesMin = DashboardLayout.clampedColumnWidths(
+            left: 500,
+            right: 480,
+            totalInnerWidth: 1016,
+            middleMin: 360,
+            chromeWidth: 16
+        )
+        XCTAssertEqual(leftShavedAfterRightReachesMin.left, 400, accuracy: 0.5)
+        XCTAssertEqual(leftShavedAfterRightReachesMin.right, DashboardLayout.columnWidthMin, accuracy: 0.5)
+        XCTAssertEqual(
+            1016 - 16 - leftShavedAfterRightReachesMin.left - leftShavedAfterRightReachesMin.right,
+            360,
+            accuracy: 0.5
+        )
+    }
+
+    func testDashboardLayoutPolicyClampsAndResolvesLeftPlanFraction() throws {
+        XCTAssertEqual(DashboardLayout.clampedLeftPlanFraction(0), DashboardLayout.defaultLeftPlanFraction)
+        XCTAssertEqual(DashboardLayout.clampedLeftPlanFraction(0.1), DashboardLayout.leftPlanFractionMin)
+        XCTAssertEqual(DashboardLayout.clampedLeftPlanFraction(0.9), DashboardLayout.leftPlanFractionMax)
+        XCTAssertEqual(DashboardLayout.clampedLeftPlanFraction(0.55), 0.55, accuracy: 0.001)
+
+        let suiteName = "DashboardLayoutPolicy-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        XCTAssertEqual(DashboardLayout.resolvedLeftPlanFraction(defaults: defaults), DashboardLayout.defaultLeftPlanFraction)
+        defaults.set(0.95, forKey: MalDazeDefaults.dashboardLeftPlanFraction)
+        XCTAssertEqual(DashboardLayout.resolvedLeftPlanFraction(defaults: defaults), DashboardLayout.leftPlanFractionMax)
+    }
+
+    func testMalDazeDefaultsDashboardLayoutCompatibilityDelegatesToDashboardLayoutPolicy() throws {
+        XCTAssertEqual(
+            MalDazeDefaults.resolvedDashboardLeftColumnWidth(stored: -1, defaultWidth: 345),
+            DashboardLayout.resolvedLeftColumnWidth(stored: -1, defaultWidth: 345),
+            accuracy: 0.5
+        )
+        XCTAssertEqual(
+            MalDazeDefaults.resolvedDashboardRightColumnWidth(stored: 302, defaultWidth: 300),
+            DashboardLayout.resolvedRightColumnWidth(stored: 302, defaultWidth: 300),
+            accuracy: 0.5
+        )
+
+        let defaultsWidths = MalDazeDefaults.clampedDashboardColumnWidths(
+            left: 500,
+            right: 480,
+            totalInnerWidth: 1016,
+            middleMin: 360,
+            chromeWidth: 16
+        )
+        let layoutWidths = DashboardLayout.clampedColumnWidths(
+            left: 500,
+            right: 480,
+            totalInnerWidth: 1016,
+            middleMin: 360,
+            chromeWidth: 16
+        )
+        XCTAssertEqual(defaultsWidths.left, layoutWidths.left, accuracy: 0.5)
+        XCTAssertEqual(defaultsWidths.right, layoutWidths.right, accuracy: 0.5)
+        XCTAssertEqual(
+            MalDazeDefaults.clampedDashboardLeftPlanFraction(0.95),
+            DashboardLayout.clampedLeftPlanFraction(0.95),
+            accuracy: 0.001
+        )
+
+        let suiteName = "DashboardDefaultsCompatibility-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set(0.1, forKey: MalDazeDefaults.dashboardLeftPlanFraction)
+        XCTAssertEqual(
+            MalDazeDefaults.resolvedDashboardLeftPlanFraction(defaults: defaults),
+            DashboardLayout.resolvedLeftPlanFraction(defaults: defaults),
+            accuracy: 0.001
+        )
+
+        let layoutSource = try readProjectSource("MalDaze/DashboardLayout.swift")
+        let rootSource = try readProjectSource("MalDaze/DashboardRootView.swift")
+        let defaultsSource = try readProjectSource("MalDaze/MalDazeDefaults.swift")
+        let projectSource = try readProjectSource("MalDaze.xcodeproj/project.pbxproj")
+
+        XCTAssertTrue(layoutSource.contains("enum DashboardLayout"))
+        XCTAssertTrue(projectSource.contains("DashboardLayout.swift in Sources"))
+        XCTAssertFalse(rootSource.contains("enum DashboardLayout"))
+        XCTAssertTrue(defaultsSource.contains("DashboardLayout.clampedColumnWidths("))
+        XCTAssertTrue(defaultsSource.contains("DashboardLayout.clampedLeftPlanFraction("))
+        XCTAssertFalse(
+            defaultsSource.contains("let deficit = middleMin - middleW"),
+            "The dashboard column overflow algorithm belongs to DashboardLayout, not MalDazeDefaults."
+        )
     }
 
     func testDashboardRootUsesResizableThreeColumnChrome() throws {

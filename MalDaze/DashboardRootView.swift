@@ -1,43 +1,6 @@
 import AppKit
 import SwiftUI
 
-private enum DashboardLayout {
-    /// 左栏基准 300pt；+15% 以容纳饮食宏量表（≈345pt）。
-    static let remindersColumnWidth: CGFloat = 300 * 1.15
-    static let learningColumnMinWidth: CGFloat = 360
-    static let controlsColumnWidth: CGFloat = 300
-    static let horizontalPadding: CGFloat = 12
-    static let dividerWidth: CGFloat = 1
-    static let safeHorizontalMargin: CGFloat = 48
-    static let baseContentHeight: CGFloat = 664
-    /// 整板相对基准尺寸的缩放（宽 +5%、高 +15%）。
-    static let panelWidthScale: CGFloat = 1.05
-    static let panelHeightScale: CGFloat = 1.15
-    static var contentHeight: CGFloat { baseContentHeight * panelHeightScale }
-    static let fallbackVisibleFrame = NSRect(x: 0, y: 0, width: 1280, height: 800)
-
-    static var baseMinimumContentWidth: CGFloat {
-        remindersColumnWidth
-        + learningColumnMinWidth
-        + controlsColumnWidth
-        + 6 * horizontalPadding
-        + DashboardColumnLayout.resizeHandleWidth * 2
-    }
-
-    static var minimumContentWidth: CGFloat {
-        baseMinimumContentWidth * panelWidthScale
-    }
-
-    static func preferredContentSize(screenVisibleFrame visibleFrame: NSRect?) -> NSSize {
-        let visibleFrame = visibleFrame ?? fallbackVisibleFrame
-        let targetWidth = visibleFrame.width - 2 * safeHorizontalMargin
-        let clampedTargetWidth = min(targetWidth, visibleFrame.width)
-        let layoutWidth = max(baseMinimumContentWidth, clampedTargetWidth)
-        let width = min(layoutWidth * panelWidthScale, visibleFrame.width)
-        return NSSize(width: width, height: contentHeight)
-    }
-}
-
 extension DashboardRootView {
     static var dashboardPreferredContentSize: NSSize {
         DashboardLayout.preferredContentSize(
@@ -111,7 +74,7 @@ struct DeskPetDashboardView: View {
 // MARK: - 分栏拖拽（列宽 / 计划·饮食行高）
 
 private enum DashboardColumnLayout {
-    static let resizeHandleWidth: CGFloat = 8
+    static let resizeHandleWidth = DashboardLayout.columnResizeHandleWidth
     static var chromeWidth: CGFloat {
         resizeHandleWidth * 2
     }
@@ -499,7 +462,7 @@ struct DashboardRootView: View {
     @AppStorage(MalDazeDefaults.idlePetAnimationIntensity) private var idlePetAnimationIntensityStored = 1.0
     @AppStorage(MalDazeDefaults.idlePetIconSidePoints) private var idlePetIconSideStored = MalDazeDefaults.idlePetIconSideDefault
     @AppStorage(MalDazeDefaults.dashboardLeftPlanFraction) private var dashboardLeftPlanFractionStored =
-        MalDazeDefaults.defaultDashboardLeftPlanFraction
+        DashboardLayout.defaultLeftPlanFraction
     @AppStorage(MalDazeDefaults.dashboardLeftColumnWidth) private var leftColumnWidthStored: Double = 0
     @AppStorage(MalDazeDefaults.dashboardRightColumnWidth) private var rightColumnWidthStored: Double = 0
 
@@ -700,16 +663,16 @@ struct DashboardRootView: View {
 
     private func resolvedColumnWidths(for contentWidth: CGFloat) -> (left: CGFloat, right: CGFloat) {
         let leftBase = leftColumnWidthDragLive
-            ?? MalDazeDefaults.resolvedDashboardLeftColumnWidth(
+            ?? DashboardLayout.resolvedLeftColumnWidth(
                 stored: leftColumnWidthStored,
                 defaultWidth: DashboardLayout.remindersColumnWidth
             )
         let rightBase = rightColumnWidthDragLive
-            ?? MalDazeDefaults.resolvedDashboardRightColumnWidth(
+            ?? DashboardLayout.resolvedRightColumnWidth(
                 stored: rightColumnWidthStored,
                 defaultWidth: DashboardLayout.controlsColumnWidth
             )
-        return MalDazeDefaults.clampedDashboardColumnWidths(
+        return DashboardLayout.clampedColumnWidths(
             left: leftBase,
             right: rightBase,
             totalInnerWidth: contentWidth,
@@ -720,16 +683,16 @@ struct DashboardRootView: View {
 
     private func updateLeftColumnWidthDrag(delta: CGFloat, contentWidth: CGFloat) {
         let leftBase = leftColumnWidthDragLive
-            ?? MalDazeDefaults.resolvedDashboardLeftColumnWidth(
+            ?? DashboardLayout.resolvedLeftColumnWidth(
                 stored: leftColumnWidthStored,
                 defaultWidth: DashboardLayout.remindersColumnWidth
             )
         let rightBase = rightColumnWidthDragLive
-            ?? MalDazeDefaults.resolvedDashboardRightColumnWidth(
+            ?? DashboardLayout.resolvedRightColumnWidth(
                 stored: rightColumnWidthStored,
                 defaultWidth: DashboardLayout.controlsColumnWidth
             )
-        let clamped = MalDazeDefaults.clampedDashboardColumnWidths(
+        let clamped = DashboardLayout.clampedColumnWidths(
             left: leftBase + delta,
             right: rightBase,
             totalInnerWidth: contentWidth,
@@ -751,16 +714,16 @@ struct DashboardRootView: View {
 
     private func updateRightColumnWidthDrag(delta: CGFloat, contentWidth: CGFloat) {
         let leftBase = leftColumnWidthDragLive
-            ?? MalDazeDefaults.resolvedDashboardLeftColumnWidth(
+            ?? DashboardLayout.resolvedLeftColumnWidth(
                 stored: leftColumnWidthStored,
                 defaultWidth: DashboardLayout.remindersColumnWidth
             )
         let rightBase = rightColumnWidthDragLive
-            ?? MalDazeDefaults.resolvedDashboardRightColumnWidth(
+            ?? DashboardLayout.resolvedRightColumnWidth(
                 stored: rightColumnWidthStored,
                 defaultWidth: DashboardLayout.controlsColumnWidth
             )
-        let clamped = MalDazeDefaults.clampedDashboardColumnWidths(
+        let clamped = DashboardLayout.clampedColumnWidths(
             left: leftBase,
             right: rightBase - delta,
             totalInnerWidth: contentWidth,
@@ -895,7 +858,7 @@ struct DashboardRootView: View {
 
     private var resolvedDashboardLeftPlanFraction: Double {
         planFractionDragLive
-            ?? MalDazeDefaults.clampedDashboardLeftPlanFraction(dashboardLeftPlanFractionStored)
+            ?? DashboardLayout.clampedLeftPlanFraction(dashboardLeftPlanFractionStored)
     }
 
     /// 左栏：计划（上）+ 饮食面板（下），比例来自设置。
@@ -923,7 +886,7 @@ struct DashboardRootView: View {
 
     private func updatePlanFractionDrag(delta: CGFloat, stackHeight: CGFloat) {
         let current = resolvedDashboardLeftPlanFraction
-        let updated = MalDazeDefaults.clampedDashboardLeftPlanFraction(
+        let updated = DashboardLayout.clampedLeftPlanFraction(
             current + Double(delta / max(stackHeight, 1))
         )
         var transaction = Transaction()
