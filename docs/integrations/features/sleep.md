@@ -23,12 +23,12 @@ Hub：[../hermes.md](../hermes.md)
 }
 ```
 
-`lockBedtime` = `targetBedtime + 5min`（Hermes 算）。`dayType` 来自 `recommend.py auto` 后的 `daily_log.day_type`。缺字段 → MalDaze 停调度。
+`lockBedtime` = `targetBedtime + 5min`（Hermes 算）。`dayType` 来自 Hermes 营养日型判定写入的 `daily_log.day_type`，再由 `sleep_tracker.py` 读入睡眠契约。缺字段 → MalDaze 停调度。
 
 ## Hermes 写端
 
 - **Cron**：`0 8 * * *` → `scripts/morning-briefing.py`
-- **顺序**：体重 → 学习 → `recommend.py auto` → 睡眠段 → 饮食
+- **顺序**：体重 → 学习 → 营养日型判定 → 睡眠段 → 饮食
 - **模块**：`scripts/sleep_tracker.py`；可选 `data/sleep/sleep_history.json`（桌宠不读）
 - **算法**：合盖 ≤ target+10min 为达标；达标则 target 前推 10min/天，下限 22:30
 

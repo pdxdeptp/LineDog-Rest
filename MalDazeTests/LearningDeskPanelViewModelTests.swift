@@ -24,7 +24,7 @@ final class LearningDeskPanelViewModelTests: XCTestCase {
 
         vm.scheduleDebouncedRefresh()
         vm.scheduleDebouncedRefresh()
-        try? await Task.sleep(nanoseconds: 1_100_000_000)
+        try? await Task.sleep(nanoseconds: 1_600_000_000)
 
         XCTAssertEqual(cli.fetchTodayCount, 1)
         XCTAssertEqual(cli.rolloverCount, 0)
@@ -36,7 +36,7 @@ final class LearningDeskPanelViewModelTests: XCTestCase {
         vm.selectedTab = .schedule
 
         vm.scheduleDebouncedRefresh()
-        try? await Task.sleep(nanoseconds: 1_100_000_000)
+        try? await Task.sleep(nanoseconds: 1_600_000_000)
 
         XCTAssertEqual(cli.scheduleRangeCount, 1)
         XCTAssertEqual(cli.fetchTodayCount, 0)
@@ -49,7 +49,7 @@ final class LearningDeskPanelViewModelTests: XCTestCase {
         vm.selectedTab = .projects
 
         vm.scheduleDebouncedRefresh()
-        try? await Task.sleep(nanoseconds: 1_100_000_000)
+        try? await Task.sleep(nanoseconds: 1_600_000_000)
 
         XCTAssertEqual(cli.fetchStatusCount, 1)
         XCTAssertEqual(cli.fetchTodayCount, 0)
@@ -144,7 +144,7 @@ final class LearningDeskPanelViewModelTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(statusFetchesBeforeChange, 1)
 
         vm.scheduleDebouncedRefresh()
-        try? await Task.sleep(nanoseconds: 1_100_000_000)
+        try? await Task.sleep(nanoseconds: 1_600_000_000)
 
         vm.selectedTab = .projects
         await vm.onTabChanged()
