@@ -14,7 +14,7 @@ Status legend:
 
 ## Current Recommended Next Step
 
-Continue with **R5: Split defaults key namespaces from behavior** when settings/defaults work is explicitly in scope. **R4: Extract Hermes path and process runtime helpers** is complete for CLI runtime consolidation and contract-reader path injection.
+Continue with **R6: Move dashboard layout clamp policy out of defaults** when settings/defaults work is explicitly in scope. **R5: Split defaults key namespaces from behavior** is complete; `MalDazeDefaults` now preserves the old key API as aliases while `MalDazeDefaultsKeys` owns the UserDefaults key strings.
 
 Do not start by splitting `AppViewModel` or `WindowManager`; both are high-impact and should wait until tests and lower-level helpers are stronger.
 
@@ -39,7 +39,7 @@ Do not start by splitting `AppViewModel` or `WindowManager`; both are high-impac
 
 | ID | Status | Risk | Task | Targets | Verification |
 | --- | --- | --- | --- | --- | --- |
-| R5 | Todo | Medium | Split defaults key namespaces from behavior | `MalDazeDefaults.swift` | No key names change; migration tests remain green |
+| R5 | Done | Medium | Split defaults key namespaces from behavior | `MalDazeDefaults.swift`, `MalDazeDefaultsKeys.swift` | `xcodebuild test -scheme MalDaze -only-testing:MalDazeTests/ControlPanelPresentationTests/testMalDazeDefaultsKeyNamespacePreservesExistingKeyContracts` passed on 2026-06-13 after RED compile failure for missing `MalDazeDefaultsKeys`; complete key contract coverage verifies every `MalDaze.*` key literal has `MalDazeDefaults` alias -> `MalDazeDefaultsKeys` namespace -> unchanged literal coverage, `MalDazeDefaults.swift` no longer directly defines key strings, and `MalDazeDefaultsKeys.swift` is registered in the app target Sources. Regression verification also included `xcodebuild test -scheme MalDaze -only-testing:MalDazeTests/PetRendererTests`. |
 | R6 | Todo | Medium | Move dashboard layout clamp policy out of defaults | `MalDazeDefaults`, dashboard layout tests | Layout policy tests cover min/middle/overflow behavior |
 | R7 | Todo | Medium | Move learning capacity Hermes sync out of defaults | `MalDazeDefaults`, learning settings/profile sync | Hermes profile sync tests prove explicit side effect path |
 | R8 | Todo | Medium | Introduce typed settings domains for views | `DashboardRootView`, `MalDazeSettingsView`, AppViewModel settings sync | Existing settings behavior preserved; NotificationCenter emissions reduced or centralized |

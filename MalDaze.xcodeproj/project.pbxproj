@@ -101,6 +101,7 @@
 		A237 /* SmartReminderInferredTime.swift in Sources */ = {isa = PBXBuildFile; fileRef = B237 /* SmartReminderInferredTime.swift */; };
 		A226 /* SmartReminderUIPanels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B226 /* SmartReminderUIPanels.swift */; };
 		A227 /* MalDazeDefaults.swift in Sources */ = {isa = PBXBuildFile; fileRef = B227 /* MalDazeDefaults.swift */; };
+		A241 /* MalDazeDefaultsKeys.swift in Sources */ = {isa = PBXBuildFile; fileRef = B241 /* MalDazeDefaultsKeys.swift */; };
 		A228 /* MalDazeSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B228 /* MalDazeSettingsView.swift */; };
 		A229 /* MalDazePresentationAnchor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B229 /* MalDazePresentationAnchor.swift */; };
 		A23E /* GlobalShortcut.swift in Sources */ = {isa = PBXBuildFile; fileRef = B23E /* GlobalShortcut.swift */; };
@@ -261,6 +262,7 @@
 		B237 /* SmartReminderInferredTime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartReminderInferredTime.swift; sourceTree = "<group>"; };
 		B226 /* SmartReminderUIPanels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartReminderUIPanels.swift; sourceTree = "<group>"; };
 		B227 /* MalDazeDefaults.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MalDazeDefaults.swift; sourceTree = "<group>"; };
+		B241 /* MalDazeDefaultsKeys.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MalDazeDefaultsKeys.swift; sourceTree = "<group>"; };
 		B228 /* MalDazeSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MalDazeSettingsView.swift; sourceTree = "<group>"; };
 		B229 /* MalDazePresentationAnchor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MalDazePresentationAnchor.swift; sourceTree = "<group>"; };
 		B23E /* GlobalShortcut.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalShortcut.swift; sourceTree = "<group>"; };
@@ -386,6 +388,7 @@
 				E20A /* SmartReminder */,
 				E20E /* T7Eject */,
 				E20B /* Settings */,
+				B241 /* MalDazeDefaultsKeys.swift */,
 				B227 /* MalDazeDefaults.swift */,
 				B23E /* GlobalShortcut.swift */,
 				B233 /* DeskPetMenuShortcut.swift */,
@@ -831,6 +834,7 @@
 				A225 /* SmartReminderOrchestrator.swift in Sources */,
 				A237 /* SmartReminderInferredTime.swift in Sources */,
 				A226 /* SmartReminderUIPanels.swift in Sources */,
+				A241 /* MalDazeDefaultsKeys.swift in Sources */,
 				A227 /* MalDazeDefaults.swift in Sources */,
 				A23E /* GlobalShortcut.swift in Sources */,
 				A233 /* DeskPetMenuShortcut.swift in Sources */,

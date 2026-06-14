@@ -27,7 +27,7 @@
 
 ## 4. Settings And Defaults Boundary
 
-- [ ] 4.1 Split `MalDazeDefaults` key namespaces from migration, clamp, layout, and Hermes sync behavior.
+- [x] 4.1 Split `MalDazeDefaults` key namespaces from migration, clamp, layout, and Hermes sync behavior.
 - [ ] 4.2 Move dashboard layout clamp policy into dashboard layout types with focused tests.
 - [ ] 4.3 Move learning capacity Hermes profile sync into an explicit learning settings sync service.
 - [ ] 4.4 Introduce typed settings domains for timer, reminder, pet appearance, dashboard layout, shortcuts, and smart input settings.

@@ -405,6 +405,315 @@ final class ControlPanelPresentationTests: XCTestCase {
         XCTAssertTrue(source.contains("static let dashboardWindowHeight"))
     }
 
+    func testMalDazeDefaultsKeyNamespacePreservesExistingKeyContracts() throws {
+        let contracts: [(alias: String, namespaced: String, value: String)] = [
+            (
+                MalDazeDefaults.smartInputLLMProvider,
+                MalDazeDefaultsKeys.SmartInput.llmProvider,
+                "MalDaze.smartInput.llmProvider"
+            ),
+            (
+                MalDazeDefaults.smartInputLLMModel,
+                MalDazeDefaultsKeys.SmartInput.llmModel,
+                "MalDaze.smartInput.llmModel"
+            ),
+            (
+                MalDazeDefaults.smartInputGeminiAPIKey,
+                MalDazeDefaultsKeys.SmartInput.geminiAPIKey,
+                "MalDaze.smartInput.geminiAPIKey"
+            ),
+            (
+                MalDazeDefaults.smartInputOpenAIAPIKey,
+                MalDazeDefaultsKeys.SmartInput.openAIAPIKey,
+                "MalDaze.smartInput.openAIAPIKey"
+            ),
+            (
+                MalDazeDefaults.smartInputDeepSeekAPIKey,
+                MalDazeDefaultsKeys.SmartInput.deepSeekAPIKey,
+                "MalDaze.smartInput.deepSeekAPIKey"
+            ),
+            (
+                MalDazeDefaults.geminiAPIKey,
+                MalDazeDefaultsKeys.LegacyGemini.apiKey,
+                "MalDaze.geminiAPIKey"
+            ),
+            (
+                MalDazeDefaults.geminiModelId,
+                MalDazeDefaultsKeys.LegacyGemini.modelId,
+                "MalDaze.geminiModelId"
+            ),
+            (
+                MalDazeDefaults.deskPetMenuShortcutKeyCode,
+                MalDazeDefaultsKeys.Shortcuts.DeskPetMenu.keyCode,
+                "MalDaze.deskPetMenuShortcut.keyCode"
+            ),
+            (
+                MalDazeDefaults.deskPetMenuShortcutModifiers,
+                MalDazeDefaultsKeys.Shortcuts.DeskPetMenu.modifiers,
+                "MalDaze.deskPetMenuShortcut.modifiers"
+            ),
+            (
+                MalDazeDefaults.deskPetMenuShortcutKeyLabel,
+                MalDazeDefaultsKeys.Shortcuts.DeskPetMenu.keyLabel,
+                "MalDaze.deskPetMenuShortcut.keyLabel"
+            ),
+            (
+                MalDazeDefaults.smartReminderInputShortcutKeyCode,
+                MalDazeDefaultsKeys.Shortcuts.SmartReminderInput.keyCode,
+                "MalDaze.smartReminderInputShortcut.keyCode"
+            ),
+            (
+                MalDazeDefaults.smartReminderInputShortcutModifiers,
+                MalDazeDefaultsKeys.Shortcuts.SmartReminderInput.modifiers,
+                "MalDaze.smartReminderInputShortcut.modifiers"
+            ),
+            (
+                MalDazeDefaults.smartReminderInputShortcutKeyLabel,
+                MalDazeDefaultsKeys.Shortcuts.SmartReminderInput.keyLabel,
+                "MalDaze.smartReminderInputShortcut.keyLabel"
+            ),
+            (
+                MalDazeDefaults.sevenMinuteReminderShortcutKeyCode,
+                MalDazeDefaultsKeys.Shortcuts.SevenMinuteReminder.keyCode,
+                "MalDaze.sevenMinuteReminderShortcut.keyCode"
+            ),
+            (
+                MalDazeDefaults.sevenMinuteReminderShortcutModifiers,
+                MalDazeDefaultsKeys.Shortcuts.SevenMinuteReminder.modifiers,
+                "MalDaze.sevenMinuteReminderShortcut.modifiers"
+            ),
+            (
+                MalDazeDefaults.sevenMinuteReminderShortcutKeyLabel,
+                MalDazeDefaultsKeys.Shortcuts.SevenMinuteReminder.keyLabel,
+                "MalDaze.sevenMinuteReminderShortcut.keyLabel"
+            ),
+            (
+                MalDazeDefaults.resetIdlePetShortcutKeyCode,
+                MalDazeDefaultsKeys.Shortcuts.ResetIdlePet.keyCode,
+                "MalDaze.resetIdlePetShortcut.keyCode"
+            ),
+            (
+                MalDazeDefaults.resetIdlePetShortcutModifiers,
+                MalDazeDefaultsKeys.Shortcuts.ResetIdlePet.modifiers,
+                "MalDaze.resetIdlePetShortcut.modifiers"
+            ),
+            (
+                MalDazeDefaults.resetIdlePetShortcutKeyLabel,
+                MalDazeDefaultsKeys.Shortcuts.ResetIdlePet.keyLabel,
+                "MalDaze.resetIdlePetShortcut.keyLabel"
+            ),
+            (
+                MalDazeDefaults.pomodoroWorkDurationMinutes,
+                MalDazeDefaultsKeys.Timer.workDurationMinutes,
+                "MalDaze.pomodoro.workDurationMinutes"
+            ),
+            (
+                MalDazeDefaults.pomodoroRestDurationMinutes,
+                MalDazeDefaultsKeys.Timer.restDurationMinutes,
+                "MalDaze.pomodoro.restDurationMinutes"
+            ),
+            (
+                MalDazeDefaults.suspendedTimerModeSnapshot,
+                MalDazeDefaultsKeys.Timer.suspendedModeSnapshot,
+                "MalDaze.timer.suspendedModeSnapshot"
+            ),
+            (
+                MalDazeDefaults.sevenMinuteReminderDurationMinutes,
+                MalDazeDefaultsKeys.SevenMinute.durationMinutes,
+                "MalDaze.sevenMinuteReminder.durationMinutes"
+            ),
+            (
+                MalDazeDefaults.restDoubleClickEndsRest,
+                MalDazeDefaultsKeys.Rest.doubleClickEndsRest,
+                "MalDaze.restDoubleClickEndsRest"
+            ),
+            (
+                MalDazeDefaults.hydrationReminderEnabled,
+                MalDazeDefaultsKeys.Hydration.enabled,
+                "MalDaze.hydrationReminder.enabled"
+            ),
+            (
+                MalDazeDefaults.hydrationReminderIntervalMinutes,
+                MalDazeDefaultsKeys.Hydration.intervalMinutes,
+                "MalDaze.hydrationReminder.intervalMinutes"
+            ),
+            (
+                MalDazeDefaults.hydrationQuietHoursEnabled,
+                MalDazeDefaultsKeys.Hydration.quietHoursEnabled,
+                "MalDaze.hydrationReminder.quietHoursEnabled"
+            ),
+            (
+                MalDazeDefaults.hydrationQuietStartMinutes,
+                MalDazeDefaultsKeys.Hydration.quietStartMinutes,
+                "MalDaze.hydrationReminder.quietStartMinutes"
+            ),
+            (
+                MalDazeDefaults.hydrationQuietResumeMinutes,
+                MalDazeDefaultsKeys.Hydration.quietResumeMinutes,
+                "MalDaze.hydrationReminder.quietResumeMinutes"
+            ),
+            (
+                MalDazeDefaults.t7EjectAutomaticEnabled,
+                MalDazeDefaultsKeys.T7Eject.automaticEnabled,
+                "MalDaze.t7Eject.automaticEnabled"
+            ),
+            (
+                MalDazeDefaults.t7EjectScheduleStartMinuteOfDay,
+                MalDazeDefaultsKeys.T7Eject.scheduleStartMinuteOfDay,
+                "MalDaze.t7Eject.scheduleStartMinuteOfDay"
+            ),
+            (
+                MalDazeDefaults.t7EjectScheduleEndMinuteOfDay,
+                MalDazeDefaultsKeys.T7Eject.scheduleEndMinuteOfDay,
+                "MalDaze.t7Eject.scheduleEndMinuteOfDay"
+            ),
+            (
+                MalDazeDefaults.t7EjectRetryIntervalSeconds,
+                MalDazeDefaultsKeys.T7Eject.retryIntervalSeconds,
+                "MalDaze.t7Eject.retryIntervalSeconds"
+            ),
+            (
+                MalDazeDefaults.t7EjectLastCompletedDay,
+                MalDazeDefaultsKeys.T7Eject.lastCompletedDay,
+                "MalDaze.t7Eject.lastCompletedDay"
+            ),
+            (
+                MalDazeDefaults.sleepScheduleEnabled,
+                MalDazeDefaultsKeys.SleepSchedule.enabled,
+                "MalDaze.sleepSchedule.enabled"
+            ),
+            (
+                MalDazeDefaults.sleepScheduleRemindersEnabled,
+                MalDazeDefaultsKeys.SleepSchedule.remindersEnabled,
+                "MalDaze.sleepSchedule.remindersEnabled"
+            ),
+            (
+                MalDazeDefaults.sleepScheduleLockScreenEnabled,
+                MalDazeDefaultsKeys.SleepSchedule.lockScreenEnabled,
+                "MalDaze.sleepSchedule.lockScreenEnabled"
+            ),
+            (
+                MalDazeDefaults.sleepScheduleDismissOnClamshell,
+                MalDazeDefaultsKeys.SleepSchedule.dismissOnClamshell,
+                "MalDaze.sleepSchedule.dismissOnClamshell"
+            ),
+            (
+                MalDazeDefaults.sleepScheduleShowerReminderEnabled,
+                MalDazeDefaultsKeys.SleepSchedule.showerReminderEnabled,
+                "MalDaze.sleepSchedule.showerReminderEnabled"
+            ),
+            (
+                MalDazeDefaults.sleepScheduleFiredContractUpdatedAt,
+                MalDazeDefaultsKeys.SleepSchedule.firedContractUpdatedAt,
+                "MalDaze.sleepSchedule.firedContractUpdatedAt"
+            ),
+            (
+                MalDazeDefaults.sleepScheduleFiredEventIDs,
+                MalDazeDefaultsKeys.SleepSchedule.firedEventIDs,
+                "MalDaze.sleepSchedule.firedEventIDs"
+            ),
+            (
+                MalDazeDefaults.breakInterruptStyle,
+                MalDazeDefaultsKeys.Rest.breakInterruptStyle,
+                "MalDaze.breakInterruptStyle"
+            ),
+            (
+                MalDazeDefaults.idlePetIconAnimationEnabled,
+                MalDazeDefaultsKeys.PetAppearance.idlePetIconAnimationEnabled,
+                "MalDaze.idlePetIconAnimationEnabled"
+            ),
+            (
+                MalDazeDefaults.idlePetAnimationIntensity,
+                MalDazeDefaultsKeys.PetAppearance.idlePetAnimationIntensity,
+                "MalDaze.idlePetAnimationIntensity"
+            ),
+            (
+                MalDazeDefaults.idlePetIconSidePoints,
+                MalDazeDefaultsKeys.PetAppearance.idlePetIconSidePoints,
+                "MalDaze.idlePetIconSidePoints"
+            ),
+            (
+                MalDazeDefaults.dashboardWindowOriginX,
+                MalDazeDefaultsKeys.DashboardWindow.originX,
+                "MalDaze.dashboardWindowOriginX"
+            ),
+            (
+                MalDazeDefaults.dashboardWindowOriginY,
+                MalDazeDefaultsKeys.DashboardWindow.originY,
+                "MalDaze.dashboardWindowOriginY"
+            ),
+            (
+                MalDazeDefaults.dashboardWindowWidth,
+                MalDazeDefaultsKeys.DashboardWindow.width,
+                "MalDaze.dashboardWindowWidth"
+            ),
+            (
+                MalDazeDefaults.dashboardWindowHeight,
+                MalDazeDefaultsKeys.DashboardWindow.height,
+                "MalDaze.dashboardWindowHeight"
+            ),
+            (
+                MalDazeDefaults.dashboardWindowFrameUsesTitledOuterSize,
+                MalDazeDefaultsKeys.DashboardWindow.frameUsesTitledOuterSize,
+                "MalDaze.dashboardWindowFrameUsesTitledOuterSize"
+            ),
+            (
+                MalDazeDefaults.dashboardLeftColumnWidth,
+                MalDazeDefaultsKeys.DashboardLayout.leftColumnWidth,
+                "MalDaze.dashboard.leftColumnWidth"
+            ),
+            (
+                MalDazeDefaults.dashboardRightColumnWidth,
+                MalDazeDefaultsKeys.DashboardLayout.rightColumnWidth,
+                "MalDaze.dashboard.rightColumnWidth"
+            ),
+            (
+                MalDazeDefaults.dashboardLeftPlanFraction,
+                MalDazeDefaultsKeys.DashboardLayout.leftPlanFraction,
+                "MalDaze.dashboard.leftPlanFraction"
+            ),
+            (
+                MalDazeDefaults.learningTodayGrouping,
+                MalDazeDefaultsKeys.Learning.todayGrouping,
+                "MalDaze.learning.todayGrouping"
+            ),
+            (
+                MalDazeDefaults.learningDailyCapacityHours,
+                MalDazeDefaultsKeys.Learning.dailyCapacityHours,
+                "MalDaze.learning.dailyCapacityHours"
+            )
+        ]
+
+        for contract in contracts {
+            XCTAssertEqual(contract.alias, contract.namespaced)
+            XCTAssertEqual(contract.namespaced, contract.value)
+        }
+
+        let defaultsSource = try readProjectSource("MalDaze/MalDazeDefaults.swift")
+        let keysSource = try readProjectSource("MalDaze/MalDazeDefaultsKeys.swift")
+        let projectSource = try readProjectSource("MalDaze.xcodeproj/project.pbxproj")
+        let coveredKeyValues = Set(contracts.map(\.value))
+        let namespacedKeyValues = Set(defaultsKeyLiterals(in: keysSource))
+
+        XCTAssertEqual(
+            coveredKeyValues,
+            namespacedKeyValues,
+            "Every MalDaze UserDefaults key in MalDazeDefaultsKeys.swift should have alias -> namespace -> literal coverage."
+        )
+
+        XCTAssertNil(
+            defaultsSource.range(
+                of: #"static let\s+\w+\s*=\s*"MalDaze\."#,
+                options: .regularExpression
+            ),
+            "MalDazeDefaults.swift should keep behavior and compatibility aliases, while key strings live in MalDazeDefaultsKeys.swift."
+        )
+        XCTAssertTrue(keysSource.contains("enum MalDazeDefaultsKeys"))
+        XCTAssertTrue(keysSource.contains(#""MalDaze.smartInput.llmProvider""#))
+        XCTAssertTrue(keysSource.contains(#""MalDaze.learning.dailyCapacityHours""#))
+        XCTAssertTrue(projectSource.contains("MalDazeDefaultsKeys.swift in Sources"))
+    }
+
     func testApplicationShouldHandleReopenFocusesDashboardWithoutToggle() throws {
         let appDelegateSource = try readProjectSource("MalDaze/MalDazeAppDelegate.swift")
         let appViewModelSource = try readProjectSource("MalDaze/AppViewModel.swift")
@@ -1765,6 +2074,16 @@ final class ControlPanelPresentationTests: XCTestCase {
             .deletingLastPathComponent()
         let sourceURL = repositoryRoot.appendingPathComponent(relativePath)
         return try String(contentsOf: sourceURL, encoding: .utf8)
+    }
+
+    private func defaultsKeyLiterals(in source: String) -> [String] {
+        let pattern = #""MalDaze\.[^"]+""#
+        let regex = try! NSRegularExpression(pattern: pattern)
+        let range = NSRange(source.startIndex..<source.endIndex, in: source)
+        return regex.matches(in: source, range: range).compactMap { match in
+            guard let matchRange = Range(match.range, in: source) else { return nil }
+            return String(source[matchRange].dropFirst().dropLast())
+        }
     }
 
     private func smartReminderInputPanelContentSource(from source: String) throws -> String {

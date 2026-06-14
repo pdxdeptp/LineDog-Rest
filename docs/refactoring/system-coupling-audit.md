@@ -194,23 +194,24 @@ Refactor direction:
 - Introduce `CarbonHotKeyRegistry` that registers descriptors in a table.
 - Keep existing NotificationCenter names initially, then consider a typed command router later.
 
-### P1: MalDazeDefaults Mixes Keys, Migration, Policy, and Side Effects
+### P1: MalDazeDefaults Still Mixes Defaults Behavior, Policy, and Side Effects
 
 Evidence:
 
-- `MalDaze/MalDazeDefaults.swift:3` through `MalDaze/MalDazeDefaults.swift:110` stores many unrelated defaults keys and fallback resolvers.
-- `MalDaze/MalDazeDefaults.swift:163` through `MalDaze/MalDazeDefaults.swift:180` performs animation intensity migration and direct UserDefaults reads.
-- `MalDaze/MalDazeDefaults.swift:197` through `MalDaze/MalDazeDefaults.swift:235` contains dashboard layout clamp policy.
-- `MalDaze/MalDazeDefaults.swift:276` through `MalDaze/MalDazeDefaults.swift:295` writes learning capacity back to Hermes profile.
+- `MalDaze/MalDazeDefaultsKeys.swift:3` through `MalDaze/MalDazeDefaultsKeys.swift:108` now owns the UserDefaults key-string namespaces for smart input, legacy Gemini, shortcuts, timer, reminders, T7, sleep, pet appearance, dashboard, and learning.
+- `MalDaze/MalDazeDefaults.swift:3` through `MalDaze/MalDazeDefaults.swift:153` preserves the existing `MalDazeDefaults.*` key API as compatibility aliases and keeps provider/default fallback resolvers.
+- `MalDaze/MalDazeDefaults.swift:163` through `MalDaze/MalDazeDefaults.swift:180` still performs animation intensity migration and direct UserDefaults reads.
+- `MalDaze/MalDazeDefaults.swift:211` through `MalDaze/MalDazeDefaults.swift:253` still contains dashboard layout clamp policy.
+- `MalDaze/MalDazeDefaults.swift:276` through `MalDaze/MalDazeDefaults.swift:295` still writes learning capacity back to Hermes profile.
 
 Risk:
 
-- A global constants enum now has business logic and cross-system side effects.
+- A global defaults facade still has business logic and cross-system side effects even though raw key strings have been split out.
 - It encourages more unrelated settings to accumulate in one file.
 
 Refactor direction:
 
-- Split key namespaces from behavior.
+- Keep the key namespace split stable and route new key strings through `MalDazeDefaultsKeys`.
 - Move layout policy to dashboard layout types.
 - Move Hermes profile sync into an explicit learning settings sync service.
 
