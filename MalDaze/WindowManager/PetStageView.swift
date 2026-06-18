@@ -1,4 +1,5 @@
 import AppKit
+import QuartzCore
 
 /// 由 `WindowManager` 实现：在桌宠点击处弹出与菜单栏相同的 SwiftUI 面板。
 protocol PetStageDeskMenuPresenter: AnyObject {
@@ -7,7 +8,8 @@ protocol PetStageDeskMenuPresenter: AnyObject {
 }
 
 struct RestVisualTickPolicy {
-    static let interactiveTickInterval: TimeInterval = 1.0 / 15.0
+    /// 进场 / 退场：宠物位形与命中区（背景 dim 由 Core Animation 驱动）。
+    static let interactiveTickInterval: TimeInterval = 1.0 / 10.0
     static let settledTickInterval: TimeInterval = 1.0
 
     static func interval(
@@ -118,6 +120,9 @@ final class PetStageView: NSView {
     /// 当前休息段动画用：全屏 `bounds` 下的起点中心与起点边长（在全屏 `base` 下插值到 `endSide`，保证从小到大）。
     private var restArcStartCenterLocal: CGPoint?
     private var restArcStartPetSide: CGFloat?
+    private var restLastDimAlpha: CGFloat = -1
+    private var restDimCoreAnimationActive = false
+    private var idleDragInProgress = false
 
     var isInRestPhase: Bool { restBeganAt != nil }
     /// 跑屏休息模式进行中（与 `isInRestPhase` 互斥）。
@@ -264,11 +269,12 @@ final class PetStageView: NSView {
             hypot(cur.x - idleMouseDownInWindow.x, cur.y - idleMouseDownInWindow.y)
         )
         guard idleMaxDragFromDown >= 4, let lastScreen = idleLastScreenMouse else { return }
+        idleDragInProgress = true
         let nowScreen = NSEvent.mouseLocation
         var f = win.frame
         f.origin.x += nowScreen.x - lastScreen.x
         f.origin.y += nowScreen.y - lastScreen.y
-        win.setFrame(f, display: true)
+        win.setFrame(f, display: false)
         idleLastScreenMouse = nowScreen
     }
 
@@ -345,6 +351,12 @@ final class PetStageView: NSView {
         if idleMaxDragFromDown < 4 {
             deskMenuPresenter?.presentDeskMenu(from: self, anchorRect: petHitRect)
         } else if let win = window {
+            if idleDragInProgress {
+                win.setFrame(win.frame, display: true)
+                needsLayout = true
+                layoutSubtreeIfNeeded()
+                idleDragInProgress = false
+            }
             onIdlePetFramePersist?(win.frame)
         }
     }
@@ -379,9 +391,10 @@ final class PetStageView: NSView {
         restPendingStartPetSide = nil
 
         restBeganAt = Date()
+        restLastDimAlpha = -1
         countdownLabel.isHidden = false
         pet.setDisplayMode(.restingRed)
-        dimView.layer?.backgroundColor = NSColor.black.withAlphaComponent(0).cgColor
+        startRestDimGrowCoreAnimation()
         layoutSubtreeIfNeeded()
         applyRestPhase(easedProgress(at: 0))
         startTickTimer()
@@ -419,6 +432,7 @@ final class PetStageView: NSView {
         breakRunCountdownLastClickAt = 0
         breakRunCountdownLabel.isHidden = true
         layoutIdlePet()
+        pet.setDisplayMode(nonRestDisplayMode)
     }
 
     /// 中断休息并回到右下角常态（不调用 `onRestComplete`；由 `WindowManager` 负责 `pendingDismiss`）。
@@ -430,6 +444,7 @@ final class PetStageView: NSView {
         restPetClickCount = 0
         restPetLastClickAt = 0
         stopTickTimer()
+        stopRestDimCoreAnimation(resetOpacity: 0)
         restBeganAt = nil
         // 同时清理跑屏状态（若两种模式之一正在运行）
         breakRunBeganAt = nil
@@ -444,8 +459,8 @@ final class PetStageView: NSView {
         restArcStartPetSide = nil
         onRestComplete = nil
         countdownLabel.isHidden = true
-        dimView.layer?.backgroundColor = NSColor.black.withAlphaComponent(0).cgColor
         layoutIdlePet()
+        pet.setDisplayMode(nonRestDisplayMode)
     }
 
     override func layout() {
@@ -542,9 +557,6 @@ final class PetStageView: NSView {
         pet.layoutPet(in: b, visualCenter: center, scale: scale)
         idlePetVisualCenter = center
         idlePetVisualSide = base * scale
-        if restBeganAt == nil, breakRunBeganAt == nil {
-            pet.setDisplayMode(nonRestDisplayMode)
-        }
     }
 
     /// 在 `WindowManager` 把桌宠窗扩到菜单栏屏全屏**之前**调用，使红狗从黑狗当时位置与大小起画。
@@ -577,16 +589,25 @@ final class PetStageView: NSView {
             restSingleClickMenuWorkItem?.cancel()
             restSingleClickMenuWorkItem = nil
             countdownLabel.isHidden = true
-            dimView.layer?.backgroundColor = NSColor.black.withAlphaComponent(0).cgColor
+            stopRestDimCoreAnimation(resetOpacity: 0)
             done?()
             layoutIdlePet()
+            pet.setDisplayMode(nonRestDisplayMode)
             return
         }
 
         updateCountdown(remaining: max(0, restTotal - elapsed))
 
-        let dimAlpha = 0.58 * p
-        dimView.layer?.backgroundColor = NSColor.black.withAlphaComponent(dimAlpha).cgColor
+        let inFadeOut = elapsed >= restTotal - fadeOutDuration
+        if inFadeOut, restDimCoreAnimationActive || restLastDimAlpha > 0 {
+            let fadeU = (elapsed - (restTotal - fadeOutDuration)) / fadeOutDuration
+            let fadeT = CGFloat(min(1, max(0, fadeU)))
+            let fadeP = 1 - fadeT
+            let easedFade = fadeP * fadeP * (3 - 2 * fadeP)
+            applyRestDimAlpha(0.58 * easedFade)
+        } else if !restDimCoreAnimationActive {
+            applyRestDimAlpha(0.58 * p)
+        }
 
         let targetCenter = CGPoint(x: b.midX, y: b.midY)
         let startCenter = restArcStartCenterLocal ?? petCornerCenter(in: b)
@@ -616,18 +637,51 @@ final class PetStageView: NSView {
 
     private func scheduleNextRestTick(after interval: TimeInterval) {
         let t = Timer.scheduledTimer(withTimeInterval: interval, repeats: false) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                guard let self, let start = self.restBeganAt else { return }
-                self.tickTimer = nil
-                let elapsed = Date().timeIntervalSince(start)
-                self.applyRestPhase(self.easedProgress(at: elapsed))
-                if self.restBeganAt != nil {
-                    self.scheduleNextRestTick(after: self.restVisualTickInterval(forElapsed: elapsed))
-                }
+            guard let self, let start = self.restBeganAt else { return }
+            self.tickTimer = nil
+            let elapsed = Date().timeIntervalSince(start)
+            self.applyRestPhase(self.easedProgress(at: elapsed))
+            if self.restBeganAt != nil {
+                self.scheduleNextRestTick(after: self.restVisualTickInterval(forElapsed: elapsed))
             }
         }
         RunLoop.main.add(t, forMode: .common)
         tickTimer = t
+    }
+
+    private func startRestDimGrowCoreAnimation() {
+        stopRestDimCoreAnimation(resetOpacity: 0)
+        restDimCoreAnimationActive = true
+        dimView.layer?.backgroundColor = NSColor.black.cgColor
+        dimView.layer?.opacity = 0
+        let anim = CABasicAnimation(keyPath: "opacity")
+        anim.fromValue = 0
+        anim.toValue = 0.58
+        anim.duration = growDuration
+        anim.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        anim.fillMode = .forwards
+        anim.isRemovedOnCompletion = false
+        dimView.layer?.add(anim, forKey: "restDimGrow")
+        DispatchQueue.main.asyncAfter(deadline: .now() + growDuration) { [weak self] in
+            guard let self, self.restBeganAt != nil else { return }
+            self.restDimCoreAnimationActive = false
+            self.restLastDimAlpha = 0.58
+            self.dimView.layer?.opacity = 0.58
+        }
+    }
+
+    private func stopRestDimCoreAnimation(resetOpacity: Float) {
+        restDimCoreAnimationActive = false
+        dimView.layer?.removeAnimation(forKey: "restDimGrow")
+        dimView.layer?.opacity = resetOpacity
+        restLastDimAlpha = CGFloat(resetOpacity)
+    }
+
+    private func applyRestDimAlpha(_ alpha: CGFloat) {
+        guard abs(alpha - restLastDimAlpha) > 0.001 else { return }
+        restLastDimAlpha = alpha
+        dimView.layer?.backgroundColor = NSColor.black.cgColor
+        dimView.layer?.opacity = Float(alpha)
     }
 
     private func restVisualTickInterval(forElapsed elapsed: TimeInterval) -> TimeInterval {

@@ -7,8 +7,8 @@ struct BreakRunMotionPolicy {
         let velocity: CGPoint
     }
 
-    /// 每帧时间间隔（≈ 30 Hz），降低 WindowServer 唤醒但保留流畅弹跳。
-    static let tickInterval: TimeInterval = 1.0 / 30.0
+    /// 每帧时间间隔（20 Hz）：较 30 Hz 再降 WindowServer 负载，位移仍按 elapsed 补偿。
+    static let tickInterval: TimeInterval = 1.0 / 20.0
 
     /// 速度范围：PawPal 3.5~6.4 px/tick × 60 Hz × 0.7 缩放，单位为 pt/s。
     static let speedRange: ClosedRange<Double> = 147.0...268.8
@@ -63,12 +63,6 @@ struct BreakRunMotionPolicy {
 }
 
 /// 跑屏休息模式引擎：将桌宠小窗在屏幕工作区内随机弹跳漫游。
-///
-/// 算法直接移植自 PawPal（MIT 许可）：
-///   `startBreakRun` / `movePetForBreakRun` / `chooseBreakRunVelocity`
-///   来源：https://github.com/zebangeth/PawPal/blob/main/src/main/main.ts
-///
-/// 速度缩放至 PawPal 原值的 70%（约 150~260 px/s），在 macOS 视网膜屏上更自然。
 @MainActor
 final class BreakRunController {
 
@@ -85,6 +79,8 @@ final class BreakRunController {
     private var movementTimer: Timer?
     private var endDate: Date = .distantPast
     private var onComplete: (() -> Void)?
+    private var cachedWorkArea: NSRect = .zero
+    private var screenObserver: NSObjectProtocol?
 
     // MARK: - Public interface
 
@@ -98,10 +94,12 @@ final class BreakRunController {
         self.velocity = Self.chooseVelocity()
         self.nextTurnAt = now
         self.lastTickDate = now
+        refreshCachedWorkArea(for: window)
+        installScreenObserverIfNeeded()
         isRunning = true
 
         let t = Timer.scheduledTimer(withTimeInterval: BreakRunMotionPolicy.tickInterval, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in self?.tick() }
+            self?.tick()
         }
         RunLoop.main.add(t, forMode: .common)
         movementTimer = t
@@ -115,18 +113,18 @@ final class BreakRunController {
         window = nil
         onComplete = nil
         lastTickDate = .distantPast
+        cachedWorkArea = .zero
+        removeScreenObserver()
     }
 
     // MARK: - Movement algorithm (ported from PawPal)
 
-    /// 随机生成速度矢量。移植自 PawPal `chooseBreakRunVelocity()`。
     private static func chooseVelocity() -> CGPoint {
         let speed = Double.random(in: BreakRunMotionPolicy.speedRange)
         let angle = Double.random(in: 0 ..< 2 * .pi)
         return CGPoint(x: cos(angle) * speed, y: sin(angle) * speed)
     }
 
-    /// 每帧逻辑。移植自 PawPal `movePetForBreakRun()`。
     private func tick() {
         guard let win = window, !win.isDestroyed else {
             stop()
@@ -135,7 +133,6 @@ final class BreakRunController {
 
         let now = Date()
 
-        // 休息时间到 → 通知完成
         if now >= endDate {
             let cb = onComplete
             stop()
@@ -146,16 +143,13 @@ final class BreakRunController {
         lastTickDate = now
 
         let bounds = win.frame
-
-        // 找到当前窗口所在显示器的工作区（兼容多显示器）
-        let workArea: NSRect
-        if let screen = NSScreen.screens.first(where: { $0.frame.contains(bounds.center) }) {
-            workArea = screen.visibleFrame
-        } else {
-            workArea = NSScreen.main?.visibleFrame ?? bounds
+        if cachedWorkArea == .zero || !cachedWorkArea.contains(bounds.center) {
+            refreshCachedWorkArea(for: win)
         }
+        let workArea = cachedWorkArea == .zero
+            ? (NSScreen.main?.visibleFrame ?? bounds)
+            : cachedWorkArea
 
-        // 随机转向（移植自 PawPal：到达转向时刻且满足概率则重新选速度方向）
         if now >= nextTurnAt {
             if BreakRunMotionPolicy.shouldChooseNewVelocity(
                 now: now,
@@ -176,6 +170,34 @@ final class BreakRunController {
         )
         velocity = step.velocity
         win.setFrameOrigin(step.origin)
+    }
+
+    private func refreshCachedWorkArea(for win: NSWindow) {
+        let bounds = win.frame
+        if let screen = NSScreen.screens.first(where: { $0.frame.contains(bounds.center) }) {
+            cachedWorkArea = screen.visibleFrame
+        } else {
+            cachedWorkArea = NSScreen.main?.visibleFrame ?? bounds
+        }
+    }
+
+    private func installScreenObserverIfNeeded() {
+        guard screenObserver == nil else { return }
+        screenObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self, let win = self.window else { return }
+            self.refreshCachedWorkArea(for: win)
+        }
+    }
+
+    private func removeScreenObserver() {
+        if let screenObserver {
+            NotificationCenter.default.removeObserver(screenObserver)
+            self.screenObserver = nil
+        }
     }
 }
 

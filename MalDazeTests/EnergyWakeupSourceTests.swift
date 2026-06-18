@@ -40,6 +40,10 @@ struct EnergyWakeupSourceTests {
                 && source.contains("IdleCursorTrackingPolicy.pollingInterval(pointer:"),
             "WindowManager should route pass-through and cadence decisions through the testable idle cursor policy."
         )
+        try expect(
+            source.contains("addLocalMonitorForEvents(matching:"),
+            "Idle cursor tracking should use a local mouse monitor while the pet window accepts events."
+        )
     }
 
     private func testBreakRunTargetsThirtyHertzAndUsesElapsedSecondsForMovement() throws {
@@ -47,8 +51,8 @@ struct EnergyWakeupSourceTests {
         let policy = try typeBody(named: "BreakRunMotionPolicy", in: source)
 
         try expect(
-            policy.contains("tickInterval: TimeInterval = 1.0 / 30.0"),
-            "Break-run movement should target about 30 Hz instead of 60 Hz."
+            policy.contains("tickInterval: TimeInterval = 1.0 / 20.0"),
+            "Break-run movement should target about 20 Hz instead of 60 Hz."
         )
         try expect(
             source.contains("lastTickDate"),

@@ -13,28 +13,24 @@ protocol PetRendering: AnyObject {
 final class PetRenderer: PetRendering {
     private let imageView = NSImageView()
 
-    // Resolved once at init; empty array means fall back to SF Symbol.
     private let gifURLsByMode: [PetDisplayMode: [URL]]
 
-    // Variant cycling for continuous states (idle / thinking), full-speed path only.
     private var cycleTimer: Timer?
     private var activeURLs: [URL] = []
     private var activeIndex: Int = 0
     private static let variantRotationInterval: TimeInterval = 5 * 60
 
     private var currentMode: PetDisplayMode = .runningBlack
-    /// 0…1：0 静止；1 与原生 NSImageView GIF + 轮换一致；(0,1) 逐帧播放且帧间隔随强度加快。
     private var animationIntensity: Double
 
     private var manualPlaybackFrames: [(NSImage, TimeInterval)] = []
     private var manualPlaybackTimer: Timer?
     private var manualPlaybackIndex: Int = 0
 
-    /// 「满速」原生路径阈值（滑杆右端可能略低于 1）。
     private static let intensityFullNativeThreshold = 0.999
-    /// 「静止」阈值。
     private static let intensityStaticThreshold = 0.001
-    private static var decodedGIFFrameCache: [URL: [(NSImage, TimeInterval)]] = [:]
+    /// 中间强度统一降帧播放，避免每帧 one-shot Timer。
+    private static let intermediateTargetFPS: Double = 12
 
     private enum PlaybackMode: Equatable {
         case staticFirstFrame
@@ -55,7 +51,6 @@ final class PetRenderer: PetRendering {
         animationIntensity = MalDazeDefaults.resolvedIdlePetAnimationIntensity()
         imageView.imageScaling = .scaleProportionallyUpOrDown
         imageView.animates = animationIntensity >= Self.intensityFullNativeThreshold
-        imageView.wantsLayer = true
         gifURLsByMode = Self.resolveGIFURLs()
     }
 
@@ -152,7 +147,7 @@ final class PetRenderer: PetRendering {
             let shouldRotate = allowsVariantRotationWhenAnimated && urls.count > 1
             guard shouldRotate else { return }
             let t = Timer.scheduledTimer(withTimeInterval: Self.variantRotationInterval, repeats: true) { [weak self] _ in
-                Task { @MainActor [weak self] in self?.rotateVariant() }
+                self?.rotateVariant()
             }
             RunLoop.main.add(t, forMode: .common)
             cycleTimer = t
@@ -162,7 +157,6 @@ final class PetRenderer: PetRendering {
         beginIntermediateGIFPlayback(url: url, intensity: s)
     }
 
-    /// 仅在强度≥满速原生阈值且原生 GIF 路径下轮换素材。
     private func rotateVariant() {
         guard animationIntensity >= Self.intensityFullNativeThreshold else { return }
         guard activeURLs.count > 1 else { return }
@@ -174,8 +168,17 @@ final class PetRenderer: PetRendering {
     }
 
     private func loadGIF(url: URL, nativeAnimated: Bool) {
-        guard let data = try? Data(contentsOf: url),
-              let image = NSImage(data: data) else {
+        let data: Data
+        if let cached = GIFFrameCache.gifData(for: url) {
+            data = cached
+        } else if let loaded = try? Data(contentsOf: url) {
+            GIFFrameCache.storeGIFData(loaded, for: url)
+            data = loaded
+        } else {
+            applyFallbackSymbol()
+            return
+        }
+        guard let image = NSImage(data: data) else {
             applyFallbackSymbol()
             return
         }
@@ -203,19 +206,17 @@ final class PetRenderer: PetRendering {
         manualPlaybackIndex = 0
         imageView.image = frames[0].0
         imageView.animates = false
-        scheduleNextManualFrameStep(intensity: Self.clampedIntensity(intensity))
+        startIntermediatePlaybackTimer(intensity: Self.clampedIntensity(intensity))
     }
 
-    private func scheduleNextManualFrameStep(intensity: Double) {
+    private func startIntermediatePlaybackTimer(intensity: Double) {
         manualPlaybackTimer?.invalidate()
         manualPlaybackTimer = nil
         guard manualPlaybackFrames.count > 1 else { return }
-        let idx = manualPlaybackIndex % manualPlaybackFrames.count
-        let baseDelay = max(manualPlaybackFrames[idx].1, 0.02)
         let speed = max(intensity, 0.05)
-        let scaled = baseDelay / speed
-        let t = Timer.scheduledTimer(withTimeInterval: scaled, repeats: false) { [weak self] _ in
-            Task { @MainActor [weak self] in self?.advanceManualFrame() }
+        let interval = 1.0 / (Self.intermediateTargetFPS * speed)
+        let t = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
+            self?.advanceManualFrame()
         }
         RunLoop.main.add(t, forMode: .common)
         manualPlaybackTimer = t
@@ -226,7 +227,6 @@ final class PetRenderer: PetRendering {
         manualPlaybackIndex = (manualPlaybackIndex + 1) % manualPlaybackFrames.count
         imageView.image = manualPlaybackFrames[manualPlaybackIndex].0
         imageView.animates = false
-        scheduleNextManualFrameStep(intensity: Self.clampedIntensity(animationIntensity))
     }
 
     private func stopManualPlayback() {
@@ -236,11 +236,10 @@ final class PetRenderer: PetRendering {
         manualPlaybackIndex = 0
     }
 
-    /// 解码 GIF 帧及每帧延迟（秒）。
     private static func cachedGIFFrames(url: URL) -> [(NSImage, TimeInterval)]? {
-        if let frames = decodedGIFFrameCache[url] { return frames }
+        if let frames = GIFFrameCache.decodedFrames(for: url) { return frames }
         guard let frames = decodeGIFFrames(url: url) else { return nil }
-        decodedGIFFrameCache[url] = frames
+        GIFFrameCache.storeDecodedFrames(frames, for: url)
         return frames
     }
 
@@ -290,10 +289,6 @@ final class PetRenderer: PetRendering {
             width: side,
             height: side
         )
-    }
-
-    nonisolated func invalidateCycleTimer() {
-        // Called from deinit; timer is captured weakly so this is safe cross-actor.
     }
 
     deinit {

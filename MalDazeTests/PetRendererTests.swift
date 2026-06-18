@@ -9,6 +9,7 @@ final class PetRendererTests: XCTestCase {
         let ud = UserDefaults.standard
         ud.removeObject(forKey: MalDazeDefaults.idlePetAnimationIntensity)
         ud.removeObject(forKey: MalDazeDefaults.idlePetIconAnimationEnabled)
+        GIFFrameCache.testing_reset()
         super.tearDown()
     }
 

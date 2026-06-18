@@ -228,6 +228,8 @@ enum MalDazeDefaults {
 
     /// Dashboard 左栏计划区高度占比（0.4–0.75），默认 0.6。
     static let dashboardLeftPlanFraction = MalDazeDefaultsKeys.DashboardLayout.leftPlanFraction
+    static let dashboardNutritionRecommendationExpanded =
+        MalDazeDefaultsKeys.DashboardLayout.nutritionRecommendationExpanded
     static let defaultDashboardLeftPlanFraction = DashboardLayout.defaultLeftPlanFraction
     static let dashboardLeftPlanFractionMin = DashboardLayout.leftPlanFractionMin
     static let dashboardLeftPlanFractionMax = DashboardLayout.leftPlanFractionMax

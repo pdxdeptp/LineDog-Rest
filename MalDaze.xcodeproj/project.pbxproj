@@ -16,6 +16,7 @@
 		A206 /* ManualTimerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B206 /* ManualTimerEngine.swift */; };
 		A207 /* AutoTimerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B207 /* AutoTimerEngine.swift */; };
 		A208 /* PetRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B208 /* PetRenderer.swift */; };
+		A2GF /* GIFFrameCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2GF /* GIFFrameCache.swift */; };
 		A20A /* WindowManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20A /* WindowManager.swift */; };
 		A2DP /* DeskPetDashboardEscapeRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2DP /* DeskPetDashboardEscapeRouter.swift */; };
 		A2BC /* BreakRunController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2BC /* BreakRunController.swift */; };
@@ -181,6 +182,7 @@
 		B206 /* ManualTimerEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManualTimerEngine.swift; sourceTree = "<group>"; };
 		B207 /* AutoTimerEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoTimerEngine.swift; sourceTree = "<group>"; };
 		B208 /* PetRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetRenderer.swift; sourceTree = "<group>"; };
+		B2GF /* GIFFrameCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GIFFrameCache.swift; sourceTree = "<group>"; };
 		B20A /* WindowManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowManager.swift; sourceTree = "<group>"; };
 		B2DP /* DeskPetDashboardEscapeRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeskPetDashboardEscapeRouter.swift; sourceTree = "<group>"; };
 		B2BC /* BreakRunController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BreakRunController.swift; sourceTree = "<group>"; };
@@ -436,6 +438,7 @@
 			isa = PBXGroup;
 			children = (
 				B208 /* PetRenderer.swift */,
+				B2GF /* GIFFrameCache.swift */,
 			);
 			path = PetRenderer;
 			sourceTree = "<group>";
@@ -779,6 +782,7 @@
 				A206 /* ManualTimerEngine.swift in Sources */,
 				A207 /* AutoTimerEngine.swift in Sources */,
 				A208 /* PetRenderer.swift in Sources */,
+				A2GF /* GIFFrameCache.swift in Sources */,
 				A20A /* WindowManager.swift in Sources */,
 				A2DP /* DeskPetDashboardEscapeRouter.swift in Sources */,
 				A2BC /* BreakRunController.swift in Sources */,

@@ -17,6 +17,8 @@ struct NutritionTodayPanelView: View {
 
     @StateObject private var viewModel = NutritionTodayViewModel()
     @State private var digitMonitor: NutritionDigitKeyMonitor?
+    @AppStorage(MalDazeDefaults.dashboardNutritionRecommendationExpanded)
+    private var recommendationSectionExpanded = true
 
     /// 饮食区正文（不含「饮食」标题）：语义字号再加大一档。
     private enum NutritionBodyFont {
@@ -66,6 +68,9 @@ struct NutritionTodayPanelView: View {
             viewModel.stopWatching()
         }
         .onChange(of: digitKeysEnabled) { _ in
+            installDigitMonitor()
+        }
+        .onChange(of: recommendationSectionExpanded) { _ in
             installDigitMonitor()
         }
     }
@@ -156,13 +161,13 @@ struct NutritionTodayPanelView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
-                Text("现在可以吃")
-                    .font(NutritionBodyFont.section)
-                    .foregroundStyle(.secondary)
+                recommendationSectionHeader
                     .padding(.top, 4)
 
-                recommendationSection
-                    .id(panel.updatedAt + "-\(viewModel.loggableItems.count)")
+                if recommendationSectionExpanded {
+                    recommendationSection
+                        .id(panel.updatedAt + "-\(viewModel.loggableItems.count)")
+                }
 
                 Text("已吃")
                     .font(NutritionBodyFont.section)
@@ -212,6 +217,27 @@ struct NutritionTodayPanelView: View {
         .accessibilityLabel(
             "钠已摄入 \(formatMg(c.sodiumMg)) 毫克，剩余 \(formatMg(r.sodiumMg)) 毫克"
         )
+    }
+
+    private var recommendationSectionHeader: some View {
+        Button {
+            recommendationSectionExpanded.toggle()
+        } label: {
+            HStack(spacing: 6) {
+                Text("现在可以吃")
+                    .font(NutritionBodyFont.section)
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 4)
+                Image(systemName: recommendationSectionExpanded ? "chevron.down" : "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text("现在可以吃"))
+        .accessibilityValue(Text(recommendationSectionExpanded ? "已展开" : "已折叠"))
+        .accessibilityHint(Text(recommendationSectionExpanded ? "折叠此区块" : "展开此区块"))
     }
 
     @ViewBuilder
@@ -448,9 +474,10 @@ struct NutritionTodayPanelView: View {
     private func installDigitMonitor() {
         digitMonitor?.stop()
         let keysEnabled = digitKeysEnabled
+        let recommendationExpanded = recommendationSectionExpanded
         let monitor = NutritionDigitKeyMonitor(
             isEnabled: { [viewModel] in
-                guard keysEnabled else { return false }
+                guard keysEnabled, recommendationExpanded else { return false }
                 return viewModel.canUseDigitShortcuts
             },
             onDigit: { digit in

@@ -174,37 +174,26 @@ extension WindowManaging {
 
 struct IdleCursorTrackingPolicy {
     static let nearPollingInterval: TimeInterval = 0.08
-    static let farPollingInterval: TimeInterval = 0.25
+    /// 指针远离宠物时低频探测，避免常态 baseline 4 Hz 轮询。
+    static let farPollingInterval: TimeInterval = 0.5
     static let nearDistance: CGFloat = 180
 
     static func ignoresMouseEvents(pointer: CGPoint, petScreenRect: CGRect) -> Bool {
         !petScreenRect.contains(pointer)
     }
 
-    static func pollingInterval(pointer: CGPoint, petScreenRect: CGRect) -> TimeInterval {
-        distance(from: pointer, to: petScreenRect) <= nearDistance ? nearPollingInterval : farPollingInterval
+    static func proximityRect(around petScreenRect: CGRect) -> CGRect {
+        petScreenRect.insetBy(dx: -nearDistance, dy: -nearDistance)
     }
 
-    private static func distance(from point: CGPoint, to rect: CGRect) -> CGFloat {
-        let dx: CGFloat
-        if point.x < rect.minX {
-            dx = rect.minX - point.x
-        } else if point.x > rect.maxX {
-            dx = point.x - rect.maxX
-        } else {
-            dx = 0
-        }
+    static func pointerIsNearPet(pointer: CGPoint, petScreenRect: CGRect) -> Bool {
+        proximityRect(around: petScreenRect).contains(pointer)
+    }
 
-        let dy: CGFloat
-        if point.y < rect.minY {
-            dy = rect.minY - point.y
-        } else if point.y > rect.maxY {
-            dy = point.y - rect.maxY
-        } else {
-            dy = 0
-        }
-
-        return hypot(dx, dy)
+    static func pollingInterval(pointer: CGPoint, petScreenRect: CGRect) -> TimeInterval {
+        pointerIsNearPet(pointer: pointer, petScreenRect: petScreenRect)
+            ? nearPollingInterval
+            : farPollingInterval
     }
 }
 
@@ -233,6 +222,8 @@ final class WindowManager: WindowManaging {
     private var screenRepositionWorkItem: DispatchWorkItem?
     /// 常态下自适应轮询光标位置：远离静态桌宠时低频，靠近命中区时短暂高频，确保透明区域不吞焦点。
     private var idleCursorTrackTimer: Timer?
+    /// 窗口可接收事件时，用本地 mouseMoved 监视离开，减少 near 轮询。
+    private var idleLocalMouseMonitor: Any?
     /// 跑屏模式驱动器（PawPal breakRun 算法移植）。
     private let breakRunController = BreakRunController()
     /// 跑屏倒计时更新定时器（1 Hz，更新 PetStageView 的小标签）。
@@ -296,6 +287,9 @@ final class WindowManager: WindowManaging {
 
     deinit {
         idleCursorTrackTimer?.invalidate()
+        if let idleLocalMouseMonitor {
+            NSEvent.removeMonitor(idleLocalMouseMonitor)
+        }
         breakRunCountdownTimer?.invalidate()
         breakRunShieldWorkItem?.cancel()
         breakRunShieldWindow?.orderOut(nil)
@@ -601,7 +595,11 @@ final class WindowManager: WindowManaging {
         let savedIdleFrame = idleFrameBeforeRest
         if wasBreakRun { idleFrameBeforeRest = nil }
         breakRunController.stop()
-        stageView?.cancelToIdle()
+        if wasBreakRun {
+            stageView?.cancelBreakRunToIdle()
+        } else {
+            stageView?.cancelToIdle()
+        }
         setWindowLevel(resting: false)
 
         if let wf = window?.frame, !Self.isApproximatelyIdleSized(wf) {
@@ -707,7 +705,7 @@ final class WindowManager: WindowManaging {
         // 60秒后展示半透明遮罩，阻止用户点击桌面
         if duration > 60 {
             let item = DispatchWorkItem { [weak self] in
-                Task { @MainActor [weak self] in self?.showBreakRunShield() }
+                self?.showBreakRunShield()
             }
             breakRunShieldWorkItem = item
             DispatchQueue.main.asyncAfter(deadline: .now() + 60, execute: item)
@@ -715,13 +713,11 @@ final class WindowManager: WindowManaging {
 
         let startDate = Date()
         let t = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                let elapsed = Date().timeIntervalSince(startDate)
-                let remaining = max(0, duration - elapsed)
-                stageView?.updateBreakRunCountdown(remaining: remaining)
-                updateBreakRunCountdownPanel(remaining: remaining)
-            }
+            guard let self else { return }
+            let elapsed = Date().timeIntervalSince(startDate)
+            let remaining = max(0, duration - elapsed)
+            stageView?.updateBreakRunCountdown(remaining: remaining)
+            updateBreakRunCountdownPanel(remaining: remaining)
         }
         RunLoop.main.add(t, forMode: .common)
         breakRunCountdownTimer = t
@@ -927,24 +923,21 @@ final class WindowManager: WindowManaging {
             syncPetRestWindowMousePolicy()
             return
         }
-        // 跑屏模式：窗口是小窗，复用常态的光标轨迹逻辑（50×50 区域内不穿透）。
-        // 常态：根据光标实时位置决定是否透传，防止透明区域抢焦点。
         startIdleCursorTracking()
         syncIdleWindowMousePolicy(rescheduleIfNeeded: true)
     }
 
     private func startIdleCursorTracking() {
         guard idleCursorTrackTimer == nil else { return }
+        guard idleLocalMouseMonitor == nil else { return }
         scheduleIdleCursorTracking(after: IdleCursorTrackingPolicy.farPollingInterval)
     }
 
     private func scheduleIdleCursorTracking(after interval: TimeInterval) {
         idleCursorTrackTimer?.invalidate()
         let t = Timer.scheduledTimer(withTimeInterval: interval, repeats: false) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                self?.idleCursorTrackTimer = nil
-                self?.syncIdleWindowMousePolicy(rescheduleIfNeeded: true)
-            }
+            self?.idleCursorTrackTimer = nil
+            self?.syncIdleWindowMousePolicy(rescheduleIfNeeded: true)
         }
         RunLoop.main.add(t, forMode: .common)
         idleCursorTrackTimer = t
@@ -953,6 +946,35 @@ final class WindowManager: WindowManaging {
     private func stopIdleCursorTracking() {
         idleCursorTrackTimer?.invalidate()
         idleCursorTrackTimer = nil
+        removeIdleLocalMouseMonitor()
+    }
+
+    private func installIdleLocalMouseMonitorIfNeeded() {
+        guard idleLocalMouseMonitor == nil else { return }
+        idleLocalMouseMonitor = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged, .rightMouseDragged]) { [weak self] event in
+            self?.handleIdleLocalMouseMoved()
+            return event
+        }
+    }
+
+    private func removeIdleLocalMouseMonitor() {
+        if let idleLocalMouseMonitor {
+            NSEvent.removeMonitor(idleLocalMouseMonitor)
+            self.idleLocalMouseMonitor = nil
+        }
+    }
+
+    private func handleIdleLocalMouseMoved() {
+        guard let win = window, let stage = stageView else { return }
+        guard !stage.isInRestPhase, deskMenuViewModel != nil else { return }
+        let petScreen = win.convertToScreen(stage.petHitRectInWindowBaseCoordinates)
+        let mouse = NSEvent.mouseLocation
+        if IdleCursorTrackingPolicy.pointerIsNearPet(pointer: mouse, petScreenRect: petScreen) {
+            return
+        }
+        win.ignoresMouseEvents = true
+        removeIdleLocalMouseMonitor()
+        scheduleIdleCursorTracking(after: IdleCursorTrackingPolicy.farPollingInterval)
     }
 
     /// 光标在宠物屏幕命中区内 → 窗口接收鼠标；光标在外 → 完全透传（不抢焦点）。
@@ -961,8 +983,16 @@ final class WindowManager: WindowManaging {
         guard !stage.isInRestPhase, deskMenuViewModel != nil else { return }
         let petScreen = win.convertToScreen(stage.petHitRectInWindowBaseCoordinates)
         let mouse = NSEvent.mouseLocation
-        win.ignoresMouseEvents = IdleCursorTrackingPolicy.ignoresMouseEvents(pointer: mouse, petScreenRect: petScreen)
-        if rescheduleIfNeeded {
+        let shouldIgnore = IdleCursorTrackingPolicy.ignoresMouseEvents(pointer: mouse, petScreenRect: petScreen)
+        win.ignoresMouseEvents = shouldIgnore
+        if shouldIgnore {
+            removeIdleLocalMouseMonitor()
+        } else {
+            installIdleLocalMouseMonitorIfNeeded()
+            idleCursorTrackTimer?.invalidate()
+            idleCursorTrackTimer = nil
+        }
+        if rescheduleIfNeeded, shouldIgnore {
             scheduleIdleCursorTracking(after: IdleCursorTrackingPolicy.pollingInterval(pointer: mouse, petScreenRect: petScreen))
         }
     }

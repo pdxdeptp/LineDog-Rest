@@ -99,6 +99,8 @@ enum MalDazeDefaultsKeys {
         static let leftColumnWidth = "MalDaze.dashboard.leftColumnWidth"
         static let rightColumnWidth = "MalDaze.dashboard.rightColumnWidth"
         static let leftPlanFraction = "MalDaze.dashboard.leftPlanFraction"
+        /// 饮食面板「现在可以吃」区块是否展开。
+        static let nutritionRecommendationExpanded = "MalDaze.dashboard.nutritionRecommendationExpanded"
     }
 
     enum Learning {
