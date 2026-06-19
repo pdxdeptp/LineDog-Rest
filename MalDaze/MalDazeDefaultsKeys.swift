@@ -101,6 +101,8 @@ enum MalDazeDefaultsKeys {
         static let leftPlanFraction = "MalDaze.dashboard.leftPlanFraction"
         /// 饮食面板「现在可以吃」区块是否展开。
         static let nutritionRecommendationExpanded = "MalDaze.dashboard.nutritionRecommendationExpanded"
+        /// 饮食面板「今日额度」计算明细是否展开。
+        static let nutritionTargetBreakdownExpanded = "MalDaze.dashboard.nutritionTargetBreakdownExpanded"
     }
 
     enum Learning {

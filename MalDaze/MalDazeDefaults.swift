@@ -230,6 +230,8 @@ enum MalDazeDefaults {
     static let dashboardLeftPlanFraction = MalDazeDefaultsKeys.DashboardLayout.leftPlanFraction
     static let dashboardNutritionRecommendationExpanded =
         MalDazeDefaultsKeys.DashboardLayout.nutritionRecommendationExpanded
+    static let dashboardNutritionTargetBreakdownExpanded =
+        MalDazeDefaultsKeys.DashboardLayout.nutritionTargetBreakdownExpanded
     static let defaultDashboardLeftPlanFraction = DashboardLayout.defaultLeftPlanFraction
     static let dashboardLeftPlanFractionMin = DashboardLayout.leftPlanFractionMin
     static let dashboardLeftPlanFractionMax = DashboardLayout.leftPlanFractionMax

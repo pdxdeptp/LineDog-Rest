@@ -66,6 +66,13 @@
 		A29E /* LearningCompleteDurationSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B29E /* LearningCompleteDurationSheet.swift */; };
 		A29F /* LearningTodayActionCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B29F /* LearningTodayActionCard.swift */; };
 		A2A0 /* LearningTomorrowPreviewBlock.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2A0 /* LearningTomorrowPreviewBlock.swift */; };
+		A2T0 /* TodayTodoModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2T0 /* TodayTodoModels.swift */; };
+		A2T1 /* TodayTodoStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2T1 /* TodayTodoStore.swift */; };
+		A2T2 /* TodayTodoRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2T2 /* TodayTodoRow.swift */; };
+		A2T3 /* TodayTodoSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2T3 /* TodayTodoSection.swift */; };
+		A2T4 /* TodayTodoHistorySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2T4 /* TodayTodoHistorySheet.swift */; };
+		A2T5 /* TodayTodoDraftField.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2T5 /* TodayTodoDraftField.swift */; };
+		A31T /* TodayTodoStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31T /* TodayTodoStoreTests.swift */; };
 		A2A1 /* NutritionDailyLogContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2A1 /* NutritionDailyLogContract.swift */; };
 		A2A2 /* NutritionDailyLogFileWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2A2 /* NutritionDailyLogFileWatcher.swift */; };
 		A2A3 /* NutritionHermesCLI.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2A3 /* NutritionHermesCLI.swift */; };
@@ -231,6 +238,13 @@
 		B29E /* LearningCompleteDurationSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningCompleteDurationSheet.swift; sourceTree = "<group>"; };
 		B29F /* LearningTodayActionCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningTodayActionCard.swift; sourceTree = "<group>"; };
 		B2A0 /* LearningTomorrowPreviewBlock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningTomorrowPreviewBlock.swift; sourceTree = "<group>"; };
+		B2T0 /* TodayTodoModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoModels.swift; sourceTree = "<group>"; };
+		B2T1 /* TodayTodoStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoStore.swift; sourceTree = "<group>"; };
+		B2T2 /* TodayTodoRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoRow.swift; sourceTree = "<group>"; };
+		B2T3 /* TodayTodoSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoSection.swift; sourceTree = "<group>"; };
+		B2T4 /* TodayTodoHistorySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoHistorySheet.swift; sourceTree = "<group>"; };
+		B2T5 /* TodayTodoDraftField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoDraftField.swift; sourceTree = "<group>"; };
+		B31T /* TodayTodoStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoStoreTests.swift; sourceTree = "<group>"; };
 		B2A1 /* NutritionDailyLogContract.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionDailyLogContract.swift; sourceTree = "<group>"; };
 		B2A2 /* NutritionDailyLogFileWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionDailyLogFileWatcher.swift; sourceTree = "<group>"; };
 		B2A3 /* NutritionHermesCLI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionHermesCLI.swift; sourceTree = "<group>"; };
@@ -480,6 +494,7 @@
 					B31F /* InterventionRequestContractTests.swift */,
 					B31J /* HermesScheduleModelsTests.swift */,
 					B31K /* LearningDeskPanelViewModelTests.swift */,
+					B31T /* TodayTodoStoreTests.swift */,
 					B31L /* FileChangeWatcherTests.swift */,
 					B31M /* GlobalShortcutModelTests.swift */,
 					B31N /* CarbonGlobalHotKeyRegistrationTests.swift */,
@@ -578,6 +593,12 @@
 				B29E /* LearningCompleteDurationSheet.swift */,
 				B29F /* LearningTodayActionCard.swift */,
 				B2A0 /* LearningTomorrowPreviewBlock.swift */,
+				B2T0 /* TodayTodoModels.swift */,
+				B2T1 /* TodayTodoStore.swift */,
+				B2T2 /* TodayTodoRow.swift */,
+				B2T3 /* TodayTodoSection.swift */,
+				B2T4 /* TodayTodoHistorySheet.swift */,
+				B2T5 /* TodayTodoDraftField.swift */,
 			);
 			path = LearningDeskPanel;
 			sourceTree = "<group>";
@@ -823,6 +844,12 @@
 				A29E /* LearningCompleteDurationSheet.swift in Sources */,
 				A29F /* LearningTodayActionCard.swift in Sources */,
 				A2A0 /* LearningTomorrowPreviewBlock.swift in Sources */,
+				A2T0 /* TodayTodoModels.swift in Sources */,
+				A2T1 /* TodayTodoStore.swift in Sources */,
+				A2T2 /* TodayTodoRow.swift in Sources */,
+				A2T3 /* TodayTodoSection.swift in Sources */,
+				A2T4 /* TodayTodoHistorySheet.swift in Sources */,
+				A2T5 /* TodayTodoDraftField.swift in Sources */,
 				A2B1 /* ScrollMonthDatePicker.swift in Sources */,
 				A2A1 /* NutritionDailyLogContract.swift in Sources */,
 				A2A2 /* NutritionDailyLogFileWatcher.swift in Sources */,
@@ -913,6 +940,7 @@
 					A31F /* InterventionRequestContractTests.swift in Sources */,
 					A31J /* HermesScheduleModelsTests.swift in Sources */,
 					A31K /* LearningDeskPanelViewModelTests.swift in Sources */,
+					A31T /* TodayTodoStoreTests.swift in Sources */,
 					A31L /* FileChangeWatcherTests.swift in Sources */,
 					A31M /* GlobalShortcutModelTests.swift in Sources */,
 					A31N /* CarbonGlobalHotKeyRegistrationTests.swift in Sources */,

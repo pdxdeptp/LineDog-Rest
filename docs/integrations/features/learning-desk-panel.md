@@ -16,6 +16,7 @@ Hub：[../hermes.md](../hermes.md) · SSOT 边界：[learning-calendar.md](./lea
 | **X8 · 日程** | [`add-learning-calendar-view`](../../openspec/changes/add-learning-calendar-view/) | 日程 Tab（月历 + Agenda）、`schedule-range`、取代周负荷 |
 | **X9 · 今日核心** | [`extend-learning-today-core`](../../openspec/changes/extend-learning-today-core/) | 双预算、完成进度、`progress`、滚入置顶、实际时长、按项目分组 |
 | **X10 · 今日导航** | [`extend-learning-today-navigation`](../../openspec/changes/extend-learning-today-navigation/) | 行动卡、明天预告、warning 点击、源链接、repack 预览 |
+| **X11 · 今日 todo** | [`add-learning-today-todo`](../../openspec/changes/add-learning-today-todo/) | MalDaze 本地随手记、顺延、历史；不同步提醒/Hermes |
 
 延后索引：[learning-desk-panel-followup.md](./learning-desk-panel-followup.md)
 
@@ -183,6 +184,21 @@ Hub：[../hermes.md](../hermes.md) · SSOT 边界：[learning-calendar.md](./lea
 - 嵌入飞书聊天、Smart mode 开关  
 - URL 输入、guided clarification、审阅时间线  
 - 拖拽 Gantt（可 backlog；v1 用日期 picker + move）
+
+### 4.4 今日 todo（MalDaze 本地 · X11）
+
+Hermes 任务列表下方独立区块 **「今日 todo」**，替代「打开备忘录手敲」：
+
+| 维度 | 行为 |
+|------|------|
+| SSOT | `~/Library/Application Support/MalDaze/today-todo.json` |
+| 添加 | 区块内输入框 + 回车；无 Sheet |
+| 完成 | 勾选后保留 + 删除线，折叠在「已完成 N」 |
+| 顺延 | 未完成项跨日打开面板时滚到今天；可显示「自 M/d 顺延」 |
+| 历史 | 「历史」Sheet：过去日期的已完成项，按日分组 |
+| 隔离 | 不计入正课/复习预算；↻ 只刷 Hermes；不同步左栏计划 / 提醒事项 |
+
+OpenSpec：[`add-learning-today-todo`](../../openspec/changes/add-learning-today-todo/)
 
 ---
 

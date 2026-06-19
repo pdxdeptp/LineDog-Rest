@@ -213,6 +213,23 @@ python3 ~/.hermes/scripts/integration_feishu_qa.py
 
 ---
 
+## 域 C · 今日 todo（`add-learning-today-todo` · X11）
+
+| # | 步骤 | 预期 |
+|---|------|------|
+| M-L-today-todo-1 | 今日 Tab · Hermes 任务下方 | 「今日 todo」区块 + 输入框 |
+| M-L-today-todo-2 | 输入一条回车 | 出现在未完成列表；左栏计划不变 |
+| M-L-today-todo-3 | 勾选完成 | 删除线 + 进「已完成 N」折叠区 |
+| M-L-today-todo-4 | 关面板再开 | 条目仍在（读 `today-todo.json`） |
+| M-L-today-todo-5 | 昨日未完成（或改日模拟） | 打开今日 Tab 后滚到今天，可选「自 xx 顺延」 |
+| M-L-today-todo-6 | 点「历史」 | 仅见过去已完成；未完成不在历史 |
+| M-L-today-todo-7 | 点学习面板 ↻ | Hermes 列表刷新；今日 todo 不重载丢失 |
+| M-L-today-todo-8 | Hermes 报错时 | 今日 todo 仍可用（若 JSON 可读） |
+
+**OpenSpec**：`add-learning-today-todo`
+
+---
+
 ## 域 C · rollover（JSON only）
 
 | # | 步骤 | 预期 |

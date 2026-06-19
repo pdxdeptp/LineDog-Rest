@@ -19,6 +19,8 @@ struct NutritionTodayPanelView: View {
     @State private var digitMonitor: NutritionDigitKeyMonitor?
     @AppStorage(MalDazeDefaults.dashboardNutritionRecommendationExpanded)
     private var recommendationSectionExpanded = true
+    @AppStorage(MalDazeDefaults.dashboardNutritionTargetBreakdownExpanded)
+    private var targetBreakdownExpanded = false
 
     /// 饮食区正文（不含「饮食」标题）：语义字号再加大一档。
     private enum NutritionBodyFont {
@@ -103,13 +105,33 @@ struct NutritionTodayPanelView: View {
 
                 Spacer(minLength: 4)
 
+                targetKcalSummaryButton(panel: panel)
+            }
+        }
+        .padding(.top, NutritionChrome.titleTopSpacing)
+    }
+
+    private func targetKcalSummaryButton(panel: NutritionPanel) -> some View {
+        Button {
+            targetBreakdownExpanded.toggle()
+        } label: {
+            HStack(spacing: 4) {
                 Text("\(Int(panel.consumed.kcal.rounded())) / \(Int(panel.targets.kcal.rounded())) kcal")
                     .font(NutritionBodyFont.kcalSummary)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+                Image(systemName: targetBreakdownExpanded ? "chevron.down" : "chevron.right")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.tertiary)
             }
+            .contentShape(Rectangle())
         }
-        .padding(.top, NutritionChrome.titleTopSpacing)
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text("今日卡路里额度"))
+        .accessibilityValue(
+            Text("已摄入 \(Int(panel.consumed.kcal.rounded()))，目标 \(Int(panel.targets.kcal.rounded())) 千卡")
+        )
+        .accessibilityHint(Text(targetBreakdownExpanded ? "折叠计算明细" : "展开计算明细"))
     }
 
     @ViewBuilder
@@ -150,6 +172,10 @@ struct NutritionTodayPanelView: View {
     private func loadedPanel(log: NutritionDailyLog, panel: NutritionPanel) -> some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 8) {
+                if targetBreakdownExpanded {
+                    targetBreakdownSection(panel: panel)
+                }
+
                 calorieBar(consumed: panel.consumed.kcal, target: panel.targets.kcal)
 
                 macroLine(panel: panel)
@@ -185,6 +211,18 @@ struct NutritionTodayPanelView: View {
             .padding(.vertical, 2)
         }
         .id(panel.updatedAt)
+    }
+
+    @ViewBuilder
+    private func targetBreakdownSection(panel: NutritionPanel) -> some View {
+        if let breakdown = panel.targetBreakdown {
+            NutritionTargetBreakdownView(breakdown: breakdown)
+        } else {
+            Text("暂无额度计算明细。请在 Hermes 运行 refresh-panel 后重试。")
+                .font(NutritionBodyFont.hint)
+                .foregroundStyle(.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 
     private func calorieBar(consumed: Double, target: Double) -> some View {
@@ -486,5 +524,100 @@ struct NutritionTodayPanelView: View {
         )
         monitor.start()
         digitMonitor = monitor
+    }
+}
+
+private struct NutritionTargetBreakdownView: View {
+    let breakdown: NutritionTargetBreakdown
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("今日目标 \(breakdown.targetKcal) kcal")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            ForEach(breakdown.layers, id: \.id) { layer in
+                NutritionTargetBreakdownLayerView(layer: layer, indent: 0)
+            }
+
+            if let rules = breakdown.macroRules {
+                Text(
+                    "宏量：蛋白 = 体重×\(formatRule(rules.proteinGPerKg))，"
+                    + "脂肪 = 体重×\(formatRule(rules.fatGPerKg))"
+                    + (rules.note.map { "，\($0)" } ?? "")
+                )
+                .font(.footnote)
+                .foregroundStyle(.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 2)
+            }
+        }
+        .padding(.vertical, 2)
+    }
+
+    private func formatRule(_ value: Double) -> String {
+        if value.rounded() == value { return String(Int(value.rounded())) }
+        return String(format: "%.1f", value)
+    }
+}
+
+private struct NutritionTargetBreakdownLayerView: View {
+    let layer: NutritionTargetBreakdownLayer
+    let indent: Int
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(layer.label)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .padding(.leading, CGFloat(indent) * 12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                if let kcalText = kcalSummary(for: layer) {
+                    Text(kcalText)
+                        .font(.footnote.monospacedDigit())
+                        .foregroundStyle(.tertiary)
+                }
+            }
+
+            if let detail = layer.detail, !detail.isEmpty {
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .padding(.leading, CGFloat(indent) * 12 + 8)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if let children = layer.children {
+                ForEach(children, id: \.id) { child in
+                    NutritionTargetBreakdownLayerView(layer: child, indent: indent + 1)
+                }
+            }
+        }
+    }
+
+    private func kcalSummary(for layer: NutritionTargetBreakdownLayer) -> String? {
+        if let result = layer.resultKcal {
+            if let delta = layer.kcal, abs(delta - result) > 0.5 {
+                return "\(signedKcal(delta)) → \(Int(result.rounded()))"
+            }
+            return "→ \(Int(result.rounded()))"
+        }
+        if let kcal = layer.kcal {
+            switch layer.id {
+            case "bmr", "rest_tdee", "total":
+                return "\(Int(kcal.rounded()))"
+            default:
+                return signedKcal(kcal)
+            }
+        }
+        return nil
+    }
+
+    private func signedKcal(_ value: Double) -> String {
+        let rounded = Int(value.rounded())
+        if rounded > 0 { return "+\(rounded)" }
+        return "\(rounded)"
     }
 }

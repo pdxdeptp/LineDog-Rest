@@ -34,6 +34,56 @@ struct NutritionPanelSuggestionItem: Equatable, Codable {
     }
 }
 
+struct NutritionTargetBreakdownLayer: Equatable, Codable {
+    let id: String
+    let label: String
+    let detail: String?
+    let kcal: Double?
+    let resultKcal: Double?
+    let children: [NutritionTargetBreakdownLayer]?
+
+    init(
+        id: String,
+        label: String,
+        detail: String? = nil,
+        kcal: Double? = nil,
+        resultKcal: Double? = nil,
+        children: [NutritionTargetBreakdownLayer]? = nil
+    ) {
+        self.id = id
+        self.label = label
+        self.detail = detail
+        self.kcal = kcal
+        self.resultKcal = resultKcal
+        self.children = children
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        label = try c.decode(String.self, forKey: .label)
+        detail = try c.decodeIfPresent(String.self, forKey: .detail)
+        kcal = try c.decodeIfPresent(Double.self, forKey: .kcal)
+        resultKcal = try c.decodeIfPresent(Double.self, forKey: .resultKcal)
+        children = try c.decodeIfPresent([NutritionTargetBreakdownLayer].self, forKey: .children)
+    }
+}
+
+struct NutritionTargetMacroRules: Equatable, Codable {
+    let proteinGPerKg: Double
+    let fatGPerKg: Double
+    let note: String?
+}
+
+struct NutritionTargetBreakdown: Equatable, Codable {
+    let targetKcal: Int
+    let phaseLabel: String?
+    let weightTrendKg: Double?
+    let weightTrendDays: Int?
+    let layers: [NutritionTargetBreakdownLayer]
+    let macroRules: NutritionTargetMacroRules?
+}
+
 struct NutritionPanelSuggestion: Equatable, Codable {
     let label: String?
     let items: [NutritionPanelSuggestionItem]
@@ -57,9 +107,10 @@ struct NutritionPanel: Equatable, Codable {
     let remaining: NutritionMacroBucket
     let suggestions: [NutritionPanelSuggestion]
     let calorieSlack: Int
+    let targetBreakdown: NutritionTargetBreakdown?
 
     enum CodingKeys: String, CodingKey {
-        case schemaVersion, updatedAt, dayLabel, workoutLabel, targets, consumed, remaining, suggestions, calorieSlack
+        case schemaVersion, updatedAt, dayLabel, workoutLabel, targets, consumed, remaining, suggestions, calorieSlack, targetBreakdown
     }
 
     init(
@@ -71,7 +122,8 @@ struct NutritionPanel: Equatable, Codable {
         consumed: NutritionMacroBucket,
         remaining: NutritionMacroBucket,
         suggestions: [NutritionPanelSuggestion],
-        calorieSlack: Int
+        calorieSlack: Int,
+        targetBreakdown: NutritionTargetBreakdown? = nil
     ) {
         self.schemaVersion = schemaVersion
         self.updatedAt = updatedAt
@@ -82,6 +134,7 @@ struct NutritionPanel: Equatable, Codable {
         self.remaining = remaining
         self.suggestions = suggestions
         self.calorieSlack = calorieSlack
+        self.targetBreakdown = targetBreakdown
     }
 
     init(from decoder: Decoder) throws {
@@ -95,6 +148,7 @@ struct NutritionPanel: Equatable, Codable {
         remaining = try c.decode(NutritionMacroBucket.self, forKey: .remaining)
         suggestions = try c.decodeIfPresent([NutritionPanelSuggestion].self, forKey: .suggestions) ?? []
         calorieSlack = try c.decodeIfPresent(Int.self, forKey: .calorieSlack) ?? 50
+        targetBreakdown = try c.decodeIfPresent(NutritionTargetBreakdown.self, forKey: .targetBreakdown)
     }
 }
 

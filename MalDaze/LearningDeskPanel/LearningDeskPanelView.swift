@@ -3,6 +3,8 @@ import SwiftUI
 
 struct LearningDeskPanelView: View {
     @StateObject private var viewModel = LearningDeskPanelViewModel()
+    @StateObject private var todayTodoStore = TodayTodoStore()
+    @State private var showTodayTodoHistory = false
     @AppStorage(MalDazeDefaults.learningDailyCapacityHours) private var dailyCapacityHours =
         MalDazeDefaults.defaultLearningDailyCapacityHours
     @AppStorage(MalDazeDefaults.learningTodayGrouping) private var todayGroupingRaw =
@@ -153,6 +155,16 @@ struct LearningDeskPanelView: View {
             isPresented: viewModel.deleteProjectCandidate != nil,
             onDismiss: { viewModel.deleteProjectCandidate = nil }
         )
+        .sheet(isPresented: $showTodayTodoHistory) {
+            TodayTodoHistorySheet(store: todayTodoStore) {
+                showTodayTodoHistory = false
+            }
+        }
+        .deskPetDashboardEscapeOverlay(
+            id: "learning.todayTodoHistory",
+            isPresented: showTodayTodoHistory,
+            onDismiss: { showTodayTodoHistory = false }
+        )
     }
 
     @ViewBuilder
@@ -210,6 +222,7 @@ struct LearningDeskPanelView: View {
         switch viewModel.selectedTab {
         case .today:
             todayContent
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         case .schedule:
             scheduleContent
         case .projects:
@@ -221,21 +234,33 @@ struct LearningDeskPanelView: View {
     private var todayContent: some View {
         switch viewModel.loadState {
         case .idle, .loading:
-            ProgressView("加载今日学习任务…")
-                .frame(maxWidth: .infinity, alignment: .center)
-                .padding(.vertical, 24)
-        case .failed(let message):
-            VStack(alignment: .leading, spacing: 8) {
-                Text("无法加载学习面板")
-                    .font(.subheadline.weight(.semibold))
-                Text(message)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Text("确认 ~/.hermes/scripts/schedule.py 存在。")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
+            VStack(alignment: .leading, spacing: 12) {
+                ProgressView("加载今日学习任务…")
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 12)
+                Spacer(minLength: 0)
+                todayTodoSectionBlock
             }
-            .padding(8)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        case .failed(let message):
+            VStack(alignment: .leading, spacing: 12) {
+                ScrollView(showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("无法加载学习面板")
+                            .font(.subheadline.weight(.semibold))
+                        Text(message)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text("确认 ~/.hermes/scripts/schedule.py 存在。")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+                    .padding(8)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                todayTodoSectionBlock
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         case .loaded(let snapshot):
             loadedBody(snapshot: snapshot)
         }
@@ -346,86 +371,85 @@ struct LearningDeskPanelView: View {
         let studyOver = response.study.totalMinutes > dailyCapacityMinutes
         let reviewOver = response.review.totalMinutes > response.review.budget
 
-        todayHeader(response: response)
+        VStack(alignment: .leading, spacing: 10) {
+            todayHeader(response: response)
 
-        if studyOver || reviewOver || !response.warnings.isEmpty {
-            LearningTodayActionCard(
-                studyOverCapacity: studyOver,
-                reviewOverCapacity: reviewOver,
-                warnings: response.warnings,
-                focusProjectId: viewModel.todayProjectFilter,
-                onFilterProject: { viewModel.filterTodayToProject($0) },
-                onOpenScheduleTomorrow: {
-                    Task { await viewModel.openScheduleTomorrow() }
-                },
-                onOpenProjectsTab: { projectId in
-                    Task { await viewModel.jumpToProjectTab(projectId: projectId) }
-                },
-                onRepackProject: { projectId in
-                    Task { await viewModel.beginRepackForProject(projectId: projectId) }
-                }
-            )
-        }
-
-        if let filterId = viewModel.todayProjectFilter,
-           let name = response.warnings.first(where: { $0.projectId == filterId })?.projectName
-               ?? displayRows.first?.pending.projectName {
-            HStack {
-                Text("筛选：\(name)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Button("清除") { viewModel.clearTodayProjectFilter() }
-                    .controlSize(.small)
-            }
-        }
-
-        if !displaySnapshot.highRolloverRows.isEmpty {
-            LearningTodayRolloverStrip(rows: displaySnapshot.highRolloverRows) { taskId in
-                viewModel.focusRolloverTask(taskId)
-            }
-        }
-
-        if !response.warnings.isEmpty {
-            VStack(alignment: .leading, spacing: 4) {
-                ForEach(response.warnings) { warning in
-                    Button {
-                        viewModel.handleWarningTap(warning)
-                    } label: {
-                        Label(
-                            "\(warning.projectName) 落后 \(warning.daysBehind) 天",
-                            systemImage: "exclamationmark.triangle.fill"
-                        )
-                        .font(.caption)
-                        .foregroundStyle(.orange)
+            if studyOver || reviewOver || !response.warnings.isEmpty {
+                LearningTodayActionCard(
+                    studyOverCapacity: studyOver,
+                    reviewOverCapacity: reviewOver,
+                    warnings: response.warnings,
+                    focusProjectId: viewModel.todayProjectFilter,
+                    onFilterProject: { viewModel.filterTodayToProject($0) },
+                    onOpenScheduleTomorrow: {
+                        Task { await viewModel.openScheduleTomorrow() }
+                    },
+                    onOpenProjectsTab: { projectId in
+                        Task { await viewModel.jumpToProjectTab(projectId: projectId) }
+                    },
+                    onRepackProject: { projectId in
+                        Task { await viewModel.beginRepackForProject(projectId: projectId) }
                     }
-                    .buttonStyle(.plain)
+                )
+            }
+
+            if let filterId = viewModel.todayProjectFilter,
+               let name = response.warnings.first(where: { $0.projectId == filterId })?.projectName
+                   ?? displayRows.first?.pending.projectName {
+                HStack {
+                    Text("筛选：\(name)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button("清除") { viewModel.clearTodayProjectFilter() }
+                        .controlSize(.small)
                 }
             }
-        }
 
-        if response.isRestDay {
-            Text("今日休息")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-        }
+            if !response.warnings.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(response.warnings) { warning in
+                        Button {
+                            viewModel.handleWarningTap(warning)
+                        } label: {
+                            Label(
+                                "\(warning.projectName) 落后 \(warning.daysBehind) 天",
+                                systemImage: "exclamationmark.triangle.fill"
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
 
-        if displayRows.isEmpty {
-            Text(response.isRestDay ? "休息日无学习任务。" : "今日无学习任务。")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .padding(.vertical, 8)
-        } else {
+            if response.isRestDay {
+                Text("今日休息")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+
             ScrollViewReader { proxy in
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 12) {
-                        todayTaskList(snapshot: displaySnapshot)
-                        if let preview = response.tomorrowPreview {
-                            sectionTitle("明天预告")
-                            LearningTomorrowPreviewBlock(preview: preview)
+                        if !displaySnapshot.highRolloverRows.isEmpty {
+                            LearningTodayRolloverStrip(rows: displaySnapshot.highRolloverRows) { taskId in
+                                viewModel.focusRolloverTask(taskId)
+                            }
+                        }
+
+                        if displayRows.isEmpty {
+                            Text(response.isRestDay ? "休息日无学习任务。" : "今日无学习任务。")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .padding(.vertical, 8)
+                        } else {
+                            todayTaskList(snapshot: displaySnapshot)
                         }
                     }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 .onChange(of: viewModel.highlightTaskId) { taskId in
                     guard let taskId else { return }
                     withAnimation {
@@ -437,7 +461,26 @@ struct LearningDeskPanelView: View {
                     }
                 }
             }
+
+            todayBottomPinnedBlock(response: response)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    @ViewBuilder
+    private func todayBottomPinnedBlock(response: HermesTodayResponse) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            todayTodoSectionBlock
+
+            if let preview = response.tomorrowPreview {
+                sectionTitle("明天预告")
+                LearningTomorrowPreviewBlock(preview: preview)
+            }
+        }
+    }
+
+    private var todayTodoSectionBlock: some View {
+        TodayTodoSection(store: todayTodoStore, showHistory: $showTodayTodoHistory)
     }
 
     @ViewBuilder
