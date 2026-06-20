@@ -142,10 +142,15 @@ final class AppViewModel: ObservableObject {
         bootstrapT7EjectScheduler: Bool? = nil
     ) {
         self.windowManager = windowManager
-        let resolvedSevenMinuteReminder = sevenMinuteReminder ?? SevenMinuteReminderController()
+        let overlayPresenter = windowManager.transientOverlayPresenter
+        let resolvedSevenMinuteReminder = sevenMinuteReminder ?? SevenMinuteReminderController(
+            overlayPresenter: overlayPresenter
+        )
         self.sevenMinuteReminder = resolvedSevenMinuteReminder
         self.fiveMinuteCatCompanion = fiveMinuteCatCompanion ?? FiveMinuteCatCompanionController()
-        self.hydrationReminder = hydrationReminder ?? HydrationReminderController()
+        self.hydrationReminder = hydrationReminder ?? HydrationReminderController(
+            overlayPresenter: overlayPresenter
+        )
         self.sleepReminder = sleepReminder ?? SleepReminderController(
             bellPresenter: resolvedSevenMinuteReminder,
             windowManager: windowManager

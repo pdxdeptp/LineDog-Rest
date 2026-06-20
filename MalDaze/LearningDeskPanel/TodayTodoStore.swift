@@ -135,6 +135,44 @@ final class TodayTodoStore: ObservableObject {
         _ = persistTodaySlices()
     }
 
+    func moveIncomplete(from source: IndexSet, to destination: Int) {
+        guard canMutate else { return }
+        guard !source.isEmpty else { return }
+
+        var ordered = incompleteEntries
+        ordered.move(fromOffsets: source, toOffset: destination)
+        applyIncompleteSortIndices(ordered)
+        _ = persistTodaySlices()
+    }
+
+    func reorderIncomplete(fromSource sourceIndex: Int, toInsertionIndex insertionIndex: Int) {
+        guard canMutate else { return }
+        guard insertionIndex != sourceIndex, insertionIndex != sourceIndex + 1 else { return }
+
+        var ordered = incompleteEntries
+        guard ordered.indices.contains(sourceIndex) else { return }
+        let item = ordered.remove(at: sourceIndex)
+        let insertAt = insertionIndex > sourceIndex ? insertionIndex - 1 : insertionIndex
+        ordered.insert(item, at: insertAt)
+        applyIncompleteSortIndices(ordered)
+        _ = persistTodaySlices()
+    }
+
+    func moveIncomplete(draggedId: UUID, before targetId: UUID) {
+        guard canMutate, draggedId != targetId else { return }
+
+        var ordered = incompleteEntries
+        guard let fromIndex = ordered.firstIndex(where: { $0.id == draggedId }),
+              let targetIndex = ordered.firstIndex(where: { $0.id == targetId })
+        else { return }
+
+        let entry = ordered.remove(at: fromIndex)
+        let insertIndex = fromIndex < targetIndex ? targetIndex - 1 : targetIndex
+        ordered.insert(entry, at: insertIndex)
+        applyIncompleteSortIndices(ordered)
+        _ = persistTodaySlices()
+    }
+
     func restore(id: UUID) {
         guard canMutate else { return }
         guard let index = allEntries.firstIndex(where: { $0.id == id }) else { return }
@@ -199,6 +237,13 @@ final class TodayTodoStore: ObservableObject {
 
     private func softDelete(at index: Int) {
         allEntries[index].deletedAt = Date()
+    }
+
+    private func applyIncompleteSortIndices(_ ordered: [TodayTodoEntry]) {
+        for (index, entry) in ordered.enumerated() {
+            guard let allIndex = allEntries.firstIndex(where: { $0.id == entry.id }) else { continue }
+            allEntries[allIndex].sortIndex = index
+        }
     }
 
     private func readFile() throws -> TodayTodoFile {

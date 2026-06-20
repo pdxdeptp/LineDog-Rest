@@ -72,6 +72,14 @@ final class MockWindowManager: WindowManaging {
 
     func applyIdlePetAnimationFromUserDefaults() {}
 
+    private lazy var transientOverlayPresenterStorage = MalDazeTransientOverlayPresenter(
+        dashboardPolicy: .init(demoteVisibleDashboardIfNeeded: { _ in })
+    )
+
+    var transientOverlayPresenter: MalDazeTransientOverlayPresenting {
+        transientOverlayPresenterStorage
+    }
+
     /// 对应真实流程里休息动画结束、`finishRestCycle` 调用用户传入的 `onDismissed`。
     func testing_simulateRestPresentationFinished() {
         let cb = pendingUserDismiss

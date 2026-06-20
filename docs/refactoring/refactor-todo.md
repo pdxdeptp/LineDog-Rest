@@ -76,7 +76,7 @@ Do not start by splitting `AppViewModel` or `WindowManager`; both are high-impac
 
 | ID | Status | Risk | Task | Targets | Verification |
 | --- | --- | --- | --- | --- | --- |
-| R22 | Todo | Medium | Extract shared reminder presentation/panel helpers | Hydration, seven-minute, sleep, intervention controllers | Panel positioning and screen-change behavior remain equivalent |
+| R22 | Done | Medium | Extract shared reminder presentation/panel helpers | Hydration, seven-minute, sleep, intervention controllers | `MalDaze/TransientOverlay/` presenter + migrated hydration/center-bell/smart-reminder paths; see `extract-transient-overlay-presenter` |
 | R23 | Todo | Medium-High | Extract PetStageView hit-test and interaction policies | `PetStageView`, WindowManager policies | Tests cover idle/rest/breakRun hit behavior where possible |
 | R24 | Todo | Medium | Review stale code maps and align them with current architecture | `docs/*CODE_MAP.md` | Docs no longer describe obsolete behavior or tick rates |
 

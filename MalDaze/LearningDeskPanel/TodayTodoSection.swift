@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 private enum TodayTodoSectionLayout {
@@ -10,6 +11,9 @@ struct TodayTodoSection: View {
     @Binding var showHistory: Bool
     var sectionHeight: CGFloat
 
+    @StateObject private var reorderController = TodayTodoReorderController()
+    @Environment(\.todayTodoListViewportHeight) private var listViewportHeight
+
     @State private var draft = ""
     @State private var draftFieldHeight = TodayTodoDraftFieldLayout.minHeight
     @State private var completedExpanded = false
@@ -18,6 +22,10 @@ struct TodayTodoSection: View {
     @State private var dismissMonitor = TodayTodoEditingDismissMonitor()
     @State private var draftFocusRequestToken = 0
     @State private var pendingDraftFocus = false
+
+    private var reorderEnabled: Bool {
+        store.incompleteEntries.count > 1 && editingEntryId == nil
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: TodayTodoSectionLayout.sectionSpacing) {
@@ -56,6 +64,7 @@ struct TodayTodoSection: View {
         }
         .onDisappear {
             dismissMonitor.stop()
+            reorderController.cancelDrag()
         }
         .onAppear {
             scheduleDraftFocusWithRetries()
@@ -129,20 +138,73 @@ struct TodayTodoSection: View {
                 }
             }
 
-            ForEach(store.incompleteEntries) { entry in
-                row(for: entry, isCompleted: false)
+            TodayTodoAnimatedReorderList(
+                entries: store.incompleteEntries,
+                listRowSpacing: TodayTodoSectionLayout.listRowSpacing,
+                reorderEnabled: reorderEnabled,
+                listViewportHeight: listViewportHeight,
+                controller: reorderController
+            ) { entry, isDragPlaceholder in
+                row(
+                    for: entry,
+                    isCompleted: false,
+                    reorderGestureEnabled: reorderEnabled && !isDragPlaceholder,
+                    onReorderPressingReady: { event in
+                        commitEditingIfNeeded()
+                        reorderController.beginPressing(
+                            entryId: entry.id,
+                            entries: store.incompleteEntries,
+                            event: event
+                        )
+                    },
+                    onReorderActivated: { event in
+                        commitEditingIfNeeded()
+                        reorderController.beginDrag(
+                            entryId: entry.id,
+                            entries: store.incompleteEntries,
+                            event: event
+                        )
+                    },
+                    onReorderDrag: { event in
+                        reorderController.updateDrag(
+                            event: event,
+                            entries: store.incompleteEntries
+                        )
+                    },
+                    onReorderEnded: {
+                        reorderController.endDrag { sourceIndex, insertionIndex in
+                            store.reorderIncomplete(
+                                fromSource: sourceIndex,
+                                toInsertionIndex: insertionIndex
+                            )
+                        }
+                    }
+                )
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func row(for entry: TodayTodoEntry, isCompleted: Bool) -> some View {
+    private func row(
+        for entry: TodayTodoEntry,
+        isCompleted: Bool,
+        reorderGestureEnabled: Bool = false,
+        onReorderPressingReady: ((NSEvent) -> Void)? = nil,
+        onReorderActivated: ((NSEvent) -> Void)? = nil,
+        onReorderDrag: ((NSEvent) -> Void)? = nil,
+        onReorderEnded: (() -> Void)? = nil
+    ) -> some View {
         TodayTodoRow(
             entry: entry,
             isCompleted: isCompleted,
             isEditing: editingEntryId == entry.id,
             editingText: $editingText,
             isBusy: false,
+            reorderGestureEnabled: reorderGestureEnabled,
+            onReorderPressingReady: onReorderPressingReady,
+            onReorderActivated: onReorderActivated,
+            onReorderDrag: onReorderDrag,
+            onReorderEnded: onReorderEnded,
             onToggleComplete: {
                 commitEditingIfNeeded()
                 store.toggleComplete(id: entry.id)

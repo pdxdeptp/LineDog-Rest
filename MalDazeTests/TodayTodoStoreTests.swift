@@ -149,6 +149,30 @@ final class TodayTodoStoreTests: XCTestCase {
         XCTAssertEqual(store.incompleteEntries.map(\.title), ["未完成昨天"])
     }
 
+    func testMoveIncompleteReordersAndPersistsSortIndex() throws {
+        let store = makeStore()
+        store.loadAndRollForward()
+
+        XCTAssertTrue(store.add(title: "第一项"))
+        XCTAssertTrue(store.add(title: "第二项"))
+        XCTAssertTrue(store.add(title: "第三项"))
+
+        store.moveIncomplete(from: IndexSet(integer: 2), to: 0)
+        XCTAssertEqual(store.incompleteEntries.map(\.title), ["第三项", "第一项", "第二项"])
+
+        store.moveIncomplete(from: IndexSet(integer: 2), to: 1)
+        XCTAssertEqual(store.incompleteEntries.map(\.title), ["第三项", "第二项", "第一项"])
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let data = try Data(contentsOf: fileURL)
+        let file = try decoder.decode(TodayTodoFile.self, from: data)
+        let todayEntries = file.entries.filter { $0.dateISO == todayISO && !$0.isCompleted && $0.deletedAt == nil }
+        let sorted = todayEntries.sorted { $0.sortIndex < $1.sortIndex }
+        XCTAssertEqual(sorted.map(\.title), ["第三项", "第二项", "第一项"])
+        XCTAssertEqual(sorted.map(\.sortIndex), [0, 1, 2])
+    }
+
     func testCorruptFileEntersErrorState() {
         try? Data("{ not-json".utf8).write(to: fileURL, options: .atomic)
 

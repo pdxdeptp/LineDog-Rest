@@ -34,6 +34,12 @@
 		A213 /* MalDazeBroadcastNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = B213 /* MalDazeBroadcastNotifications.swift */; };
 		A214 /* FiveMinuteCatCompanionController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B214 /* FiveMinuteCatCompanionController.swift */; };
 		A23C /* HydrationReminderController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B23C /* HydrationReminderController.swift */; };
+		A24A /* MalDazeTransientOverlayPresenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B24A /* MalDazeTransientOverlayPresenter.swift */; };
+		A24B /* PassiveCenteredOverlayGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = B24B /* PassiveCenteredOverlayGeometry.swift */; };
+		A24C /* CenterBellOverlayContentBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = B24C /* CenterBellOverlayContentBuilder.swift */; };
+		A24D /* HydrationOverlayContentBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = B24D /* HydrationOverlayContentBuilder.swift */; };
+		A24E /* TransientOverlayDashboardPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = B24E /* TransientOverlayDashboardPolicy.swift */; };
+		A30T /* TransientOverlayPresenterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B30T /* TransientOverlayPresenterTests.swift */; };
 		A27D /* SleepScheduleContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = B27D /* SleepScheduleContract.swift */; };
 		A27E /* SleepReminderPlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = B27E /* SleepReminderPlan.swift */; };
 		A27F /* SleepReminderController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B27F /* SleepReminderController.swift */; };
@@ -72,6 +78,11 @@
 		A2T1 /* TodayTodoStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2T1 /* TodayTodoStore.swift */; };
 		A2T2 /* TodayTodoRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2T2 /* TodayTodoRow.swift */; };
 		A2T3 /* TodayTodoSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2T3 /* TodayTodoSection.swift */; };
+		A2TR /* TodayTodoRowFramePreferenceKey.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2TR /* TodayTodoRowFramePreferenceKey.swift */; };
+		A2TC /* TodayTodoReorderController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2TC /* TodayTodoReorderController.swift */; };
+		A2TL /* TodayTodoAnimatedReorderList.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2TL /* TodayTodoAnimatedReorderList.swift */; };
+		A2TP /* TodayTodoListPointerReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2TP /* TodayTodoListPointerReader.swift */; };
+		A2TV /* TodayTodoListViewportHeight.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2TV /* TodayTodoListViewportHeight.swift */; };
 		A2T8 /* TodayTodoContentLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2T8 /* TodayTodoContentLayout.swift */; };
 		A2T7 /* TodayTodoLayoutPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2T7 /* TodayTodoLayoutPolicy.swift */; };
 		A2T4 /* TodayTodoHistorySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2T4 /* TodayTodoHistorySheet.swift */; };
@@ -80,6 +91,7 @@
 		A31T /* TodayTodoStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31T /* TodayTodoStoreTests.swift */; };
 		A31V /* LearningScheduleDayWindowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31V /* LearningScheduleDayWindowTests.swift */; };
 		A31W /* TodayTodoContentLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31W /* TodayTodoContentLayoutTests.swift */; };
+		A31R /* TodayTodoReorderControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31R /* TodayTodoReorderControllerTests.swift */; };
 		A31U /* TodayTodoLayoutPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31U /* TodayTodoLayoutPolicyTests.swift */; };
 		A2A1 /* NutritionDailyLogContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2A1 /* NutritionDailyLogContract.swift */; };
 		A2A2 /* NutritionDailyLogFileWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2A2 /* NutritionDailyLogFileWatcher.swift */; };
@@ -214,6 +226,12 @@
 		B213 /* MalDazeBroadcastNotifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MalDazeBroadcastNotifications.swift; sourceTree = "<group>"; };
 		B214 /* FiveMinuteCatCompanionController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FiveMinuteCatCompanionController.swift; sourceTree = "<group>"; };
 		B23C /* HydrationReminderController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HydrationReminderController.swift; sourceTree = "<group>"; };
+		B24A /* MalDazeTransientOverlayPresenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MalDazeTransientOverlayPresenter.swift; sourceTree = "<group>"; };
+		B24B /* PassiveCenteredOverlayGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PassiveCenteredOverlayGeometry.swift; sourceTree = "<group>"; };
+		B24C /* CenterBellOverlayContentBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CenterBellOverlayContentBuilder.swift; sourceTree = "<group>"; };
+		B24D /* HydrationOverlayContentBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HydrationOverlayContentBuilder.swift; sourceTree = "<group>"; };
+		B24E /* TransientOverlayDashboardPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransientOverlayDashboardPolicy.swift; sourceTree = "<group>"; };
+		B30T /* TransientOverlayPresenterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransientOverlayPresenterTests.swift; sourceTree = "<group>"; };
 		B27D /* SleepScheduleContract.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepScheduleContract.swift; sourceTree = "<group>"; };
 		B27E /* SleepReminderPlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepReminderPlan.swift; sourceTree = "<group>"; };
 		B27F /* SleepReminderController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepReminderController.swift; sourceTree = "<group>"; };
@@ -252,6 +270,11 @@
 		B2T1 /* TodayTodoStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoStore.swift; sourceTree = "<group>"; };
 		B2T2 /* TodayTodoRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoRow.swift; sourceTree = "<group>"; };
 		B2T3 /* TodayTodoSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoSection.swift; sourceTree = "<group>"; };
+		B2TR /* TodayTodoRowFramePreferenceKey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoRowFramePreferenceKey.swift; sourceTree = "<group>"; };
+		B2TC /* TodayTodoReorderController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoReorderController.swift; sourceTree = "<group>"; };
+		B2TL /* TodayTodoAnimatedReorderList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoAnimatedReorderList.swift; sourceTree = "<group>"; };
+		B2TP /* TodayTodoListPointerReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoListPointerReader.swift; sourceTree = "<group>"; };
+		B2TV /* TodayTodoListViewportHeight.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoListViewportHeight.swift; sourceTree = "<group>"; };
 		B2T8 /* TodayTodoContentLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoContentLayout.swift; sourceTree = "<group>"; };
 		B2T7 /* TodayTodoLayoutPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoLayoutPolicy.swift; sourceTree = "<group>"; };
 		B2T4 /* TodayTodoHistorySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoHistorySheet.swift; sourceTree = "<group>"; };
@@ -260,6 +283,7 @@
 		B31T /* TodayTodoStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoStoreTests.swift; sourceTree = "<group>"; };
 		B31V /* LearningScheduleDayWindowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningScheduleDayWindowTests.swift; sourceTree = "<group>"; };
 		B31W /* TodayTodoContentLayoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoContentLayoutTests.swift; sourceTree = "<group>"; };
+		B31R /* TodayTodoReorderControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoReorderControllerTests.swift; sourceTree = "<group>"; };
 		B31U /* TodayTodoLayoutPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoLayoutPolicyTests.swift; sourceTree = "<group>"; };
 		B2A1 /* NutritionDailyLogContract.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionDailyLogContract.swift; sourceTree = "<group>"; };
 		B2A2 /* NutritionDailyLogFileWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionDailyLogFileWatcher.swift; sourceTree = "<group>"; };
@@ -419,6 +443,7 @@
 				E207 /* SevenMinuteReminder */,
 				E208 /* FiveMinuteCat */,
 				E20C /* HydrationReminder */,
+				E214 /* TransientOverlay */,
 				E20D /* SleepReminder */,
 				E210 /* InterventionRequest */,
 				E211 /* LearningDeskPanel */,
@@ -498,6 +523,7 @@
 				B307 /* DeskReminderTimeFormatterTests.swift */,
 				B308 /* DeskReminderSidebarMergerTests.swift */,
 				B309 /* ControlPanelPresentationTests.swift */,
+				B30T /* TransientOverlayPresenterTests.swift */,
 					B311 /* PetRendererTests.swift */,
 					B313 /* T7EjectHelperTests.swift */,
 					B314 /* T7TargetResolverTests.swift */,
@@ -512,6 +538,7 @@
 					B31J /* HermesScheduleModelsTests.swift */,
 					B31K /* LearningDeskPanelViewModelTests.swift */,
 					B31T /* TodayTodoStoreTests.swift */,
+					B31R /* TodayTodoReorderControllerTests.swift */,
 					B31U /* TodayTodoLayoutPolicyTests.swift */,
 					B31W /* TodayTodoContentLayoutTests.swift */,
 					B31V /* LearningScheduleDayWindowTests.swift */,
@@ -550,6 +577,18 @@
 				B23C /* HydrationReminderController.swift */,
 			);
 			path = HydrationReminder;
+			sourceTree = "<group>";
+		};
+		E214 /* TransientOverlay */ = {
+			isa = PBXGroup;
+			children = (
+				B24E /* TransientOverlayDashboardPolicy.swift */,
+				B24A /* MalDazeTransientOverlayPresenter.swift */,
+				B24B /* PassiveCenteredOverlayGeometry.swift */,
+				B24C /* CenterBellOverlayContentBuilder.swift */,
+				B24D /* HydrationOverlayContentBuilder.swift */,
+			);
+			path = TransientOverlay;
 			sourceTree = "<group>";
 		};
 		E20D /* SleepReminder */ = {
@@ -620,6 +659,11 @@
 				B2T3 /* TodayTodoSection.swift */,
 				B2T7 /* TodayTodoLayoutPolicy.swift */,
 				B2T8 /* TodayTodoContentLayout.swift */,
+				B2TR /* TodayTodoRowFramePreferenceKey.swift */,
+				B2TC /* TodayTodoReorderController.swift */,
+				B2TL /* TodayTodoAnimatedReorderList.swift */,
+				B2TP /* TodayTodoListPointerReader.swift */,
+				B2TV /* TodayTodoListViewportHeight.swift */,
 				B2T4 /* TodayTodoHistorySheet.swift */,
 				B2T5 /* TodayTodoDraftField.swift */,
 				B2T6 /* TodayTodoInlineText.swift */,
@@ -838,6 +882,11 @@
 				A213 /* MalDazeBroadcastNotifications.swift in Sources */,
 				A214 /* FiveMinuteCatCompanionController.swift in Sources */,
 				A23C /* HydrationReminderController.swift in Sources */,
+				A24E /* TransientOverlayDashboardPolicy.swift in Sources */,
+				A24A /* MalDazeTransientOverlayPresenter.swift in Sources */,
+				A24B /* PassiveCenteredOverlayGeometry.swift in Sources */,
+				A24C /* CenterBellOverlayContentBuilder.swift in Sources */,
+				A24D /* HydrationOverlayContentBuilder.swift in Sources */,
 				A23F /* HermesRuntime.swift in Sources */,
 				A27D /* SleepScheduleContract.swift in Sources */,
 				A27E /* SleepReminderPlan.swift in Sources */,
@@ -876,6 +925,11 @@
 				A2T3 /* TodayTodoSection.swift in Sources */,
 				A2T7 /* TodayTodoLayoutPolicy.swift in Sources */,
 				A2T8 /* TodayTodoContentLayout.swift in Sources */,
+				A2TR /* TodayTodoRowFramePreferenceKey.swift in Sources */,
+				A2TC /* TodayTodoReorderController.swift in Sources */,
+				A2TL /* TodayTodoAnimatedReorderList.swift in Sources */,
+				A2TP /* TodayTodoListPointerReader.swift in Sources */,
+				A2TV /* TodayTodoListViewportHeight.swift in Sources */,
 				A2T4 /* TodayTodoHistorySheet.swift in Sources */,
 				A2T5 /* TodayTodoDraftField.swift in Sources */,
 				A2T6 /* TodayTodoInlineText.swift in Sources */,
@@ -956,6 +1010,7 @@
 				A307 /* DeskReminderTimeFormatterTests.swift in Sources */,
 				A308 /* DeskReminderSidebarMergerTests.swift in Sources */,
 				A309 /* ControlPanelPresentationTests.swift in Sources */,
+				A30T /* TransientOverlayPresenterTests.swift in Sources */,
 					A311 /* PetRendererTests.swift in Sources */,
 					A313 /* T7EjectHelperTests.swift in Sources */,
 					A314 /* T7TargetResolverTests.swift in Sources */,
@@ -970,6 +1025,7 @@
 					A31J /* HermesScheduleModelsTests.swift in Sources */,
 					A31K /* LearningDeskPanelViewModelTests.swift in Sources */,
 					A31T /* TodayTodoStoreTests.swift in Sources */,
+					A31R /* TodayTodoReorderControllerTests.swift in Sources */,
 					A31U /* TodayTodoLayoutPolicyTests.swift in Sources */,
 					A31W /* TodayTodoContentLayoutTests.swift in Sources */,
 					A31V /* LearningScheduleDayWindowTests.swift in Sources */,

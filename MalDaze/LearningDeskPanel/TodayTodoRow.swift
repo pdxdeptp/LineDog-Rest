@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct TodayTodoRow: View {
@@ -6,6 +7,11 @@ struct TodayTodoRow: View {
     let isEditing: Bool
     @Binding var editingText: String
     let isBusy: Bool
+    var reorderGestureEnabled: Bool = false
+    var onReorderPressingReady: ((NSEvent) -> Void)? = nil
+    var onReorderActivated: ((NSEvent) -> Void)? = nil
+    var onReorderDrag: ((NSEvent) -> Void)? = nil
+    var onReorderEnded: (() -> Void)? = nil
     let onToggleComplete: () -> Void
     let onBeginEdit: () -> Void
     let onCommitEdit: () -> Void
@@ -27,8 +33,13 @@ struct TodayTodoRow: View {
                     text: isEditing ? $editingText : .constant(entry.title),
                     isEditing: isEditing,
                     isCompleted: isCompleted,
+                    reorderGestureEnabled: reorderGestureEnabled,
                     onBeginEditing: onBeginEdit,
-                    onCommit: onCommitEdit
+                    onCommit: onCommitEdit,
+                    onReorderPressingReady: onReorderPressingReady,
+                    onReorderActivated: onReorderActivated,
+                    onReorderDrag: onReorderDrag,
+                    onReorderEnded: onReorderEnded
                 )
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, minHeight: 18, alignment: .leading)

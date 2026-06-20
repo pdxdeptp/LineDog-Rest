@@ -361,42 +361,55 @@ final class ControlPanelPresentationTests: XCTestCase {
     }
 
     func testCenterBellReminderDismissalUsesNonActivatingPanel() throws {
-        let source = try readProjectSource("MalDaze/SevenMinuteReminder/SevenMinuteReminderController.swift")
-        let reminderSource = try functionSource(named: "showReminderWindow", in: source)
+        let source = try readProjectSource("MalDaze/TransientOverlay/PassiveCenteredOverlayGeometry.swift")
+        let presenterSource = try readProjectSource("MalDaze/TransientOverlay/MalDazeTransientOverlayPresenter.swift")
+        let bellSource = try readProjectSource("MalDaze/SevenMinuteReminder/SevenMinuteReminderController.swift")
 
         XCTAssertTrue(
-            reminderSource.contains("NSPanel("),
-            "The click-to-dismiss center bell should use a panel, not an ordinary app-activating window."
+            source.contains("NSPanel("),
+            "The center bell shell should use a panel."
         )
         XCTAssertTrue(
-            reminderSource.contains(".nonactivatingPanel"),
+            source.contains(".nonactivatingPanel"),
             "Dismissing the center bell should not activate MalDaze and surface the Dashboard."
         )
+        XCTAssertTrue(
+            presenterSource.contains("presentCenterBell"),
+            "SevenMinuteReminderController should delegate center bell presentation."
+        )
+        XCTAssertTrue(
+            bellSource.contains("overlayPresenter.presentCenterBell"),
+            "SevenMinuteReminderController should delegate center bell presentation."
+        )
         XCTAssertFalse(
-            reminderSource.contains("NSWindow("),
-            "The center bell dismissal surface should not be an ordinary NSWindow."
+            bellSource.contains("showReminderWindow"),
+            "Center bell window code should not remain in SevenMinuteReminderController."
         )
     }
 
     func testHydrationReminderActionsUseNonActivatingPanel() throws {
-        let source = try readProjectSource("MalDaze/HydrationReminder/HydrationReminderController.swift")
-        let reminderSource = try functionSource(named: "showReminderWindow", in: source)
+        let geometrySource = try readProjectSource("MalDaze/TransientOverlay/PassiveCenteredOverlayGeometry.swift")
+        let hydrationSource = try readProjectSource("MalDaze/HydrationReminder/HydrationReminderController.swift")
 
         XCTAssertTrue(
-            reminderSource.contains("NSPanel("),
+            geometrySource.contains("NSPanel("),
             "The hydration reminder should use a panel, not an ordinary app-activating window."
         )
         XCTAssertTrue(
-            reminderSource.contains(".nonactivatingPanel"),
+            geometrySource.contains(".nonactivatingPanel"),
             "Clicking hydration reminder actions should not activate MalDaze and surface the Dashboard."
         )
+        XCTAssertTrue(
+            hydrationSource.contains("overlayPresenter.presentHydrationReminder"),
+            "HydrationReminderController should delegate overlay presentation."
+        )
         XCTAssertFalse(
-            reminderSource.contains("NSApp.activate(ignoringOtherApps: true)"),
+            hydrationSource.contains("NSApp.activate(ignoringOtherApps: true)"),
             "Showing the hydration reminder should not activate MalDaze because that can foreground Dashboard."
         )
         XCTAssertFalse(
-            reminderSource.contains("NSWindow("),
-            "The hydration reminder action surface should not be an ordinary NSWindow."
+            hydrationSource.contains("showReminderWindow"),
+            "Hydration reminder window code should not remain in HydrationReminderController."
         )
     }
 
@@ -1116,6 +1129,44 @@ final class ControlPanelPresentationTests: XCTestCase {
         XCTAssertFalse(policySource.contains("compactStackHeight"))
         XCTAssertFalse(policySource.contains("hysteresisBand"))
         XCTAssertFalse(policySource.contains("estimatedRowHeight"))
+    }
+
+    func testTodayTodoUsesAnimatedTextBodyReorder() throws {
+        let sectionSource = try readProjectSource("MalDaze/LearningDeskPanel/TodayTodoSection.swift")
+        let rowSource = try readProjectSource("MalDaze/LearningDeskPanel/TodayTodoRow.swift")
+        let inlineSource = try readProjectSource("MalDaze/LearningDeskPanel/TodayTodoInlineText.swift")
+        let controllerSource = try readProjectSource("MalDaze/LearningDeskPanel/TodayTodoReorderController.swift")
+        let listSource = try readProjectSource("MalDaze/LearningDeskPanel/TodayTodoAnimatedReorderList.swift")
+        let frameSource = try readProjectSource("MalDaze/LearningDeskPanel/TodayTodoRowFramePreferenceKey.swift")
+
+        XCTAssertTrue(sectionSource.contains("TodayTodoAnimatedReorderList("))
+        XCTAssertTrue(sectionSource.contains("TodayTodoReorderController()"))
+        XCTAssertFalse(sectionSource.contains("TodayTodoReorderDropDelegate"))
+        XCTAssertFalse(sectionSource.contains("onDrop("))
+        XCTAssertFalse(sectionSource.contains("draggingEntryId"))
+        XCTAssertFalse(sectionSource.contains("line.3.horizontal"))
+
+        XCTAssertFalse(rowSource.contains("showsReorderHandle"))
+        XCTAssertFalse(rowSource.contains("reorderDragProvider"))
+        XCTAssertTrue(rowSource.contains("reorderGestureEnabled"))
+        XCTAssertTrue(rowSource.contains("onReorderActivated"))
+
+        XCTAssertTrue(inlineSource.contains("TodayTodoReorderMetrics.longPressDuration"))
+        XCTAssertTrue(inlineSource.contains("onReorderActivated"))
+        XCTAssertTrue(inlineSource.contains("isReorderDragging"))
+
+        XCTAssertTrue(controllerSource.contains("TodayTodoReorderController"))
+        XCTAssertTrue(controllerSource.contains("previewOrder"))
+        XCTAssertTrue(controllerSource.contains("case settling"))
+        XCTAssertTrue(controllerSource.contains("TodayTodoReorderPhase"))
+
+        XCTAssertTrue(listSource.contains("TodayTodoRowFramePreferenceKey"))
+        XCTAssertTrue(listSource.contains("TodayTodoListPointerReader"))
+        XCTAssertFalse(listSource.contains("TodayTodoListCoordinateAnchor"))
+        XCTAssertTrue(controllerSource.contains("TodayTodoReorderMetrics.liftScale"))
+
+        XCTAssertTrue(frameSource.contains("TodayTodoRowFramePreferenceKey"))
+        XCTAssertTrue(frameSource.contains("TodayTodoReorderEdgeScrollPreferenceKey"))
     }
 
     func testDeskPetDashboardWindowLayoutClampsToSmallVisibleFrame() {

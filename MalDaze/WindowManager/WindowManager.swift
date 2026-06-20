@@ -165,6 +165,8 @@ protocol WindowManaging: AnyObject {
     func applyIdlePetIconSideFromUserDefaults()
     /// `MalDazeDefaults.idlePetAnimationIntensity` 变更后：刷新桌宠 GIF 动画强度。
     func applyIdlePetAnimationFromUserDefaults()
+    /// 临时浮层（中心铃铛、喝水、智能提醒）展示 SSOT。
+    var transientOverlayPresenter: MalDazeTransientOverlayPresenting { get }
 }
 
 extension WindowManaging {
@@ -258,6 +260,18 @@ final class WindowManager: WindowManaging {
     private var smartToastDismiss: Timer?
     /// 智能输入框草稿：点外部 / Esc /「取消」关闭后面板不丢字；回车提交成功后清空。
     private var smartReminderInputDraft: String = ""
+    private lazy var transientOverlayPresenterStorage = MalDazeTransientOverlayPresenter(
+        dashboardPolicy: .init { [weak self] appWasActiveBeforePresent in
+            self?.demoteVisibleDashboardBelowOtherApplicationsIfNeeded(
+                onlyIfAppWasInactive: true,
+                appWasActiveBeforeOverlay: appWasActiveBeforePresent
+            )
+        }
+    )
+
+    var transientOverlayPresenter: MalDazeTransientOverlayPresenting {
+        transientOverlayPresenterStorage
+    }
 
     init() {
         // SwiftUI + 仅 MenuBarExtra 时，`AppViewModel` 初始化可能早于应用完成启动；窗口层级未就绪会导致「有进程但桌宠窗从未真正出现」。
@@ -1095,17 +1109,12 @@ final class WindowManager: WindowManaging {
             }
         )
         smartInputPanel = panel
-        SmartReminderUIPanels.positionPanelTopCenter(panel, anchor: anchor, size: panel.frame.size)
-        NSApp.activate(ignoringOtherApps: true)
-        panel.makeKeyAndOrderFront(nil)
-        panel.makeFirstResponder(panel.contentView)
+        transientOverlayPresenter.presentSmartReminderInput(
+            panel: panel,
+            anchor: anchor,
+            size: panel.frame.size
+        )
         installSmartInputDismissMonitors()
-        DispatchQueue.main.async { [weak panel] in
-            guard let panel else { return }
-            NSApp.activate(ignoringOtherApps: true)
-            panel.makeKeyAndOrderFront(nil)
-            panel.makeFirstResponder(panel.contentView)
-        }
     }
 
     func presentSmartReminderInputFromGlobalShortcut(
@@ -1169,8 +1178,7 @@ final class WindowManager: WindowManaging {
         )
         smartToastPanel = panel
         let anchor = window.map { $0.frame } ?? Self.defaultSmartInputAnchorInScreen()
-        SmartReminderUIPanels.positionPanelTopCenter(panel, anchor: anchor, size: size)
-        panel.orderFrontRegardless()
+        transientOverlayPresenter.presentSmartReminderToast(panel: panel, anchor: anchor, size: size)
         smartToastDismiss = Timer.scheduledTimer(withTimeInterval: 4.0, repeats: false) { [weak self] _ in
             Task { @MainActor in
                 self?.dismissSmartReminderToast()
@@ -1323,8 +1331,12 @@ extension WindowManager: PetStageDeskMenuPresenter {
     }
 
     /// 桌宠休息/跑屏 `orderFrontRegardless` 会把整个 App 激活，连带抬高已打开的 Dashboard；压回全局栈底且保持可见。
-    private func demoteVisibleDashboardBelowOtherApplicationsIfNeeded() {
+    private func demoteVisibleDashboardBelowOtherApplicationsIfNeeded(
+        onlyIfAppWasInactive: Bool = false,
+        appWasActiveBeforeOverlay: Bool = false
+    ) {
         guard let dashboard = deskMenuWindow, dashboard.isVisible else { return }
+        if onlyIfAppWasInactive, appWasActiveBeforeOverlay { return }
         dashboard.order(.below, relativeTo: 0)
     }
 

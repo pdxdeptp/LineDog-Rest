@@ -1,21 +1,24 @@
 import AppKit
 
-/// 可配置时长（默认 7 分钟）的倒计时 + 结束铃铛提醒。与桌宠、`WindowManager`、`PetStageView` 无引用关系，独立窗口层级。
+/// 可配置时长（默认 7 分钟）的倒计时 + 结束铃铛提醒。中心铃铛展示委托 `MalDazeTransientOverlayPresenter`。
 @MainActor
 final class SevenMinuteReminderController {
     /// 倒计时进行中为 `true`；仅显示铃铛等待点击时为 `false`（可再次开始）。
     var onRunningChanged: ((Bool) -> Void)?
 
+    private let overlayPresenter: MalDazeTransientOverlayPresenting
     private var countdownWindow: NSWindow?
     private var countdownLabel: NSTextField?
-    private var reminderWindow: NSWindow?
     private var tickTimer: Timer?
     private var remainingSeconds: Int = 0
-    /// 本次 `start()` 使用的分钟数（用于结束文案；避免倒计时中途用户改设置导致文案不一致）。
     private var startedDurationMinutes: Int = 7
     private var screenObserver: NSObjectProtocol?
     private var lastReminderMessage: String = ""
     private var completionMessage: String = ""
+
+    init(overlayPresenter: MalDazeTransientOverlayPresenting) {
+        self.overlayPresenter = overlayPresenter
+    }
 
     func start() {
         start(minutes: Self.configuredDurationMinutes(), completionMessage: "")
@@ -25,7 +28,7 @@ final class SevenMinuteReminderController {
     func start(minutes: Int, completionMessage: String) {
         stopTickTimer()
         tearDownCountdownUI()
-        tearDownReminderUI()
+        overlayPresenter.dismissCenterBell()
         let clamped = min(180, max(1, minutes))
         startedDurationMinutes = clamped
         self.completionMessage = completionMessage
@@ -48,7 +51,7 @@ final class SevenMinuteReminderController {
     func cancel() {
         stopTickTimer()
         tearDownCountdownUI()
-        tearDownReminderUI()
+        overlayPresenter.dismissCenterBell()
         removeScreenObserver()
         completionMessage = ""
         onRunningChanged?(false)
@@ -56,16 +59,16 @@ final class SevenMinuteReminderController {
 
     /// 与倒计时结束相同 UI：中央铃铛 + 文案，点击任意处关闭。
     func presentCenterBellReminder(message: String = "计时结束") {
-        observeScreensIfNeeded()
-        showReminderWindow(message: message)
+        lastReminderMessage = message
+        overlayPresenter.presentCenterBell(message: message, onDismiss: {})
     }
 
     /// 仅关闭中央铃铛浮层，不影响独立倒计时条。
     func dismissCenterBellReminderIfShowing() {
-        tearDownReminderUI()
+        overlayPresenter.dismissCenterBell()
     }
 
-    var isCenterBellReminderVisible: Bool { reminderWindow != nil }
+    var isCenterBellReminderVisible: Bool { overlayPresenter.isCenterBellVisible }
 
     private static func configuredDurationMinutes() -> Int {
         var v = UserDefaults.standard.integer(forKey: MalDazeDefaults.sevenMinuteReminderDurationMinutes)
@@ -106,12 +109,7 @@ final class SevenMinuteReminderController {
             ? "\(startedDurationMinutes) 分钟计时结束"
             : completionMessage
         completionMessage = ""
-        showReminderWindow(message: message)
-    }
-
-    private func dismissReminder() {
-        tearDownReminderUI()
-        removeScreenObserver()
+        presentCenterBellReminder(message: message)
     }
 
     // MARK: - Countdown window（右下角，穿透鼠标）
@@ -184,136 +182,6 @@ final class SevenMinuteReminderController {
         countdownLabel = nil
     }
 
-    // MARK: - Reminder window（屏幕中心，铃铛 + 文案，点按关闭）
-
-    private static let reminderMaxTextWidth: CGFloat = 280
-    private static let reminderPadding: CGFloat = 20
-    private static let reminderIconGap: CGFloat = 12
-    private static let reminderIconSide: CGFloat = 52
-
-    private static func contentSizeForReminder(message: String) -> NSSize {
-        let pad = reminderPadding
-        let maxInnerW = reminderMaxTextWidth - 2 * pad
-        let font = NSFont.systemFont(ofSize: 16, weight: .semibold)
-        let attrs: [NSAttributedString.Key: Any] = [.font: font]
-        let rect = (message as NSString).boundingRect(
-            with: NSSize(width: max(80, maxInnerW), height: .greatestFiniteMagnitude),
-            options: [.usesLineFragmentOrigin, .usesFontLeading],
-            attributes: attrs
-        )
-        let textH = ceil(max(24, rect.height))
-        let w = max(200, min(reminderMaxTextWidth, ceil(rect.width) + 2 * pad))
-        let h = pad + reminderIconSide + reminderIconGap + textH + pad
-        return NSSize(width: w, height: h)
-    }
-
-    private static func reminderFrame(contentSize: NSSize) -> NSRect {
-        guard let s = MenuBarNSScreen.screen ?? NSScreen.screens.first else {
-            return NSRect(x: 200, y: 200, width: contentSize.width, height: contentSize.height)
-        }
-        let vf = s.visibleFrame
-        let x = vf.midX - contentSize.width / 2
-        let y = vf.midY - contentSize.height / 2
-        return NSRect(x: x, y: y, width: contentSize.width, height: contentSize.height)
-    }
-
-    private func showReminderWindow(message: String) {
-        lastReminderMessage = message
-        tearDownReminderUI()
-        observeScreensIfNeeded()
-        let size = Self.contentSizeForReminder(message: message)
-        let frame = Self.reminderFrame(contentSize: size)
-        let win = NSPanel(
-            contentRect: frame,
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false,
-            screen: MenuBarNSScreen.screen ?? NSScreen.screens.first
-        )
-        win.isFloatingPanel = true
-        win.isOpaque = false
-        win.backgroundColor = .clear
-        win.level = .screenSaver
-        win.collectionBehavior = [.canJoinAllSpaces, .stationary]
-        win.isReleasedWhenClosed = false
-        win.ignoresMouseEvents = false
-        win.hidesOnDeactivate = false
-
-        let container = NSView(frame: NSRect(origin: .zero, size: size))
-        container.wantsLayer = true
-        container.layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(0.94).cgColor
-        container.layer?.cornerRadius = 16
-        container.layer?.borderWidth = 1
-        container.layer?.borderColor = NSColor.separatorColor.withAlphaComponent(0.6).cgColor
-        container.layer?.shadowColor = NSColor.black.cgColor
-        container.layer?.shadowOpacity = 0.22
-        container.layer?.shadowOffset = NSSize(width: 0, height: -3)
-        container.layer?.shadowRadius = 12
-
-        let baseSymbol =
-            NSImage(systemSymbolName: "bell.badge.fill", accessibilityDescription: "提醒")
-            ?? NSImage(systemSymbolName: "bell.fill", accessibilityDescription: "提醒")
-            ?? NSImage(size: NSSize(width: 48, height: 48))
-        let cfg = NSImage.SymbolConfiguration(pointSize: 36, weight: .medium)
-            .applying(NSImage.SymbolConfiguration(paletteColors: [.systemOrange]))
-        let iconImg = baseSymbol.withSymbolConfiguration(cfg) ?? baseSymbol
-        let imgView = NSImageView(image: iconImg)
-        imgView.imageScaling = NSImageScaling.scaleProportionallyUpOrDown
-        imgView.imageAlignment = .alignCenter
-        imgView.isEditable = false
-
-        let textField = NSTextField(wrappingLabelWithString: message)
-        textField.font = NSFont.systemFont(ofSize: 16, weight: .semibold)
-        textField.textColor = .labelColor
-        textField.alignment = .center
-        textField.maximumNumberOfLines = 0
-        textField.isEditable = false
-        textField.isSelectable = false
-        textField.isBordered = false
-        textField.drawsBackground = false
-
-        let pad = Self.reminderPadding
-        let iconY = size.height - pad - Self.reminderIconSide
-        imgView.frame = NSRect(
-            x: (size.width - Self.reminderIconSide) / 2,
-            y: iconY,
-            width: Self.reminderIconSide,
-            height: Self.reminderIconSide
-        )
-        let textY = pad
-        let textH = iconY - Self.reminderIconGap - textY
-        textField.frame = NSRect(x: pad, y: textY, width: size.width - 2 * pad, height: max(24, textH))
-
-        let overlay = ReminderDismissPanelView(frame: container.bounds)
-        overlay.autoresizingMask = [.width, .height]
-        overlay.wantsLayer = true
-        overlay.layer?.backgroundColor = NSColor.clear.cgColor
-        overlay.onDismiss = { [weak self] in
-            Task { @MainActor [weak self] in
-                self?.dismissReminder()
-            }
-        }
-
-        container.addSubview(imgView)
-        container.addSubview(textField)
-        container.addSubview(overlay)
-
-        win.contentView = container
-        reminderWindow = win
-        win.orderFrontRegardless()
-    }
-
-    private func repositionReminderWindow() {
-        guard let win = reminderWindow else { return }
-        let sz = Self.contentSizeForReminder(message: lastReminderMessage)
-        win.setFrame(Self.reminderFrame(contentSize: sz), display: true)
-    }
-
-    private func tearDownReminderUI() {
-        reminderWindow?.orderOut(nil)
-        reminderWindow = nil
-    }
-
     // MARK: - Screen changes
 
     private func observeScreensIfNeeded() {
@@ -325,7 +193,6 @@ final class SevenMinuteReminderController {
         ) { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.repositionCountdownWindow()
-                self?.repositionReminderWindow()
             }
         }
     }
@@ -335,15 +202,5 @@ final class SevenMinuteReminderController {
             NotificationCenter.default.removeObserver(o)
             screenObserver = nil
         }
-    }
-}
-
-// MARK: - 点击面板任意处关闭
-
-private final class ReminderDismissPanelView: NSView {
-    var onDismiss: (() -> Void)?
-
-    override func mouseDown(with event: NSEvent) {
-        onDismiss?()
     }
 }

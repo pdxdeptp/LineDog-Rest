@@ -33,7 +33,7 @@ final class SleepReminderClamshellTests: XCTestCase {
 
     func testWillSleepDismissesActiveSleepLock() {
         let mock = MockWindowManager()
-        let bell = SevenMinuteReminderController()
+        let bell = SevenMinuteReminderController(overlayPresenter: mock.transientOverlayPresenter)
         let controller = SleepReminderController(
             contractReader: SleepScheduleContractReader(fileURL: URL(fileURLWithPath: "/dev/null")),
             bellPresenter: bell,
@@ -55,7 +55,7 @@ final class SleepReminderClamshellTests: XCTestCase {
     func testWillSleepSkipsDismissWhenClamshellSettingOff() {
         UserDefaults.standard.set(false, forKey: MalDazeDefaults.sleepScheduleDismissOnClamshell)
         let mock = MockWindowManager()
-        let bell = SevenMinuteReminderController()
+        let bell = SevenMinuteReminderController(overlayPresenter: mock.transientOverlayPresenter)
         let controller = SleepReminderController(
             contractReader: SleepScheduleContractReader(fileURL: URL(fileURLWithPath: "/dev/null")),
             bellPresenter: bell,

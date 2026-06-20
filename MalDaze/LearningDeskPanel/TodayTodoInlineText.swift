@@ -12,8 +12,13 @@ struct TodayTodoInlineText: NSViewRepresentable {
     @Binding var text: String
     var isEditing: Bool
     var isCompleted: Bool
+    var reorderGestureEnabled: Bool = false
     var onBeginEditing: () -> Void
     var onCommit: () -> Void
+    var onReorderPressingReady: ((NSEvent) -> Void)? = nil
+    var onReorderActivated: ((NSEvent) -> Void)? = nil
+    var onReorderDrag: ((NSEvent) -> Void)? = nil
+    var onReorderEnded: (() -> Void)? = nil
 
     func makeCoordinator() -> Coordinator {
         Coordinator(parent: self)
@@ -31,7 +36,12 @@ struct TodayTodoInlineText: NSViewRepresentable {
             text: text,
             isEditing: isEditing,
             isCompleted: isCompleted,
-            onBeginEditing: onBeginEditing
+            reorderGestureEnabled: reorderGestureEnabled,
+            onBeginEditing: onBeginEditing,
+            onReorderPressingReady: onReorderPressingReady,
+            onReorderActivated: onReorderActivated,
+            onReorderDrag: onReorderDrag,
+            onReorderEnded: onReorderEnded
         )
     }
 
@@ -56,15 +66,102 @@ struct TodayTodoInlineText: NSViewRepresentable {
 
 final class InlineNotesTextView: NSTextView {
     var onBeginEditingWithEvent: ((NSEvent) -> Void)?
+    var reorderGestureEnabled = false
+    var onReorderPressingReady: ((NSEvent) -> Void)?
+    var onReorderActivated: ((NSEvent) -> Void)?
+    var onReorderDrag: ((NSEvent) -> Void)?
+    var onReorderEnded: (() -> Void)?
+
+    private var longPressTimer: Timer?
+    private var longPressReady = false
+    private var isReorderDragging = false
+    private var mouseDownLocation: NSPoint = .zero
+    private var mouseDownEvent: NSEvent?
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
     override func mouseDown(with event: NSEvent) {
-        if !isEditable {
-            onBeginEditingWithEvent?(event)
+        if isEditable {
+            super.mouseDown(with: event)
             return
         }
-        super.mouseDown(with: event)
+
+        resetReorderTracking()
+
+        if reorderGestureEnabled {
+            mouseDownLocation = event.locationInWindow
+            mouseDownEvent = event
+            longPressTimer = Timer.scheduledTimer(
+                withTimeInterval: TodayTodoReorderMetrics.longPressDuration,
+                repeats: false
+            ) { [weak self] _ in
+                guard let self, let event = self.mouseDownEvent else { return }
+                self.longPressReady = true
+                self.onReorderPressingReady?(event)
+            }
+            return
+        }
+
+        onBeginEditingWithEvent?(event)
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        if reorderGestureEnabled, longPressReady || isReorderDragging {
+            let dx = event.locationInWindow.x - mouseDownLocation.x
+            let dy = event.locationInWindow.y - mouseDownLocation.y
+            let distance = hypot(dx, dy)
+
+            if !isReorderDragging, longPressReady, distance >= TodayTodoReorderMetrics.dragStartThreshold {
+                isReorderDragging = true
+                onReorderActivated?(event)
+            }
+
+            if isReorderDragging {
+                onReorderDrag?(event)
+                return
+            }
+        }
+
+        if isEditable {
+            super.mouseDragged(with: event)
+        }
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        longPressTimer?.invalidate()
+        longPressTimer = nil
+
+        if isReorderDragging {
+            isReorderDragging = false
+            longPressReady = false
+            NSCursor.arrow.set()
+            onReorderEnded?()
+            resetReorderTracking()
+            return
+        }
+
+        if reorderGestureEnabled, longPressReady, !isReorderDragging {
+            onReorderEnded?()
+            resetReorderTracking()
+            return
+        }
+
+        if reorderGestureEnabled, let mouseDownEvent, !longPressReady {
+            onBeginEditingWithEvent?(mouseDownEvent)
+            resetReorderTracking()
+            return
+        }
+
+        super.mouseUp(with: event)
+        resetReorderTracking()
+    }
+
+    private func resetReorderTracking() {
+        longPressTimer?.invalidate()
+        longPressTimer = nil
+        longPressReady = false
+        isReorderDragging = false
+        mouseDownEvent = nil
     }
 }
 
@@ -74,6 +171,11 @@ final class InlineNotesTextContainer: NSView {
     private var isLocallyEditing = false
     private var isCompleted = false
     private var onBeginEditing: (() -> Void)?
+    private var reorderGestureEnabled = false
+    private var onReorderPressingReady: ((NSEvent) -> Void)?
+    private var onReorderActivated: ((NSEvent) -> Void)?
+    private var onReorderDrag: ((NSEvent) -> Void)?
+    private var onReorderEnded: (() -> Void)?
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
@@ -120,10 +222,26 @@ final class InlineNotesTextContainer: NSView {
         text: String,
         isEditing: Bool,
         isCompleted: Bool,
-        onBeginEditing: @escaping () -> Void
+        reorderGestureEnabled: Bool,
+        onBeginEditing: @escaping () -> Void,
+        onReorderPressingReady: ((NSEvent) -> Void)?,
+        onReorderActivated: ((NSEvent) -> Void)?,
+        onReorderDrag: ((NSEvent) -> Void)?,
+        onReorderEnded: (() -> Void)?
     ) {
         self.isCompleted = isCompleted
         self.onBeginEditing = onBeginEditing
+        self.reorderGestureEnabled = reorderGestureEnabled
+        self.onReorderPressingReady = onReorderPressingReady
+        self.onReorderActivated = onReorderActivated
+        self.onReorderDrag = onReorderDrag
+        self.onReorderEnded = onReorderEnded
+
+        textView.reorderGestureEnabled = reorderGestureEnabled && !isCompleted && !isEditing
+        textView.onReorderPressingReady = onReorderPressingReady
+        textView.onReorderActivated = onReorderActivated
+        textView.onReorderDrag = onReorderDrag
+        textView.onReorderEnded = onReorderEnded
 
         textView.onBeginEditingWithEvent = { [weak self] event in
             self?.beginEditing(with: event)
