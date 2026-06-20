@@ -285,19 +285,68 @@ final class HermesScheduleModelsTests: XCTestCase {
           "old_deadline": "2026-07-01",
           "new_deadline": "2026-08-15",
           "repacked": true,
+          "repack_scope": "all_active",
+          "feasible": true,
+          "affected_project_ids": ["lc_review", "agents"],
+          "project_cadences": [
+            {
+              "project_id": "lc_review",
+              "remaining_study_tasks": 25,
+              "eligible_study_days": 25,
+              "min_preferred_daily": 1,
+              "max_preferred_daily": 1,
+              "moved_task_count": 3
+            }
+          ],
           "changes": [
-            { "task_id": "lc_review_task_2", "title": "Ch2", "old_date": "2026-06-08", "new_date": "2026-06-09" }
+            {
+              "project_id": "lc_review",
+              "task_id": "lc_review_task_2",
+              "title": "Ch2",
+              "old_date": "2026-06-08",
+              "new_date": "2026-06-09"
+            }
           ],
           "overflow_count": 0,
           "overflow_tasks": [],
+          "capacity_conflicts": [],
           "deadline_exceeded": false
         }
         """
         let response = try HermesScheduleJSON.decode(HermesSetDeadlineResponse.self, from: json)
         XCTAssertTrue(response.succeeded)
-        XCTAssertEqual(response.newDeadline, "2026-08-15")
-        XCTAssertEqual(response.changes?.count, 1)
-        XCTAssertEqual(response.changes?.first?.taskId, "lc_review_task_2")
+        XCTAssertEqual(response.repackScope, "all_active")
+        XCTAssertEqual(response.feasible, true)
+        XCTAssertEqual(response.affectedProjectIds?.count, 2)
+        XCTAssertEqual(response.projectCadences?.first?.minPreferredDaily, 1)
+        XCTAssertEqual(response.changes?.first?.projectId, "lc_review")
+    }
+
+    func testDecodeInfeasibleSetDeadlineResponse() throws {
+        let json = """
+        {
+          "project_id": "lc_review",
+          "name": "LC Review",
+          "old_deadline": "2026-07-01",
+          "new_deadline": "2026-06-01",
+          "repacked": true,
+          "repack_scope": "all_active",
+          "feasible": false,
+          "overflow_count": 2,
+          "overflow_tasks": [
+            { "project_id": "lc_review", "task_id": "t1", "title": "A", "scheduled_date": "2026-06-10" }
+          ],
+          "capacity_conflicts": [
+            { "type": "study_capacity_exceeded", "date": "2026-06-10", "load_minutes": 521, "capacity": 300, "over_by": 221 }
+          ],
+          "changes": [],
+          "deadline_exceeded": true,
+          "dry_run": true
+        }
+        """
+        let response = try HermesScheduleJSON.decode(HermesSetDeadlineResponse.self, from: json)
+        XCTAssertFalse(response.isFeasiblePreview)
+        XCTAssertEqual(response.capacityConflicts?.first?.overBy, 221)
     }
 
     func testDecodeDeleteProjectResponse() throws {

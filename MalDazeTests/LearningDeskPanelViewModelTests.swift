@@ -103,6 +103,60 @@ final class LearningDeskPanelViewModelTests: XCTestCase {
         XCTAssertGreaterThan(cli.scheduleRangeCount, loadsAfterScheduleVisit)
     }
 
+    func testFocusScheduleOnTodayUsesStartingAtWindow() async {
+        let cli = MockHermesScheduleCLI()
+        let vm = LearningDeskPanelViewModel(cli: cli)
+        await vm.focusScheduleOnToday(reload: true)
+        if case .startingAt(let iso) = vm.scheduleDayWindow {
+            XCTAssertEqual(iso, LearningDeskPanelViewModel.isoDate(Date()))
+        } else {
+            XCTFail("expected startingAt day window")
+        }
+    }
+
+    func testShiftScheduleMonthUsesEntireRangeWindow() async {
+        let cli = MockHermesScheduleCLI()
+        let vm = LearningDeskPanelViewModel(cli: cli)
+        await vm.shiftScheduleMonth(by: -1)
+        XCTAssertEqual(vm.scheduleDayWindow, .entireRange)
+    }
+
+    func testDeadlinePreviewDisclosesCrossProjectImpact() async {
+        let cli = MockHermesScheduleCLI()
+        let vm = LearningDeskPanelViewModel(cli: cli)
+        await vm.loadStatus(force: true)
+        guard case .loaded(let projects) = vm.statusLoadState,
+              let project = projects.first else {
+            XCTFail("expected loaded projects")
+            return
+        }
+
+        vm.beginDeadlineEdit(project: project)
+        await vm.previewDeadlineRepack(projectId: project.projectId, deadline: "2026-09-01")
+
+        XCTAssertEqual(vm.deadlineRepackPreview?.affectedProjectCount, 2)
+        XCTAssertEqual(vm.deadlineRepackPreview?.feasible, true)
+    }
+
+    func testInfeasibleDeadlinePreviewBlocksConfirm() async {
+        let cli = MockHermesScheduleCLI()
+        cli.infeasibleDryRun = true
+        let vm = LearningDeskPanelViewModel(cli: cli)
+        await vm.loadStatus(force: true)
+        guard case .loaded(let projects) = vm.statusLoadState,
+              let project = projects.first else {
+            XCTFail("expected loaded projects")
+            return
+        }
+
+        vm.beginDeadlineEdit(project: project)
+        await vm.previewDeadlineRepack(projectId: project.projectId, deadline: "2026-06-01")
+        XCTAssertEqual(vm.deadlineRepackPreview?.feasible, false)
+
+        await vm.confirmDeadlineEdit(newDeadline: "2026-06-01")
+        XCTAssertEqual(cli.applyDeadlineCount, 0)
+    }
+
     func testStatusCacheReusedWithoutSecondFetch() async {
         let cli = MockHermesScheduleCLI()
         let vm = LearningDeskPanelViewModel(cli: cli)
@@ -158,6 +212,8 @@ private final class MockHermesScheduleCLI: HermesScheduleCLI, @unchecked Sendabl
     var fetchStatusCount = 0
     var scheduleRangeCount = 0
     var deleteProjectCount = 0
+    var applyDeadlineCount = 0
+    var infeasibleDryRun = false
 
     var projectsFileURL: URL {
         URL(fileURLWithPath: "/tmp/projects.json")
@@ -250,14 +306,52 @@ private final class MockHermesScheduleCLI: HermesScheduleCLI, @unchecked Sendabl
     }
 
     func setDeadline(projectId: String, deadline: String, dryRun: Bool) async throws -> HermesSetDeadlineResponse {
-        HermesSetDeadlineResponse(
+        if !dryRun { applyDeadlineCount += 1 }
+        if dryRun && infeasibleDryRun {
+            return HermesSetDeadlineResponse(
+                projectId: projectId,
+                name: "Project A",
+                oldDeadline: "2026-08-01",
+                newDeadline: deadline,
+                repacked: true,
+                repackMode: nil,
+                repackScope: "all_active",
+                feasible: false,
+                affectedProjectIds: [projectId],
+                projectCadences: [],
+                capacityConflicts: [
+                    HermesCapacityConflict(type: "study_capacity_exceeded", date: "2026-06-10", loadMinutes: 521, capacity: 300, overBy: 221)
+                ],
+                changes: [],
+                overflowCount: 2,
+                overflowTasks: [],
+                deadlineExceeded: true,
+                dryRun: true,
+                error: nil
+            )
+        }
+        return HermesSetDeadlineResponse(
             projectId: projectId,
             name: "Project A",
             oldDeadline: "2026-08-01",
             newDeadline: deadline,
-            repacked: !dryRun,
-            repackMode: dryRun ? "spread" : nil,
-            changes: dryRun ? [HermesDeadlineChange(taskId: "t1", title: "Next", oldDate: "2026-06-10", newDate: "2026-06-11")] : [],
+            repacked: true,
+            repackMode: nil,
+            repackScope: "all_active",
+            feasible: true,
+            affectedProjectIds: [projectId, "p2"],
+            projectCadences: [
+                HermesProjectCadence(
+                    projectId: projectId,
+                    remainingStudyTasks: 2,
+                    eligibleStudyDays: 20,
+                    minPreferredDaily: 1,
+                    maxPreferredDaily: 1,
+                    movedTaskCount: dryRun ? 1 : 0
+                )
+            ],
+            capacityConflicts: [],
+            changes: dryRun ? [HermesDeadlineChange(projectId: projectId, taskId: "t1", title: "Next", oldDate: "2026-06-10", newDate: "2026-06-11")] : [],
             overflowCount: 0,
             overflowTasks: [],
             deadlineExceeded: false,

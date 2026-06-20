@@ -108,5 +108,6 @@ enum MalDazeDefaultsKeys {
     enum Learning {
         static let todayGrouping = "MalDaze.learning.todayGrouping"
         static let dailyCapacityHours = "MalDaze.learning.dailyCapacityHours"
+        static let todayHermesTaskFraction = "MalDaze.learning.todayHermesTaskFraction"
     }
 }

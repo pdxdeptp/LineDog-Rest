@@ -33,7 +33,7 @@ MalDaze **不写** `recommendation.json`，也不在 recommendation 缺失或过
 | `dayLabel` | 训练日 / 休息日 |
 | `workoutLabel` | 训练日可选：练胸 / 练背和腿（由 `daily_log.workout_split` 派生；轮换历史只读 `training_log`） |
 | `targets` / `consumed` / `remaining` | 含 `sodium_mg` |
-| `targetBreakdown` | 今日目标 kcal 计算明细（与 `targets.kcal` 同源；Hermes `refresh-panel` 写入） |
+| `targetBreakdown` | 今日目标 kcal 计算明细（与 `targets.kcal` 同源；Hermes `get_targets()._meta` 投影，随 panel 重算/backfill 自动写入） |
 | `suggestions` | 第一版固定 `[]`，仅 schema 兼容；不是推荐来源 |
 | `calorieSlack` | 固定 50 |
 | `updatedAt` | ISO；与 recommendation `basedOn` 对齐判定 fresh/stale |

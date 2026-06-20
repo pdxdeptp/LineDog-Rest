@@ -3,51 +3,56 @@ import SwiftUI
 struct TodayTodoRow: View {
     let entry: TodayTodoEntry
     let isCompleted: Bool
+    let isEditing: Bool
+    @Binding var editingText: String
     let isBusy: Bool
     let onToggleComplete: () -> Void
-    let onEdit: () -> Void
+    let onBeginEdit: () -> Void
+    let onCommitEdit: () -> Void
     let onDelete: () -> Void
 
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
+        HStack(alignment: .top, spacing: 6) {
             Button(action: onToggleComplete) {
                 Image(systemName: isCompleted ? "checkmark.circle.fill" : "circle")
-                    .font(.body)
+                    .font(.title3)
                     .foregroundStyle(isCompleted ? Color.secondary : Color.primary)
             }
             .buttonStyle(.plain)
             .disabled(isBusy)
             .accessibilityLabel(isCompleted ? "标记为未完成" : "标记为完成")
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(entry.title)
-                    .font(.subheadline)
-                    .strikethrough(isCompleted, color: .secondary)
-                    .foregroundStyle(isCompleted ? Color.secondary : Color.primary)
-                    .lineLimit(6)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .multilineTextAlignment(.leading)
+            VStack(alignment: .leading, spacing: 1) {
+                TodayTodoInlineText(
+                    text: isEditing ? $editingText : .constant(entry.title),
+                    isEditing: isEditing,
+                    isCompleted: isCompleted,
+                    onBeginEditing: onBeginEdit,
+                    onCommit: onCommitEdit
+                )
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, minHeight: 18, alignment: .leading)
+                .contentShape(Rectangle())
 
-                if !isCompleted, let hint = TodayTodoFormatting.rolledFromHint(entry.rolledFromDateISO) {
+                if !isCompleted, !isEditing,
+                   let hint = TodayTodoFormatting.rolledFromHint(entry.rolledFromDateISO) {
                     Text(hint)
-                        .font(.caption2)
+                        .font(.caption)
                         .foregroundStyle(.tertiary)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            Menu {
-                Button("编辑…", action: onEdit)
-                Button("删除", role: .destructive, action: onDelete)
-            } label: {
-                Image(systemName: "ellipsis.circle")
-                    .font(.caption)
+            Button(role: .destructive, action: onDelete) {
+                Image(systemName: "trash")
+                    .font(.footnote)
                     .foregroundStyle(.secondary)
             }
-            .menuStyle(.borderlessButton)
-            .fixedSize()
+            .buttonStyle(.borderless)
             .disabled(isBusy)
+            .help("删除")
         }
-        .padding(.vertical, 4)
+        .fixedSize(horizontal: false, vertical: true)
+        .padding(.vertical, 1)
     }
 }

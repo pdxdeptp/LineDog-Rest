@@ -247,6 +247,15 @@ enum MalDazeDefaults {
     /// 学习面板每日正课上限（小时），默认 5；同步到 Hermes `daily_capacity_minutes`。
     static let learningTodayGrouping = MalDazeDefaultsKeys.Learning.todayGrouping
     static let learningDailyCapacityHours = LearningSettingsSyncService.dailyCapacityHoursKey
+    static let learningTodayHermesTaskFraction = MalDazeDefaultsKeys.Learning.todayHermesTaskFraction
+    static let defaultLearningTodayHermesTaskFraction = DashboardLayout.defaultLearningTodayHermesTaskFraction
+    static let learningTodayHermesTaskFractionMin = DashboardLayout.learningTodayHermesTaskFractionMin
+    static let learningTodayHermesTaskFractionMax = DashboardLayout.learningTodayHermesTaskFractionMax
+
+    static func clampedLearningTodayHermesTaskFraction(_ value: Double) -> Double {
+        DashboardLayout.clampedLearningTodayHermesTaskFraction(value)
+    }
+
     static let defaultLearningDailyCapacityHours = LearningSettingsSyncService.defaultDailyCapacityHours
     static let learningDailyCapacityHoursMin = LearningSettingsSyncService.dailyCapacityHoursMin
     static let learningDailyCapacityHoursMax = LearningSettingsSyncService.dailyCapacityHoursMax

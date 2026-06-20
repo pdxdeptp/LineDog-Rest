@@ -21,6 +21,15 @@ enum DashboardLayout {
     static let leftPlanFractionMin = 0.4
     static let leftPlanFractionMax = 0.75
 
+    static let learningTodayHermesTaskFractionMin = 0.28
+    static let learningTodayHermesTaskFractionMax = 0.82
+    static let defaultLearningTodayHermesTaskFraction = 0.62
+
+    static func clampedLearningTodayHermesTaskFraction(_ value: Double) -> Double {
+        let base = value == 0 ? defaultLearningTodayHermesTaskFraction : value
+        return min(max(base, learningTodayHermesTaskFractionMin), learningTodayHermesTaskFractionMax)
+    }
+
     static var baseMinimumContentWidth: CGFloat {
         remindersColumnWidth
         + learningColumnMinWidth
@@ -92,6 +101,28 @@ enum DashboardLayout {
     static func clampedLeftPlanFraction(_ value: Double) -> Double {
         let base = value == 0 ? defaultLeftPlanFraction : value
         return min(max(base, leftPlanFractionMin), leftPlanFractionMax)
+    }
+
+    /// 行向分隔：总高度减去 handle 后，上下两栏可分配高度。
+    static func verticalSplitHeights(
+        totalHeight: CGFloat,
+        upperFraction: Double,
+        handleHeight: CGFloat = columnResizeHandleWidth
+    ) -> (upper: CGFloat, lower: CGFloat, stack: CGFloat) {
+        let stack = max(totalHeight - handleHeight, 1)
+        let clampedFraction = min(max(upperFraction, 0), 1)
+        let upper = stack * clampedFraction
+        return (upper, stack - upper, stack)
+    }
+
+    /// 将像素 delta 换算为比例增量；`stackHeight` 为 handle 以上/以下可分配总高度。
+    static func fractionAfterVerticalDrag(
+        current: Double,
+        delta: CGFloat,
+        stackHeight: CGFloat,
+        clamp: (Double) -> Double
+    ) -> Double {
+        clamp(current + Double(delta / max(stackHeight, 1)))
     }
 
     static func resolvedLeftPlanFraction(defaults: UserDefaults = .standard) -> Double {

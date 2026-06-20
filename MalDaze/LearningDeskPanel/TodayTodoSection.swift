@@ -1,135 +1,231 @@
 import SwiftUI
 
+private enum TodayTodoSectionLayout {
+    static let sectionSpacing: CGFloat = 6
+    static let listRowSpacing: CGFloat = 2
+}
+
 struct TodayTodoSection: View {
     @ObservedObject var store: TodayTodoStore
     @Binding var showHistory: Bool
+    var sectionHeight: CGFloat
 
     @State private var draft = ""
     @State private var draftFieldHeight = TodayTodoDraftFieldLayout.minHeight
     @State private var completedExpanded = false
-    @State private var editingEntry: TodayTodoEntry?
+    @State private var editingEntryId: UUID?
+    @State private var editingText = ""
+    @State private var dismissMonitor = TodayTodoEditingDismissMonitor()
+    @State private var draftFocusRequestToken = 0
+    @State private var pendingDraftFocus = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: TodayTodoSectionLayout.sectionSpacing) {
             header
 
             if case .error(let message) = store.loadState {
                 Text(message)
-                    .font(.caption)
+                    .font(.footnote)
                     .foregroundStyle(.orange)
             }
 
             if let mutationError = store.mutationError {
                 Text(mutationError)
-                    .font(.caption)
+                    .font(.footnote)
                     .foregroundStyle(.orange)
             }
 
             if store.canMutate {
-                if store.incompleteEntries.isEmpty, store.completedEntries.isEmpty {
-                    Text("随手记今天要做的小事，不会同步到提醒事项。")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                }
-
-                ForEach(store.incompleteEntries) { entry in
-                    TodayTodoRow(
-                        entry: entry,
-                        isCompleted: false,
-                        isBusy: false,
-                        onToggleComplete: { store.toggleComplete(id: entry.id) },
-                        onEdit: { editingEntry = entry },
-                        onDelete: { store.delete(id: entry.id) }
-                    )
-                }
-
-                if !store.completedEntries.isEmpty {
-                    DisclosureGroup(isExpanded: $completedExpanded) {
-                        ForEach(store.completedEntries) { entry in
-                            TodayTodoRow(
-                                entry: entry,
-                                isCompleted: true,
-                                isBusy: false,
-                                onToggleComplete: { store.toggleComplete(id: entry.id) },
-                                onEdit: { editingEntry = entry },
-                                onDelete: { store.delete(id: entry.id) }
-                            )
-                        }
-                    } label: {
-                        Text("已完成 \(store.completedEntries.count)")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                TodayTodoDraftField(
-                    text: $draft,
-                    placeholder: "Shift+回车换行，回车添加…",
-                    onSubmit: submitDraft,
-                    height: $draftFieldHeight
-                )
-                .frame(height: draftFieldHeight)
-                .disabled(!store.canMutate)
+                todoContentArea
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
         }
+        .frame(height: sectionHeight, alignment: .topLeading)
         .task {
             store.loadAndRollForward()
         }
-        .alert("编辑条目", isPresented: editingPresented) {
-            TextField("标题", text: editingTitle)
-            Button("保存") {
-                if let entry = editingEntry {
-                    store.updateTitle(id: entry.id, title: editingTitle.wrappedValue)
+        .onChange(of: editingEntryId) { entryId in
+            if entryId != nil {
+                dismissMonitor.start {
+                    commitEditingIfNeeded()
                 }
-                editingEntry = nil
-            }
-            Button("取消", role: .cancel) {
-                editingEntry = nil
+            } else {
+                dismissMonitor.stop()
+                TodayTodoEditingFocus.activeView = nil
             }
         }
+        .onDisappear {
+            dismissMonitor.stop()
+        }
+        .onAppear {
+            scheduleDraftFocusWithRetries()
+        }
+        .onChange(of: store.loadState) { _ in
+            deliverDraftFocusIfReady()
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(
+                for: MalDazeBroadcastNotifications.deskPetDashboardDidOpen
+            )
+        ) { _ in
+            scheduleDraftFocusWithRetries()
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(
+                for: MalDazeBroadcastNotifications.focusDashboardFromDock
+            )
+        ) { _ in
+            scheduleDraftFocusWithRetries()
+        }
+    }
+
+    private var todoContentArea: some View {
+        TodayTodoContentLayout(
+            listRowSpacing: TodayTodoSectionLayout.listRowSpacing,
+            draftMinimumHeight: draftFieldHeight,
+            todoEntries: { todoEntries },
+            draftFieldRow: { draftFieldRow }
+        )
+    }
+
+    private var draftFieldRow: some View {
+        HStack(alignment: .top, spacing: 6) {
+            Image(systemName: "circle")
+                .font(.title3)
+                .foregroundStyle(Color.primary)
+                .accessibilityHidden(true)
+
+            TodayTodoDraftField(
+                text: $draft,
+                placeholder: "Shift+回车换行，回车添加…",
+                onSubmit: submitDraft,
+                height: $draftFieldHeight,
+                focusRequestToken: draftFocusRequestToken
+            )
+            .frame(height: draftFieldHeight)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .disabled(!store.canMutate)
+    }
+
+    @ViewBuilder
+    private var todoEntries: some View {
+        VStack(alignment: .leading, spacing: TodayTodoSectionLayout.listRowSpacing) {
+            if store.incompleteEntries.isEmpty, store.completedEntries.isEmpty {
+                Text("随手记今天要做的小事，不会同步到提醒事项。")
+                    .font(.footnote)
+                    .foregroundStyle(.tertiary)
+            }
+
+            if !store.completedEntries.isEmpty {
+                DisclosureGroup(isExpanded: $completedExpanded) {
+                    ForEach(store.completedEntries) { entry in
+                        row(for: entry, isCompleted: true)
+                    }
+                } label: {
+                    Text("已完成 \(store.completedEntries.count)")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            ForEach(store.incompleteEntries) { entry in
+                row(for: entry, isCompleted: false)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func row(for entry: TodayTodoEntry, isCompleted: Bool) -> some View {
+        TodayTodoRow(
+            entry: entry,
+            isCompleted: isCompleted,
+            isEditing: editingEntryId == entry.id,
+            editingText: $editingText,
+            isBusy: false,
+            onToggleComplete: {
+                commitEditingIfNeeded()
+                store.toggleComplete(id: entry.id)
+            },
+            onBeginEdit: {
+                beginEditing(entry)
+            },
+            onCommitEdit: {
+                commitEditing(entryId: entry.id)
+            },
+            onDelete: {
+                if editingEntryId == entry.id {
+                    editingEntryId = nil
+                    editingText = ""
+                }
+                store.delete(id: entry.id)
+            }
+        )
     }
 
     private var header: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text("今日 todo")
-                .font(.caption.weight(.semibold))
+                .font(.footnote.weight(.semibold))
                 .foregroundStyle(.secondary)
             Spacer(minLength: 0)
             if store.canMutate {
                 Button("历史") {
+                    commitEditingIfNeeded()
                     showHistory = true
                 }
                 .controlSize(.small)
             }
             if !store.incompleteEntries.isEmpty {
                 Text("\(store.incompleteEntries.count) 条")
-                    .font(.caption2.monospacedDigit())
+                    .font(.caption.monospacedDigit())
                     .foregroundStyle(.tertiary)
             }
         }
     }
 
-    private var editingPresented: Binding<Bool> {
-        Binding(
-            get: { editingEntry != nil },
-            set: { if !$0 { editingEntry = nil } }
-        )
+    private func beginEditing(_ entry: TodayTodoEntry) {
+        if editingEntryId != entry.id {
+            commitEditingIfNeeded()
+            editingEntryId = entry.id
+            editingText = entry.title
+        }
     }
 
-    private var editingTitle: Binding<String> {
-        Binding(
-            get: { editingEntry?.title ?? "" },
-            set: { newValue in
-                guard var entry = editingEntry else { return }
-                entry.title = newValue
-                editingEntry = entry
-            }
-        )
+    private func commitEditing(entryId: UUID) {
+        guard editingEntryId == entryId else { return }
+        store.updateTitle(id: entryId, title: editingText)
+        editingEntryId = nil
+        editingText = ""
+        TodayTodoEditingFocus.activeView = nil
     }
 
-    private func submitDraft() {
-        guard store.add(title: draft) else { return }
+    private func commitEditingIfNeeded() {
+        guard let entryId = editingEntryId else { return }
+        commitEditing(entryId: entryId)
+    }
+
+    private func submitDraft() -> Bool {
+        commitEditingIfNeeded()
+        guard store.add(title: draft) else { return false }
         draft = ""
         draftFieldHeight = TodayTodoDraftFieldLayout.minHeight
+        return true
+    }
+
+    private func scheduleDraftFocusWithRetries() {
+        pendingDraftFocus = true
+        deliverDraftFocusIfReady()
+        for delay in [0.12, 0.28, 0.48, 0.72] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                deliverDraftFocusIfReady()
+            }
+        }
+    }
+
+    private func deliverDraftFocusIfReady() {
+        guard store.canMutate else { return }
+        pendingDraftFocus = false
+        draftFocusRequestToken += 1
     }
 }

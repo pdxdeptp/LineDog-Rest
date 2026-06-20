@@ -17,6 +17,7 @@ Hub：[../hermes.md](../hermes.md) · SSOT 边界：[learning-calendar.md](./lea
 | **X9 · 今日核心** | [`extend-learning-today-core`](../../openspec/changes/extend-learning-today-core/) | 双预算、完成进度、`progress`、滚入置顶、实际时长、按项目分组 |
 | **X10 · 今日导航** | [`extend-learning-today-navigation`](../../openspec/changes/extend-learning-today-navigation/) | 行动卡、明天预告、warning 点击、源链接、repack 预览 |
 | **X11 · 今日 todo** | [`add-learning-today-todo`](../../openspec/changes/add-learning-today-todo/) | MalDaze 本地随手记、顺延、历史；不同步提醒/Hermes |
+| **X11.1 · todo 贴底** | [`fix-today-todo-scroll-pin-threshold`](../../openspec/changes/fix-today-todo-scroll-pin-threshold/) | compact/pinned 双模式；溢出即贴底 |
 
 延后索引：[learning-desk-panel-followup.md](./learning-desk-panel-followup.md)
 
@@ -176,7 +177,7 @@ Hub：[../hermes.md](../hermes.md) · SSOT 边界：[learning-calendar.md](./lea
 - 展示 `status` 返回的 **全部** 项目；non-active 弱化，active 置顶。
 - `next_task` **不等于**「今日下一项」或「最近日期」—— 仅为 JSON 任务列表中第一条 `pending`。
 - 点行（非截止日控件）→ 切 **今日** Tab 并高亮同 `project_id` 首条 pending（若有）。
-- **active** 项目：点 **「📅 日期  修改」** → sheet 选新截止日 → 确认后 `set-deadline`：**从今日起重排**该项目未完成课程（已完成不变）；装不下则 `overflow` 提示（US-10）。
+- **active** 项目：点 **「📅 日期  修改」** → sheet 先 `set-deadline --dry-run` 预览 → 确认后正式 apply。Hermes **默认全局协调**所有活跃项目未完成课程（共享 `daily_capacity_minutes`、动态均衡 cadence）；面板展示受影响项目数、各项目 cadence 摘要与移动节数；`feasible: false` 时禁用确认（US-10）。
 - 今日 / 项目写操作成功后后台刷新 status，避免切 Tab 仍见旧进度。
 
 ### 4.3 中栏不做
@@ -197,8 +198,18 @@ Hermes 任务列表下方独立区块 **「今日 todo」**，替代「打开备
 | 顺延 | 未完成项跨日打开面板时滚到今天；可显示「自 M/d 顺延」 |
 | 历史 | 「历史」Sheet：过去日期的已完成项，按日分组 |
 | 隔离 | 不计入正课/复习预算；↻ 只刷 Hermes；不同步左栏计划 / 提醒事项 |
+| 布局 | Hermes 任务与 todo 区可拖动分隔。输入框在视图树中只有一个固定挂载点；由 `TodayTodoLayoutPolicy` 根据列表实测高度、输入行实测高度与当前 Geometry 一次性解析 **measuring / compact / pinned**。`capacity = max(contentAreaHeight - safeDraftHeight - spacing, 0)`，`safeDraftHeight = max(实测整行, 同步 draft 编辑器高度, 28pt)`。边界 tolerance 固定 **0.5pt**：`listHeight <= capacity - 0.5` → compact（viewport = 实高）；超出 → pinned（viewport = capacity，列表可滚动，输入贴底）。缺少完整测量或列表宽度与 live width 相差 > 0.5pt 时进入 measuring（安全 capacity viewport、禁用滚动）。任意来源转入 pinned 无动画滚到底部锚点，转入 compact 无动画归顶部；同 mode 下 resize 保留当前 scroll offset。内容区小于 draft 行高 + spacing 时 list viewport = 0；mode/viewport 变化不触发新的 focus token。 |
 
-OpenSpec：[`add-learning-today-todo`](../../openspec/changes/add-learning-today-todo/)
+OpenSpec：[`add-learning-today-todo`](../../openspec/changes/add-learning-today-todo/) · [`fix-today-todo-scroll-pin-threshold`](../../openspec/changes/fix-today-todo-scroll-pin-threshold/)
+
+**手动 QA（X11.1）**
+
+1. 默认窗口：添加短条目、换行条目、rollover hint，应在**第一份完整测量**后刚溢出即 pinned，无需再添加或拖动。
+2. 分别通过成功添加、分隔线缩小、横向换行、完成组展开进入 pinned：均应无动画滚到底部锚点。
+3. pinned 内拖动分隔线或缩放窗口（纵横）：保留当前 scroll offset，输入焦点与文本稳定。
+4. pinned 内滚动后删除/完成/折叠至 compact：无动画归顶部，draft 紧跟列表。
+5. 多行 draft 增至 120pt、超过 120pt 内部滚动、空提交/失败提交、480×360 最小窗口与极端分隔比例：无负 frame、无输入框重建。
+6. 控制台无新增 “Preference tried to update multiple times per frame” 警告。
 
 ---
 
@@ -275,7 +286,7 @@ python3 "$HERMES_HOME/scripts/schedule.py" today
 | 删除 | 确认后 | `remove --task-id <id>` | 不级联 |
 | 插入 | 轻表单 | `insert --project-id … --title … --duration N --date …` | 不级联 |
 | 复习通过/失败 | L3 按钮 | `review --task-id … --result passed\|failed` | — |
-| 改项目截止日 | 项目 Tab · active | `set-deadline --project-id … --deadline YYYY-MM-DD` | **默认重排**未完成课；`--no-repack` 仅改日期 |
+| 改项目截止日 | 项目 Tab · active | `set-deadline --dry-run` → `set-deadline` | **默认全局重排**所有活跃项目；响应含 `repack_scope`、`feasible`、`affected_project_ids[]`、`project_cadences[]`、`changes[].project_id`；不可行时非 dry-run 不落盘 |
 
 环境：`HERMES_HOME=~/.hermes`；`python3` 路径与 Smart Reminder 子进程策略一致。
 

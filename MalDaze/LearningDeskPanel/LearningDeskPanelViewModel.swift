@@ -60,8 +60,12 @@ final class LearningDeskPanelViewModel: ObservableObject {
     }
 
     struct DeadlineRepackPreview: Equatable {
+        let feasible: Bool
+        let affectedProjectCount: Int
         let changeCount: Int
         let overflowCount: Int
+        let cadenceLines: [String]
+        let conflictSummary: String?
     }
 
     struct CompleteDurationCandidate: Identifiable, Equatable {
@@ -87,8 +91,13 @@ final class LearningDeskPanelViewModel: ObservableObject {
 
     @Published private(set) var loadState: LoadState = .idle
     @Published private(set) var scheduleLoadState: ScheduleLoadState = .idle
+    @Published private(set) var scheduleIsFetching = false
     @Published var scheduleMonth: String = LearningDeskPanelViewModel.currentMonthKey()
     @Published var selectedScheduleDate: String?
+    @Published private(set) var scheduleDayWindow: LearningScheduleDayWindow = .startingAt(
+        LearningDeskPanelViewModel.isoDate(Date())
+    )
+    private var pendingScheduleFocusDate: String?
     @Published private(set) var statusLoadState: StatusLoadState = .idle
     @Published var selectedTab: PanelTab = .today
     @Published private(set) var busyTaskIds: Set<String> = []
@@ -173,34 +182,103 @@ final class LearningDeskPanelViewModel: ObservableObject {
     }
 
     func loadSchedule(force: Bool) async {
-        if case .loading = scheduleLoadState, !force { return }
+        if scheduleIsFetching, !force { return }
         if !force, scheduleCacheValid, case .loaded = scheduleLoadState { return }
-        scheduleLoadState = .loading
+
+        let retainLoadedSnapshot: Bool
+        if case .loaded(let response) = scheduleLoadState {
+            retainLoadedSnapshot = Self.monthKey(fromISO: response.fromDate) == scheduleMonth
+        } else {
+            retainLoadedSnapshot = false
+        }
+
+        if !retainLoadedSnapshot {
+            scheduleLoadState = .loading
+        }
+
+        scheduleIsFetching = true
+        defer { scheduleIsFetching = false }
+
         do {
             let response = try await cli.scheduleRange(month: scheduleMonth, fromDate: nil, toDate: nil)
             scheduleLoadState = .loaded(response)
             scheduleCacheValid = true
         } catch {
-            scheduleLoadState = .failed(error.localizedDescription)
-            scheduleCacheValid = false
+            if retainLoadedSnapshot, case .loaded = scheduleLoadState {
+                actionNotice = error.localizedDescription
+            } else {
+                scheduleLoadState = .failed(error.localizedDescription)
+                scheduleCacheValid = false
+            }
         }
+    }
+
+    var scheduleDisplayedDays: [HermesScheduleRangeDay] {
+        if case .loaded(let response) = scheduleLoadState { return response.days }
+        return []
+    }
+
+    var scheduleDisplayedDeadlines: [HermesScheduleRangeDeadline] {
+        if case .loaded(let response) = scheduleLoadState { return response.deadlines }
+        return []
+    }
+
+    var scheduleDisplayedTruncated: Bool {
+        if case .loaded(let response) = scheduleLoadState { return response.truncated == true }
+        return false
+    }
+
+    var scheduleDisplayedErrorMessage: String? {
+        if case .failed(let message) = scheduleLoadState { return message }
+        return nil
+    }
+
+    var scheduleShowsLoadingPlaceholder: Bool {
+        switch scheduleLoadState {
+        case .idle, .loading:
+            return true
+        default:
+            return false
+        }
+    }
+
+    var scheduleDayListPresentation: LearningScheduleDayWindow.Presentation {
+        scheduleDayWindow.presentation(for: scheduleDisplayedDays)
+    }
+
+    func showFullScheduleRange() {
+        scheduleDayWindow = .entireRange
     }
 
     func shiftScheduleMonth(by offset: Int) async {
         guard let shifted = Self.shiftMonthKey(scheduleMonth, by: offset) else { return }
         scheduleMonth = shifted
+        scheduleDayWindow = .entireRange
         selectedScheduleDate = nil
         await loadSchedule(force: true)
     }
 
     func jumpToTodayInSchedule() async {
-        let today = Self.isoDate(Date())
-        let month = Self.currentMonthKey()
-        if scheduleMonth != month {
+        await focusSchedule(on: Self.isoDate(Date()), reload: true)
+    }
+
+    func focusScheduleOnToday(reload: Bool) async {
+        await focusSchedule(on: Self.isoDate(Date()), reload: reload)
+    }
+
+    func focusSchedule(on isoDate: String, reload: Bool) async {
+        if let month = Self.monthKey(fromISO: isoDate) {
             scheduleMonth = month
-            await loadSchedule(force: true)
+        } else if isoDate == Self.isoDate(Date()) {
+            scheduleMonth = Self.currentMonthKey()
         }
-        selectedScheduleDate = today
+        scheduleDayWindow = .startingAt(isoDate)
+        if reload {
+            await loadSchedule(force: true)
+        } else {
+            await loadScheduleIfNeeded()
+        }
+        selectedScheduleDate = isoDate
     }
 
     var scheduleMonthTitle: String {
@@ -250,15 +328,12 @@ final class LearningDeskPanelViewModel: ObservableObject {
     func onTabChanged() async {
         switch selectedTab {
         case .schedule:
-            switch scheduleLoadState {
-            case .idle:
-                await loadSchedule(force: false)
-            case .failed:
-                await loadSchedule(force: true)
-            default:
-                if !scheduleCacheValid {
-                    await loadSchedule(force: true)
-                }
+            if let pendingScheduleFocusDate {
+                let target = pendingScheduleFocusDate
+                self.pendingScheduleFocusDate = nil
+                await focusSchedule(on: target, reload: true)
+            } else {
+                await focusScheduleOnToday(reload: true)
             }
         case .projects:
             await loadStatusIfNeeded()
@@ -473,10 +548,7 @@ final class LearningDeskPanelViewModel: ObservableObject {
         do {
             let result = try await cli.setDeadline(projectId: projectId, deadline: deadline, dryRun: true)
             guard result.succeeded else { return }
-            deadlineRepackPreview = DeadlineRepackPreview(
-                changeCount: result.changes?.count ?? 0,
-                overflowCount: result.overflowCount ?? 0
-            )
+            deadlineRepackPreview = DeadlineRepackPreviewFormatter.make(from: result)
         } catch {
             deadlineRepackPreview = nil
         }
@@ -487,6 +559,7 @@ final class LearningDeskPanelViewModel: ObservableObject {
         let projectId = session.projectId
         let preview = deadlineRepackPreview
         let hasRepackWork = (preview?.changeCount ?? 0) > 0 || (preview?.overflowCount ?? 0) > 0
+        guard preview?.feasible != false else { return }
         guard newDeadline != session.currentDeadline || hasRepackWork else {
             deadlineEditSession = nil
             deadlineRepackPreview = nil
@@ -519,19 +592,18 @@ final class LearningDeskPanelViewModel: ObservableObject {
     private func deadlineEditNotice(from result: HermesSetDeadlineResponse) -> String {
         var parts: [String] = []
         let moved = result.changes?.count ?? 0
+        if let affected = result.affectedProjectIds?.count, affected > 1 {
+            parts.append("已协调 \(affected) 个活跃项目")
+        }
         if result.repacked == true, moved > 0 {
-            if result.repackMode == "spread" {
-                parts.append("已摊开重排 \(moved) 节课")
-            } else {
-                parts.append("已重排 \(moved) 节课")
-            }
+            parts.append("已重排 \(moved) 节课")
         } else if result.repacked == true {
             parts.append("截止日已更新")
         } else {
             parts.append("截止日已更新")
         }
         if let overflow = result.overflowCount, overflow > 0 {
-            parts.append("\(overflow) 节课未能排进新截止日（仍保留在原日期）")
+            parts.append("\(overflow) 节课未能排进新截止日")
         }
         return parts.joined(separator: "；")
     }
@@ -565,13 +637,8 @@ final class LearningDeskPanelViewModel: ObservableObject {
     }
 
     func openScheduleTomorrow() async {
-        let tomorrow = Self.tomorrowISO()
-        if let month = Self.monthKey(fromISO: tomorrow) {
-            scheduleMonth = month
-        }
-        selectedScheduleDate = tomorrow
+        pendingScheduleFocusDate = Self.tomorrowISO()
         selectedTab = .schedule
-        await loadSchedule(force: true)
     }
 
     func jumpToProjectTab(projectId: String) async {

@@ -6,13 +6,18 @@ struct LearningScheduleView<TaskRow: View>: View {
     let deadlines: [HermesScheduleRangeDeadline]
     let budgetStudyMinutes: Int
     let isLoading: Bool
+    let isFetching: Bool
     let errorMessage: String?
     let truncated: Bool
+    let hiddenEarlierDayCount: Int
     @Binding var selectedDate: String?
     let onPrevMonth: () -> Void
     let onNextMonth: () -> Void
     let onJumpToday: () -> Void
+    let onShowEarlierDays: () -> Void
     @ViewBuilder let taskRow: (LearningTaskDisplayRow, Bool) -> TaskRow
+
+    @State private var chromeHeight: CGFloat = 0
 
     private var deadlineDates: Set<String> {
         Set(deadlines.map(\.deadline))
@@ -22,27 +27,73 @@ struct LearningScheduleView<TaskRow: View>: View {
         LearningScheduleFormatting.isoDate(Date())
     }
 
+    private var showsEarlierDaysButton: Bool {
+        hiddenEarlierDayCount > 0
+    }
+
     var body: some View {
-        Group {
-            if isLoading {
-                ProgressView("加载日程…")
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 24)
-            } else if let errorMessage {
-                Text(errorMessage)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .padding(8)
-            } else {
-                VStack(alignment: .leading, spacing: 10) {
-                    monthHeader
-                    if truncated {
-                        Text("范围已截断，部分远日任务可能未显示。")
-                            .font(.caption2)
-                            .foregroundStyle(.orange)
+        GeometryReader { geometry in
+            let viewportHeight = LearningScheduleScrollLayout.agendaViewportHeight(
+                totalHeight: geometry.size.height,
+                chromeHeight: chromeHeight,
+                showsEarlierButton: showsEarlierDaysButton
+            )
+
+            VStack(alignment: .leading, spacing: LearningScheduleScrollLayout.chromeSpacing) {
+                scheduleChrome
+                    .background {
+                        GeometryReader { chromeGeometry in
+                            Color.clear.preference(
+                                key: ScheduleChromeHeightKey.self,
+                                value: chromeGeometry.size.height
+                            )
+                        }
                     }
-                    agendaList
+
+                if let errorMessage, days.isEmpty, !isLoading {
+                    Text(errorMessage)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(8)
+                    Spacer(minLength: 0)
+                } else {
+                    agendaList(viewportHeight: viewportHeight)
+                        .frame(height: viewportHeight, alignment: .topLeading)
+                        .overlay {
+                            if isLoading {
+                                ProgressView("加载日程…")
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                    .background(Color(.controlBackgroundColor).opacity(0.72))
+                            } else if isFetching {
+                                ProgressView()
+                                    .controlSize(.small)
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                                    .padding(8)
+                            }
+                        }
                 }
+            }
+            .frame(width: geometry.size.width, height: geometry.size.height, alignment: .topLeading)
+            .onPreferenceChange(ScheduleChromeHeightKey.self) { chromeHeight = $0 }
+        }
+    }
+
+    private var scheduleChrome: some View {
+        VStack(alignment: .leading, spacing: LearningScheduleScrollLayout.chromeSpacing) {
+            monthHeader
+            if truncated {
+                Text("范围已截断，部分远日任务可能未显示。")
+                    .font(.caption2)
+                    .foregroundStyle(.orange)
+            }
+            if showsEarlierDaysButton {
+                Button {
+                    onShowEarlierDays()
+                } label: {
+                    Label("显示较早 \(hiddenEarlierDayCount) 天", systemImage: "chevron.up")
+                        .font(.caption)
+                }
+                .buttonStyle(.borderless)
             }
         }
     }
@@ -66,31 +117,17 @@ struct LearningScheduleView<TaskRow: View>: View {
         }
     }
 
-    private var agendaList: some View {
-        ScrollViewReader { proxy in
-            ScrollView(showsIndicators: false) {
-                LazyVStack(alignment: .leading, spacing: 12) {
-                    ForEach(days) { day in
-                        agendaSection(day)
-                            .id(day.date)
-                    }
-                }
-            }
-            .onChange(of: selectedDate) { newValue in
-                guard let newValue else { return }
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    proxy.scrollTo(newValue, anchor: .top)
-                }
-            }
-            .onAppear {
-                guard selectedDate == nil else { return }
-                if days.contains(where: { $0.date == todayISO }) {
-                    selectedDate = todayISO
-                } else if let first = days.first(where: { !$0.tasks.isEmpty }) {
-                    selectedDate = first.date
+    @ViewBuilder
+    private func agendaList(viewportHeight: CGFloat) -> some View {
+        ScrollView(showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 12) {
+                ForEach(days) { day in
+                    agendaSection(day)
+                        .id(day.date)
                 }
             }
         }
+        .frame(height: viewportHeight, alignment: .topLeading)
     }
 
     @ViewBuilder
@@ -168,6 +205,14 @@ struct LearningScheduleView<TaskRow: View>: View {
                 : Color(.controlBackgroundColor).opacity(0.35),
             in: RoundedRectangle(cornerRadius: 8)
         )
+    }
+}
+
+private struct ScheduleChromeHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }
 

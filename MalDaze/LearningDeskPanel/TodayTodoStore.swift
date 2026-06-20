@@ -10,6 +10,7 @@ enum TodayTodoLoadState: Equatable {
 final class TodayTodoStore: ObservableObject {
     @Published private(set) var incompleteEntries: [TodayTodoEntry] = []
     @Published private(set) var completedEntries: [TodayTodoEntry] = []
+    @Published private(set) var deletedEntries: [TodayTodoEntry] = []
     @Published private(set) var loadState: TodayTodoLoadState = .idle
     @Published private(set) var mutationError: String?
 
@@ -53,6 +54,7 @@ final class TodayTodoStore: ObservableObject {
             let today = todayISO()
             var changed = false
             file.entries = file.entries.map { entry in
+                guard entry.deletedAt == nil else { return entry }
                 guard !entry.isCompleted, entry.dateISO < today else { return entry }
                 var rolled = entry
                 rolled.rolledFromDateISO = entry.rolledFromDateISO ?? entry.dateISO
@@ -70,10 +72,12 @@ final class TodayTodoStore: ObservableObject {
             loadState = .error(error.localizedDescription)
             incompleteEntries = []
             completedEntries = []
+            deletedEntries = []
         } catch {
             loadState = .error("无法读取今日 todo。")
             incompleteEntries = []
             completedEntries = []
+            deletedEntries = []
         }
     }
 
@@ -117,7 +121,7 @@ final class TodayTodoStore: ObservableObject {
         guard canMutate else { return }
         guard let index = allEntries.firstIndex(where: { $0.id == id }) else { return }
         if title.isEmpty {
-            allEntries.remove(at: index)
+            softDelete(at: index)
         } else {
             allEntries[index].title = title
         }
@@ -126,13 +130,32 @@ final class TodayTodoStore: ObservableObject {
 
     func delete(id: UUID) {
         guard canMutate else { return }
-        allEntries.removeAll { $0.id == id }
+        guard let index = allEntries.firstIndex(where: { $0.id == id }) else { return }
+        softDelete(at: index)
+        _ = persistTodaySlices()
+    }
+
+    func restore(id: UUID) {
+        guard canMutate else { return }
+        guard let index = allEntries.firstIndex(where: { $0.id == id }) else { return }
+        guard allEntries[index].deletedAt != nil else { return }
+        allEntries[index].deletedAt = nil
+        _ = persistTodaySlices()
+    }
+
+    func permanentlyDelete(id: UUID) {
+        guard canMutate else { return }
+        guard let index = allEntries.firstIndex(where: { $0.id == id }) else { return }
+        guard allEntries[index].deletedAt != nil else { return }
+        allEntries.remove(at: index)
         _ = persistTodaySlices()
     }
 
     func historyGroupedByDate() -> [TodayTodoHistorySection] {
         let today = todayISO()
-        let history = allEntries.filter { $0.isCompleted && $0.dateISO < today }
+        let history = allEntries.filter {
+            $0.deletedAt == nil && $0.isCompleted && $0.dateISO < today
+        }
         let grouped = Dictionary(grouping: history, by: \.dateISO)
         return grouped.keys.sorted(by: >).map { dateISO in
             let entries = grouped[dateISO] ?? []
@@ -157,7 +180,12 @@ final class TodayTodoStore: ObservableObject {
     }
 
     private func publishTodaySlices(for today: String) {
-        let todayEntries = allEntries.filter { $0.dateISO == today }
+        let activeEntries = allEntries.filter { $0.deletedAt == nil }
+        deletedEntries = allEntries
+            .filter { $0.deletedAt != nil }
+            .sorted { ($0.deletedAt ?? .distantPast) > ($1.deletedAt ?? .distantPast) }
+
+        let todayEntries = activeEntries.filter { $0.dateISO == today }
         incompleteEntries = todayEntries
             .filter { !$0.isCompleted }
             .sorted { lhs, rhs in
@@ -167,6 +195,10 @@ final class TodayTodoStore: ObservableObject {
         completedEntries = todayEntries
             .filter(\.isCompleted)
             .sorted { ($0.completedAt ?? $0.createdAt) > ($1.completedAt ?? $1.createdAt) }
+    }
+
+    private func softDelete(at index: Int) {
+        allEntries[index].deletedAt = Date()
     }
 
     private func readFile() throws -> TodayTodoFile {

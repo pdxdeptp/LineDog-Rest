@@ -263,20 +263,30 @@ struct LearningDeadlineEditSheet: View {
                     onDateChange(LearningDeskPanelViewModel.isoDate(pickedDate))
                 }
 
-            Text("未完成课程将从今天起重排到新截止日；已完成的课不变。双击日期可直接确认。")
+            Text("Hermes 可能协调所有活跃项目的未完成课程；已完成的课不变。双击日期可直接确认。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-            if let preview, canConfirm {
+            if let preview {
+                if preview.affectedProjectCount > 1 {
+                    Text("将影响 \(preview.affectedProjectCount) 个活跃项目")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.secondary)
+                }
+                ForEach(preview.cadenceLines, id: \.self) { line in
+                    Text(line)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 if preview.changeCount > 0 {
                     Text("将移动 \(preview.changeCount) 节课")
                         .font(.caption.weight(.medium))
                         .foregroundStyle(.secondary)
                 }
-                if preview.overflowCount > 0 {
-                    Text("\(preview.overflowCount) 节课无法排进新截止日，确认后仍保留在原日期")
+                if let conflict = preview.conflictSummary {
+                    Text(conflict)
                         .font(.caption.weight(.medium))
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(preview.feasible ? .orange : .red)
                 }
             }
 
@@ -300,6 +310,7 @@ struct LearningDeadlineEditSheet: View {
     }
 
     private var canConfirm: Bool {
+        guard preview?.feasible != false else { return false }
         let newDeadline = LearningDeskPanelViewModel.isoDate(pickedDate)
         if newDeadline != session.currentDeadline { return true }
         guard let preview else { return false }

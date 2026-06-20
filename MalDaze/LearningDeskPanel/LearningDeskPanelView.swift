@@ -9,9 +9,18 @@ struct LearningDeskPanelView: View {
         MalDazeDefaults.defaultLearningDailyCapacityHours
     @AppStorage(MalDazeDefaults.learningTodayGrouping) private var todayGroupingRaw =
         LearningDeskPanelViewModel.TodayGroupingMode.flat.rawValue
+    @AppStorage(MalDazeDefaults.learningTodayHermesTaskFraction) private var todayHermesTaskFractionStored =
+        MalDazeDefaults.defaultLearningTodayHermesTaskFraction
+    @State private var todayHermesTaskFractionDragLive: Double?
 
     private var todayGrouping: LearningDeskPanelViewModel.TodayGroupingMode {
         LearningDeskPanelViewModel.TodayGroupingMode(rawValue: todayGroupingRaw) ?? .flat
+    }
+
+    private var resolvedTodayHermesTaskFraction: Double {
+        MalDazeDefaults.clampedLearningTodayHermesTaskFraction(
+            todayHermesTaskFractionDragLive ?? todayHermesTaskFractionStored
+        )
     }
 
     private var dailyCapacityMinutes: Int {
@@ -25,6 +34,7 @@ struct LearningDeskPanelView: View {
             header
             tabPicker
             tabContent
+                .layoutPriority(1)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding(10)
@@ -225,6 +235,7 @@ struct LearningDeskPanelView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         case .schedule:
             scheduleContent
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         case .projects:
             projectsContent
         }
@@ -234,16 +245,14 @@ struct LearningDeskPanelView: View {
     private var todayContent: some View {
         switch viewModel.loadState {
         case .idle, .loading:
-            VStack(alignment: .leading, spacing: 12) {
+            todayHermesTodoSplit {
                 ProgressView("加载今日学习任务…")
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 12)
-                Spacer(minLength: 0)
-                todayTodoSectionBlock
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            } lower: { sectionHeight in
+                todayTodoSectionBlock(sectionHeight: sectionHeight)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         case .failed(let message):
-            VStack(alignment: .leading, spacing: 12) {
+            todayHermesTodoSplit {
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("无法加载学习面板")
@@ -257,10 +266,9 @@ struct LearningDeskPanelView: View {
                     }
                     .padding(8)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                todayTodoSectionBlock
+            } lower: { sectionHeight in
+                todayTodoSectionBlock(sectionHeight: sectionHeight)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         case .loaded(let snapshot):
             loadedBody(snapshot: snapshot)
         }
@@ -314,53 +322,24 @@ struct LearningDeskPanelView: View {
 
     @ViewBuilder
     private var scheduleContent: some View {
-        switch viewModel.scheduleLoadState {
-        case .idle, .loading:
-            LearningScheduleView(
-                monthTitle: viewModel.scheduleMonthTitle,
-                days: [],
-                deadlines: [],
-                budgetStudyMinutes: dailyCapacityMinutes,
-                isLoading: true,
-                errorMessage: nil,
-                truncated: false,
-                selectedDate: $viewModel.selectedScheduleDate,
-                onPrevMonth: { Task { await viewModel.shiftScheduleMonth(by: -1) } },
-                onNextMonth: { Task { await viewModel.shiftScheduleMonth(by: 1) } },
-                onJumpToday: { Task { await viewModel.jumpToTodayInSchedule() } },
-                taskRow: { row, isReview in taskRow(row, isReview: isReview) }
-            )
-        case .failed(let message):
-            LearningScheduleView(
-                monthTitle: viewModel.scheduleMonthTitle,
-                days: [],
-                deadlines: [],
-                budgetStudyMinutes: dailyCapacityMinutes,
-                isLoading: false,
-                errorMessage: message,
-                truncated: false,
-                selectedDate: $viewModel.selectedScheduleDate,
-                onPrevMonth: { Task { await viewModel.shiftScheduleMonth(by: -1) } },
-                onNextMonth: { Task { await viewModel.shiftScheduleMonth(by: 1) } },
-                onJumpToday: { Task { await viewModel.jumpToTodayInSchedule() } },
-                taskRow: { row, isReview in taskRow(row, isReview: isReview) }
-            )
-        case .loaded(let response):
-            LearningScheduleView(
-                monthTitle: viewModel.scheduleMonthTitle,
-                days: response.days,
-                deadlines: response.deadlines,
-                budgetStudyMinutes: dailyCapacityMinutes,
-                isLoading: false,
-                errorMessage: nil,
-                truncated: response.truncated == true,
-                selectedDate: $viewModel.selectedScheduleDate,
-                onPrevMonth: { Task { await viewModel.shiftScheduleMonth(by: -1) } },
-                onNextMonth: { Task { await viewModel.shiftScheduleMonth(by: 1) } },
-                onJumpToday: { Task { await viewModel.jumpToTodayInSchedule() } },
-                taskRow: { row, isReview in taskRow(row, isReview: isReview) }
-            )
-        }
+        let presentation = viewModel.scheduleDayListPresentation
+        LearningScheduleView(
+            monthTitle: viewModel.scheduleMonthTitle,
+            days: presentation.visibleDays,
+            deadlines: viewModel.scheduleDisplayedDeadlines,
+            budgetStudyMinutes: dailyCapacityMinutes,
+            isLoading: viewModel.scheduleShowsLoadingPlaceholder,
+            isFetching: viewModel.scheduleIsFetching && !viewModel.scheduleShowsLoadingPlaceholder,
+            errorMessage: viewModel.scheduleDisplayedErrorMessage,
+            truncated: viewModel.scheduleDisplayedTruncated,
+            hiddenEarlierDayCount: presentation.hiddenEarlierDayCount,
+            selectedDate: $viewModel.selectedScheduleDate,
+            onPrevMonth: { Task { await viewModel.shiftScheduleMonth(by: -1) } },
+            onNextMonth: { Task { await viewModel.shiftScheduleMonth(by: 1) } },
+            onJumpToday: { Task { await viewModel.jumpToTodayInSchedule() } },
+            onShowEarlierDays: { viewModel.showFullScheduleRange() },
+            taskRow: { row, isReview in taskRow(row, isReview: isReview) }
+        )
     }
 
     @ViewBuilder
@@ -430,57 +409,86 @@ struct LearningDeskPanelView: View {
                     .foregroundStyle(.secondary)
             }
 
-            ScrollViewReader { proxy in
-                ScrollView(showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 12) {
-                        if !displaySnapshot.highRolloverRows.isEmpty {
-                            LearningTodayRolloverStrip(rows: displaySnapshot.highRolloverRows) { taskId in
-                                viewModel.focusRolloverTask(taskId)
+            todayHermesTodoSplit {
+                ScrollViewReader { proxy in
+                    ScrollView(showsIndicators: false) {
+                        VStack(alignment: .leading, spacing: 12) {
+                            if !displaySnapshot.highRolloverRows.isEmpty {
+                                LearningTodayRolloverStrip(rows: displaySnapshot.highRolloverRows) { taskId in
+                                    viewModel.focusRolloverTask(taskId)
+                                }
+                            }
+
+                            if displayRows.isEmpty {
+                                Text(response.isRestDay ? "休息日无学习任务。" : "今日无学习任务。")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                                    .padding(.vertical, 8)
+                            } else {
+                                todayTaskList(snapshot: displaySnapshot)
                             }
                         }
-
-                        if displayRows.isEmpty {
-                            Text(response.isRestDay ? "休息日无学习任务。" : "今日无学习任务。")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                                .padding(.vertical, 8)
-                        } else {
-                            todayTaskList(snapshot: displaySnapshot)
+                    }
+                    .onChange(of: viewModel.highlightTaskId) { taskId in
+                        guard let taskId else { return }
+                        withAnimation {
+                            proxy.scrollTo(taskId, anchor: .center)
+                        }
+                        Task {
+                            try? await Task.sleep(nanoseconds: 2_000_000_000)
+                            viewModel.clearHighlight()
                         }
                     }
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                .onChange(of: viewModel.highlightTaskId) { taskId in
-                    guard let taskId else { return }
-                    withAnimation {
-                        proxy.scrollTo(taskId, anchor: .center)
-                    }
-                    Task {
-                        try? await Task.sleep(nanoseconds: 2_000_000_000)
-                        viewModel.clearHighlight()
-                    }
-                }
+            } lower: { sectionHeight in
+                todayTodoSectionBlock(sectionHeight: sectionHeight)
             }
-
-            todayBottomPinnedBlock(response: response)
+            .frame(maxHeight: .infinity, alignment: .topLeading)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
     @ViewBuilder
-    private func todayBottomPinnedBlock(response: HermesTodayResponse) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            todayTodoSectionBlock
+    private func todayHermesTodoSplit<Upper: View, Lower: View>(
+        @ViewBuilder upper: @escaping () -> Upper,
+        @ViewBuilder lower: @escaping (_ todoSectionHeight: CGFloat) -> Lower
+    ) -> some View {
+        DashboardVerticalFractionSplit(
+            upperFraction: resolvedTodayHermesTaskFraction,
+            handleAccessibilityLabel: "调整学习任务与今日 todo 区高度",
+            handleID: "learning-today-hermes-todo-resize",
+            onFractionDragChanged: updateTodayHermesTaskFractionDrag,
+            onFractionDragEnded: commitTodayHermesTaskFractionDrag,
+            upper: upper,
+            lower: lower
+        )
+    }
 
-            if let preview = response.tomorrowPreview {
-                sectionTitle("明天预告")
-                LearningTomorrowPreviewBlock(preview: preview)
-            }
+    private func updateTodayHermesTaskFractionDrag(delta: CGFloat, stackHeight: CGFloat) {
+        let updated = DashboardLayout.fractionAfterVerticalDrag(
+            current: resolvedTodayHermesTaskFraction,
+            delta: delta,
+            stackHeight: stackHeight,
+            clamp: MalDazeDefaults.clampedLearningTodayHermesTaskFraction
+        )
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            todayHermesTaskFractionDragLive = updated
         }
     }
 
-    private var todayTodoSectionBlock: some View {
-        TodayTodoSection(store: todayTodoStore, showHistory: $showTodayTodoHistory)
+    private func commitTodayHermesTaskFractionDrag() {
+        todayHermesTaskFractionStored = resolvedTodayHermesTaskFraction
+        todayHermesTaskFractionDragLive = nil
+    }
+
+    private func todayTodoSectionBlock(sectionHeight: CGFloat) -> some View {
+        TodayTodoSection(
+            store: todayTodoStore,
+            showHistory: $showTodayTodoHistory,
+            sectionHeight: sectionHeight
+        )
     }
 
     @ViewBuilder

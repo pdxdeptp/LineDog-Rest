@@ -508,12 +508,14 @@ struct HermesStatusProject: Decodable, Equatable {
 }
 
 struct HermesDeadlineChange: Decodable, Equatable {
+    let projectId: String?
     let taskId: String
     let title: String?
     let oldDate: String?
     let newDate: String?
 
     enum CodingKeys: String, CodingKey {
+        case projectId = "project_id"
         case taskId = "task_id"
         case title
         case oldDate = "old_date"
@@ -522,14 +524,50 @@ struct HermesDeadlineChange: Decodable, Equatable {
 }
 
 struct HermesDeadlineOverflowTask: Decodable, Equatable {
+    let projectId: String?
     let taskId: String
     let title: String?
     let scheduledDate: String?
 
     enum CodingKeys: String, CodingKey {
+        case projectId = "project_id"
         case taskId = "task_id"
         case title
         case scheduledDate = "scheduled_date"
+    }
+}
+
+struct HermesProjectCadence: Decodable, Equatable {
+    let projectId: String
+    let remainingStudyTasks: Int?
+    let eligibleStudyDays: Int?
+    let minPreferredDaily: Int?
+    let maxPreferredDaily: Int?
+    let movedTaskCount: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case projectId = "project_id"
+        case remainingStudyTasks = "remaining_study_tasks"
+        case eligibleStudyDays = "eligible_study_days"
+        case minPreferredDaily = "min_preferred_daily"
+        case maxPreferredDaily = "max_preferred_daily"
+        case movedTaskCount = "moved_task_count"
+    }
+}
+
+struct HermesCapacityConflict: Decodable, Equatable {
+    let type: String?
+    let date: String?
+    let loadMinutes: Int?
+    let capacity: Int?
+    let overBy: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case type
+        case date
+        case loadMinutes = "load_minutes"
+        case capacity
+        case overBy = "over_by"
     }
 }
 
@@ -540,6 +578,11 @@ struct HermesSetDeadlineResponse: Decodable, Equatable {
     let newDeadline: String?
     let repacked: Bool?
     let repackMode: String?
+    let repackScope: String?
+    let feasible: Bool?
+    let affectedProjectIds: [String]?
+    let projectCadences: [HermesProjectCadence]?
+    let capacityConflicts: [HermesCapacityConflict]?
     let changes: [HermesDeadlineChange]?
     let overflowCount: Int?
     let overflowTasks: [HermesDeadlineOverflowTask]?
@@ -554,6 +597,11 @@ struct HermesSetDeadlineResponse: Decodable, Equatable {
         case newDeadline = "new_deadline"
         case repacked
         case repackMode = "repack_mode"
+        case repackScope = "repack_scope"
+        case feasible
+        case affectedProjectIds = "affected_project_ids"
+        case projectCadences = "project_cadences"
+        case capacityConflicts = "capacity_conflicts"
         case changes
         case overflowCount = "overflow_count"
         case overflowTasks = "overflow_tasks"
@@ -563,6 +611,7 @@ struct HermesSetDeadlineResponse: Decodable, Equatable {
     }
 
     var succeeded: Bool { error == nil && projectId != nil }
+    var isFeasiblePreview: Bool { feasible ?? ((overflowCount ?? 0) == 0) }
 }
 
 enum LearningProjectStatusOrdering {

@@ -243,9 +243,13 @@ final class ControlPanelPresentationTests: XCTestCase {
             source.contains("safeAreaRegions = []"),
             "Dashboard hosting controller should extend SwiftUI under the transparent titlebar."
         )
-        XCTAssertTrue(
+        XCTAssertFalse(
             source.contains("sizingOptions = [.intrinsicContentSize]"),
-            "Dashboard hosting controller should not push SwiftUI minSize back onto the window frame."
+            "Dashboard window size should follow persisted/user frame, not SwiftUI intrinsic content."
+        )
+        XCTAssertTrue(
+            source.contains("window.inLiveResize"),
+            "Dashboard frame persistence should ignore programmatic resize, not user drag-resize."
         )
         let bindSource = try functionSource(named: "bindDeskPetMenu", in: source)
         XCTAssertFalse(
@@ -1011,25 +1015,26 @@ final class ControlPanelPresentationTests: XCTestCase {
     }
 
     func testDashboardRootUsesResizableThreeColumnChrome() throws {
-        let source = try readProjectSource("MalDaze/DashboardRootView.swift")
+        let rootSource = try readProjectSource("MalDaze/DashboardRootView.swift")
+        let handleSource = try readProjectSource("MalDaze/DashboardResizeHandle.swift")
 
-        XCTAssertTrue(source.contains("GeometryReader"))
-        XCTAssertTrue(source.contains("final class DashboardColumnResizeHandleView"))
-        XCTAssertTrue(source.contains("override func mouseDragged(with event: NSEvent)"))
-        XCTAssertTrue(source.contains("DashboardWindowDragStrip"))
-        XCTAssertTrue(source.contains("performDrag(with:"))
+        XCTAssertTrue(rootSource.contains("GeometryReader"))
+        XCTAssertTrue(handleSource.contains("final class DashboardColumnResizeHandleView"))
+        XCTAssertTrue(handleSource.contains("override func mouseDragged(with event: NSEvent)"))
+        XCTAssertTrue(rootSource.contains("DashboardWindowDragStrip"))
+        XCTAssertTrue(rootSource.contains("performDrag(with:"))
         XCTAssertFalse(
-            source.contains("ScrollView([.horizontal, .vertical])"),
+            rootSource.contains("ScrollView([.horizontal, .vertical])"),
             "Dashboard should fill the window instead of pinning a fixed-size scroll document."
         )
         XCTAssertTrue(
-            source.contains("maxWidth: .infinity, maxHeight: .infinity"),
+            rootSource.contains("maxWidth: .infinity, maxHeight: .infinity"),
             "Middle column should absorb horizontal resize slack."
         )
     }
 
     func testDashboardResizeHandleUsesWindowStableDragCoordinates() throws {
-        let source = try readProjectSource("MalDaze/DashboardRootView.swift")
+        let source = try readProjectSource("MalDaze/DashboardResizeHandle.swift")
         let dragCoordinateSource = try functionSource(named: "dragCoordinate", in: source)
 
         XCTAssertTrue(
@@ -1044,6 +1049,73 @@ final class ControlPanelPresentationTests: XCTestCase {
             dragCoordinateSource.contains("convert(event.locationInWindow, from: nil)"),
             "Resize drag deltas must not derive from handle-local coordinates because the handle moves during live layout."
         )
+        XCTAssertTrue(
+            source.contains("hoverCursorActive"),
+            "Resize handle should track hover vs drag cursor pushes separately to avoid unbalanced NSCursor.pop()."
+        )
+        XCTAssertTrue(
+            source.contains("DashboardVerticalFractionSplit"),
+            "Row splits should share one vertical fraction split implementation."
+        )
+    }
+
+    func testDashboardVerticalSplitLayoutHelpers() {
+        let split = DashboardLayout.verticalSplitHeights(totalHeight: 408, upperFraction: 0.6)
+        XCTAssertEqual(split.stack, 400, accuracy: 0.001)
+        XCTAssertEqual(split.upper, 240, accuracy: 0.001)
+        XCTAssertEqual(split.lower, 160, accuracy: 0.001)
+
+        let clamped = DashboardLayout.fractionAfterVerticalDrag(
+            current: 0.5,
+            delta: 40,
+            stackHeight: 400,
+            clamp: DashboardLayout.clampedLeftPlanFraction
+        )
+        XCTAssertEqual(clamped, 0.6, accuracy: 0.001)
+    }
+
+    func testLearningDeskPanelUsesSharedVerticalSplit() throws {
+        let source = try readProjectSource("MalDaze/LearningDeskPanel/LearningDeskPanelView.swift")
+        XCTAssertTrue(source.contains("DashboardVerticalFractionSplit"))
+        XCTAssertTrue(source.contains(".frame(maxHeight: .infinity, alignment: .topLeading)"))
+    }
+
+    func testTodayTodoSectionUsesStableContentLayoutShell() throws {
+        let sectionSource = try readProjectSource("MalDaze/LearningDeskPanel/TodayTodoSection.swift")
+        let layoutSource = try readProjectSource("MalDaze/LearningDeskPanel/TodayTodoContentLayout.swift")
+        let policySource = try readProjectSource("MalDaze/LearningDeskPanel/TodayTodoLayoutPolicy.swift")
+
+        XCTAssertTrue(sectionSource.contains("TodayTodoContentLayout("))
+        XCTAssertFalse(sectionSource.contains("isDraftPinned"))
+        XCTAssertFalse(sectionSource.contains("reevaluatePinMode"))
+        XCTAssertFalse(sectionSource.contains("estimatedRowHeight"))
+        XCTAssertFalse(sectionSource.contains("listHeightMeasurer"))
+        XCTAssertFalse(sectionSource.contains("if !isDraftPinned"))
+        XCTAssertFalse(sectionSource.contains("if isDraftPinned"))
+        XCTAssertFalse(sectionSource.contains("splitDragInProgress"))
+
+        XCTAssertTrue(layoutSource.contains("ScrollViewReader"))
+        XCTAssertTrue(layoutSource.contains("ScrollView(showsIndicators: false)"))
+        XCTAssertTrue(layoutSource.contains(".frame(height: resolution.listViewportHeight"))
+        XCTAssertTrue(layoutSource.contains("today-todo-scroll-top"))
+        XCTAssertTrue(layoutSource.contains("today-todo-scroll-bottom"))
+        XCTAssertTrue(layoutSource.contains("TodayTodoMeasuredGeometryKey"))
+        XCTAssertFalse(layoutSource.contains("withAnimation"))
+        XCTAssertFalse(layoutSource.contains(".animation("))
+
+        let draftMountCount = layoutSource.components(separatedBy: "draftFieldRow").count - 1
+        XCTAssertEqual(draftMountCount, 2, "Layout shell should reference draftFieldRow only for mount and measurement.")
+        let todoEntriesMountCount = layoutSource.components(separatedBy: "todoEntries").count - 1
+        XCTAssertGreaterThanOrEqual(todoEntriesMountCount, 1)
+        XCTAssertFalse(layoutSource.contains(".hidden()"))
+
+        XCTAssertTrue(policySource.contains("enum TodayTodoLayoutMode"))
+        XCTAssertTrue(policySource.contains("TodayTodoLayoutResolution"))
+        XCTAssertTrue(policySource.contains("static func resolve"))
+        XCTAssertFalse(policySource.contains("shouldPinDraft"))
+        XCTAssertFalse(policySource.contains("compactStackHeight"))
+        XCTAssertFalse(policySource.contains("hysteresisBand"))
+        XCTAssertFalse(policySource.contains("estimatedRowHeight"))
     }
 
     func testDeskPetDashboardWindowLayoutClampsToSmallVisibleFrame() {

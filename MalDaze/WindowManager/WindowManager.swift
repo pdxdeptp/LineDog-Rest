@@ -47,7 +47,8 @@ enum DeskPetDashboardWindowLayout {
 }
 
 private final class DeskPetDashboardWindowDelegate: NSObject, NSWindowDelegate {
-    var onFrameChanged: (() -> Void)?
+    var onWindowMoved: (() -> Void)?
+    var onWindowLiveResized: (() -> Void)?
     var onCloseRequest: (() -> Void)?
 
     func windowShouldClose(_ sender: NSWindow) -> Bool {
@@ -56,11 +57,12 @@ private final class DeskPetDashboardWindowDelegate: NSObject, NSWindowDelegate {
     }
 
     func windowDidMove(_ notification: Notification) {
-        onFrameChanged?()
+        onWindowMoved?()
     }
 
     func windowDidResize(_ notification: Notification) {
-        onFrameChanged?()
+        guard let window = notification.object as? NSWindow, window.inLiveResize else { return }
+        onWindowLiveResized?()
     }
 }
 
@@ -1234,15 +1236,15 @@ extension WindowManager: PetStageDeskMenuPresenter {
     }
 
     private static func resolvedDashboardWindowFrame() -> NSRect {
+        let visibleFrame = dashboardDefaultVisibleFrame()
+        let defaultFrame = DeskPetDashboardWindowLayout.centeredFrame(visibleFrame: visibleFrame)
         let d = UserDefaults.standard
         guard d.object(forKey: MalDazeDefaults.dashboardWindowOriginX) != nil,
               d.object(forKey: MalDazeDefaults.dashboardWindowOriginY) != nil,
               d.object(forKey: MalDazeDefaults.dashboardWindowWidth) != nil,
               d.object(forKey: MalDazeDefaults.dashboardWindowHeight) != nil
         else {
-            return DeskPetDashboardWindowLayout.centeredFrame(
-                visibleFrame: dashboardDefaultVisibleFrame()
-            )
+            return defaultFrame
         }
         let storedFrame = NSRect(
             x: d.double(forKey: MalDazeDefaults.dashboardWindowOriginX),
@@ -1250,8 +1252,12 @@ extension WindowManager: PetStageDeskMenuPresenter {
             width: d.double(forKey: MalDazeDefaults.dashboardWindowWidth),
             height: d.double(forKey: MalDazeDefaults.dashboardWindowHeight)
         )
-        let visibleFrame = MalDazePresentationAnchor.visibleFrameContainingScreenRect(storedFrame)
-        return DeskPetDashboardWindowLayout.clampedFrame(storedFrame, visibleFrame: visibleFrame)
+        if storedFrame.width < defaultFrame.width * 0.75
+            || storedFrame.height < defaultFrame.height * 0.75 {
+            return defaultFrame
+        }
+        let clampVisibleFrame = MalDazePresentationAnchor.visibleFrameContainingScreenRect(storedFrame)
+        return DeskPetDashboardWindowLayout.clampedFrame(storedFrame, visibleFrame: clampVisibleFrame)
     }
 
     private func persistDashboardWindowFrame(_ frame: NSRect) {
@@ -1280,7 +1286,13 @@ extension WindowManager: PetStageDeskMenuPresenter {
         Self.configureDashboardWindowChrome(dashboardWindow)
         dashboardWindow.identifier = NSUserInterfaceItemIdentifier(Self.deskPetDashboardWindowIdentifier)
         dashboardWindow.delegate = deskMenuWindowDelegate
-        deskMenuWindowDelegate.onFrameChanged = { [weak self] in
+        deskMenuWindowDelegate.onWindowMoved = { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self, let win = self.deskMenuWindow, win.isVisible else { return }
+                self.persistDashboardWindowFrame(win.frame)
+            }
+        }
+        deskMenuWindowDelegate.onWindowLiveResized = { [weak self] in
             Task { @MainActor [weak self] in
                 guard let self, let win = self.deskMenuWindow, win.isVisible else { return }
                 self.persistDashboardWindowFrame(win.frame)
@@ -1295,9 +1307,6 @@ extension WindowManager: PetStageDeskMenuPresenter {
         let host = NSHostingController(rootView: makeDeskPetDashboardRootView(viewModel: vm))
         if #available(macOS 13.3, *) {
             host.safeAreaRegions = []
-        }
-        if #available(macOS 14.0, *) {
-            host.sizingOptions = [.intrinsicContentSize]
         }
         dashboardWindow.contentViewController = host
         dashboardWindow.setFrame(panelFrame, display: false)
@@ -1327,14 +1336,26 @@ extension WindowManager: PetStageDeskMenuPresenter {
 
     private func showDashboardWindow() {
         guard let dashboardWindow = makeDeskMenuWindowIfNeeded() else { return }
+        let targetFrame = Self.resolvedDashboardWindowFrame()
         if !dashboardWindow.isVisible {
-            dashboardWindow.setFrame(Self.resolvedDashboardWindowFrame(), display: false)
+            dashboardWindow.setFrame(targetFrame, display: false)
         }
         NSApp.activate(ignoringOtherApps: true)
         dashboardWindow.makeKeyAndOrderFront(nil)
         installDashboardEscMonitor()
-        persistDashboardWindowFrame(dashboardWindow.frame)
-        NotificationCenter.default.post(name: MalDazeBroadcastNotifications.deskPetDashboardDidOpen, object: nil)
+        DispatchQueue.main.async { [weak self] in
+            guard let self, let dashboardWindow = self.deskMenuWindow else { return }
+            self.restoreDashboardWindowFrameIfShrunk(dashboardWindow, expected: targetFrame)
+            NotificationCenter.default.post(name: MalDazeBroadcastNotifications.deskPetDashboardDidOpen, object: nil)
+        }
+    }
+
+    private func restoreDashboardWindowFrameIfShrunk(_ window: NSWindow, expected: NSRect) {
+        guard window.isVisible else { return }
+        let current = window.frame
+        if current.width < expected.width - 2 || current.height < expected.height - 2 {
+            window.setFrame(expected, display: true)
+        }
     }
 
     private func hideDashboardWindow() {

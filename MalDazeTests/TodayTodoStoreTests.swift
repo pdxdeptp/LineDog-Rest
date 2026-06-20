@@ -48,10 +48,35 @@ final class TodayTodoStoreTests: XCTestCase {
 
         store.delete(id: id)
         XCTAssertEqual(store.completedEntries.count, 0)
+        XCTAssertEqual(store.deletedEntries.count, 1)
+        XCTAssertEqual(store.deletedEntries[0].title, "买打印纸")
+
+        store.restore(id: id)
+        XCTAssertEqual(store.completedEntries.count, 1)
+        XCTAssertEqual(store.deletedEntries.count, 0)
+
+        store.delete(id: id)
+        store.permanentlyDelete(id: id)
+        XCTAssertEqual(store.deletedEntries.count, 0)
 
         let data = try Data(contentsOf: fileURL)
         let file = try JSONDecoder().decode(TodayTodoFile.self, from: data)
         XCTAssertTrue(file.entries.isEmpty)
+    }
+
+    func testDeleteMovesIncompleteEntryToTrash() {
+        let store = makeStore()
+        store.loadAndRollForward()
+        XCTAssertTrue(store.add(title: "误删项"))
+        let id = store.incompleteEntries[0].id
+
+        store.delete(id: id)
+        XCTAssertEqual(store.incompleteEntries.count, 0)
+        XCTAssertEqual(store.deletedEntries.count, 1)
+
+        store.restore(id: id)
+        XCTAssertEqual(store.incompleteEntries.count, 1)
+        XCTAssertEqual(store.incompleteEntries[0].title, "误删项")
     }
 
     func testRollForwardIncompleteEntry() throws {

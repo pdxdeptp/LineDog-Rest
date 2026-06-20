@@ -10,6 +10,7 @@
 		A201 /* MalDazeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B201 /* MalDazeApp.swift */; };
 		A202 /* AppViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B202 /* AppViewModel.swift */; };
 		A203 /* DashboardRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B203 /* DashboardRootView.swift */; };
+		A243 /* DashboardResizeHandle.swift in Sources */ = {isa = PBXBuildFile; fileRef = B243 /* DashboardResizeHandle.swift */; };
 		A242 /* DashboardLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = B242 /* DashboardLayout.swift */; };
 		A204 /* TimeState.swift in Sources */ = {isa = PBXBuildFile; fileRef = B204 /* TimeState.swift */; };
 		A205 /* TimerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B205 /* TimerEngine.swift */; };
@@ -51,6 +52,7 @@
 		A290 /* HermesScheduleModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B290 /* HermesScheduleModels.swift */; };
 		A291 /* HermesScheduleCLI.swift in Sources */ = {isa = PBXBuildFile; fileRef = B291 /* HermesScheduleCLI.swift */; };
 		A292 /* LearningDeskPanelViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B292 /* LearningDeskPanelViewModel.swift */; };
+		A2RP /* DeadlineRepackPreviewFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2RP /* DeadlineRepackPreviewFormatter.swift */; };
 		A293 /* LearningDeskPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B293 /* LearningDeskPanelView.swift */; };
 		A294 /* LearningTaskRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B294 /* LearningTaskRow.swift */; };
 		A295 /* LearningMovePreviewSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B295 /* LearningMovePreviewSheet.swift */; };
@@ -61,18 +63,24 @@
 		A29A /* HermesLearningProfileStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B29A /* HermesLearningProfileStore.swift */; };
 		A29G /* LearningSettingsSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B29G /* LearningSettingsSyncService.swift */; };
 		A29B /* LearningProjectStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B29B /* LearningProjectStatusView.swift */; };
+		A2SD /* LearningScheduleDayWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2SD /* LearningScheduleDayWindow.swift */; };
 		A29C /* LearningScheduleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B29C /* LearningScheduleView.swift */; };
 		A29D /* LearningTodayRolloverStrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = B29D /* LearningTodayRolloverStrip.swift */; };
 		A29E /* LearningCompleteDurationSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B29E /* LearningCompleteDurationSheet.swift */; };
 		A29F /* LearningTodayActionCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B29F /* LearningTodayActionCard.swift */; };
-		A2A0 /* LearningTomorrowPreviewBlock.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2A0 /* LearningTomorrowPreviewBlock.swift */; };
 		A2T0 /* TodayTodoModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2T0 /* TodayTodoModels.swift */; };
 		A2T1 /* TodayTodoStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2T1 /* TodayTodoStore.swift */; };
 		A2T2 /* TodayTodoRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2T2 /* TodayTodoRow.swift */; };
 		A2T3 /* TodayTodoSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2T3 /* TodayTodoSection.swift */; };
+		A2T8 /* TodayTodoContentLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2T8 /* TodayTodoContentLayout.swift */; };
+		A2T7 /* TodayTodoLayoutPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2T7 /* TodayTodoLayoutPolicy.swift */; };
 		A2T4 /* TodayTodoHistorySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2T4 /* TodayTodoHistorySheet.swift */; };
 		A2T5 /* TodayTodoDraftField.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2T5 /* TodayTodoDraftField.swift */; };
+		A2T6 /* TodayTodoInlineText.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2T6 /* TodayTodoInlineText.swift */; };
 		A31T /* TodayTodoStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31T /* TodayTodoStoreTests.swift */; };
+		A31V /* LearningScheduleDayWindowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31V /* LearningScheduleDayWindowTests.swift */; };
+		A31W /* TodayTodoContentLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31W /* TodayTodoContentLayoutTests.swift */; };
+		A31U /* TodayTodoLayoutPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31U /* TodayTodoLayoutPolicyTests.swift */; };
 		A2A1 /* NutritionDailyLogContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2A1 /* NutritionDailyLogContract.swift */; };
 		A2A2 /* NutritionDailyLogFileWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2A2 /* NutritionDailyLogFileWatcher.swift */; };
 		A2A3 /* NutritionHermesCLI.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2A3 /* NutritionHermesCLI.swift */; };
@@ -183,6 +191,7 @@
 		B201 /* MalDazeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MalDazeApp.swift; sourceTree = "<group>"; };
 		B202 /* AppViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppViewModel.swift; sourceTree = "<group>"; };
 		B203 /* DashboardRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardRootView.swift; sourceTree = "<group>"; };
+		B243 /* DashboardResizeHandle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardResizeHandle.swift; sourceTree = "<group>"; };
 		B242 /* DashboardLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardLayout.swift; sourceTree = "<group>"; };
 		B204 /* TimeState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeState.swift; sourceTree = "<group>"; };
 		B205 /* TimerEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimerEngine.swift; sourceTree = "<group>"; };
@@ -223,6 +232,7 @@
 		B290 /* HermesScheduleModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HermesScheduleModels.swift; sourceTree = "<group>"; };
 		B291 /* HermesScheduleCLI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HermesScheduleCLI.swift; sourceTree = "<group>"; };
 		B292 /* LearningDeskPanelViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningDeskPanelViewModel.swift; sourceTree = "<group>"; };
+		B2RP /* DeadlineRepackPreviewFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeadlineRepackPreviewFormatter.swift; sourceTree = "<group>"; };
 		B293 /* LearningDeskPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningDeskPanelView.swift; sourceTree = "<group>"; };
 		B294 /* LearningTaskRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningTaskRow.swift; sourceTree = "<group>"; };
 		B295 /* LearningMovePreviewSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningMovePreviewSheet.swift; sourceTree = "<group>"; };
@@ -233,18 +243,24 @@
 		B29A /* HermesLearningProfileStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HermesLearningProfileStore.swift; sourceTree = "<group>"; };
 		B29G /* LearningSettingsSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningSettingsSyncService.swift; sourceTree = "<group>"; };
 		B29B /* LearningProjectStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningProjectStatusView.swift; sourceTree = "<group>"; };
+		B2SD /* LearningScheduleDayWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningScheduleDayWindow.swift; sourceTree = "<group>"; };
 		B29C /* LearningScheduleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningScheduleView.swift; sourceTree = "<group>"; };
 		B29D /* LearningTodayRolloverStrip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningTodayRolloverStrip.swift; sourceTree = "<group>"; };
 		B29E /* LearningCompleteDurationSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningCompleteDurationSheet.swift; sourceTree = "<group>"; };
 		B29F /* LearningTodayActionCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningTodayActionCard.swift; sourceTree = "<group>"; };
-		B2A0 /* LearningTomorrowPreviewBlock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningTomorrowPreviewBlock.swift; sourceTree = "<group>"; };
 		B2T0 /* TodayTodoModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoModels.swift; sourceTree = "<group>"; };
 		B2T1 /* TodayTodoStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoStore.swift; sourceTree = "<group>"; };
 		B2T2 /* TodayTodoRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoRow.swift; sourceTree = "<group>"; };
 		B2T3 /* TodayTodoSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoSection.swift; sourceTree = "<group>"; };
+		B2T8 /* TodayTodoContentLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoContentLayout.swift; sourceTree = "<group>"; };
+		B2T7 /* TodayTodoLayoutPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoLayoutPolicy.swift; sourceTree = "<group>"; };
 		B2T4 /* TodayTodoHistorySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoHistorySheet.swift; sourceTree = "<group>"; };
 		B2T5 /* TodayTodoDraftField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoDraftField.swift; sourceTree = "<group>"; };
+		B2T6 /* TodayTodoInlineText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoInlineText.swift; sourceTree = "<group>"; };
 		B31T /* TodayTodoStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoStoreTests.swift; sourceTree = "<group>"; };
+		B31V /* LearningScheduleDayWindowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningScheduleDayWindowTests.swift; sourceTree = "<group>"; };
+		B31W /* TodayTodoContentLayoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoContentLayoutTests.swift; sourceTree = "<group>"; };
+		B31U /* TodayTodoLayoutPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoLayoutPolicyTests.swift; sourceTree = "<group>"; };
 		B2A1 /* NutritionDailyLogContract.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionDailyLogContract.swift; sourceTree = "<group>"; };
 		B2A2 /* NutritionDailyLogFileWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionDailyLogFileWatcher.swift; sourceTree = "<group>"; };
 		B2A3 /* NutritionHermesCLI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionHermesCLI.swift; sourceTree = "<group>"; };
@@ -390,6 +406,7 @@
 				B210 /* MalDazeAppDelegate.swift */,
 				B202 /* AppViewModel.swift */,
 				B203 /* DashboardRootView.swift */,
+				B243 /* DashboardResizeHandle.swift */,
 				B242 /* DashboardLayout.swift */,
 				B20F /* MenuBarDogLabel.swift */,
 				B20E /* PetDisplayMode.swift */,
@@ -495,6 +512,9 @@
 					B31J /* HermesScheduleModelsTests.swift */,
 					B31K /* LearningDeskPanelViewModelTests.swift */,
 					B31T /* TodayTodoStoreTests.swift */,
+					B31U /* TodayTodoLayoutPolicyTests.swift */,
+					B31W /* TodayTodoContentLayoutTests.swift */,
+					B31V /* LearningScheduleDayWindowTests.swift */,
 					B31L /* FileChangeWatcherTests.swift */,
 					B31M /* GlobalShortcutModelTests.swift */,
 					B31N /* CarbonGlobalHotKeyRegistrationTests.swift */,
@@ -578,6 +598,7 @@
 				B290 /* HermesScheduleModels.swift */,
 				B291 /* HermesScheduleCLI.swift */,
 				B292 /* LearningDeskPanelViewModel.swift */,
+				B2RP /* DeadlineRepackPreviewFormatter.swift */,
 				B293 /* LearningDeskPanelView.swift */,
 				B294 /* LearningTaskRow.swift */,
 				B295 /* LearningMovePreviewSheet.swift */,
@@ -589,16 +610,19 @@
 				B29G /* LearningSettingsSyncService.swift */,
 				B29B /* LearningProjectStatusView.swift */,
 				B29C /* LearningScheduleView.swift */,
+				B2SD /* LearningScheduleDayWindow.swift */,
 				B29D /* LearningTodayRolloverStrip.swift */,
 				B29E /* LearningCompleteDurationSheet.swift */,
 				B29F /* LearningTodayActionCard.swift */,
-				B2A0 /* LearningTomorrowPreviewBlock.swift */,
 				B2T0 /* TodayTodoModels.swift */,
 				B2T1 /* TodayTodoStore.swift */,
 				B2T2 /* TodayTodoRow.swift */,
 				B2T3 /* TodayTodoSection.swift */,
+				B2T7 /* TodayTodoLayoutPolicy.swift */,
+				B2T8 /* TodayTodoContentLayout.swift */,
 				B2T4 /* TodayTodoHistorySheet.swift */,
 				B2T5 /* TodayTodoDraftField.swift */,
+				B2T6 /* TodayTodoInlineText.swift */,
 			);
 			path = LearningDeskPanel;
 			sourceTree = "<group>";
@@ -794,6 +818,7 @@
 				A210 /* MalDazeAppDelegate.swift in Sources */,
 				A202 /* AppViewModel.swift in Sources */,
 				A203 /* DashboardRootView.swift in Sources */,
+				A243 /* DashboardResizeHandle.swift in Sources */,
 				A242 /* DashboardLayout.swift in Sources */,
 				A20F /* MenuBarDogLabel.swift in Sources */,
 				A20E /* PetDisplayMode.swift in Sources */,
@@ -829,6 +854,7 @@
 				A290 /* HermesScheduleModels.swift in Sources */,
 				A291 /* HermesScheduleCLI.swift in Sources */,
 				A292 /* LearningDeskPanelViewModel.swift in Sources */,
+				A2RP /* DeadlineRepackPreviewFormatter.swift in Sources */,
 				A293 /* LearningDeskPanelView.swift in Sources */,
 				A294 /* LearningTaskRow.swift in Sources */,
 				A295 /* LearningMovePreviewSheet.swift in Sources */,
@@ -840,16 +866,19 @@
 				A29G /* LearningSettingsSyncService.swift in Sources */,
 				A29B /* LearningProjectStatusView.swift in Sources */,
 				A29C /* LearningScheduleView.swift in Sources */,
+				A2SD /* LearningScheduleDayWindow.swift in Sources */,
 				A29D /* LearningTodayRolloverStrip.swift in Sources */,
 				A29E /* LearningCompleteDurationSheet.swift in Sources */,
 				A29F /* LearningTodayActionCard.swift in Sources */,
-				A2A0 /* LearningTomorrowPreviewBlock.swift in Sources */,
 				A2T0 /* TodayTodoModels.swift in Sources */,
 				A2T1 /* TodayTodoStore.swift in Sources */,
 				A2T2 /* TodayTodoRow.swift in Sources */,
 				A2T3 /* TodayTodoSection.swift in Sources */,
+				A2T7 /* TodayTodoLayoutPolicy.swift in Sources */,
+				A2T8 /* TodayTodoContentLayout.swift in Sources */,
 				A2T4 /* TodayTodoHistorySheet.swift in Sources */,
 				A2T5 /* TodayTodoDraftField.swift in Sources */,
+				A2T6 /* TodayTodoInlineText.swift in Sources */,
 				A2B1 /* ScrollMonthDatePicker.swift in Sources */,
 				A2A1 /* NutritionDailyLogContract.swift in Sources */,
 				A2A2 /* NutritionDailyLogFileWatcher.swift in Sources */,
@@ -941,6 +970,9 @@
 					A31J /* HermesScheduleModelsTests.swift in Sources */,
 					A31K /* LearningDeskPanelViewModelTests.swift in Sources */,
 					A31T /* TodayTodoStoreTests.swift in Sources */,
+					A31U /* TodayTodoLayoutPolicyTests.swift in Sources */,
+					A31W /* TodayTodoContentLayoutTests.swift in Sources */,
+					A31V /* LearningScheduleDayWindowTests.swift in Sources */,
 					A31L /* FileChangeWatcherTests.swift in Sources */,
 					A31M /* GlobalShortcutModelTests.swift in Sources */,
 					A31N /* CarbonGlobalHotKeyRegistrationTests.swift in Sources */,

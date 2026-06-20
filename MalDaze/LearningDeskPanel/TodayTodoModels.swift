@@ -9,6 +9,42 @@ struct TodayTodoEntry: Codable, Identifiable, Equatable {
     let createdAt: Date
     var completedAt: Date?
     var sortIndex: Int
+    var deletedAt: Date?
+
+    init(
+        id: UUID,
+        title: String,
+        dateISO: String,
+        rolledFromDateISO: String?,
+        isCompleted: Bool,
+        createdAt: Date,
+        completedAt: Date?,
+        sortIndex: Int,
+        deletedAt: Date? = nil
+    ) {
+        self.id = id
+        self.title = title
+        self.dateISO = dateISO
+        self.rolledFromDateISO = rolledFromDateISO
+        self.isCompleted = isCompleted
+        self.createdAt = createdAt
+        self.completedAt = completedAt
+        self.sortIndex = sortIndex
+        self.deletedAt = deletedAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        title = try container.decode(String.self, forKey: .title)
+        dateISO = try container.decode(String.self, forKey: .dateISO)
+        rolledFromDateISO = try container.decodeIfPresent(String.self, forKey: .rolledFromDateISO)
+        isCompleted = try container.decode(Bool.self, forKey: .isCompleted)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        completedAt = try container.decodeIfPresent(Date.self, forKey: .completedAt)
+        sortIndex = try container.decode(Int.self, forKey: .sortIndex)
+        deletedAt = try container.decodeIfPresent(Date.self, forKey: .deletedAt)
+    }
 }
 
 struct TodayTodoFile: Codable, Equatable {
@@ -64,6 +100,15 @@ enum TodayTodoFormatting {
         let weekdayNames = ["", "周日", "周一", "周二", "周三", "周四", "周五", "周六"]
         let weekdayLabel = weekdayNames.indices.contains(weekday) ? weekdayNames[weekday] : ""
         return "\(m)月\(d)日 \(weekdayLabel)"
+    }
+
+    static func deletedAtHint(_ deletedAt: Date) -> String {
+        let cal = Calendar.current
+        let m = cal.component(.month, from: deletedAt)
+        let d = cal.component(.day, from: deletedAt)
+        let hour = cal.component(.hour, from: deletedAt)
+        let minute = cal.component(.minute, from: deletedAt)
+        return String(format: "删除于 %d/%d %02d:%02d", m, d, hour, minute)
     }
 }
 

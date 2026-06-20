@@ -80,20 +80,6 @@ private enum DashboardColumnLayout {
     }
 }
 
-private enum DashboardResizeHandleLineLayout {
-    static let thickness: CGFloat = 3
-    static let opacity: CGFloat = 0.55
-
-    static func centeredLineOrigin(in extent: CGFloat) -> CGFloat {
-        floor((extent - thickness) / 2)
-    }
-}
-
-private enum DashboardResizeHandleAxis {
-    case columns
-    case rows
-}
-
 /// 透明标题栏区拖窗；`isMovableByWindowBackground == false` 时由 AppKit 显式 `performDrag`。
 private final class DashboardWindowDragStripView: NSView {
     override var isFlipped: Bool { true }
@@ -110,189 +96,6 @@ private struct DashboardWindowDragStrip: NSViewRepresentable {
     }
 
     func updateNSView(_ nsView: DashboardWindowDragStripView, context: Context) {}
-}
-
-private final class DashboardColumnResizeHandleView: NSView {
-    var axis: DashboardResizeHandleAxis = .columns
-    var onDragChanged: ((CGFloat) -> Void)?
-    var onDragEnded: (() -> Void)?
-    private var lastDragValue: CGFloat = 0
-    private var isDragging = false
-    private var trackingArea: NSTrackingArea?
-
-    override var isFlipped: Bool { true }
-    override var isOpaque: Bool { false }
-
-    private var resizeCursor: NSCursor {
-        axis == .columns ? .resizeLeftRight : .resizeUpDown
-    }
-
-    override func hitTest(_ point: NSPoint) -> NSView? {
-        bounds.contains(point) ? self : nil
-    }
-
-    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
-
-    override func resetCursorRects() {
-        discardCursorRects()
-        addCursorRect(bounds, cursor: resizeCursor)
-    }
-
-    override func layout() {
-        super.layout()
-        installTrackingAreaIfNeeded()
-        resetCursorRects()
-        needsDisplay = true
-    }
-
-    override func updateTrackingAreas() {
-        super.updateTrackingAreas()
-        installTrackingAreaIfNeeded()
-        resetCursorRects()
-    }
-
-    override func cursorUpdate(with event: NSEvent) {
-        resizeCursor.set()
-    }
-
-    override func mouseEntered(with event: NSEvent) {
-        resizeCursor.push()
-    }
-
-    override func mouseExited(with event: NSEvent) {
-        if !isDragging {
-            NSCursor.pop()
-        }
-    }
-
-    override func draw(_ dirtyRect: NSRect) {
-        NSColor.separatorColor.withAlphaComponent(DashboardResizeHandleLineLayout.opacity).setFill()
-        let thickness = DashboardResizeHandleLineLayout.thickness
-        switch axis {
-        case .columns:
-            let x = DashboardResizeHandleLineLayout.centeredLineOrigin(in: bounds.width)
-            NSRect(x: x, y: 0, width: thickness, height: bounds.height).fill()
-        case .rows:
-            let y = DashboardResizeHandleLineLayout.centeredLineOrigin(in: bounds.height)
-            NSRect(x: 0, y: y, width: bounds.width, height: thickness).fill()
-        }
-    }
-
-    override func mouseDown(with event: NSEvent) {
-        lastDragValue = dragCoordinate(for: event)
-        isDragging = true
-        resizeCursor.set()
-    }
-
-    override func mouseDragged(with event: NSEvent) {
-        guard isDragging else { return }
-        let value = dragCoordinate(for: event)
-        let delta = value - lastDragValue
-        lastDragValue = value
-        guard abs(delta) > 0.01 else { return }
-        onDragChanged?(delta)
-    }
-
-    override func mouseUp(with event: NSEvent) {
-        guard isDragging else { return }
-        isDragging = false
-        lastDragValue = 0
-        onDragEnded?()
-        NSCursor.pop()
-    }
-
-    private func dragCoordinate(for event: NSEvent) -> CGFloat {
-        switch axis {
-        case .columns:
-            return event.locationInWindow.x
-        case .rows:
-            return -event.locationInWindow.y
-        }
-    }
-
-    private func installTrackingAreaIfNeeded() {
-        if let trackingArea {
-            removeTrackingArea(trackingArea)
-        }
-        let options: NSTrackingArea.Options = [
-            .activeInKeyWindow,
-            .mouseEnteredAndExited,
-            .cursorUpdate,
-            .inVisibleRect,
-        ]
-        let area = NSTrackingArea(rect: bounds, options: options, owner: self, userInfo: nil)
-        addTrackingArea(area)
-        trackingArea = area
-    }
-}
-
-private struct DashboardResizeHandleChrome: NSViewRepresentable {
-    var axis: DashboardResizeHandleAxis
-    var onDragChanged: (CGFloat) -> Void
-    var onDragEnded: () -> Void
-
-    func makeNSView(context: Context) -> DashboardColumnResizeHandleView {
-        let view = DashboardColumnResizeHandleView()
-        view.axis = axis
-        view.onDragChanged = onDragChanged
-        view.onDragEnded = onDragEnded
-        return view
-    }
-
-    func updateNSView(_ nsView: DashboardColumnResizeHandleView, context: Context) {
-        nsView.axis = axis
-        nsView.onDragChanged = onDragChanged
-        nsView.onDragEnded = onDragEnded
-    }
-
-    func sizeThatFits(_ proposal: ProposedViewSize, nsView: DashboardColumnResizeHandleView, context: Context) -> CGSize? {
-        switch axis {
-        case .columns:
-            return CGSize(
-                width: DashboardColumnLayout.resizeHandleWidth,
-                height: proposal.height ?? nsView.bounds.height
-            )
-        case .rows:
-            return CGSize(
-                width: proposal.width ?? nsView.bounds.width,
-                height: DashboardColumnLayout.resizeHandleWidth
-            )
-        }
-    }
-}
-
-private struct DashboardColumnResizeHandleChrome: View {
-    var onDragChanged: (CGFloat) -> Void
-    var onDragEnded: () -> Void
-
-    var body: some View {
-        DashboardResizeHandleChrome(
-            axis: .columns,
-            onDragChanged: onDragChanged,
-            onDragEnded: onDragEnded
-        )
-        .frame(width: DashboardColumnLayout.resizeHandleWidth)
-        .frame(maxHeight: .infinity)
-        .accessibilityLabel(Text("调整分栏宽度"))
-        .accessibilityAddTraits(.isButton)
-    }
-}
-
-private struct DashboardRowResizeHandleChrome: View {
-    var onDragChanged: (CGFloat) -> Void
-    var onDragEnded: () -> Void
-
-    var body: some View {
-        DashboardResizeHandleChrome(
-            axis: .rows,
-            onDragChanged: onDragChanged,
-            onDragEnded: onDragEnded
-        )
-        .frame(height: DashboardColumnLayout.resizeHandleWidth)
-        .frame(maxWidth: .infinity)
-        .accessibilityLabel(Text("调整计划与饮食区高度"))
-        .accessibilityAddTraits(.isButton)
-    }
 }
 
 // MARK: - Card style for section grouping
@@ -863,31 +666,29 @@ struct DashboardRootView: View {
 
     /// 左栏：计划（上）+ 饮食面板（下），比例来自设置。
     private var leftColumnStack: some View {
-        GeometryReader { geo in
-            let rowHandleHeight = DashboardColumnLayout.resizeHandleWidth
-            let stackHeight = max(geo.size.height - rowHandleHeight, 1)
-            let planHeight = stackHeight * resolvedDashboardLeftPlanFraction
-            VStack(spacing: 0) {
+        DashboardVerticalFractionSplit(
+            upperFraction: resolvedDashboardLeftPlanFraction,
+            handleAccessibilityLabel: "调整计划与饮食区高度",
+            handleID: "dashboard-plan-nutrition-resize",
+            onFractionDragChanged: updatePlanFractionDrag,
+            onFractionDragEnded: commitPlanFractionDrag,
+            upper: {
                 remindersSidebar
-                    .frame(height: planHeight, alignment: .topLeading)
-                DashboardRowResizeHandleChrome(
-                    onDragChanged: { updatePlanFractionDrag(delta: $0, stackHeight: stackHeight) },
-                    onDragEnded: commitPlanFractionDrag
-                )
-                .id("dashboard-plan-nutrition-resize")
+            },
+            lower: { _ in
                 NutritionTodayPanelView(
                     digitKeysEnabled: reminderUnderEdit == nil && deleteConfirmationId == nil
                 )
-                .frame(maxHeight: .infinity, alignment: .topLeading)
             }
-        }
-        .frame(maxHeight: .infinity)
+        )
     }
 
     private func updatePlanFractionDrag(delta: CGFloat, stackHeight: CGFloat) {
-        let current = resolvedDashboardLeftPlanFraction
-        let updated = DashboardLayout.clampedLeftPlanFraction(
-            current + Double(delta / max(stackHeight, 1))
+        let updated = DashboardLayout.fractionAfterVerticalDrag(
+            current: resolvedDashboardLeftPlanFraction,
+            delta: delta,
+            stackHeight: stackHeight,
+            clamp: DashboardLayout.clampedLeftPlanFraction
         )
         var transaction = Transaction()
         transaction.disablesAnimations = true
