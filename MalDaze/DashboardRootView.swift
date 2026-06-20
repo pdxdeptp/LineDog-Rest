@@ -664,21 +664,21 @@ struct DashboardRootView: View {
             ?? DashboardLayout.clampedLeftPlanFraction(dashboardLeftPlanFractionStored)
     }
 
-    /// 左栏：计划（上）+ 饮食面板（下），比例来自设置。
+    /// 左栏：饮食（上）+ 计划（下）；`leftPlanFraction` 仍为计划区占可分配高度的比例。
     private var leftColumnStack: some View {
         DashboardVerticalFractionSplit(
-            upperFraction: resolvedDashboardLeftPlanFraction,
-            handleAccessibilityLabel: "调整计划与饮食区高度",
+            upperFraction: 1 - resolvedDashboardLeftPlanFraction,
+            handleAccessibilityLabel: "调整饮食与计划区高度",
             handleID: "dashboard-plan-nutrition-resize",
             onFractionDragChanged: updatePlanFractionDrag,
             onFractionDragEnded: commitPlanFractionDrag,
             upper: {
-                remindersSidebar
-            },
-            lower: { _ in
                 NutritionTodayPanelView(
                     digitKeysEnabled: reminderUnderEdit == nil && deleteConfirmationId == nil
                 )
+            },
+            lower: { _ in
+                remindersSidebar
             }
         )
     }
@@ -686,7 +686,7 @@ struct DashboardRootView: View {
     private func updatePlanFractionDrag(delta: CGFloat, stackHeight: CGFloat) {
         let updated = DashboardLayout.fractionAfterVerticalDrag(
             current: resolvedDashboardLeftPlanFraction,
-            delta: delta,
+            delta: -delta,
             stackHeight: stackHeight,
             clamp: DashboardLayout.clampedLeftPlanFraction
         )
@@ -772,6 +772,8 @@ struct DashboardRootView: View {
 
                 statusChip
 
+                todayFocusSection
+
                 dashboardModeControl
 
                 controlsQuickActions
@@ -807,6 +809,15 @@ struct DashboardRootView: View {
         .background(
             (isResting ? Color.orange : Color.accentColor).opacity(0.10),
             in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+        )
+    }
+
+    private var todayFocusSection: some View {
+        FocusSessionTodaySection(
+            sessionCount: viewModel.todayFocusSessionCount,
+            totalMinutes: viewModel.todayFocusMinutesTotal,
+            finalizedSessions: viewModel.todayFocusSessions,
+            inProgress: viewModel.inProgressFocusSegment
         )
     }
 

@@ -310,7 +310,7 @@ final class ControlPanelPresentationTests: XCTestCase {
         XCTAssertTrue(escMonitorSource.contains("NSEvent.addLocalMonitorForEvents(matching: .keyDown)"))
         XCTAssertTrue(escMonitorSource.contains("event.keyCode == 53"))
         XCTAssertTrue(escMonitorSource.contains("charactersIgnoringModifiers?.lowercased() == \"w\""))
-        XCTAssertTrue(escMonitorSource.contains("smartInputPanel == nil"))
+        XCTAssertTrue(escMonitorSource.contains("!self.transientOverlayPresenter.isSmartReminderInputVisible"))
     }
 
     func testRestPresentationDemotesVisibleDashboardBelowOtherApplications() throws {
@@ -533,6 +533,16 @@ final class ControlPanelPresentationTests: XCTestCase {
                 MalDazeDefaults.suspendedTimerModeSnapshot,
                 MalDazeDefaultsKeys.Timer.suspendedModeSnapshot,
                 "MalDaze.timer.suspendedModeSnapshot"
+            ),
+            (
+                MalDazeDefaults.preferredTimerMode,
+                MalDazeDefaultsKeys.Timer.preferredMode,
+                "MalDaze.timer.preferredMode"
+            ),
+            (
+                MalDazeDefaults.chronoSessionSnapshot,
+                MalDazeDefaultsKeys.Timer.chronoSessionSnapshot,
+                "MalDaze.timer.chronoSessionSnapshot"
             ),
             (
                 MalDazeDefaults.sevenMinuteReminderDurationMinutes,
@@ -1135,15 +1145,20 @@ final class ControlPanelPresentationTests: XCTestCase {
         let sectionSource = try readProjectSource("MalDaze/LearningDeskPanel/TodayTodoSection.swift")
         let rowSource = try readProjectSource("MalDaze/LearningDeskPanel/TodayTodoRow.swift")
         let inlineSource = try readProjectSource("MalDaze/LearningDeskPanel/TodayTodoInlineText.swift")
+        let trackerSource = try readProjectSource("MalDaze/LearningDeskPanel/TodayTodoLongPressGestureTracker.swift")
         let controllerSource = try readProjectSource("MalDaze/LearningDeskPanel/TodayTodoReorderController.swift")
+        let geometrySource = try readProjectSource("MalDaze/LearningDeskPanel/TodayTodoReorderGeometry.swift")
         let listSource = try readProjectSource("MalDaze/LearningDeskPanel/TodayTodoAnimatedReorderList.swift")
         let frameSource = try readProjectSource("MalDaze/LearningDeskPanel/TodayTodoRowFramePreferenceKey.swift")
 
         XCTAssertTrue(sectionSource.contains("TodayTodoAnimatedReorderList("))
         XCTAssertTrue(sectionSource.contains("TodayTodoReorderController()"))
+        XCTAssertTrue(sectionSource.contains("reorderIncomplete("))
+        XCTAssertTrue(sectionSource.contains("draggedId:"))
+        XCTAssertTrue(sectionSource.contains("toFinalIndex:"))
         XCTAssertFalse(sectionSource.contains("TodayTodoReorderDropDelegate"))
         XCTAssertFalse(sectionSource.contains("onDrop("))
-        XCTAssertFalse(sectionSource.contains("draggingEntryId"))
+        XCTAssertFalse(sectionSource.contains("previewOrder"))
         XCTAssertFalse(sectionSource.contains("line.3.horizontal"))
 
         XCTAssertFalse(rowSource.contains("showsReorderHandle"))
@@ -1151,19 +1166,29 @@ final class ControlPanelPresentationTests: XCTestCase {
         XCTAssertTrue(rowSource.contains("reorderGestureEnabled"))
         XCTAssertTrue(rowSource.contains("onReorderActivated"))
 
-        XCTAssertTrue(inlineSource.contains("TodayTodoReorderMetrics.longPressDuration"))
+        XCTAssertTrue(inlineSource.contains("TodayTodoLongPressGestureTracker"))
+        XCTAssertTrue(inlineSource.contains("isTrackingReorderGesture"))
+        XCTAssertTrue(inlineSource.contains("reorderGestureEnabled || isTrackingReorderGesture"))
+        XCTAssertTrue(trackerSource.contains("TodayTodoReorderMetrics.longPressDuration"))
         XCTAssertTrue(inlineSource.contains("onReorderActivated"))
-        XCTAssertTrue(inlineSource.contains("isReorderDragging"))
 
         XCTAssertTrue(controllerSource.contains("TodayTodoReorderController"))
-        XCTAssertTrue(controllerSource.contains("previewOrder"))
-        XCTAssertTrue(controllerSource.contains("case settling"))
-        XCTAssertTrue(controllerSource.contains("TodayTodoReorderPhase"))
+        XCTAssertTrue(controllerSource.contains("baseOrder"))
+        XCTAssertTrue(controllerSource.contains("targetIndex"))
+        XCTAssertTrue(controllerSource.contains("TodayTodoDragPointerModel"))
+        XCTAssertTrue(controllerSource.contains(".settling"))
+        XCTAssertTrue(geometrySource.contains("TodayTodoReorderPhase"))
+        XCTAssertFalse(controllerSource.contains("settlingDuration"))
+
+        XCTAssertTrue(geometrySource.contains("projectedGeometry"))
+        XCTAssertTrue(geometrySource.contains("targetHysteresis"))
 
         XCTAssertTrue(listSource.contains("TodayTodoRowFramePreferenceKey"))
         XCTAssertTrue(listSource.contains("TodayTodoListPointerReader"))
+        XCTAssertTrue(listSource.contains("TodayTodoDragPreview"))
+        XCTAssertTrue(listSource.contains("TodayTodoWindowFrameReporter"))
+        XCTAssertFalse(listSource.contains("geometry.frame(in: .global)"))
         XCTAssertFalse(listSource.contains("TodayTodoListCoordinateAnchor"))
-        XCTAssertTrue(controllerSource.contains("TodayTodoReorderMetrics.liftScale"))
 
         XCTAssertTrue(frameSource.contains("TodayTodoRowFramePreferenceKey"))
         XCTAssertTrue(frameSource.contains("TodayTodoReorderEdgeScrollPreferenceKey"))
@@ -1214,9 +1239,17 @@ final class ControlPanelPresentationTests: XCTestCase {
         let controlsSource = try propertySource(named: "mainControlsColumn", in: source)
 
         XCTAssertOrdered(
-            ["mainPanelHeader", "statusChip", "controlsQuickActions", "controlsSettingsGroups", "controlsUtilityFooter"],
+            [
+                "mainPanelHeader",
+                "statusChip",
+                "todayFocusSection",
+                "dashboardModeControl",
+                "controlsQuickActions",
+                "controlsSettingsGroups",
+                "controlsUtilityFooter",
+            ],
             in: controlsSource,
-            "The right controls column should render header/status, quick actions, settings groups, then utility footer."
+            "The right controls column should render header/status, today focus, mode, quick actions, settings groups, then utility footer."
         )
         XCTAssertTrue(
             source.contains("private var controlsQuickActions: some View"),
@@ -1242,6 +1275,23 @@ final class ControlPanelPresentationTests: XCTestCase {
             source.contains("DashboardUtilityButton"),
             "Footer actions should use a local utility-action helper instead of competing with primary controls."
         )
+    }
+
+    func testDashboardTodayFocusSectionUsesFocusSessionProjectionAndCopyRules() throws {
+        let source = try readProjectSource("MalDaze/DashboardRootView.swift")
+        let focusSource = try propertySource(named: "todayFocusSection", in: source)
+
+        XCTAssertTrue(focusSource.contains("FocusSessionTodaySection"))
+        XCTAssertTrue(focusSource.contains("viewModel.todayFocusSessionCount"))
+        XCTAssertTrue(focusSource.contains("viewModel.todayFocusMinutesTotal"))
+        XCTAssertTrue(focusSource.contains("viewModel.todayFocusSessions"))
+        XCTAssertTrue(focusSource.contains("viewModel.inProgressFocusSegment"))
+
+        let sectionSource = try readProjectSource("MalDaze/FocusSession/FocusSessionTodaySection.swift")
+        XCTAssertTrue(sectionSource.contains("今天还没有番茄"))
+        XCTAssertTrue(sectionSource.contains("个番茄 · 共"))
+        XCTAssertTrue(sectionSource.contains("–进行中 · 已"))
+        XCTAssertTrue(sectionSource.contains("提前结束"))
     }
 
     func testDashboardQuickActionsWireStateAwareExistingViewModelActions() throws {
@@ -2101,12 +2151,12 @@ final class ControlPanelPresentationTests: XCTestCase {
             "WindowManager should keep both local and global click-away monitors for smart reminder input dismissal."
         )
         XCTAssertTrue(
-            localClickAwaySource.contains("!panel.frame.contains(NSEvent.mouseLocation)")
+            localClickAwaySource.contains("!self.transientOverlayPresenter.smartReminderInputContains(screenPoint: NSEvent.mouseLocation)")
                 && localClickAwaySource.contains("teardownSmartInputPanel(invokeUserCancel: true)"),
             "The local click-away monitor should close through the cancel lifecycle only when the click is outside the panel."
         )
         XCTAssertTrue(
-            globalClickAwaySource.contains("!panel.frame.contains(NSEvent.mouseLocation)")
+            globalClickAwaySource.contains("!self.transientOverlayPresenter.smartReminderInputContains(screenPoint: NSEvent.mouseLocation)")
                 && globalClickAwaySource.contains("teardownSmartInputPanel(invokeUserCancel: true)"),
             "The global click-away monitor should close through the cancel lifecycle only when the click is outside the panel."
         )
@@ -2190,31 +2240,40 @@ final class ControlPanelPresentationTests: XCTestCase {
     }
 
     func testSmartReminderPositioningRuntimeUsesAnchorScreenVisibleFrame() throws {
-        let source = try readProjectSource("MalDaze/SmartReminder/SmartReminderUIPanels.swift")
-        let positioningSource = try functionSource(
-            named: "positionPanelTopCenter",
-            in: source,
-            after: "    static func positionPanelTopCenter"
+        let geometrySource = try readProjectSource("MalDaze/TransientOverlay/InteractiveAnchoredOverlayGeometry.swift")
+        let panelSource = try readProjectSource("MalDaze/SmartReminder/SmartReminderUIPanels.swift")
+        let visibleFrameSource = try functionSource(
+            named: "visibleFrame",
+            in: geometrySource,
+            after: "enum InteractiveAnchoredOverlayGeometry"
         )
 
         XCTAssertTrue(
-            source.contains("static func frameTopCenter(anchor: NSRect, size: NSSize, visibleFrame: NSRect)"),
-            "Smart reminder positioning should expose a deterministic helper that accepts an explicit visibleFrame."
+            panelSource.contains("InteractiveAnchoredOverlayGeometry.frameTopCenter"),
+            "Smart reminder content builder should delegate clamp math to InteractiveAnchoredOverlayGeometry."
         )
         XCTAssertTrue(
-            positioningSource.contains("NSScreen.screens"),
+            geometrySource.contains("static func frameTopCenter(anchor: NSRect, size: NSSize, visibleFrame: NSRect)"),
+            "Interactive overlay positioning should expose a deterministic helper that accepts an explicit visibleFrame."
+        )
+        XCTAssertTrue(
+            geometrySource.contains("static func positionPanel(_ panel: NSWindow, anchor: NSRect, size: NSSize)"),
+            "Interactive overlay runtime positioning should live in InteractiveAnchoredOverlayGeometry."
+        )
+        XCTAssertTrue(
+            visibleFrameSource.contains("NSScreen.screens"),
             "Runtime smart reminder positioning should resolve the screen containing the anchor."
         )
         XCTAssertTrue(
-            positioningSource.contains(".visibleFrame"),
+            visibleFrameSource.contains(".visibleFrame"),
             "Runtime smart reminder positioning should clamp against NSScreen.visibleFrame rather than the raw screen frame."
         )
         XCTAssertTrue(
-            positioningSource.contains("frameTopCenter(anchor: anchor, size: size, visibleFrame:"),
+            geometrySource.contains("frameTopCenter(anchor: anchor, size: size, visibleFrame:"),
             "Runtime smart reminder positioning should delegate frame calculation to the deterministic helper."
         )
         XCTAssertFalse(
-            positioningSource.contains("let x = anchor.midX - size.width / 2"),
+            geometrySource.contains("let x = anchor.midX - size.width / 2"),
             "Runtime smart reminder positioning should no longer directly set an unclamped top-center frame."
         )
     }

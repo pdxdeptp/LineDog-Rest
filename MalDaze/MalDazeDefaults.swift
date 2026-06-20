@@ -86,6 +86,10 @@ enum MalDazeDefaults {
     static let pomodoroRestDurationMinutes = MalDazeDefaultsKeys.Timer.restDurationMinutes
     /// 用户主动停止计时时保存的模式快照；存在即表示启动后保持暂停并显示「恢复计时」。
     static let suspendedTimerModeSnapshot = MalDazeDefaultsKeys.Timer.suspendedModeSnapshot
+    /// 用户上次在 Dashboard 选择的计时模式（手动番茄 / 整点半点）。
+    static let preferredTimerMode = MalDazeDefaultsKeys.Timer.preferredMode
+    /// 运行中或用户暂停的计时会话快照（含剩余时间）。
+    static let chronoSessionSnapshot = MalDazeDefaultsKeys.Timer.chronoSessionSnapshot
 
     /// 独立倒计时长度（分钟），默认 7。
     static let sevenMinuteReminderDurationMinutes = MalDazeDefaultsKeys.SevenMinute.durationMinutes

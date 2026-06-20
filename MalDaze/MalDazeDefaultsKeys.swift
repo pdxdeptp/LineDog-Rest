@@ -43,6 +43,8 @@ enum MalDazeDefaultsKeys {
     enum Timer {
         static let workDurationMinutes = "MalDaze.pomodoro.workDurationMinutes"
         static let restDurationMinutes = "MalDaze.pomodoro.restDurationMinutes"
+        static let preferredMode = "MalDaze.timer.preferredMode"
+        static let chronoSessionSnapshot = "MalDaze.timer.chronoSessionSnapshot"
         static let suspendedModeSnapshot = "MalDaze.timer.suspendedModeSnapshot"
     }
 

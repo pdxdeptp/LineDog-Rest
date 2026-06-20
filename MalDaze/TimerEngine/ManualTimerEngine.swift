@@ -19,6 +19,9 @@ final class ManualTimerEngine: TimerEngine {
         self.restDuration = restDuration
     }
 
+    var configuredWorkDuration: TimeInterval { workDuration }
+    var configuredRestDuration: TimeInterval { restDuration }
+
     /// 更新下一段工作 / 休息所用时长（当前正在进行的相位仍按进入该相位时的 `phaseEnd` 计时）。
     func setPhaseDurations(work: TimeInterval, rest: TimeInterval) {
         workDuration = work
@@ -36,6 +39,14 @@ final class ManualTimerEngine: TimerEngine {
         guard tickTimer != nil, isRestPhase, let end = phaseEnd else { return 0 }
         return max(0, end.timeIntervalSinceNow)
     }
+
+    /// 若计时器在跑且处于工作段，返回距该段结束剩余时间；否则为 0。
+    var workPhaseRemainingOrZero: TimeInterval {
+        guard tickTimer != nil, !isRestPhase, let end = phaseEnd else { return 0 }
+        return max(0, end.timeIntervalSinceNow)
+    }
+
+    var currentPhaseEnd: Date? { phaseEnd }
 
     func start() {
         stop()
@@ -69,6 +80,32 @@ final class ManualTimerEngine: TimerEngine {
         phaseEnd = Date().addingTimeInterval(remaining)
         scheduleTick()
         emit()
+    }
+
+    /// 从持久化快照恢复当前相位，并按 wall clock 追赶到 now。
+    func restorePersistedPhase(end: Date, isRestPhase: Bool, now: Date = Date()) {
+        tickTimer?.invalidate()
+        tickTimer = nil
+        self.isRestPhase = isRestPhase
+        phaseEnd = end
+        lastEmittedRemainingWholeSeconds = -1
+        reconcileWallClockFromPersisted(now: now)
+        scheduleTick()
+        emit()
+    }
+
+    private func reconcileWallClockFromPersisted(now: Date) {
+        guard var end = phaseEnd else { return }
+        while end.timeIntervalSince(now) <= 0 {
+            if isRestPhase {
+                isRestPhase = false
+                end = end.addingTimeInterval(workDuration)
+            } else {
+                isRestPhase = true
+                end = end.addingTimeInterval(restDuration)
+            }
+        }
+        phaseEnd = end
     }
 
     private func scheduleTick() {

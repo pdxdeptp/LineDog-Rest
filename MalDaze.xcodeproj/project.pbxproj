@@ -15,7 +15,11 @@
 		A204 /* TimeState.swift in Sources */ = {isa = PBXBuildFile; fileRef = B204 /* TimeState.swift */; };
 		A205 /* TimerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B205 /* TimerEngine.swift */; };
 		A206 /* ManualTimerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B206 /* ManualTimerEngine.swift */; };
-		A207 /* AutoTimerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B207 /* AutoTimerEngine.swift */; };
+        A207 /* AutoTimerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B207 /* AutoTimerEngine.swift */; };
+		A2CS /* ChronoSessionPersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2CS /* ChronoSessionPersistence.swift */; };
+		A2FS1 /* FocusSessionModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2FS1 /* FocusSessionModels.swift */; };
+		A2FS2 /* FocusSessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2FS2 /* FocusSessionStore.swift */; };
+		A2FS3 /* FocusSessionTodaySection.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2FS3 /* FocusSessionTodaySection.swift */; };
 		A208 /* PetRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B208 /* PetRenderer.swift */; };
 		A2GF /* GIFFrameCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2GF /* GIFFrameCache.swift */; };
 		A20A /* WindowManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20A /* WindowManager.swift */; };
@@ -89,6 +93,8 @@
 		A2T5 /* TodayTodoDraftField.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2T5 /* TodayTodoDraftField.swift */; };
 		A2T6 /* TodayTodoInlineText.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2T6 /* TodayTodoInlineText.swift */; };
 		A31T /* TodayTodoStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31T /* TodayTodoStoreTests.swift */; };
+		A31FS /* FocusSessionStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31FS /* FocusSessionStoreTests.swift */; };
+		A31CS /* ChronoSessionCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31CS /* ChronoSessionCoordinatorTests.swift */; };
 		A31V /* LearningScheduleDayWindowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31V /* LearningScheduleDayWindowTests.swift */; };
 		A31W /* TodayTodoContentLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31W /* TodayTodoContentLayoutTests.swift */; };
 		A31R /* TodayTodoReorderControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31R /* TodayTodoReorderControllerTests.swift */; };
@@ -209,6 +215,10 @@
 		B205 /* TimerEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimerEngine.swift; sourceTree = "<group>"; };
 		B206 /* ManualTimerEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManualTimerEngine.swift; sourceTree = "<group>"; };
 		B207 /* AutoTimerEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoTimerEngine.swift; sourceTree = "<group>"; };
+		B2CS /* ChronoSessionPersistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChronoSessionPersistence.swift; sourceTree = "<group>"; };
+		B2FS1 /* FocusSessionModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusSessionModels.swift; sourceTree = "<group>"; };
+		B2FS2 /* FocusSessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusSessionStore.swift; sourceTree = "<group>"; };
+		B2FS3 /* FocusSessionTodaySection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusSessionTodaySection.swift; sourceTree = "<group>"; };
 		B208 /* PetRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetRenderer.swift; sourceTree = "<group>"; };
 		B2GF /* GIFFrameCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GIFFrameCache.swift; sourceTree = "<group>"; };
 		B20A /* WindowManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowManager.swift; sourceTree = "<group>"; };
@@ -281,6 +291,8 @@
 		B2T5 /* TodayTodoDraftField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoDraftField.swift; sourceTree = "<group>"; };
 		B2T6 /* TodayTodoInlineText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoInlineText.swift; sourceTree = "<group>"; };
 		B31T /* TodayTodoStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoStoreTests.swift; sourceTree = "<group>"; };
+		B31FS /* FocusSessionStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusSessionStoreTests.swift; sourceTree = "<group>"; };
+		B31CS /* ChronoSessionCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChronoSessionCoordinatorTests.swift; sourceTree = "<group>"; };
 		B31V /* LearningScheduleDayWindowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningScheduleDayWindowTests.swift; sourceTree = "<group>"; };
 		B31W /* TodayTodoContentLayoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoContentLayoutTests.swift; sourceTree = "<group>"; };
 		B31R /* TodayTodoReorderControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoReorderControllerTests.swift; sourceTree = "<group>"; };
@@ -438,6 +450,7 @@
 				B23F /* HermesRuntime.swift */,
 				B213 /* MalDazeBroadcastNotifications.swift */,
 				E203 /* TimerEngine */,
+				E216 /* FocusSession */,
 				E204 /* PetRenderer */,
 				E205 /* WindowManager */,
 				E207 /* SevenMinuteReminder */,
@@ -486,8 +499,19 @@
 				B205 /* TimerEngine.swift */,
 				B206 /* ManualTimerEngine.swift */,
 				B207 /* AutoTimerEngine.swift */,
+				B2CS /* ChronoSessionPersistence.swift */,
 			);
 			path = TimerEngine;
+			sourceTree = "<group>";
+		};
+		E216 /* FocusSession */ = {
+			isa = PBXGroup;
+			children = (
+				B2FS1 /* FocusSessionModels.swift */,
+				B2FS2 /* FocusSessionStore.swift */,
+				B2FS3 /* FocusSessionTodaySection.swift */,
+			);
+			path = FocusSession;
 			sourceTree = "<group>";
 		};
 		E204 /* PetRenderer */ = {
@@ -538,6 +562,8 @@
 					B31J /* HermesScheduleModelsTests.swift */,
 					B31K /* LearningDeskPanelViewModelTests.swift */,
 					B31T /* TodayTodoStoreTests.swift */,
+					B31FS /* FocusSessionStoreTests.swift */,
+					B31CS /* ChronoSessionCoordinatorTests.swift */,
 					B31R /* TodayTodoReorderControllerTests.swift */,
 					B31U /* TodayTodoLayoutPolicyTests.swift */,
 					B31W /* TodayTodoContentLayoutTests.swift */,
@@ -871,6 +897,10 @@
 				A205 /* TimerEngine.swift in Sources */,
 				A206 /* ManualTimerEngine.swift in Sources */,
 				A207 /* AutoTimerEngine.swift in Sources */,
+				A2CS /* ChronoSessionPersistence.swift in Sources */,
+				A2FS1 /* FocusSessionModels.swift in Sources */,
+				A2FS2 /* FocusSessionStore.swift in Sources */,
+				A2FS3 /* FocusSessionTodaySection.swift in Sources */,
 				A208 /* PetRenderer.swift in Sources */,
 				A2GF /* GIFFrameCache.swift in Sources */,
 				A20A /* WindowManager.swift in Sources */,
@@ -1025,6 +1055,8 @@
 					A31J /* HermesScheduleModelsTests.swift in Sources */,
 					A31K /* LearningDeskPanelViewModelTests.swift in Sources */,
 					A31T /* TodayTodoStoreTests.swift in Sources */,
+					A31FS /* FocusSessionStoreTests.swift in Sources */,
+					A31CS /* ChronoSessionCoordinatorTests.swift in Sources */,
 					A31R /* TodayTodoReorderControllerTests.swift in Sources */,
 					A31U /* TodayTodoLayoutPolicyTests.swift in Sources */,
 					A31W /* TodayTodoContentLayoutTests.swift in Sources */,

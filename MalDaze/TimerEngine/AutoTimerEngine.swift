@@ -37,6 +37,9 @@ final class AutoTimerEngine: TimerEngine {
         return max(0, end.timeIntervalSince(now()))
     }
 
+    var currentPhaseEnd: Date? { phaseEnd }
+    var currentWaitingAnchor: Date? { activeWaitingAnchor }
+
     func start() {
         stop()
         isResting = false
@@ -64,6 +67,38 @@ final class AutoTimerEngine: TimerEngine {
         phaseEnd = nil
         lastRestingEmitWholeSeconds = nil
         scheduleWatching()
+    }
+
+    func restorePersistedWatching(nextAnchor: Date) {
+        stop()
+        let currentDate = now()
+        if nextAnchor <= currentDate {
+            scheduleWatching()
+            return
+        }
+        activeWaitingAnchor = nextAnchor
+        phaseEnd = nextAnchor
+        onStateChange?(.autoWatching(nextAnchor: nextAnchor))
+        let delay = max(0, nextAnchor.timeIntervalSince(currentDate))
+        let t = Timer(timeInterval: delay, repeats: false) { [weak self] _ in
+            self?.handleAnchorTimerFire(expectedAnchor: nextAnchor)
+        }
+        RunLoop.main.add(t, forMode: .common)
+        tickTimer = t
+    }
+
+    func restorePersistedRest(end: Date) {
+        stop()
+        let currentDate = now()
+        if end <= currentDate {
+            scheduleWatching()
+            return
+        }
+        isResting = true
+        phaseEnd = end
+        lastRestingEmitWholeSeconds = max(0, Int(end.timeIntervalSince(currentDate).rounded(.down)))
+        onStateChange?(.resting(remaining: end.timeIntervalSince(currentDate)))
+        scheduleRestTick()
     }
 
     private func scheduleWatching() {
