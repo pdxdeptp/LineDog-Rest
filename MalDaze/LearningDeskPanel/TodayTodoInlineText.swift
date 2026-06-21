@@ -15,6 +15,7 @@ struct TodayTodoInlineText: NSViewRepresentable {
     var reorderGestureEnabled: Bool = false
     var onBeginEditing: () -> Void
     var onCommit: () -> Void
+    var onLiveEdit: ((String) -> Void)? = nil
     var onReorderPressingReady: ((NSEvent) -> Void)? = nil
     var onReorderActivated: ((NSEvent) -> Void)? = nil
     var onReorderDrag: ((NSEvent) -> Void)? = nil
@@ -55,6 +56,9 @@ struct TodayTodoInlineText: NSViewRepresentable {
         func textDidChange(_ notification: Notification) {
             guard let textView = notification.object as? NSTextView else { return }
             parent.text = textView.string
+            if parent.isEditing {
+                parent.onLiveEdit?(textView.string)
+            }
         }
 
         func textDidEndEditing(_ notification: Notification) {
@@ -72,11 +76,12 @@ final class InlineNotesTextView: NSTextView {
     var onReorderDrag: ((NSEvent) -> Void)?
     var onReorderEnded: (() -> Void)?
 
-    private var longPressTimer: Timer?
-    private var longPressReady = false
-    private var isReorderDragging = false
-    private var mouseDownLocation: NSPoint = .zero
-    private var mouseDownEvent: NSEvent?
+    private let gestureTracker = TodayTodoLongPressGestureTracker()
+
+    /// True while a press/drag session started with reorder enabled; survives SwiftUI sync turning off `reorderGestureEnabled` for placeholders.
+    var isTrackingReorderGesture: Bool {
+        gestureTracker.isReorderDragging || gestureTracker.reorderEnabledSnapshot
+    }
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
@@ -86,37 +91,23 @@ final class InlineNotesTextView: NSTextView {
             return
         }
 
-        resetReorderTracking()
-
-        if reorderGestureEnabled {
-            mouseDownLocation = event.locationInWindow
-            mouseDownEvent = event
-            longPressTimer = Timer.scheduledTimer(
-                withTimeInterval: TodayTodoReorderMetrics.longPressDuration,
-                repeats: false
-            ) { [weak self] _ in
-                guard let self, let event = self.mouseDownEvent else { return }
-                self.longPressReady = true
-                self.onReorderPressingReady?(event)
-            }
-            return
+        gestureTracker.onPressingReady = onReorderPressingReady
+        gestureTracker.reset()
+        let outcome = gestureTracker.mouseDown(reorderEnabled: reorderGestureEnabled, event: event)
+        if outcome == .quickClickEdit {
+            onBeginEditingWithEvent?(event)
         }
-
-        onBeginEditingWithEvent?(event)
     }
 
     override func mouseDragged(with event: NSEvent) {
-        if reorderGestureEnabled, longPressReady || isReorderDragging {
-            let dx = event.locationInWindow.x - mouseDownLocation.x
-            let dy = event.locationInWindow.y - mouseDownLocation.y
-            let distance = hypot(dx, dy)
-
-            if !isReorderDragging, longPressReady, distance >= TodayTodoReorderMetrics.dragStartThreshold {
-                isReorderDragging = true
+        if reorderGestureEnabled || isTrackingReorderGesture {
+            let outcome = gestureTracker.mouseDragged(event: event)
+            if outcome == .reorderActivated {
                 onReorderActivated?(event)
+                onReorderDrag?(event)
+                return
             }
-
-            if isReorderDragging {
+            if gestureTracker.isReorderDragging {
                 onReorderDrag?(event)
                 return
             }
@@ -128,40 +119,17 @@ final class InlineNotesTextView: NSTextView {
     }
 
     override func mouseUp(with event: NSEvent) {
-        longPressTimer?.invalidate()
-        longPressTimer = nil
-
-        if isReorderDragging {
-            isReorderDragging = false
-            longPressReady = false
-            NSCursor.arrow.set()
+        let (outcome, editEvent) = gestureTracker.mouseUp()
+        switch outcome {
+        case .reorderEnded, .longPressReleasedWithoutDrag:
             onReorderEnded?()
-            resetReorderTracking()
-            return
+        case .quickClickEdit:
+            if let editEvent {
+                onBeginEditingWithEvent?(editEvent)
+            }
+        case .none, .pressingReady, .reorderActivated:
+            super.mouseUp(with: event)
         }
-
-        if reorderGestureEnabled, longPressReady, !isReorderDragging {
-            onReorderEnded?()
-            resetReorderTracking()
-            return
-        }
-
-        if reorderGestureEnabled, let mouseDownEvent, !longPressReady {
-            onBeginEditingWithEvent?(mouseDownEvent)
-            resetReorderTracking()
-            return
-        }
-
-        super.mouseUp(with: event)
-        resetReorderTracking()
-    }
-
-    private func resetReorderTracking() {
-        longPressTimer?.invalidate()
-        longPressTimer = nil
-        longPressReady = false
-        isReorderDragging = false
-        mouseDownEvent = nil
     }
 }
 
@@ -237,7 +205,10 @@ final class InlineNotesTextContainer: NSView {
         self.onReorderDrag = onReorderDrag
         self.onReorderEnded = onReorderEnded
 
-        textView.reorderGestureEnabled = reorderGestureEnabled && !isCompleted && !isEditing
+        let desiredReorderEnabled = reorderGestureEnabled && !isCompleted && !isEditing
+        if desiredReorderEnabled || !textView.isTrackingReorderGesture {
+            textView.reorderGestureEnabled = desiredReorderEnabled || textView.isTrackingReorderGesture
+        }
         textView.onReorderPressingReady = onReorderPressingReady
         textView.onReorderActivated = onReorderActivated
         textView.onReorderDrag = onReorderDrag

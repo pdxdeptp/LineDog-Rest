@@ -193,12 +193,14 @@ Hermes 任务列表下方独立区块 **「今日 todo」**，替代「打开备
 | 维度 | 行为 |
 |------|------|
 | SSOT | `~/Library/Application Support/MalDaze/today-todo.json` |
+| 存档 | append-only `today-todo-archive.jsonl`（同目录）；每次变更追加一行 JSON，不参与 UI/恢复 |
+| 编辑保存 | inline 编辑实时写盘（300ms debounce）；失焦/关面板/退出 app 前 flush + finalize（trim；空标题进回收站） |
 | 添加 | 区块内输入框 + 回车；无 Sheet |
 | 完成 | 勾选后保留 + 删除线，折叠在「已完成 N」 |
-| 顺延 | 未完成项跨日打开面板时滚到今天；可显示「自 M/d 顺延」 |
+| 顺延 | 未完成项跨日打开面板时滚到今天；`rolledFromDateISO` 仍写入 JSON，UI 不展示 |
 | 历史 | 「历史」Sheet：过去日期的已完成项，按日分组 |
 | 隔离 | 不计入正课/复习预算；↻ 只刷 Hermes；不同步左栏计划 / 提醒事项 |
-| 布局 | Hermes 任务与 todo 区可拖动分隔。输入框在视图树中只有一个固定挂载点；由 `TodayTodoLayoutPolicy` 根据列表实测高度、输入行实测高度与当前 Geometry 一次性解析 **measuring / compact / pinned**。`capacity = max(contentAreaHeight - safeDraftHeight - spacing, 0)`，`safeDraftHeight = max(实测整行, 同步 draft 编辑器高度, 28pt)`。边界 tolerance 固定 **0.5pt**：`listHeight <= capacity - 0.5` → compact（viewport = 实高）；超出 → pinned（viewport = capacity，列表可滚动，输入贴底）。缺少完整测量或列表宽度与 live width 相差 > 0.5pt 时进入 measuring（安全 capacity viewport、禁用滚动）。任意来源转入 pinned 无动画滚到底部锚点，转入 compact 无动画归顶部；同 mode 下 resize 保留当前 scroll offset；pinned 下继续添加导致列表变长时自动滚到底部。**未完成条目 ≥ 2 时，长按文字区（350ms）后拖动排序**：三阶段动画（抓起 scale/shadow → 拖动 overlay 1:1 跟手 + 邻行 spring 让位 2pt → 松手 spring 落定后写 `sortIndex`），无 ≡ 手柄；拖动中用 `previewOrder`，不写 JSON；pointer 与行 frame 共用 list top-left 坐标系。内容区小于 draft 行高 + spacing 时 list viewport = 0；mode/viewport 变化不触发新的 focus token。 |
+| 布局 | Hermes 任务与 todo 区可拖动分隔。输入框在视图树中只有一个固定挂载点；由 `TodayTodoLayoutPolicy` 根据列表实测高度、输入行实测高度与当前 Geometry 一次性解析 **measuring / compact / pinned**。`capacity = max(contentAreaHeight - safeDraftHeight - spacing, 0)`，`safeDraftHeight = max(实测整行, 同步 draft 编辑器高度, 28pt)`。边界 tolerance 固定 **0.5pt**：`listHeight <= capacity - 0.5` → compact（viewport = 实高）；超出 → pinned（viewport = capacity，列表可滚动，输入贴底）。缺少完整测量或列表宽度与 live width 相差 > 0.5pt 时进入 measuring（安全 capacity viewport、禁用滚动）。任意来源转入 pinned 无动画滚到底部锚点，转入 compact 无动画归顶部；同 mode 下 resize 保留当前 scroll offset；pinned 下继续添加导致列表变长时自动滚到底部。**未完成条目 ≥ 2 时，长按文字区（350ms）后拖动排序**：固定槽位模型（`baseOrder` + `targetIndex` + `projectedGeometry`）；pressing 不替换 AppKit 事件源；邻行 spring 让位 + overlay 2pt 指示器；animation completion 后写 `sortIndex`；有效区域 ±12pt；pinned 增量 edge scroll。内容区小于 draft 行高 + spacing 时 list viewport = 0；mode/viewport 变化不触发新的 focus token。 |
 
 OpenSpec：[`add-learning-today-todo`](../../openspec/changes/add-learning-today-todo/) · [`fix-today-todo-scroll-pin-threshold`](../../openspec/changes/fix-today-todo-scroll-pin-threshold/)
 

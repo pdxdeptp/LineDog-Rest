@@ -15,11 +15,18 @@
 		A204 /* TimeState.swift in Sources */ = {isa = PBXBuildFile; fileRef = B204 /* TimeState.swift */; };
 		A205 /* TimerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B205 /* TimerEngine.swift */; };
 		A206 /* ManualTimerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B206 /* ManualTimerEngine.swift */; };
+		A2MPE /* ManualPhaseEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2MPE /* ManualPhaseEvent.swift */; };
         A207 /* AutoTimerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B207 /* AutoTimerEngine.swift */; };
 		A2CS /* ChronoSessionPersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2CS /* ChronoSessionPersistence.swift */; };
 		A2FS1 /* FocusSessionModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2FS1 /* FocusSessionModels.swift */; };
 		A2FS2 /* FocusSessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2FS2 /* FocusSessionStore.swift */; };
+		A2MFC /* ManualFocusCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2MFC /* ManualFocusCoordinator.swift */; };
 		A2FS3 /* FocusSessionTodaySection.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2FS3 /* FocusSessionTodaySection.swift */; };
+		A2FS4 /* FocusDayTimelineCellGridModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2FS4 /* FocusDayTimelineCellGridModel.swift */; };
+		A2FS5 /* FocusDayTimelineCellGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2FS5 /* FocusDayTimelineCellGridView.swift */; };
+		A2FS6 /* FocusDayTimelineSegmentPopover.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2FS6 /* FocusDayTimelineSegmentPopover.swift */; };
+		A2FS7 /* FocusDayTimelineFailedMarkerPopover.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2FS7 /* FocusDayTimelineFailedMarkerPopover.swift */; };
+		A2FTP /* FocusTimelinePresenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2FTP /* FocusTimelinePresenter.swift */; };
 		A208 /* PetRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B208 /* PetRenderer.swift */; };
 		A2GF /* GIFFrameCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2GF /* GIFFrameCache.swift */; };
 		A20A /* WindowManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20A /* WindowManager.swift */; };
@@ -43,6 +50,8 @@
 		A24C /* CenterBellOverlayContentBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = B24C /* CenterBellOverlayContentBuilder.swift */; };
 		A24D /* HydrationOverlayContentBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = B24D /* HydrationOverlayContentBuilder.swift */; };
 		A24E /* TransientOverlayDashboardPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = B24E /* TransientOverlayDashboardPolicy.swift */; };
+		A24F /* TransientOverlayContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = B24F /* TransientOverlayContent.swift */; };
+		A24G /* InteractiveAnchoredOverlayGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = B24G /* InteractiveAnchoredOverlayGeometry.swift */; };
 		A30T /* TransientOverlayPresenterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B30T /* TransientOverlayPresenterTests.swift */; };
 		A27D /* SleepScheduleContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = B27D /* SleepScheduleContract.swift */; };
 		A27E /* SleepReminderPlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = B27E /* SleepReminderPlan.swift */; };
@@ -64,6 +73,7 @@
 		A292 /* LearningDeskPanelViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B292 /* LearningDeskPanelViewModel.swift */; };
 		A2RP /* DeadlineRepackPreviewFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2RP /* DeadlineRepackPreviewFormatter.swift */; };
 		A293 /* LearningDeskPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B293 /* LearningDeskPanelView.swift */; };
+		A2LFT /* LearningDeskFocusTimelineRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2LFT /* LearningDeskFocusTimelineRow.swift */; };
 		A294 /* LearningTaskRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B294 /* LearningTaskRow.swift */; };
 		A295 /* LearningMovePreviewSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B295 /* LearningMovePreviewSheet.swift */; };
 		A296 /* LearningProjectsFileWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = B296 /* LearningProjectsFileWatcher.swift */; };
@@ -80,9 +90,16 @@
 		A29F /* LearningTodayActionCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B29F /* LearningTodayActionCard.swift */; };
 		A2T0 /* TodayTodoModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2T0 /* TodayTodoModels.swift */; };
 		A2T1 /* TodayTodoStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2T1 /* TodayTodoStore.swift */; };
+		A2TA /* TodayTodoArchiveLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2TA /* TodayTodoArchiveLog.swift */; };
+		A2AS /* TodayTodoAutosaveScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2AS /* TodayTodoAutosaveScheduler.swift */; };
 		A2T2 /* TodayTodoRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2T2 /* TodayTodoRow.swift */; };
 		A2T3 /* TodayTodoSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2T3 /* TodayTodoSection.swift */; };
 		A2TR /* TodayTodoRowFramePreferenceKey.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2TR /* TodayTodoRowFramePreferenceKey.swift */; };
+        A2RG /* TodayTodoReorderGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2RG /* TodayTodoReorderGeometry.swift */; };
+		A2PM /* TodayTodoDragPointerModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2PM /* TodayTodoDragPointerModel.swift */; };
+		A2GT /* TodayTodoLongPressGestureTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2GT /* TodayTodoLongPressGestureTracker.swift */; };
+		A2TDP /* TodayTodoDragPreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2TDP /* TodayTodoDragPreview.swift */; };
+		A2SB /* TodayTodoScrollEdgeBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2SB /* TodayTodoScrollEdgeBridge.swift */; };
 		A2TC /* TodayTodoReorderController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2TC /* TodayTodoReorderController.swift */; };
 		A2TL /* TodayTodoAnimatedReorderList.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2TL /* TodayTodoAnimatedReorderList.swift */; };
 		A2TP /* TodayTodoListPointerReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2TP /* TodayTodoListPointerReader.swift */; };
@@ -94,7 +111,11 @@
 		A2T6 /* TodayTodoInlineText.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2T6 /* TodayTodoInlineText.swift */; };
 		A31T /* TodayTodoStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31T /* TodayTodoStoreTests.swift */; };
 		A31FS /* FocusSessionStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31FS /* FocusSessionStoreTests.swift */; };
+		A31FG /* FocusDayTimelineCellGridModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31FG /* FocusDayTimelineCellGridModelTests.swift */; };
+		A31FTP /* FocusTimelinePresenterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31FTP /* FocusTimelinePresenterTests.swift */; };
 		A31CS /* ChronoSessionCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31CS /* ChronoSessionCoordinatorTests.swift */; };
+		A31MFC /* ManualFocusCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31MFC /* ManualFocusCoordinatorTests.swift */; };
+		A31MPE /* ManualTimerEnginePhaseReplayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31MPE /* ManualTimerEnginePhaseReplayTests.swift */; };
 		A31V /* LearningScheduleDayWindowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31V /* LearningScheduleDayWindowTests.swift */; };
 		A31W /* TodayTodoContentLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31W /* TodayTodoContentLayoutTests.swift */; };
 		A31R /* TodayTodoReorderControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31R /* TodayTodoReorderControllerTests.swift */; };
@@ -214,11 +235,18 @@
 		B204 /* TimeState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeState.swift; sourceTree = "<group>"; };
 		B205 /* TimerEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimerEngine.swift; sourceTree = "<group>"; };
 		B206 /* ManualTimerEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManualTimerEngine.swift; sourceTree = "<group>"; };
+		B2MPE /* ManualPhaseEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManualPhaseEvent.swift; sourceTree = "<group>"; };
 		B207 /* AutoTimerEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoTimerEngine.swift; sourceTree = "<group>"; };
 		B2CS /* ChronoSessionPersistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChronoSessionPersistence.swift; sourceTree = "<group>"; };
 		B2FS1 /* FocusSessionModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusSessionModels.swift; sourceTree = "<group>"; };
 		B2FS2 /* FocusSessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusSessionStore.swift; sourceTree = "<group>"; };
+		B2MFC /* ManualFocusCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManualFocusCoordinator.swift; sourceTree = "<group>"; };
 		B2FS3 /* FocusSessionTodaySection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusSessionTodaySection.swift; sourceTree = "<group>"; };
+		B2FS4 /* FocusDayTimelineCellGridModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusDayTimelineCellGridModel.swift; sourceTree = "<group>"; };
+		B2FS5 /* FocusDayTimelineCellGridView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusDayTimelineCellGridView.swift; sourceTree = "<group>"; };
+		B2FS6 /* FocusDayTimelineSegmentPopover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusDayTimelineSegmentPopover.swift; sourceTree = "<group>"; };
+		B2FS7 /* FocusDayTimelineFailedMarkerPopover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusDayTimelineFailedMarkerPopover.swift; sourceTree = "<group>"; };
+		B2FTP /* FocusTimelinePresenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusTimelinePresenter.swift; sourceTree = "<group>"; };
 		B208 /* PetRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetRenderer.swift; sourceTree = "<group>"; };
 		B2GF /* GIFFrameCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GIFFrameCache.swift; sourceTree = "<group>"; };
 		B20A /* WindowManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowManager.swift; sourceTree = "<group>"; };
@@ -241,6 +269,8 @@
 		B24C /* CenterBellOverlayContentBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CenterBellOverlayContentBuilder.swift; sourceTree = "<group>"; };
 		B24D /* HydrationOverlayContentBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HydrationOverlayContentBuilder.swift; sourceTree = "<group>"; };
 		B24E /* TransientOverlayDashboardPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransientOverlayDashboardPolicy.swift; sourceTree = "<group>"; };
+		B24F /* TransientOverlayContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransientOverlayContent.swift; sourceTree = "<group>"; };
+		B24G /* InteractiveAnchoredOverlayGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InteractiveAnchoredOverlayGeometry.swift; sourceTree = "<group>"; };
 		B30T /* TransientOverlayPresenterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransientOverlayPresenterTests.swift; sourceTree = "<group>"; };
 		B27D /* SleepScheduleContract.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepScheduleContract.swift; sourceTree = "<group>"; };
 		B27E /* SleepReminderPlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepReminderPlan.swift; sourceTree = "<group>"; };
@@ -262,6 +292,7 @@
 		B292 /* LearningDeskPanelViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningDeskPanelViewModel.swift; sourceTree = "<group>"; };
 		B2RP /* DeadlineRepackPreviewFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeadlineRepackPreviewFormatter.swift; sourceTree = "<group>"; };
 		B293 /* LearningDeskPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningDeskPanelView.swift; sourceTree = "<group>"; };
+		B2LFT /* LearningDeskFocusTimelineRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningDeskFocusTimelineRow.swift; sourceTree = "<group>"; };
 		B294 /* LearningTaskRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningTaskRow.swift; sourceTree = "<group>"; };
 		B295 /* LearningMovePreviewSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningMovePreviewSheet.swift; sourceTree = "<group>"; };
 		B296 /* LearningProjectsFileWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningProjectsFileWatcher.swift; sourceTree = "<group>"; };
@@ -278,9 +309,16 @@
 		B29F /* LearningTodayActionCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningTodayActionCard.swift; sourceTree = "<group>"; };
 		B2T0 /* TodayTodoModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoModels.swift; sourceTree = "<group>"; };
 		B2T1 /* TodayTodoStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoStore.swift; sourceTree = "<group>"; };
+		B2TA /* TodayTodoArchiveLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoArchiveLog.swift; sourceTree = "<group>"; };
+		B2AS /* TodayTodoAutosaveScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoAutosaveScheduler.swift; sourceTree = "<group>"; };
 		B2T2 /* TodayTodoRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoRow.swift; sourceTree = "<group>"; };
 		B2T3 /* TodayTodoSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoSection.swift; sourceTree = "<group>"; };
 		B2TR /* TodayTodoRowFramePreferenceKey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoRowFramePreferenceKey.swift; sourceTree = "<group>"; };
+		B2RG /* TodayTodoReorderGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoReorderGeometry.swift; sourceTree = "<group>"; };
+		B2PM /* TodayTodoDragPointerModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoDragPointerModel.swift; sourceTree = "<group>"; };
+		B2GT /* TodayTodoLongPressGestureTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoLongPressGestureTracker.swift; sourceTree = "<group>"; };
+		B2TDP /* TodayTodoDragPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoDragPreview.swift; sourceTree = "<group>"; };
+		B2SB /* TodayTodoScrollEdgeBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoScrollEdgeBridge.swift; sourceTree = "<group>"; };
 		B2TC /* TodayTodoReorderController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoReorderController.swift; sourceTree = "<group>"; };
 		B2TL /* TodayTodoAnimatedReorderList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoAnimatedReorderList.swift; sourceTree = "<group>"; };
 		B2TP /* TodayTodoListPointerReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoListPointerReader.swift; sourceTree = "<group>"; };
@@ -292,7 +330,11 @@
 		B2T6 /* TodayTodoInlineText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoInlineText.swift; sourceTree = "<group>"; };
 		B31T /* TodayTodoStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoStoreTests.swift; sourceTree = "<group>"; };
 		B31FS /* FocusSessionStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusSessionStoreTests.swift; sourceTree = "<group>"; };
+		B31FG /* FocusDayTimelineCellGridModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusDayTimelineCellGridModelTests.swift; sourceTree = "<group>"; };
+		B31FTP /* FocusTimelinePresenterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusTimelinePresenterTests.swift; sourceTree = "<group>"; };
 		B31CS /* ChronoSessionCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChronoSessionCoordinatorTests.swift; sourceTree = "<group>"; };
+		B31MFC /* ManualFocusCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManualFocusCoordinatorTests.swift; sourceTree = "<group>"; };
+		B31MPE /* ManualTimerEnginePhaseReplayTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManualTimerEnginePhaseReplayTests.swift; sourceTree = "<group>"; };
 		B31V /* LearningScheduleDayWindowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningScheduleDayWindowTests.swift; sourceTree = "<group>"; };
 		B31W /* TodayTodoContentLayoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoContentLayoutTests.swift; sourceTree = "<group>"; };
 		B31R /* TodayTodoReorderControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTodoReorderControllerTests.swift; sourceTree = "<group>"; };
@@ -498,6 +540,7 @@
 				B204 /* TimeState.swift */,
 				B205 /* TimerEngine.swift */,
 				B206 /* ManualTimerEngine.swift */,
+				B2MPE /* ManualPhaseEvent.swift */,
 				B207 /* AutoTimerEngine.swift */,
 				B2CS /* ChronoSessionPersistence.swift */,
 			);
@@ -509,7 +552,13 @@
 			children = (
 				B2FS1 /* FocusSessionModels.swift */,
 				B2FS2 /* FocusSessionStore.swift */,
+				B2MFC /* ManualFocusCoordinator.swift */,
 				B2FS3 /* FocusSessionTodaySection.swift */,
+				B2FS4 /* FocusDayTimelineCellGridModel.swift */,
+				B2FS5 /* FocusDayTimelineCellGridView.swift */,
+				B2FS6 /* FocusDayTimelineSegmentPopover.swift */,
+				B2FS7 /* FocusDayTimelineFailedMarkerPopover.swift */,
+				B2FTP /* FocusTimelinePresenter.swift */,
 			);
 			path = FocusSession;
 			sourceTree = "<group>";
@@ -563,7 +612,11 @@
 					B31K /* LearningDeskPanelViewModelTests.swift */,
 					B31T /* TodayTodoStoreTests.swift */,
 					B31FS /* FocusSessionStoreTests.swift */,
+					B31FG /* FocusDayTimelineCellGridModelTests.swift */,
+					B31FTP /* FocusTimelinePresenterTests.swift */,
 					B31CS /* ChronoSessionCoordinatorTests.swift */,
+					B31MFC /* ManualFocusCoordinatorTests.swift */,
+					B31MPE /* ManualTimerEnginePhaseReplayTests.swift */,
 					B31R /* TodayTodoReorderControllerTests.swift */,
 					B31U /* TodayTodoLayoutPolicyTests.swift */,
 					B31W /* TodayTodoContentLayoutTests.swift */,
@@ -609,7 +662,9 @@
 			isa = PBXGroup;
 			children = (
 				B24E /* TransientOverlayDashboardPolicy.swift */,
+				B24F /* TransientOverlayContent.swift */,
 				B24A /* MalDazeTransientOverlayPresenter.swift */,
+				B24G /* InteractiveAnchoredOverlayGeometry.swift */,
 				B24B /* PassiveCenteredOverlayGeometry.swift */,
 				B24C /* CenterBellOverlayContentBuilder.swift */,
 				B24D /* HydrationOverlayContentBuilder.swift */,
@@ -665,6 +720,7 @@
 				B292 /* LearningDeskPanelViewModel.swift */,
 				B2RP /* DeadlineRepackPreviewFormatter.swift */,
 				B293 /* LearningDeskPanelView.swift */,
+				B2LFT /* LearningDeskFocusTimelineRow.swift */,
 				B294 /* LearningTaskRow.swift */,
 				B295 /* LearningMovePreviewSheet.swift */,
 				B296 /* LearningProjectsFileWatcher.swift */,
@@ -681,11 +737,18 @@
 				B29F /* LearningTodayActionCard.swift */,
 				B2T0 /* TodayTodoModels.swift */,
 				B2T1 /* TodayTodoStore.swift */,
+				B2TA /* TodayTodoArchiveLog.swift */,
+				B2AS /* TodayTodoAutosaveScheduler.swift */,
 				B2T2 /* TodayTodoRow.swift */,
 				B2T3 /* TodayTodoSection.swift */,
 				B2T7 /* TodayTodoLayoutPolicy.swift */,
 				B2T8 /* TodayTodoContentLayout.swift */,
 				B2TR /* TodayTodoRowFramePreferenceKey.swift */,
+				B2RG /* TodayTodoReorderGeometry.swift */,
+				B2PM /* TodayTodoDragPointerModel.swift */,
+				B2GT /* TodayTodoLongPressGestureTracker.swift */,
+				B2TDP /* TodayTodoDragPreview.swift */,
+				B2SB /* TodayTodoScrollEdgeBridge.swift */,
 				B2TC /* TodayTodoReorderController.swift */,
 				B2TL /* TodayTodoAnimatedReorderList.swift */,
 				B2TP /* TodayTodoListPointerReader.swift */,
@@ -896,11 +959,18 @@
 				A204 /* TimeState.swift in Sources */,
 				A205 /* TimerEngine.swift in Sources */,
 				A206 /* ManualTimerEngine.swift in Sources */,
+				A2MPE /* ManualPhaseEvent.swift in Sources */,
 				A207 /* AutoTimerEngine.swift in Sources */,
 				A2CS /* ChronoSessionPersistence.swift in Sources */,
 				A2FS1 /* FocusSessionModels.swift in Sources */,
 				A2FS2 /* FocusSessionStore.swift in Sources */,
+				A2MFC /* ManualFocusCoordinator.swift in Sources */,
 				A2FS3 /* FocusSessionTodaySection.swift in Sources */,
+				A2FS4 /* FocusDayTimelineCellGridModel.swift in Sources */,
+				A2FS5 /* FocusDayTimelineCellGridView.swift in Sources */,
+				A2FS6 /* FocusDayTimelineSegmentPopover.swift in Sources */,
+				A2FS7 /* FocusDayTimelineFailedMarkerPopover.swift in Sources */,
+				A2FTP /* FocusTimelinePresenter.swift in Sources */,
 				A208 /* PetRenderer.swift in Sources */,
 				A2GF /* GIFFrameCache.swift in Sources */,
 				A20A /* WindowManager.swift in Sources */,
@@ -913,7 +983,9 @@
 				A214 /* FiveMinuteCatCompanionController.swift in Sources */,
 				A23C /* HydrationReminderController.swift in Sources */,
 				A24E /* TransientOverlayDashboardPolicy.swift in Sources */,
+				A24F /* TransientOverlayContent.swift in Sources */,
 				A24A /* MalDazeTransientOverlayPresenter.swift in Sources */,
+				A24G /* InteractiveAnchoredOverlayGeometry.swift in Sources */,
 				A24B /* PassiveCenteredOverlayGeometry.swift in Sources */,
 				A24C /* CenterBellOverlayContentBuilder.swift in Sources */,
 				A24D /* HydrationOverlayContentBuilder.swift in Sources */,
@@ -935,6 +1007,7 @@
 				A292 /* LearningDeskPanelViewModel.swift in Sources */,
 				A2RP /* DeadlineRepackPreviewFormatter.swift in Sources */,
 				A293 /* LearningDeskPanelView.swift in Sources */,
+				A2LFT /* LearningDeskFocusTimelineRow.swift in Sources */,
 				A294 /* LearningTaskRow.swift in Sources */,
 				A295 /* LearningMovePreviewSheet.swift in Sources */,
 				A296 /* LearningProjectsFileWatcher.swift in Sources */,
@@ -951,11 +1024,18 @@
 				A29F /* LearningTodayActionCard.swift in Sources */,
 				A2T0 /* TodayTodoModels.swift in Sources */,
 				A2T1 /* TodayTodoStore.swift in Sources */,
+				A2TA /* TodayTodoArchiveLog.swift in Sources */,
+				A2AS /* TodayTodoAutosaveScheduler.swift in Sources */,
 				A2T2 /* TodayTodoRow.swift in Sources */,
 				A2T3 /* TodayTodoSection.swift in Sources */,
 				A2T7 /* TodayTodoLayoutPolicy.swift in Sources */,
 				A2T8 /* TodayTodoContentLayout.swift in Sources */,
 				A2TR /* TodayTodoRowFramePreferenceKey.swift in Sources */,
+				A2RG /* TodayTodoReorderGeometry.swift in Sources */,
+				A2PM /* TodayTodoDragPointerModel.swift in Sources */,
+				A2GT /* TodayTodoLongPressGestureTracker.swift in Sources */,
+				A2TDP /* TodayTodoDragPreview.swift in Sources */,
+				A2SB /* TodayTodoScrollEdgeBridge.swift in Sources */,
 				A2TC /* TodayTodoReorderController.swift in Sources */,
 				A2TL /* TodayTodoAnimatedReorderList.swift in Sources */,
 				A2TP /* TodayTodoListPointerReader.swift in Sources */,
@@ -1056,7 +1136,11 @@
 					A31K /* LearningDeskPanelViewModelTests.swift in Sources */,
 					A31T /* TodayTodoStoreTests.swift in Sources */,
 					A31FS /* FocusSessionStoreTests.swift in Sources */,
+					A31FG /* FocusDayTimelineCellGridModelTests.swift in Sources */,
+					A31FTP /* FocusTimelinePresenterTests.swift in Sources */,
 					A31CS /* ChronoSessionCoordinatorTests.swift in Sources */,
+					A31MFC /* ManualFocusCoordinatorTests.swift in Sources */,
+					A31MPE /* ManualTimerEnginePhaseReplayTests.swift in Sources */,
 					A31R /* TodayTodoReorderControllerTests.swift in Sources */,
 					A31U /* TodayTodoLayoutPolicyTests.swift in Sources */,
 					A31W /* TodayTodoContentLayoutTests.swift in Sources */,

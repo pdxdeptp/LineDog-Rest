@@ -8,6 +8,7 @@ struct NutritionCLIError: Error, LocalizedError {
 
 protocol NutritionHermesCLI: Sendable {
     func logFood(name: String, grams: Double) async throws
+    func refreshPanel() async throws
 }
 
 struct ProcessNutritionHermesCLI: NutritionHermesCLI {
@@ -40,6 +41,16 @@ struct ProcessNutritionHermesCLI: NutritionHermesCLI {
         }
         guard NutritionHermesCLIFormatting.logSucceeded(from: stdout) else {
             throw NutritionCLIError(message: "记录响应异常，请确认食物名在 foods.json 中存在。")
+        }
+    }
+
+    func refreshPanel() async throws {
+        let stdout = try await runRecommend(arguments: ["refresh-panel"])
+        if let message = NutritionHermesCLIFormatting.errorMessage(from: stdout) {
+            throw NutritionCLIError(message: message)
+        }
+        guard NutritionHermesCLIFormatting.refreshPanelSucceeded(from: stdout) else {
+            throw NutritionCLIError(message: "刷新 panel 响应异常。")
         }
     }
 
@@ -116,5 +127,12 @@ enum NutritionHermesCLIFormatting {
               let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         else { return false }
         return root["logged"] != nil
+    }
+
+    static func refreshPanelSucceeded(from stdout: String) -> Bool {
+        guard let data = stdout.data(using: .utf8),
+              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { return false }
+        return root["refresh_panel"] as? Bool == true
     }
 }

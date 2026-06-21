@@ -2,6 +2,183 @@ import CoreGraphics
 import XCTest
 @testable import MalDaze
 
+final class TodayTodoReorderGeometryTests: XCTestCase {
+    private let a = UUID()
+    private let b = UUID()
+    private let c = UUID()
+
+    private var baseOrder: [UUID] { [a, b, c] }
+
+    private var frames: [UUID: CGRect] {
+        [
+            a: CGRect(x: 0, y: 0, width: 100, height: 20),
+            b: CGRect(x: 0, y: 22, width: 100, height: 20),
+            c: CGRect(x: 0, y: 44, width: 100, height: 30),
+        ]
+    }
+
+    private var heights: [UUID: CGFloat] {
+        [a: 20, b: 20, c: 30]
+    }
+
+    func testTargetIndexUsesSourceExcludedSpatialOrder() {
+        let centerAboveA: CGFloat = 5
+        XCTAssertEqual(
+            TodayTodoReorderGeometry.rawTargetIndex(
+                floatingCenterY: centerAboveA,
+                baseOrder: baseOrder,
+                sourceId: c,
+                rowFrames: frames
+            ),
+            0
+        )
+
+        let centerBetweenAB: CGFloat = 21
+        XCTAssertEqual(
+            TodayTodoReorderGeometry.rawTargetIndex(
+                floatingCenterY: centerBetweenAB,
+                baseOrder: baseOrder,
+                sourceId: c,
+                rowFrames: frames
+            ),
+            1
+        )
+
+        let centerBelowB: CGFloat = 80
+        XCTAssertEqual(
+            TodayTodoReorderGeometry.rawTargetIndex(
+                floatingCenterY: centerBelowB,
+                baseOrder: baseOrder,
+                sourceId: c,
+                rowFrames: frames
+            ),
+            2
+        )
+    }
+
+    func testProjectedOffsetsMoveAffectedNeighborsOnly() {
+        let offsetB = TodayTodoReorderGeometry.rowOffset(
+            entryId: b,
+            sourceId: c,
+            sourceIndex: 2,
+            targetIndex: 1,
+            baseOrder: baseOrder,
+            rowFrames: frames,
+            rowHeights: heights,
+            listRowSpacing: 2
+        )
+        XCTAssertNotEqual(offsetB, 0)
+
+        let offsetA = TodayTodoReorderGeometry.rowOffset(
+            entryId: a,
+            sourceId: c,
+            sourceIndex: 2,
+            targetIndex: 1,
+            baseOrder: baseOrder,
+            rowFrames: frames,
+            rowHeights: heights,
+            listRowSpacing: 2
+        )
+        XCTAssertEqual(offsetA, 0, accuracy: 0.001)
+    }
+
+    func testSettleYUsesProjectedTargetNotSource() {
+        let geometry = TodayTodoReorderGeometry.projectedGeometry(
+            baseOrder: baseOrder,
+            rowFrames: frames,
+            rowHeights: heights,
+            sourceId: c,
+            targetIndex: 0,
+            listRowSpacing: 2
+        )
+        XCTAssertEqual(geometry.projectedMinY[c] ?? -1, 0, accuracy: 0.001)
+        XCTAssertNotEqual(geometry.projectedMinY[c] ?? -1, frames[c]?.minY ?? -1)
+    }
+
+    func testProjectedGeometryPreservesTotalHeight() {
+        let initial = TodayTodoReorderGeometry.projectedGeometry(
+            baseOrder: baseOrder,
+            rowFrames: frames,
+            rowHeights: heights,
+            sourceId: c,
+            targetIndex: 2,
+            listRowSpacing: 2
+        )
+        let moved = TodayTodoReorderGeometry.projectedGeometry(
+            baseOrder: baseOrder,
+            rowFrames: frames,
+            rowHeights: heights,
+            sourceId: c,
+            targetIndex: 0,
+            listRowSpacing: 2
+        )
+        XCTAssertEqual(initial.totalHeight, moved.totalHeight, accuracy: 0.001)
+    }
+}
+
+@MainActor
+final class TodayTodoLongPressGestureTrackerTests: XCTestCase {
+    private func makeEvent(x: CGFloat, y: CGFloat) -> NSEvent {
+        NSEvent.mouseEvent(
+            with: .leftMouseDown,
+            location: NSPoint(x: x, y: y),
+            modifierFlags: [],
+            timestamp: 0,
+            windowNumber: 0,
+            context: nil,
+            eventNumber: 0,
+            clickCount: 1,
+            pressure: 1
+        )!
+    }
+
+    func testQuickClickEditsWithoutLongPress() {
+        var now: TimeInterval = 0
+        let tracker = TodayTodoLongPressGestureTracker(
+            clock: { now },
+            schedule: { _, _ in }
+        )
+        let down = makeEvent(x: 0, y: 0)
+        let outcome = tracker.mouseDown(reorderEnabled: true, event: down)
+        XCTAssertEqual(outcome, .none)
+
+        let (upOutcome, editEvent) = tracker.mouseUp()
+        XCTAssertEqual(upOutcome, .quickClickEdit)
+        XCTAssertNotNil(editEvent)
+    }
+
+    func testLongPressWithoutDragDoesNotEdit() {
+        var now: TimeInterval = 0
+        var scheduled: (() -> Void)?
+        let tracker = TodayTodoLongPressGestureTracker(
+            clock: { now },
+            schedule: { _, block in scheduled = block }
+        )
+        _ = tracker.mouseDown(reorderEnabled: true, event: makeEvent(x: 0, y: 0))
+        now += 0.36
+        scheduled?()
+
+        let (upOutcome, editEvent) = tracker.mouseUp()
+        XCTAssertEqual(upOutcome, .longPressReleasedWithoutDrag)
+        XCTAssertNil(editEvent)
+    }
+
+    func testFourPointMoveActivatesReorder() {
+        var now: TimeInterval = 0
+        var scheduled: (() -> Void)?
+        let tracker = TodayTodoLongPressGestureTracker(
+            clock: { now },
+            schedule: { _, block in scheduled = block }
+        )
+        _ = tracker.mouseDown(reorderEnabled: true, event: makeEvent(x: 0, y: 0))
+        now += 0.36
+        scheduled?()
+
+        let dragOutcome = tracker.mouseDragged(event: makeEvent(x: 5, y: 0))
+        XCTAssertEqual(dragOutcome, .reorderActivated)
+    }
+}
+
 @MainActor
 final class TodayTodoReorderControllerTests: XCTestCase {
     private func makeEntry(id: UUID, title: String, sortIndex: Int) -> TodayTodoEntry {
@@ -17,55 +194,7 @@ final class TodayTodoReorderControllerTests: XCTestCase {
         )
     }
 
-    func testListPointerYFlipsAppKitLocalYToTopLeft() {
-        let listHeight: CGFloat = 200
-        XCTAssertEqual(
-            TodayTodoReorderPointerBridge.listPointerY(appKitLocalY: 0, listHeight: listHeight),
-            200,
-            accuracy: 0.001
-        )
-        XCTAssertEqual(
-            TodayTodoReorderPointerBridge.listPointerY(appKitLocalY: 200, listHeight: listHeight),
-            0,
-            accuracy: 0.001
-        )
-        XCTAssertEqual(
-            TodayTodoReorderPointerBridge.listPointerY(appKitLocalY: 50, listHeight: listHeight),
-            150,
-            accuracy: 0.001
-        )
-    }
-
-    func testInsertionIndexUsesFrozenTopLeftFrames() {
-        let a = UUID()
-        let b = UUID()
-        let c = UUID()
-        let order = [a, b, c]
-        let frames: [UUID: CGRect] = [
-            a: CGRect(x: 0, y: 0, width: 100, height: 20),
-            b: CGRect(x: 0, y: 22, width: 100, height: 20),
-            c: CGRect(x: 0, y: 44, width: 100, height: 20),
-        ]
-
-        XCTAssertEqual(
-            TodayTodoReorderController.insertionIndex(for: 5, order: order, rowFrames: frames),
-            0
-        )
-        XCTAssertEqual(
-            TodayTodoReorderController.insertionIndex(for: 21, order: order, rowFrames: frames),
-            1
-        )
-        XCTAssertEqual(
-            TodayTodoReorderController.insertionIndex(for: 33, order: order, rowFrames: frames),
-            2
-        )
-        XCTAssertEqual(
-            TodayTodoReorderController.insertionIndex(for: 80, order: order, rowFrames: frames),
-            3
-        )
-    }
-
-    func testPreviewOrderUpdatesDuringDragWithoutPersisting() {
+    func testBaseOrderRemainsImmutableWhileTargetChanges() {
         let controller = TodayTodoReorderController()
         let a = UUID()
         let b = UUID()
@@ -75,38 +204,21 @@ final class TodayTodoReorderControllerTests: XCTestCase {
             makeEntry(id: b, title: "B", sortIndex: 1),
             makeEntry(id: c, title: "C", sortIndex: 2),
         ]
-        let frames: [UUID: CGRect] = [
-            a: CGRect(x: 0, y: 0, width: 100, height: 20),
-            b: CGRect(x: 0, y: 22, width: 100, height: 20),
-            c: CGRect(x: 0, y: 44, width: 100, height: 20),
+        let frames = [
+            TodayTodoRowFrame(id: a, frame: CGRect(x: 0, y: 0, width: 100, height: 20)),
+            TodayTodoRowFrame(id: b, frame: CGRect(x: 0, y: 22, width: 100, height: 20)),
+            TodayTodoRowFrame(id: c, frame: CGRect(x: 0, y: 44, width: 100, height: 20)),
         ]
-        controller.updateRowFrames(frames.map { TodayTodoRowFrame(id: $0.key, frame: $0.value) })
+        controller.updateRowFrames(frames)
+        controller.beginDrag(entryId: b, entries: entries, pointerContentY: 25)
+        let initialBase = controller.baseOrder
 
-        controller.beginDrag(entryId: c, entries: entries, pointerY: 10)
-        XCTAssertEqual(controller.phase, .dragging)
-        XCTAssertEqual(controller.previewOrder, [a, b, c])
-
-        controller.updateDrag(pointerY: 21, entries: entries)
-        XCTAssertEqual(controller.previewOrder, [a, c, b])
-        XCTAssertEqual(controller.phase, .dragging)
-
-        var commitCalled = false
-        controller.endDrag { _, _ in
-            commitCalled = true
-        }
-        XCTAssertEqual(controller.phase, .settling)
-        XCTAssertFalse(commitCalled)
-
-        let settleExpectation = expectation(description: "settling completes")
-        DispatchQueue.main.asyncAfter(deadline: .now() + TodayTodoReorderMetrics.settlingDuration + 0.05) {
-            settleExpectation.fulfill()
-        }
-        wait(for: [settleExpectation], timeout: 2)
-        XCTAssertTrue(commitCalled)
-        XCTAssertEqual(controller.phase, .idle)
+        controller.updateDrag(pointerContentY: 0, viewportY: 10)
+        XCTAssertEqual(controller.baseOrder, initialBase)
+        XCTAssertNotEqual(controller.targetIndex, controller.sourceIndex)
     }
 
-    func testCancelDragDoesNotCommit() {
+    func testSettlingCommitsOnceViaCompletion() {
         let controller = TodayTodoReorderController()
         let a = UUID()
         let b = UUID()
@@ -114,26 +226,69 @@ final class TodayTodoReorderControllerTests: XCTestCase {
             makeEntry(id: a, title: "A", sortIndex: 0),
             makeEntry(id: b, title: "B", sortIndex: 1),
         ]
-        let frames: [UUID: CGRect] = [
-            a: CGRect(x: 0, y: 0, width: 100, height: 20),
-            b: CGRect(x: 0, y: 22, width: 100, height: 20),
-        ]
-        controller.updateRowFrames(frames.map { TodayTodoRowFrame(id: $0.key, frame: $0.value) })
-        controller.beginDrag(entryId: b, entries: entries, pointerY: 5)
-        controller.updateDrag(pointerY: 5, entries: entries)
+        controller.updateRowFrames([
+            TodayTodoRowFrame(id: a, frame: CGRect(x: 0, y: 0, width: 100, height: 20)),
+            TodayTodoRowFrame(id: b, frame: CGRect(x: 0, y: 22, width: 100, height: 20)),
+        ])
+        controller.beginDrag(entryId: b, entries: entries, pointerContentY: 25)
+        controller.updateDrag(pointerContentY: 0, viewportY: 10)
+        XCTAssertNotEqual(controller.targetIndex, controller.sourceIndex)
 
-        var commitCalled = false
-        controller.cancelDrag()
+        var commitCount = 0
+        controller.endDrag { _, _ in commitCount += 1 }
+        XCTAssertEqual(controller.phase, .settling)
+        XCTAssertEqual(commitCount, 0)
 
-        XCTAssertEqual(controller.phase, .cancelling)
-        XCTAssertFalse(commitCalled)
-
-        let cancelExpectation = expectation(description: "cancel completes")
-        DispatchQueue.main.asyncAfter(deadline: .now() + TodayTodoReorderMetrics.settlingDuration + 0.05) {
-            cancelExpectation.fulfill()
-        }
-        wait(for: [cancelExpectation], timeout: 2)
-        XCTAssertFalse(commitCalled)
+        controller.finishSettlingAnimation()
+        XCTAssertEqual(commitCount, 1)
         XCTAssertEqual(controller.phase, .idle)
+    }
+
+    func testPointerModelUpdatesDoNotChangeTargetIndex() {
+        let controller = TodayTodoReorderController()
+        let a = UUID()
+        let b = UUID()
+        let entries = [
+            makeEntry(id: a, title: "A", sortIndex: 0),
+            makeEntry(id: b, title: "B", sortIndex: 1),
+        ]
+        controller.updateRowFrames([
+            TodayTodoRowFrame(id: a, frame: CGRect(x: 0, y: 0, width: 100, height: 20)),
+            TodayTodoRowFrame(id: b, frame: CGRect(x: 0, y: 22, width: 100, height: 20)),
+        ])
+        controller.beginDrag(entryId: b, entries: entries, pointerContentY: 5)
+        let target = controller.targetIndex
+
+        controller.updateDrag(pointerContentY: 6, viewportY: 6)
+        controller.updateDrag(pointerContentY: 7, viewportY: 7)
+        XCTAssertEqual(controller.targetIndex, target)
+    }
+
+    func testIdentityChangeAbortsWithoutCommit() {
+        let controller = TodayTodoReorderController()
+        let a = UUID()
+        let b = UUID()
+        let entries = [
+            makeEntry(id: a, title: "A", sortIndex: 0),
+            makeEntry(id: b, title: "B", sortIndex: 1),
+        ]
+        controller.updateRowFrames([
+            TodayTodoRowFrame(id: a, frame: CGRect(x: 0, y: 0, width: 100, height: 20)),
+            TodayTodoRowFrame(id: b, frame: CGRect(x: 0, y: 22, width: 100, height: 20)),
+        ])
+        controller.beginDrag(entryId: b, entries: entries, pointerContentY: 5)
+
+        let changed = [entries[0], TodayTodoEntry(
+            id: UUID(),
+            title: "X",
+            dateISO: "2026-06-18",
+            rolledFromDateISO: nil,
+            isCompleted: false,
+            createdAt: .distantPast,
+            completedAt: nil,
+            sortIndex: 1
+        )]
+        controller.updateDrag(pointerContentY: 5, viewportY: 5)
+        XCTAssertFalse(controller.validateEntriesIdentity(changed))
     }
 }

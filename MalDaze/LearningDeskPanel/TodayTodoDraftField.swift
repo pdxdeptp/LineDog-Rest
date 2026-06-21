@@ -7,6 +7,8 @@ enum TodayTodoDraftFieldLayout {
     static let horizontalInset: CGFloat = 0
     static let verticalInset: CGFloat = 2
     static let underlineGap: CGFloat = 2
+    static let placeholderTextColor = NSColor.tertiaryLabelColor
+    static let inputTextColor = NSColor.labelColor
 }
 
 /// 多行文本：回车提交/保存，⇧回车换行，高度随内容在 min/max 内增长；底部横线样式。
@@ -113,6 +115,11 @@ final class DraftScrollContainer: NSView {
             height: CGFloat.greatestFiniteMagnitude
         )
         textView.font = NSFont.preferredFont(forTextStyle: .body)
+        textView.textColor = TodayTodoDraftFieldLayout.inputTextColor
+        textView.typingAttributes = [
+            .font: textView.font as Any,
+            .foregroundColor: TodayTodoDraftFieldLayout.inputTextColor,
+        ]
         textView.backgroundColor = .clear
         textView.focusRingType = .none
         textView.insertionPointColor = .labelColor
@@ -142,7 +149,7 @@ final class DraftScrollContainer: NSView {
         ])
 
         let placeholder = NSTextField(labelWithString: "")
-        placeholder.textColor = .placeholderTextColor
+        placeholder.textColor = TodayTodoDraftFieldLayout.placeholderTextColor
         placeholder.font = textView.font
         placeholder.translatesAutoresizingMaskIntoConstraints = false
         placeholder.lineBreakMode = .byTruncatingTail
@@ -194,6 +201,11 @@ final class DraftScrollContainer: NSView {
         let isFirstResponder = textView.window?.firstResponder === textView
         if text.isEmpty || !isFirstResponder {
             textView.string = text
+            textView.textColor = TodayTodoDraftFieldLayout.inputTextColor
+            textView.typingAttributes = [
+                .font: textView.font as Any,
+                .foregroundColor: TodayTodoDraftFieldLayout.inputTextColor,
+            ]
             textView.undoManager?.removeAllActions()
             syncPlaceholderVisibility()
         }

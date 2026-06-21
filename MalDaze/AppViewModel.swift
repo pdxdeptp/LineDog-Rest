@@ -26,10 +26,15 @@ final class AppViewModel: ObservableObject {
     /// 状态栏小狗与「休息中」红态；与桌宠非休息配色同步。
     @Published private(set) var petDisplayMode: PetDisplayMode = .runningBlack
 
-    /// 菜单「停止计时」：仅当引擎实际在跑时为可点。
-    @Published private(set) var canStopChronoButton = false
-    /// 菜单「恢复计时」：用户从运行中点过「停止计时」后为 true，直到恢复或切模式。
-    @Published private(set) var showResumeChronoButton = false
+    /// 手动模式且未在计时：可开始专注。
+    var canStartManualFocus: Bool {
+        mode == .manual && !isChronoSessionActive
+    }
+
+    /// 手动工作相运行中：可放弃当前番茄。
+    @Published private(set) var canAbandonManualFocus = false
+    /// 自动提醒运行中：可停止自动提醒。
+    @Published private(set) var canStopAutoReminders = false
     /// 休息全屏时是否拦截鼠标（默认开）；关则休息时仍可正常点击背后桌面与应用。
     @Published private(set) var restBlocksClicksDuringRest: Bool
     /// 休息霸屏期间连续单击桌宠 10 下可提前结束休息（默认开）。
@@ -58,7 +63,9 @@ final class AppViewModel: ObservableObject {
     @Published private(set) var todayFocusSessionCount = 0
     @Published private(set) var todayFocusMinutesTotal = 0
     @Published private(set) var todayFocusSessions: [FocusSession] = []
-    @Published private(set) var inProgressFocusSegment: FocusSessionInProgress?
+    @Published private(set) var inProgressFocusSegment: FocusPomodoroInProgress?
+    /// 学习面板专注时间轴：静态 skeleton + live overlay，与 statusLine tick 解耦。
+    let focusTimelinePresenter = FocusTimelinePresenter()
     /// 桌宠 Dashboard Esc 分级：sheet / 对话框优先于关面板。
     let dashboardEscapeRouter = DeskPetDashboardEscapeRouter()
 
@@ -79,11 +86,10 @@ final class AppViewModel: ObservableObject {
 
     private var cancellables = Set<AnyCancellable>()
 
-    /// 「计时中」：自动模式引擎在跑，或手动模式已点「开始专注」尚未「停止计时」。
+    /// 「计时中」：自动模式引擎在跑，或手动模式已点「开始专注」。
     private var isChronoSessionActive: Bool
-    /// 用户主动暂停后，同一会话内可用「恢复计时」继续（手动：重新一轮工作段；自动：重新对齐锚点）。
-    private var chronoSessionSuspendedByUser = false
     private var chronoSession = ChronoSessionCoordinator()
+    private let manualFocusCoordinator: ManualFocusCoordinator
 
     private let manualEngine: ManualTimerEngine
     private let autoEngine: AutoTimerEngine
@@ -104,8 +110,6 @@ final class AppViewModel: ObservableObject {
     private let t7EjectUIService: (any T7EjectServiceUIControlling)?
 
     private var wasResting = false
-    private var workSegmentStartedAt: Date?
-    private var wasInManualWorkPhase = false
     private var testRestActive = false
     private var cachedStatusLine: String = "自动模式：正在对齐系统时钟…"
     /// 避免 `syncPetDisplayMode` 在计时器 tick 中重复调用 `WindowManager`（模式未变时）。
@@ -180,6 +184,7 @@ final class AppViewModel: ObservableObject {
         self.deskReminders = deskReminders ?? DeskRemindersModel()
         self.focusSessionStore = focusSessionStore ?? FocusSessionStore()
         self.focusSessionStore.loadIfNeeded()
+        self.manualFocusCoordinator = ManualFocusCoordinator(store: self.focusSessionStore)
         self.smartReminderOrchestrator = SmartReminderOrchestrator()
         let ud = UserDefaults.standard
         let wMin = Self.clampedPomodoroWorkMinutes(ud.integer(forKey: MalDazeDefaults.pomodoroWorkDurationMinutes))
@@ -211,6 +216,13 @@ final class AppViewModel: ObservableObject {
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 self.handleTimeState(state, source: .manual)
+            }
+        }
+        me.onPhaseEvent = { [weak self] event in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.manualFocusCoordinator.handle(event)
+                self.handleFocusPhaseEvent(event)
             }
         }
         ae.onStateChange = { [weak self] state in
@@ -357,7 +369,50 @@ final class AppViewModel: ObservableObject {
 
         installAutoTimerLifecycleObserversIfNeeded()
         installChronoSessionPersistenceObserversIfNeeded()
+        focusTimelinePresenter.liveInputProvider = { [weak self] in
+            guard let self else {
+                return FocusTimelineLiveInput(projection: nil, isManualWorkActive: false)
+            }
+            let now = Date()
+            return FocusTimelineLiveInput(
+                projection: self.manualFocusCoordinator.inProgressProjection(
+                    now: now,
+                    manualEngine: self.manualEngine,
+                    isManualSessionActive: self.mode == .manual && self.isChronoSessionActive
+                ),
+                isManualWorkActive: self.isManualWorkActiveForTimeline
+            )
+        }
         refreshFocusSessionProjection()
+    }
+
+    func updateFocusTimelineDay(_ day: Date) {
+        focusTimelinePresenter.setTimelineDay(day)
+        syncFocusTimelineSkeleton()
+    }
+
+    private var isManualWorkActiveForTimeline: Bool {
+        mode == .manual
+            && isChronoSessionActive
+            && manualEngine.isTimerRunning
+            && !manualEngine.isInRestPhase
+    }
+
+    private func handleFocusPhaseEvent(_ event: ManualPhaseEvent) {
+        refreshFocusSessionSummary()
+        var windowAnchors: [Date] = []
+        if case .workStarted(let start, _) = event {
+            windowAnchors = [start]
+        }
+        syncFocusTimelineSkeleton(windowAnchorDates: windowAnchors)
+        focusTimelinePresenter.syncLiveOverlay()
+    }
+
+    private func syncFocusTimelineSkeleton(windowAnchorDates: [Date] = []) {
+        focusTimelinePresenter.rebuildSkeleton(
+            finalizedSessions: todayFocusSessions,
+            windowAnchorDates: windowAnchorDates
+        )
     }
 
     private var chronoSessionTerminateObserver: NSObjectProtocol?
@@ -372,7 +427,10 @@ final class AppViewModel: ObservableObject {
             ) { [weak self] _ in
                 guard let self else { return }
                 MainActor.assumeIsolated {
-                    self.syncPersistRunningChronoSession()
+                    // Clean quit: drop running snapshot so relaunch does not wall-clock replay
+                    // offline time into completed pomodoros. Crash/kill paths omit willTerminate
+                    // and keep the last persisted snapshot from ticks / resign-active.
+                    self.clearChronoSessionPersistence()
                 }
             }
         }
@@ -419,7 +477,6 @@ final class AppViewModel: ObservableObject {
         guard
             mode == .auto,
             isChronoSessionActive,
-            !chronoSessionSuspendedByUser,
             !autoEngine.isInScheduledRest
         else { return }
         autoEngine.realignWatching()
@@ -614,21 +671,13 @@ final class AppViewModel: ObservableObject {
         ChronoSessionCaptureContext(
             mode: mode,
             manualEngine: manualEngine,
-            autoEngine: autoEngine,
-            workSegmentStartedAt: workSegmentStartedAt,
-            wasInManualWorkPhase: wasInManualWorkPhase
+            autoEngine: autoEngine
         )
     }
 
     private func syncPersistRunningChronoSession() {
-        guard isChronoSessionActive, !chronoSessionSuspendedByUser else { return }
+        guard isChronoSessionActive else { return }
         chronoSession.persistRunning(from: chronoCaptureContext())
-    }
-
-    private func applyEngineRestoreHints(_ hints: ChronoSessionEngineRestoreHints) {
-        workSegmentStartedAt = hints.workSegmentStartedAt
-        wasInManualWorkPhase = hints.wasInManualWorkPhase
-        refreshFocusSessionProjection()
     }
 
     private func applyChronoBootstrapPlan(
@@ -642,34 +691,15 @@ final class AppViewModel: ObservableObject {
             applyPreferredTimerModeOnBootstrap(autoEngine: autoEngine, defaults: defaults)
         case .restoreRunning(let record):
             mode = record.appMode()
-            chronoSessionSuspendedByUser = false
             isChronoSessionActive = true
-            applyEngineRestoreHints(
-                chronoSession.applyEngines(
-                    record: record,
-                    manualEngine: manualEngine,
-                    autoEngine: autoEngine
-                )
+            chronoSession.applyEngines(
+                record: record,
+                manualEngine: manualEngine,
+                autoEngine: autoEngine
             )
-        case .restoreUserPaused(let record):
-            mode = record.appMode()
-            chronoSessionSuspendedByUser = true
-            isChronoSessionActive = false
-            publishUserPausedStatus(for: record.appMode())
-        case .restoreUserPausedModeOnly(let pause):
-            mode = pause.appMode()
-            chronoSessionSuspendedByUser = true
-            isChronoSessionActive = false
-            publishUserPausedStatus(for: pause.appMode())
-        }
-    }
-
-    private func publishUserPausedStatus(for restoredMode: Mode) {
-        switch restoredMode {
-        case .manual:
-            publishStatus("已暂停。点击「恢复计时」继续，或再次「开始专注」开新一轮。")
-        case .auto:
-            publishStatus("自动提醒已暂停。点击「恢复计时」重新对齐整点 / 半点。")
+            refreshFocusSessionProjection()
+            refreshChronoChrome()
+            syncPetDisplayMode()
         }
     }
 
@@ -924,10 +954,8 @@ final class AppViewModel: ObservableObject {
     private enum Source { case manual, auto }
 
     func setMode(_ newMode: Mode) {
-        if mode == .manual {
-            finalizeManualWorkSegmentIfNeeded(source: .stoppedEarly)
-        } else {
-            clearManualWorkSegmentTracking()
+        if mode == .manual, isChronoSessionActive, manualEngine.isTimerRunning, !manualEngine.isInRestPhase {
+            manualFocusCoordinator.abandonCurrentWorkPhase(manualEngine: manualEngine)
         }
         mode = newMode
         manualEngine.stop()
@@ -935,7 +963,6 @@ final class AppViewModel: ObservableObject {
         windowManager.dismissRestImmediately(bringIdlePetWindowToFront: false)
         wasResting = false
         testRestActive = false
-        chronoSessionSuspendedByUser = false
         clearChronoSessionPersistence()
 
         switch newMode {
@@ -948,79 +975,52 @@ final class AppViewModel: ObservableObject {
             autoEngine.start()
         }
         persistPreferredTimerMode()
+        refreshFocusSessionProjection()
         refreshChronoChrome()
         syncPetDisplayMode()
     }
 
     func startManualFocus() {
         guard mode == .manual else { return }
+        if isChronoSessionActive, manualEngine.isTimerRunning, !manualEngine.isInRestPhase {
+            manualFocusCoordinator.abandonCurrentWorkPhase(manualEngine: manualEngine)
+        }
         autoEngine.stop()
         windowManager.dismissRestImmediately(bringIdlePetWindowToFront: false)
         wasResting = false
         testRestActive = false
-        chronoSessionSuspendedByUser = false
         clearChronoSessionPersistence()
         manualEngine.start()
         isChronoSessionActive = true
         refreshChronoChrome()
+        refreshFocusSessionProjection()
         syncPetDisplayMode()
     }
 
-    /// 暂停当前模式下的计时（手动 / 自动）；未在计时时忽略。之后显示「恢复计时」。
-    func stopTimers() {
-        guard isChronoSessionActive else { return }
-        chronoSession.persistUserPaused(from: chronoCaptureContext())
-        if mode == .manual, manualEngine.isTimerRunning, !manualEngine.isInRestPhase {
-            finalizeManualWorkSegmentIfNeeded(source: .stoppedEarly)
-        } else {
-            clearManualWorkSegmentTracking()
-        }
+    func abandonManualFocus() {
+        guard mode == .manual, isChronoSessionActive, manualEngine.isTimerRunning, !manualEngine.isInRestPhase else { return }
+        manualFocusCoordinator.abandonCurrentWorkPhase(manualEngine: manualEngine)
         manualEngine.stop()
+        windowManager.dismissRestImmediately(bringIdlePetWindowToFront: false)
+        wasResting = false
+        testRestActive = false
+        isChronoSessionActive = false
+        clearChronoSessionPersistence()
+        publishStatus("手动模式：点击「开始专注」。")
+        refreshChronoChrome()
+        refreshFocusSessionProjection()
+        syncPetDisplayMode()
+    }
+
+    func stopAutoReminders() {
+        guard mode == .auto, isChronoSessionActive else { return }
         autoEngine.stop()
         windowManager.dismissRestImmediately(bringIdlePetWindowToFront: false)
         wasResting = false
         testRestActive = false
         isChronoSessionActive = false
-        chronoSessionSuspendedByUser = true
-        if mode == .manual {
-            publishStatus("已暂停。点击「恢复计时」继续，或再次「开始专注」开新一轮。")
-        } else {
-            publishStatus("自动提醒已暂停。点击「恢复计时」重新对齐整点 / 半点。")
-        }
-        refreshChronoChrome()
-        syncPetDisplayMode()
-    }
-
-    /// 在用户点击「停止计时」之后恢复同一模式下的计时。
-    func resumeTimers() {
-        guard chronoSessionSuspendedByUser else { return }
-        let stored = chronoSession.loadState()
-        chronoSessionSuspendedByUser = false
-        windowManager.dismissRestImmediately(bringIdlePetWindowToFront: false)
-        wasResting = false
-        testRestActive = false
-
-        switch stored {
-        case .record(let record) where record.isUserPaused:
-            applyEngineRestoreHints(
-                chronoSession.applyEngines(
-                    record: record,
-                    manualEngine: manualEngine,
-                    autoEngine: autoEngine
-                )
-            )
-        case .modeOnlyPause, .none, .record:
-            switch mode {
-            case .manual:
-                manualEngine.start()
-            case .auto:
-                autoEngine.start()
-                publishStatus("自动模式：正在对齐系统时钟…")
-            }
-        }
         clearChronoSessionPersistence()
-        isChronoSessionActive = true
-        syncPersistRunningChronoSession()
+        publishStatus("自动提醒已停止。切换回整点/半点模式可重新开启。")
         refreshChronoChrome()
         syncPetDisplayMode()
     }
@@ -1138,16 +1138,8 @@ final class AppViewModel: ObservableObject {
             wasResting = false
         case .working(let remaining):
             wasResting = false
-            if mode == .manual, source == .manual, !wasInManualWorkPhase {
-                beginManualWorkSegment()
-            } else if mode == .manual, source == .manual {
-                refreshFocusSessionProjection()
-            }
             publishStatus("专注中 · 剩余 \(Self.formatClock(remaining))")
         case .resting(let remaining):
-            if mode == .manual, source == .manual {
-                finalizeManualWorkSegmentIfNeeded(source: .completed)
-            }
             publishStatus("休息中 · 剩余 \(Self.formatClock(remaining))（请放松双眼）")
             if !wasResting {
                 wasResting = true
@@ -1167,8 +1159,13 @@ final class AppViewModel: ObservableObject {
     }
 
     private func refreshChronoChrome() {
-        canStopChronoButton = isChronoSessionActive
-        showResumeChronoButton = chronoSessionSuspendedByUser
+        canAbandonManualFocus = mode == .manual
+            && isChronoSessionActive
+            && manualEngine.isTimerRunning
+            && !manualEngine.isInRestPhase
+        canStopAutoReminders = mode == .auto
+            && isChronoSessionActive
+            && autoEngine.isTimerRunning
     }
 
     private func syncPetDisplayMode() {
@@ -1212,50 +1209,40 @@ final class AppViewModel: ObservableObject {
         return String(format: "%d:%02d", s / 60, s % 60)
     }
 
-    private func beginManualWorkSegment(now: Date = Date()) {
-        workSegmentStartedAt = now
-        wasInManualWorkPhase = true
-        refreshFocusSessionProjection(now: now)
-    }
-
-    private func finalizeManualWorkSegmentIfNeeded(source: FocusSessionSource, endedAt: Date = Date()) {
-        guard wasInManualWorkPhase, let startedAt = workSegmentStartedAt else { return }
-        wasInManualWorkPhase = false
-        workSegmentStartedAt = nil
-        do {
-            _ = try focusSessionStore.appendFinalized(startedAt: startedAt, endedAt: endedAt, source: source)
-        } catch {
-            // P1: focus session persistence failure must not block timer UX.
-        }
-        refreshFocusSessionProjection(now: endedAt)
-    }
-
-    private func clearManualWorkSegmentTracking() {
-        wasInManualWorkPhase = false
-        workSegmentStartedAt = nil
-        refreshFocusSessionProjection()
+    private func refreshFocusSessionSummary(now: Date = Date()) {
+        let summary = manualFocusCoordinator.refreshTodaySummary(now: now)
+        todayFocusSessions = summary.sessions
+        todayFocusSessionCount = summary.count
+        todayFocusMinutesTotal = summary.minutes
+        inProgressFocusSegment = manualFocusCoordinator.inProgressProjection(
+            now: now,
+            manualEngine: manualEngine,
+            isManualSessionActive: mode == .manual && isChronoSessionActive
+        )
     }
 
     private func refreshFocusSessionProjection(now: Date = Date()) {
-        let calendar = Calendar.current
-        todayFocusSessions = focusSessionStore.todaySessions(calendar: calendar, now: now)
-        todayFocusSessionCount = focusSessionStore.todayPomodoroCount(calendar: calendar, now: now)
-        var totalSeconds = focusSessionStore.todayFinalizedSeconds(calendar: calendar, now: now)
-        if mode == .manual,
-           isChronoSessionActive,
-           !chronoSessionSuspendedByUser,
-           wasInManualWorkPhase,
-           let startedAt = workSegmentStartedAt {
-            let elapsedSeconds = FocusSessionFormatting.elapsedWholeSeconds(from: startedAt, to: now)
-            inProgressFocusSegment = FocusSessionInProgress(
-                startedAt: startedAt,
-                elapsedSeconds: elapsedSeconds
-            )
-            totalSeconds += elapsedSeconds
-        } else {
-            inProgressFocusSegment = nil
+        refreshFocusSessionSummary(now: now)
+        syncFocusTimelineSkeleton()
+        focusTimelinePresenter.syncLiveOverlay()
+    }
+
+    func updateFocusSession(id: UUID, startedAt: Date, endedAt: Date) {
+        do {
+            _ = try manualFocusCoordinator.updateSession(id: id, startedAt: startedAt, endedAt: endedAt)
+            refreshFocusSessionProjection()
+        } catch {
+            // Focus session edit failure must not block desk UI.
         }
-        todayFocusMinutesTotal = FocusSessionFormatting.displayMinutes(fromSeconds: totalSeconds)
+    }
+
+    func deleteFocusSession(id: UUID) {
+        do {
+            try manualFocusCoordinator.deleteSession(id: id)
+            refreshFocusSessionProjection()
+        } catch {
+            // Focus session edit failure must not block desk UI.
+        }
     }
 }
 

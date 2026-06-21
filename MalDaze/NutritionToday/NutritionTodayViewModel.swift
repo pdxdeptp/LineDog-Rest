@@ -24,6 +24,7 @@ final class NutritionTodayViewModel: ObservableObject {
     @Published private(set) var loggableItems: [NutritionLoggableItem] = []
     @Published private(set) var isLogging = false
     @Published private(set) var loggingFlatIndex: Int?
+    @Published private(set) var isRefreshingPanel = false
     @Published var actionNotice: String?
 
     private let reader: any NutritionDailyLogReading
@@ -75,6 +76,23 @@ final class NutritionTodayViewModel: ObservableObject {
             lastRecommendationGeneratedAt = nil
             recommendationState = .idle
             loadState = .failed("读取饮食数据失败。")
+        }
+    }
+
+    func refreshPanel() async {
+        guard !isRefreshingPanel, !isLogging else { return }
+
+        isRefreshingPanel = true
+        actionNotice = nil
+        defer { isRefreshingPanel = false }
+
+        do {
+            try await cli.refreshPanel()
+            loadToday(showLoading: false)
+        } catch let error as NutritionCLIError {
+            actionNotice = error.message
+        } catch {
+            actionNotice = error.localizedDescription
         }
     }
 

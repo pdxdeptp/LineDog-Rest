@@ -1,5 +1,25 @@
 import SwiftUI
 
+private struct TodayTodoSpringCompletionModifier: AnimatableModifier {
+    var progress: CGFloat
+    let generation: UInt
+    let onComplete: (UInt) -> Void
+
+    var animatableData: CGFloat {
+        get { progress }
+        set {
+            progress = newValue
+            if newValue >= 1 {
+                onComplete(generation)
+            }
+        }
+    }
+
+    func body(content: Content) -> some View {
+        content
+    }
+}
+
 private enum TodayTodoReorderCoordinateSpace {
     static let list = "todayTodoReorderList"
 }
@@ -12,11 +32,10 @@ struct TodayTodoAnimatedReorderList<RowContent: View>: View {
     @ObservedObject var controller: TodayTodoReorderController
     @ViewBuilder var rowContent: (TodayTodoEntry, Bool) -> RowContent
 
+    @State private var settleAnimationProgress: CGFloat = 0
+
     private var displayOrder: [UUID] {
-        if controller.previewOrder.isEmpty {
-            return entries.map(\.id)
-        }
-        return controller.previewOrder
+        controller.baseOrder.isEmpty ? entries.map(\.id) : controller.baseOrder
     }
 
     private var entryLookup: [UUID: TodayTodoEntry] {
@@ -33,60 +52,158 @@ struct TodayTodoAnimatedReorderList<RowContent: View>: View {
                 }
             }
             .coordinateSpace(name: TodayTodoReorderCoordinateSpace.list)
+            .background {
+                TodayTodoWindowFrameReporter { frameInWindow in
+                    controller.updateValidRegionInWindow(frameInWindow)
+                }
+            }
             .onPreferenceChange(TodayTodoRowFramePreferenceKey.self) { frames in
                 controller.updateRowFrames(frames)
             }
             .preference(
                 key: TodayTodoReorderEdgeScrollPreferenceKey.self,
                 value: TodayTodoReorderEdgeScrollPreference(
-                    direction: controller.edgeScrollDirection,
-                    targetEntryId: controller.edgeScrollTargetId
+                    velocity: controller.edgeScrollVelocity,
+                    enabled: controller.isDragging
                 )
             )
 
-            TodayTodoListPointerReader { view in
+            TodayTodoListPointerReader(viewportHeight: listViewportHeight) { view in
                 controller.listPointerView = view
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .allowsHitTesting(false)
 
+            if let indicatorY = controller.insertionIndicatorMinY,
+               controller.isDragging || controller.phase == .settling {
+                Rectangle()
+                    .fill(Color.accentColor.opacity(0.35))
+                    .frame(height: TodayTodoReorderMetrics.insertionIndicatorThickness)
+                    .offset(y: indicatorY)
+                    .allowsHitTesting(false)
+            }
+
             if let draggingEntryId = controller.draggingEntryId,
                let entry = entryLookup[draggingEntryId],
                let frame = controller.frozenRowFrames[draggingEntryId],
+               let overlayMinY = controller.draggedOverlayMinY(for: draggingEntryId),
                controller.showsDragOverlay {
-                rowContent(entry, true)
-                    .frame(width: frame.width, alignment: .leading)
-                    .offset(
-                        x: frame.minX,
-                        y: frame.minY + controller.draggedOverlayOffset(for: draggingEntryId)
+                TodayTodoDragPreview(
+                    title: entry.title,
+                    width: frame.width
+                )
+                .offset(x: frame.minX, y: overlayMinY)
+                .scaleEffect(
+                    controller.phase == .dragging ? TodayTodoReorderMetrics.liftScale : 1
+                )
+                .shadow(color: .black.opacity(0.12), radius: 8, x: 0, y: 2)
+                .modifier(
+                    TodayTodoSpringCompletionModifier(
+                        progress: settleAnimationProgress,
+                        generation: controller.sessionGeneration,
+                        onComplete: { generation in
+                            guard generation == controller.sessionGeneration else { return }
+                            controller.finishSettlingAnimation()
+                        }
                     )
-                    .scaleEffect(controller.overlayScale(for: draggingEntryId))
-                    .shadow(color: .black.opacity(0.12), radius: 8, x: 0, y: 2)
-                    .animation(controller.springAnimation, value: controller.phase)
-                    .animation(nil, value: controller.listPointerY)
-                    .zIndex(1)
-                    .allowsHitTesting(false)
+                )
+                .animation(
+                    controller.phase == .dragging ? nil : controller.springAnimation,
+                    value: overlayMinY
+                )
+                .zIndex(1)
+                .allowsHitTesting(false)
+                .onChange(of: controller.phase) { phase in
+                    if phase == .settling || phase == .cancelling {
+                        settleAnimationProgress = 0
+                        controller.notifySettlingAnimationStarted()
+                        withAnimation(controller.springAnimation) {
+                            settleAnimationProgress = 1
+                        }
+                    } else {
+                        settleAnimationProgress = 0
+                    }
+                }
             }
         }
         .onChange(of: listViewportHeight) { height in
             controller.updateListViewportHeight(height)
         }
+        .onChange(of: entries.map(\.id)) { ids in
+            if !controller.validateEntriesIdentity(entries) {
+                controller.invalidateSessionOnDisappear()
+            }
+            _ = ids
+        }
         .onAppear {
             controller.updateListViewportHeight(listViewportHeight)
+            controller.updateListRowSpacing(listRowSpacing)
+        }
+        .onDisappear {
+            controller.invalidateSessionOnDisappear()
         }
     }
 
     @ViewBuilder
     private func rowSlot(for entry: TodayTodoEntry) -> some View {
         let isDragPlaceholder = controller.draggingEntryId == entry.id && controller.showsDragOverlay
-        let offset = controller.rowOffset(for: entry.id, listRowSpacing: listRowSpacing)
+        let isPressingSource = controller.showsPressingLift && controller.draggingEntryId == entry.id
+        let offset = controller.rowOffset(for: entry.id)
 
         rowContent(entry, isDragPlaceholder)
             .opacity(isDragPlaceholder ? 0 : 1)
+            .scaleEffect(isPressingSource ? TodayTodoReorderMetrics.liftScale : 1)
+            .shadow(color: isPressingSource ? .black.opacity(0.12) : .clear, radius: 8, x: 0, y: 2)
             .todayTodoRowFrame(id: entry.id, in: .named(TodayTodoReorderCoordinateSpace.list))
             .offset(y: offset)
-            .animation(controller.springAnimation, value: controller.insertionIndex)
-            .animation(controller.springAnimation, value: controller.previewOrder)
+            .animation(controller.springAnimation, value: controller.targetIndex)
             .id(entry.id)
+    }
+}
+
+/// Reports the hosting view's bounds in window coordinates for reorder exit detection.
+private struct TodayTodoWindowFrameReporter: NSViewRepresentable {
+    let onUpdate: (CGRect) -> Void
+
+    func makeNSView(context: Context) -> ReportingView {
+        ReportingView(onUpdate: onUpdate)
+    }
+
+    func updateNSView(_ nsView: ReportingView, context: Context) {
+        nsView.onUpdate = onUpdate
+        nsView.reportFrameIfNeeded()
+    }
+
+    final class ReportingView: NSView {
+        var onUpdate: (CGRect) -> Void
+        private var lastReportedFrame: CGRect = .null
+
+        init(onUpdate: @escaping (CGRect) -> Void) {
+            self.onUpdate = onUpdate
+            super.init(frame: .zero)
+        }
+
+        @available(*, unavailable)
+        required init?(coder: NSCoder) {
+            fatalError("init(coder:) has not been implemented")
+        }
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            reportFrameIfNeeded()
+        }
+
+        override func layout() {
+            super.layout()
+            reportFrameIfNeeded()
+        }
+
+        func reportFrameIfNeeded() {
+            guard window != nil else { return }
+            let frameInWindow = convert(bounds, to: nil)
+            guard frameInWindow != lastReportedFrame else { return }
+            lastReportedFrame = frameInWindow
+            onUpdate(frameInWindow)
+        }
     }
 }

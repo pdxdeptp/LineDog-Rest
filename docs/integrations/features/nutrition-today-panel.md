@@ -22,7 +22,7 @@ MalDaze **不写** `recommendation.json`，也不在 recommendation 缺失或过
 
 - **展示 facts/metrics**：读磁盘上的 `daily_log.json` `panel` / `records`；FSEvents 只在 Hermes **已改写文件** 后刷新 UI。
 - **展示 recommendation**：读 `recommendation.json` 的 summary、rationale、warnings、items；只有 fresh 且 `loggable: true` 的 item 可点击或数字键记录。
-- **唯一 nutrition 写动作**：通过 `recommend.py log` 记一笔已吃。桌宠**不**调用 `refresh-panel`、`plan_engine`、LLM，也不本地重算营养。
+- **写动作**：通过 `recommend.py log` 记一笔已吃；用户可点目标明细区刷新按钮调用 `recommend.py refresh-panel` 重算 panel（不改 records）。桌宠**不**调用 `plan_engine`、LLM，也不本地重算营养。
 - **「现在可以吃」来源**：只来自 Hermes-authored `recommendation.json`。`daily_log.panel.suggestions` 第一版保留为空数组 `[]` 只作 schema 兼容；MalDaze 必须忽略它，即使 legacy 数据非空也不能展示。
 - **推荐 item 展示字段**：`displayName` 是 Hermes author 的完整可见食物/数量/单位文案；`kcal` 是可选的 per-item 热量字段，存在时桌宠展示，缺失时桌宠不从 `foods.json` 或 planner 本地推算。
 
@@ -33,7 +33,9 @@ MalDaze **不写** `recommendation.json`，也不在 recommendation 缺失或过
 | `dayLabel` | 训练日 / 休息日 |
 | `workoutLabel` | 训练日可选：练胸 / 练背和腿（由 `daily_log.workout_split` 派生；轮换历史只读 `training_log`） |
 | `targets` / `consumed` / `remaining` | 含 `sodium_mg` |
-| `targetBreakdown` | 今日目标 kcal 计算明细（与 `targets.kcal` 同源；Hermes `get_targets()._meta` 投影，随 panel 重算/backfill 自动写入） |
+| `targetBreakdown` | 今日目标 kcal 计算明细（v1 layers；v3 authority 时可为 schema v2） |
+| `estimatorShadow` | 可选。V3 shadow 诊断：readiness、effective TDEE 区间、confounded |
+| `targetBreakdownShadow` | 可选。formula authority 时的 v2 shadow 明细；Malformed v2 fail loud |
 | `suggestions` | 第一版固定 `[]`，仅 schema 兼容；不是推荐来源 |
 | `calorieSlack` | 固定 50 |
 | `updatedAt` | ISO；与 recommendation `basedOn` 对齐判定 fresh/stale |

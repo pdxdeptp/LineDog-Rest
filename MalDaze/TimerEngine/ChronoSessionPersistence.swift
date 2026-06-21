@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - Record
 
-/// Wall-clock SSOT for an in-flight chrono session. `phaseEnd` is the absolute end of the current phase.
+/// Wall-clock SSOT for an actively running chrono session. `phaseEnd` is the absolute end of the current phase.
 struct ChronoSessionRecord: Codable, Equatable {
     enum Mode: String, Codable {
         case manual
@@ -16,33 +16,9 @@ struct ChronoSessionRecord: Codable, Equatable {
         case autoResting
     }
 
-    /// `.none` — app exited while counting; relaunch restores engines immediately.
-    /// `.user` — user tapped「停止计时」; relaunch shows「恢复计时」until resumed.
-    enum PauseKind: String, Codable {
-        case none
-        case user
-    }
-
     let mode: Mode
     let phase: Phase
     let phaseEnd: Date
-    let pauseKind: PauseKind
-    /// Manual work segment only; used for Dashboard in-progress focus row.
-    let workSegmentStartedAt: Date?
-
-    var isUserPaused: Bool { pauseKind == .user }
-
-    func appMode() -> AppViewModel.Mode {
-        switch mode {
-        case .manual: return .manual
-        case .auto: return .auto
-        }
-    }
-}
-
-/// Legacy pause token without a phase anchor. Resume realigns / restarts instead of continuing remaining time.
-struct ChronoSessionModeOnlyPause: Equatable {
-    let mode: ChronoSessionRecord.Mode
 
     func appMode() -> AppViewModel.Mode {
         switch mode {
@@ -55,7 +31,6 @@ struct ChronoSessionModeOnlyPause: Equatable {
 enum ChronoSessionStoredState: Equatable {
     case none
     case record(ChronoSessionRecord)
-    case modeOnlyPause(ChronoSessionModeOnlyPause)
 }
 
 // MARK: - Capture
@@ -64,8 +39,6 @@ struct ChronoSessionCaptureContext {
     let mode: AppViewModel.Mode
     let manualEngine: ManualTimerEngine
     let autoEngine: AutoTimerEngine
-    let workSegmentStartedAt: Date?
-    let wasInManualWorkPhase: Bool
 }
 
 // MARK: - Bootstrap
@@ -73,23 +46,28 @@ struct ChronoSessionCaptureContext {
 enum ChronoSessionBootstrapPlan: Equatable {
     case usePreferredMode(AppViewModel.Mode)
     case restoreRunning(ChronoSessionRecord)
-    case restoreUserPaused(ChronoSessionRecord)
-    case restoreUserPausedModeOnly(ChronoSessionModeOnlyPause)
-}
-
-struct ChronoSessionEngineRestoreHints: Equatable {
-    let workSegmentStartedAt: Date?
-    let wasInManualWorkPhase: Bool
 }
 
 // MARK: - Store
 
 enum ChronoSessionStore {
-    private static let schemaVersion = 2
+    private static let schemaVersion = 3
 
     private struct Envelope: Codable {
         let schemaVersion: Int
         let record: ChronoSessionRecord
+    }
+
+    private struct V2Record: Codable {
+        let mode: ChronoSessionRecord.Mode
+        let phase: ChronoSessionRecord.Phase
+        let phaseEnd: Date
+        let pauseKind: String
+    }
+
+    private struct V2Envelope: Codable {
+        let schemaVersion: Int
+        let record: V2Record
     }
 
     static func loadState(defaults: UserDefaults = .standard) -> ChronoSessionStoredState {
@@ -98,18 +76,27 @@ enum ChronoSessionStore {
                envelope.schemaVersion == schemaVersion {
                 return .record(envelope.record)
             }
+            if let v2 = try? JSONDecoder().decode(V2Envelope.self, from: data),
+               v2.schemaVersion == 2 {
+                if v2.record.pauseKind == "user" {
+                    clear(defaults: defaults)
+                    return .none
+                }
+                return .record(
+                    ChronoSessionRecord(
+                        mode: v2.record.mode,
+                        phase: v2.record.phase,
+                        phaseEnd: v2.record.phaseEnd
+                    )
+                )
+            }
             if let legacy = try? JSONDecoder().decode(LegacyChronoSessionSnapshot.self, from: data),
                let record = migrateLegacySnapshot(legacy) {
                 return .record(record)
             }
-            if let legacy = try? JSONDecoder().decode(LegacyChronoSessionSnapshot.self, from: data),
-               legacy.isUserSuspended,
-               let mode = ChronoSessionRecord.Mode(rawValue: legacy.modeToken) {
-                return .modeOnlyPause(ChronoSessionModeOnlyPause(mode: mode))
-            }
         }
-        if let modeOnly = migrateLegacySuspendedModeToken(defaults: defaults) {
-            return .modeOnlyPause(modeOnly)
+        if defaults.object(forKey: MalDazeDefaults.suspendedTimerModeSnapshot) != nil {
+            clear(defaults: defaults)
         }
         return .none
     }
@@ -118,14 +105,7 @@ enum ChronoSessionStore {
         let envelope = Envelope(schemaVersion: schemaVersion, record: record)
         guard let data = try? JSONEncoder().encode(envelope) else { return }
         defaults.set(data, forKey: MalDazeDefaults.chronoSessionSnapshot)
-        if record.isUserPaused {
-            defaults.set(record.mode.rawValue, forKey: MalDazeDefaults.suspendedTimerModeSnapshot)
-        }
-    }
-
-    static func saveModeOnlyPause(_ pause: ChronoSessionModeOnlyPause, defaults: UserDefaults = .standard) {
-        defaults.removeObject(forKey: MalDazeDefaults.chronoSessionSnapshot)
-        defaults.set(pause.mode.rawValue, forKey: MalDazeDefaults.suspendedTimerModeSnapshot)
+        defaults.removeObject(forKey: MalDazeDefaults.suspendedTimerModeSnapshot)
     }
 
     static func clear(defaults: UserDefaults = .standard) {
@@ -139,25 +119,10 @@ enum ChronoSessionStore {
               let phaseEnd = legacy.phaseEnd else {
             return nil
         }
-        return ChronoSessionRecord(
-            mode: mode,
-            phase: phase,
-            phaseEnd: phaseEnd,
-            pauseKind: legacy.isUserSuspended ? .user : .none,
-            workSegmentStartedAt: legacy.workSegmentStartedAt
-        )
-    }
-
-    private static func migrateLegacySuspendedModeToken(defaults: UserDefaults) -> ChronoSessionModeOnlyPause? {
-        guard defaults.object(forKey: MalDazeDefaults.suspendedTimerModeSnapshot) != nil else {
+        if legacy.isUserSuspended {
             return nil
         }
-        guard let rawMode = defaults.string(forKey: MalDazeDefaults.suspendedTimerModeSnapshot),
-              let mode = ChronoSessionRecord.Mode(rawValue: rawMode) else {
-            defaults.removeObject(forKey: MalDazeDefaults.suspendedTimerModeSnapshot)
-            return nil
-        }
-        return ChronoSessionModeOnlyPause(mode: mode)
+        return ChronoSessionRecord(mode: mode, phase: phase, phaseEnd: phaseEnd)
     }
 }
 
@@ -167,19 +132,8 @@ struct ChronoSessionCoordinator {
     private(set) var lastPersistedPhaseEnd: Date?
 
     mutating func persistRunning(from context: ChronoSessionCaptureContext, defaults: UserDefaults = .standard) {
-        guard let record = capture(from: context, pauseKind: .none) else { return }
+        guard let record = capture(from: context) else { return }
         persistIfChanged(record, defaults: defaults)
-    }
-
-    mutating func persistUserPaused(from context: ChronoSessionCaptureContext, defaults: UserDefaults = .standard) {
-        if let record = capture(from: context, pauseKind: .user) {
-            save(record, defaults: defaults)
-            lastPersistedPhaseEnd = record.phaseEnd
-            return
-        }
-        let mode: ChronoSessionRecord.Mode = context.mode == .manual ? .manual : .auto
-        ChronoSessionStore.saveModeOnlyPause(ChronoSessionModeOnlyPause(mode: mode), defaults: defaults)
-        lastPersistedPhaseEnd = nil
     }
 
     mutating func persistIfChanged(_ record: ChronoSessionRecord, defaults: UserDefaults = .standard) {
@@ -204,10 +158,7 @@ struct ChronoSessionCoordinator {
         ChronoSessionStore.loadState(defaults: defaults)
     }
 
-    func capture(
-        from context: ChronoSessionCaptureContext,
-        pauseKind: ChronoSessionRecord.PauseKind
-    ) -> ChronoSessionRecord? {
+    func capture(from context: ChronoSessionCaptureContext) -> ChronoSessionRecord? {
         let mode: ChronoSessionRecord.Mode = context.mode == .manual ? .manual : .auto
 
         switch context.mode {
@@ -217,35 +168,14 @@ struct ChronoSessionCoordinator {
                 return nil
             }
             let phase: ChronoSessionRecord.Phase = context.manualEngine.isInRestPhase ? .manualResting : .manualWorking
-            let startedAt = (!context.manualEngine.isInRestPhase && context.wasInManualWorkPhase)
-                ? context.workSegmentStartedAt
-                : nil
-            return ChronoSessionRecord(
-                mode: mode,
-                phase: phase,
-                phaseEnd: phaseEnd,
-                pauseKind: pauseKind,
-                workSegmentStartedAt: startedAt
-            )
+            return ChronoSessionRecord(mode: mode, phase: phase, phaseEnd: phaseEnd)
         case .auto:
             guard context.autoEngine.isTimerRunning else { return nil }
             if context.autoEngine.isInScheduledRest, let phaseEnd = context.autoEngine.currentPhaseEnd {
-                return ChronoSessionRecord(
-                    mode: mode,
-                    phase: .autoResting,
-                    phaseEnd: phaseEnd,
-                    pauseKind: pauseKind,
-                    workSegmentStartedAt: nil
-                )
+                return ChronoSessionRecord(mode: mode, phase: .autoResting, phaseEnd: phaseEnd)
             }
             if let anchor = context.autoEngine.currentWaitingAnchor ?? context.autoEngine.currentPhaseEnd {
-                return ChronoSessionRecord(
-                    mode: mode,
-                    phase: .autoWatching,
-                    phaseEnd: anchor,
-                    pauseKind: pauseKind,
-                    workSegmentStartedAt: nil
-                )
+                return ChronoSessionRecord(mode: mode, phase: .autoWatching, phaseEnd: anchor)
             }
             return nil
         }
@@ -259,14 +189,7 @@ struct ChronoSessionCoordinator {
         case .none:
             return .usePreferredMode(preferredMode)
         case .record(let record):
-            switch record.pauseKind {
-            case .none:
-                return .restoreRunning(record)
-            case .user:
-                return .restoreUserPaused(record)
-            }
-        case .modeOnlyPause(let pause):
-            return .restoreUserPausedModeOnly(pause)
+            return .restoreRunning(record)
         }
     }
 
@@ -274,29 +197,16 @@ struct ChronoSessionCoordinator {
         record: ChronoSessionRecord,
         manualEngine: ManualTimerEngine,
         autoEngine: AutoTimerEngine
-    ) -> ChronoSessionEngineRestoreHints {
+    ) {
         switch record.phase {
         case .manualWorking:
             manualEngine.restorePersistedPhase(end: record.phaseEnd, isRestPhase: false)
-            if let startedAt = record.workSegmentStartedAt {
-                return ChronoSessionEngineRestoreHints(
-                    workSegmentStartedAt: startedAt,
-                    wasInManualWorkPhase: true
-                )
-            }
-            return ChronoSessionEngineRestoreHints(
-                workSegmentStartedAt: record.phaseEnd.addingTimeInterval(-manualEngine.configuredWorkDuration),
-                wasInManualWorkPhase: true
-            )
         case .manualResting:
             manualEngine.restorePersistedPhase(end: record.phaseEnd, isRestPhase: true)
-            return ChronoSessionEngineRestoreHints(workSegmentStartedAt: nil, wasInManualWorkPhase: false)
         case .autoWatching:
             autoEngine.restorePersistedWatching(nextAnchor: record.phaseEnd)
-            return ChronoSessionEngineRestoreHints(workSegmentStartedAt: nil, wasInManualWorkPhase: false)
         case .autoResting:
             autoEngine.restorePersistedRest(end: record.phaseEnd)
-            return ChronoSessionEngineRestoreHints(workSegmentStartedAt: nil, wasInManualWorkPhase: false)
         }
     }
 }
@@ -311,7 +221,6 @@ private struct LegacyChronoSessionSnapshot: Codable {
     let workSegmentStartedAt: Date?
 }
 
-// Backward-compatible test helpers.
 enum ChronoSessionSnapshotStore {
     static func clear(defaults: UserDefaults = .standard) {
         ChronoSessionStore.clear(defaults: defaults)

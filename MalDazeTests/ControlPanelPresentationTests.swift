@@ -1242,14 +1242,13 @@ final class ControlPanelPresentationTests: XCTestCase {
             [
                 "mainPanelHeader",
                 "statusChip",
-                "todayFocusSection",
                 "dashboardModeControl",
                 "controlsQuickActions",
                 "controlsSettingsGroups",
                 "controlsUtilityFooter",
             ],
             in: controlsSource,
-            "The right controls column should render header/status, today focus, mode, quick actions, settings groups, then utility footer."
+            "The right controls column should render header/status, mode, quick actions, settings groups, then utility footer."
         )
         XCTAssertTrue(
             source.contains("private var controlsQuickActions: some View"),
@@ -1277,21 +1276,48 @@ final class ControlPanelPresentationTests: XCTestCase {
         )
     }
 
-    func testDashboardTodayFocusSectionUsesFocusSessionProjectionAndCopyRules() throws {
+    func testDashboardControlsColumnExcludesTodayFocusList() throws {
         let source = try readProjectSource("MalDaze/DashboardRootView.swift")
-        let focusSource = try propertySource(named: "todayFocusSection", in: source)
+        let controlsSource = try propertySource(named: "mainControlsColumn", in: source)
 
-        XCTAssertTrue(focusSource.contains("FocusSessionTodaySection"))
-        XCTAssertTrue(focusSource.contains("viewModel.todayFocusSessionCount"))
-        XCTAssertTrue(focusSource.contains("viewModel.todayFocusMinutesTotal"))
-        XCTAssertTrue(focusSource.contains("viewModel.todayFocusSessions"))
-        XCTAssertTrue(focusSource.contains("viewModel.inProgressFocusSegment"))
+        XCTAssertFalse(controlsSource.contains("todayFocusSection"))
+        XCTAssertFalse(controlsSource.contains("FocusSessionTodaySection"))
+    }
 
-        let sectionSource = try readProjectSource("MalDaze/FocusSession/FocusSessionTodaySection.swift")
-        XCTAssertTrue(sectionSource.contains("今天还没有番茄"))
-        XCTAssertTrue(sectionSource.contains("个番茄 · 共"))
-        XCTAssertTrue(sectionSource.contains("–进行中 · 已"))
-        XCTAssertTrue(sectionSource.contains("提前结束"))
+    func testLearningDeskPanelTodayHeaderShowsFocusCellGrid() throws {
+        let panelSource = try readProjectSource("MalDaze/LearningDeskPanel/LearningDeskPanelView.swift")
+        let dashboardSource = try readProjectSource("MalDaze/DashboardRootView.swift")
+        let headerSource = try functionSource(named: "todayHeader", in: panelSource)
+        let focusRowSource = try functionSource(named: "focusTimelineRow", in: panelSource)
+
+        XCTAssertTrue(dashboardSource.contains("LearningDeskPanelView(appViewModel:"))
+        XCTAssertTrue(headerSource.contains("focusTimelineRow(response:"))
+        XCTAssertFalse(headerSource.contains("progressLine"))
+        let budgetLineSource = try functionSource(named: "budgetLine", in: panelSource)
+        XCTAssertTrue(budgetLineSource.contains("· 完成"))
+        XCTAssertFalse(budgetLineSource.contains("ProgressView"))
+        XCTAssertFalse(focusRowSource.contains("FocusDayTimelineCellGridModel.make"))
+        XCTAssertTrue(focusRowSource.contains("LearningDeskFocusTimelineRow"))
+        XCTAssertTrue(focusRowSource.contains("appViewModel.focusTimelinePresenter"))
+
+        let timelineRowSource = try readProjectSource("MalDaze/LearningDeskPanel/LearningDeskFocusTimelineRow.swift")
+        XCTAssertTrue(timelineRowSource.contains("FocusDayTimelineCellGridView"))
+        XCTAssertTrue(timelineRowSource.contains("presenter.displayModel"))
+        XCTAssertTrue(timelineRowSource.contains("presenter.setVisible"))
+
+        let gridSource = try readProjectSource("MalDaze/FocusSession/FocusDayTimelineCellGridView.swift")
+        XCTAssertTrue(gridSource.contains("Color.accentColor"))
+        XCTAssertTrue(gridSource.contains("今天还没有专注"))
+        XCTAssertTrue(gridSource.contains("个 ·"))
+    }
+
+    func testFocusDayTimelineCellGridModelUsesLeadingFractionFill() throws {
+        let modelSource = try readProjectSource("MalDaze/FocusSession/FocusDayTimelineCellGridModel.swift")
+        XCTAssertTrue(modelSource.contains("startFraction"))
+        XCTAssertTrue(modelSource.contains("widthFraction"))
+        XCTAssertTrue(modelSource.contains("makeSkeleton"))
+        XCTAssertTrue(modelSource.contains("applying(liveOverlay:"))
+        XCTAssertTrue(modelSource.contains("floorToCellBoundary"))
     }
 
     func testDashboardQuickActionsWireStateAwareExistingViewModelActions() throws {
@@ -1313,9 +1339,11 @@ final class ControlPanelPresentationTests: XCTestCase {
         )
 
         XCTAssertTrue(timerSource.contains("viewModel.startManualFocus()"))
-        XCTAssertTrue(timerSource.contains("viewModel.stopTimers()"))
-        XCTAssertTrue(timerSource.contains("viewModel.resumeTimers()"))
-        XCTAssertTrue(timerSource.contains("viewModel.mode == .manual"))
+        XCTAssertTrue(timerSource.contains("viewModel.abandonManualFocus()"))
+        XCTAssertTrue(timerSource.contains("viewModel.stopAutoReminders()"))
+        XCTAssertTrue(timerSource.contains("viewModel.canStartManualFocus"))
+        XCTAssertTrue(timerSource.contains("viewModel.canAbandonManualFocus"))
+        XCTAssertTrue(timerSource.contains("viewModel.canStopAutoReminders"))
         XCTAssertTrue(timerSource.contains("自动计时由当前模式控制"))
         XCTAssertTrue(timerSource.contains(".disabled("))
 
@@ -1427,13 +1455,13 @@ final class ControlPanelPresentationTests: XCTestCase {
                 "if isManualIdle",
                 "viewModel.startManualFocus()",
                 ".keyboardShortcut(\"s\", modifiers: [.command])",
-                "} else if viewModel.showResumeChronoButton",
-                "viewModel.resumeTimers()",
-                "} else if viewModel.canStopChronoButton",
-                "viewModel.stopTimers()"
+                "} else if viewModel.canAbandonManualFocus",
+                "viewModel.abandonManualFocus()",
+                "} else if viewModel.canStopAutoReminders",
+                "viewModel.stopAutoReminders()"
             ],
             in: timerSource,
-            "Command-S must be scoped to the manual-start action and must not attach to stop or resume states."
+            "Command-S must be scoped to the manual-start action and must not attach to abandon or stop-auto states."
         )
         XCTAssertFalse(
             timerSource.contains("return DashboardQuickActionButton"),
@@ -1441,7 +1469,7 @@ final class ControlPanelPresentationTests: XCTestCase {
         )
     }
 
-    func testDashboardStopTimerActionIsNotProminent() throws {
+    func testDashboardAbandonFocusActionIsProminentDuringManualWork() throws {
         let source = try readProjectSource("MalDaze/DashboardRootView.swift")
         let timerSource = try propertySource(named: "dashboardTimerQuickAction", in: source)
 
@@ -1449,18 +1477,22 @@ final class ControlPanelPresentationTests: XCTestCase {
         let startActionRange = try XCTUnwrap(timerSource[startTitleRange.upperBound...].range(of: "viewModel.startManualFocus()"))
         let startActionSource = String(timerSource[startTitleRange.lowerBound..<startActionRange.upperBound])
 
-        let stopTitleRange = try XCTUnwrap(timerSource.range(of: "title: \"停止计时\""))
-        let stopActionRange = try XCTUnwrap(timerSource[stopTitleRange.upperBound...].range(of: "viewModel.stopTimers()"))
-        let stopActionSource = String(timerSource[stopTitleRange.lowerBound..<stopActionRange.upperBound])
+        let abandonTitleRange = try XCTUnwrap(timerSource.range(of: "title: \"放弃当前番茄\""))
+        let abandonActionRange = try XCTUnwrap(timerSource[abandonTitleRange.upperBound...].range(of: "viewModel.abandonManualFocus()"))
+        let abandonActionSource = String(timerSource[abandonTitleRange.lowerBound..<abandonActionRange.upperBound])
 
         XCTAssertTrue(
             startActionSource.contains("isProminent: true"),
             "Starting focus should remain the single prominent timer call to action."
         )
-        XCTAssertFalse(
-            stopActionSource.contains("isProminent: true"),
-            "Stopping a timer is a secondary action and should match the other regular quick actions."
+        XCTAssertTrue(
+            abandonActionSource.contains("isProminent: true"),
+            "Abandoning the current pomodoro is the primary manual-work action and should stay prominent."
         )
+        XCTAssertFalse(timerSource.contains("停止计时"))
+        XCTAssertFalse(timerSource.contains("恢复计时"))
+        XCTAssertFalse(timerSource.contains("viewModel.stopTimers()"))
+        XCTAssertFalse(timerSource.contains("viewModel.resumeTimers()"))
     }
 
     func testDashboardControlHelpersExposeStatefulAccessibility() throws {

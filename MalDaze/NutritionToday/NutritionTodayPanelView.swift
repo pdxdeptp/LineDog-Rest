@@ -216,13 +216,45 @@ struct NutritionTodayPanelView: View {
     @ViewBuilder
     private func targetBreakdownSection(panel: NutritionPanel) -> some View {
         if let breakdown = panel.targetBreakdown {
-            NutritionTargetBreakdownView(breakdown: breakdown)
+            NutritionTargetBreakdownView(
+                breakdown: breakdown,
+                isRefreshing: viewModel.isRefreshingPanel,
+                onRefresh: {
+                    Task { await viewModel.refreshPanel() }
+                }
+            )
         } else {
-            Text("暂无额度计算明细。请在 Hermes 运行 refresh-panel 后重试。")
-                .font(NutritionBodyFont.hint)
-                .foregroundStyle(.tertiary)
-                .fixedSize(horizontal: false, vertical: true)
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text("暂无额度计算明细。")
+                    .font(NutritionBodyFont.hint)
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+                panelRefreshButton
+            }
         }
+    }
+
+    private var panelRefreshButton: some View {
+        Button {
+            Task { await viewModel.refreshPanel() }
+        } label: {
+            Group {
+                if viewModel.isRefreshingPanel {
+                    ProgressView()
+                        .controlSize(.small)
+                } else {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.caption.weight(.semibold))
+                }
+            }
+            .frame(width: 18, height: 18)
+            .foregroundStyle(.tertiary)
+        }
+        .buttonStyle(.plain)
+        .disabled(viewModel.isRefreshingPanel || viewModel.isLogging)
+        .accessibilityLabel(Text("刷新今日目标计算"))
+        .accessibilityHint(Text("从 Hermes 重新拉取 panel 与额度明细"))
     }
 
     private func calorieBar(consumed: Double, target: Double) -> some View {
@@ -529,12 +561,34 @@ struct NutritionTodayPanelView: View {
 
 private struct NutritionTargetBreakdownView: View {
     let breakdown: NutritionTargetBreakdown
+    let isRefreshing: Bool
+    let onRefresh: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("今日目标 \(breakdown.targetKcal) kcal")
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(.secondary)
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text("今日目标 \(breakdown.targetKcal) kcal")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 0)
+                Button(action: onRefresh) {
+                    Group {
+                        if isRefreshing {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.caption.weight(.semibold))
+                        }
+                    }
+                    .frame(width: 18, height: 18)
+                    .foregroundStyle(.tertiary)
+                }
+                .buttonStyle(.plain)
+                .disabled(isRefreshing)
+                .accessibilityLabel(Text("刷新今日目标计算"))
+                .accessibilityHint(Text("从 Hermes 重新拉取 panel 与额度明细"))
+            }
 
             ForEach(breakdown.layers, id: \.id) { layer in
                 NutritionTargetBreakdownLayerView(layer: layer, indent: 0)
@@ -561,27 +615,40 @@ private struct NutritionTargetBreakdownView: View {
     }
 }
 
+private enum NutritionTargetBreakdownLayout {
+    /// 趋势体重 / 校准说明等右侧列共用宽度，保证上下行右对齐。
+    static let trailingColumnWidth: CGFloat = 156
+}
+
 private struct NutritionTargetBreakdownLayerView: View {
     let layer: NutritionTargetBreakdownLayer
     let indent: Int
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(layer.label)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .padding(.leading, CGFloat(indent) * 12)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                if let kcalText = kcalSummary(for: layer) {
-                    Text(kcalText)
-                        .font(.footnote.monospacedDigit())
+                if let trailing = trailingSummary(for: layer) {
+                    Text(trailing)
+                        .font(trailingFont(for: layer))
                         .foregroundStyle(.tertiary)
+                        .multilineTextAlignment(.trailing)
+                        .frame(
+                            width: usesTrailingColumn(for: layer)
+                                ? NutritionTargetBreakdownLayout.trailingColumnWidth
+                                : nil,
+                            alignment: .trailing
+                        )
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
 
-            if let detail = layer.detail, !detail.isEmpty {
+            if let detail = layer.detail, !detail.isEmpty, !showsDetailInline(for: layer) {
                 Text(detail)
                     .font(.caption)
                     .foregroundStyle(.tertiary)
@@ -597,7 +664,42 @@ private struct NutritionTargetBreakdownLayerView: View {
         }
     }
 
+    private func showsDetailInline(for layer: NutritionTargetBreakdownLayer) -> Bool {
+        usesTrailingColumn(for: layer)
+    }
+
+    private func usesTrailingColumn(for layer: NutritionTargetBreakdownLayer) -> Bool {
+        switch layer.id {
+        case "weight_trend", "calibration_v3", "calibration_legacy_ols", "calibration":
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func trailingFont(for layer: NutritionTargetBreakdownLayer) -> Font {
+        switch layer.id {
+        case "weight_trend", "calibration_v3", "calibration_legacy_ols", "calibration":
+            return .footnote
+        default:
+            return .footnote.monospacedDigit()
+        }
+    }
+
+    private func trailingSummary(for layer: NutritionTargetBreakdownLayer) -> String? {
+        if usesTrailingColumn(for: layer), let detail = layer.detail, !detail.isEmpty {
+            return detail
+        }
+        return kcalSummary(for: layer)
+    }
+
     private func kcalSummary(for layer: NutritionTargetBreakdownLayer) -> String? {
+        switch layer.id {
+        case "calibration_v3", "calibration_legacy_ols", "calibration":
+            return nil
+        default:
+            break
+        }
         if let result = layer.resultKcal {
             if let delta = layer.kcal, abs(delta - result) > 0.5 {
                 return "\(signedKcal(delta)) → \(Int(result.rounded()))"

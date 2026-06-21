@@ -76,7 +76,7 @@ Do not start by splitting `AppViewModel` or `WindowManager`; both are high-impac
 
 | ID | Status | Risk | Task | Targets | Verification |
 | --- | --- | --- | --- | --- | --- |
-| R22 | Done | Medium | Extract shared reminder presentation/panel helpers | Hydration, seven-minute, sleep, intervention controllers | `MalDaze/TransientOverlay/` presenter + migrated hydration/center-bell/smart-reminder paths; see `extract-transient-overlay-presenter` |
+| R22 | Done | Medium | Extract shared reminder presentation/panel helpers | Hydration, seven-minute, sleep, intervention controllers | `MalDaze/TransientOverlay/` presenter owns passive + interactive overlay shells; `extract-transient-overlay-presenter` + `complete-transient-overlay-presenter-extraction`; `xcodebuild test -project MalDaze.xcodeproj -scheme MalDaze -destination 'platform=macOS' -only-testing:MalDazeTests/TransientOverlayPresenterTests -only-testing:MalDazeTests/SevenMinuteReminderCompletionTests -only-testing:MalDazeTests/ControlPanelPresentationTests/testSmartReminderEntryPointsAndLifecycleRemainWired -only-testing:MalDazeTests/SleepReminderClamshellTests` passed on 2026-06-20; full `MalDazeTests` still has pre-existing failures in `T7EjectServiceTests` and `ControlPanelPresentationTests/testMalDazeDefaultsKeyNamespacePreservesExistingKeyContracts` unrelated to overlay extraction |
 | R23 | Todo | Medium-High | Extract PetStageView hit-test and interaction policies | `PetStageView`, WindowManager policies | Tests cover idle/rest/breakRun hit behavior where possible |
 | R24 | Todo | Medium | Review stale code maps and align them with current architecture | `docs/*CODE_MAP.md` | Docs no longer describe obsolete behavior or tick rates |
 

@@ -50,12 +50,12 @@ struct TodayTodoSection: View {
         }
         .frame(height: sectionHeight, alignment: .topLeading)
         .task {
-            store.loadAndRollForward()
+            store.loadIfNeeded()
         }
         .onChange(of: editingEntryId) { entryId in
             if entryId != nil {
                 dismissMonitor.start {
-                    commitEditingIfNeeded()
+                    endEditingSessionIfNeeded()
                 }
             } else {
                 dismissMonitor.stop()
@@ -63,8 +63,14 @@ struct TodayTodoSection: View {
             }
         }
         .onDisappear {
+            endEditingSessionIfNeeded()
+            store.flushPendingTitleEdits()
             dismissMonitor.stop()
-            reorderController.cancelDrag()
+            reorderController.invalidateSessionOnDisappear()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
+            endEditingSessionIfNeeded()
+            store.flushPendingTitleEdits()
         }
         .onAppear {
             scheduleDraftFocusWithRetries()
@@ -98,11 +104,8 @@ struct TodayTodoSection: View {
     }
 
     private var draftFieldRow: some View {
-        HStack(alignment: .top, spacing: 6) {
-            Image(systemName: "circle")
-                .font(.title3)
-                .foregroundStyle(Color.primary)
-                .accessibilityHidden(true)
+        HStack(alignment: .top, spacing: TodayTodoRowLayout.leadingControlSpacing) {
+            TodayTodoRowLayout.leadingGutter
 
             TodayTodoDraftField(
                 text: $draft,
@@ -148,9 +151,9 @@ struct TodayTodoSection: View {
                 row(
                     for: entry,
                     isCompleted: false,
-                    reorderGestureEnabled: reorderEnabled && !isDragPlaceholder,
+                    reorderGestureEnabled: reorderEnabled,
                     onReorderPressingReady: { event in
-                        commitEditingIfNeeded()
+                        endEditingSessionIfNeeded()
                         reorderController.beginPressing(
                             entryId: entry.id,
                             entries: store.incompleteEntries,
@@ -158,7 +161,7 @@ struct TodayTodoSection: View {
                         )
                     },
                     onReorderActivated: { event in
-                        commitEditingIfNeeded()
+                        endEditingSessionIfNeeded()
                         reorderController.beginDrag(
                             entryId: entry.id,
                             entries: store.incompleteEntries,
@@ -172,10 +175,10 @@ struct TodayTodoSection: View {
                         )
                     },
                     onReorderEnded: {
-                        reorderController.endDrag { sourceIndex, insertionIndex in
+                        reorderController.endDrag { draggedId, finalIndex in
                             store.reorderIncomplete(
-                                fromSource: sourceIndex,
-                                toInsertionIndex: insertionIndex
+                                draggedId: draggedId,
+                                toFinalIndex: finalIndex
                             )
                         }
                     }
@@ -192,7 +195,8 @@ struct TodayTodoSection: View {
         onReorderPressingReady: ((NSEvent) -> Void)? = nil,
         onReorderActivated: ((NSEvent) -> Void)? = nil,
         onReorderDrag: ((NSEvent) -> Void)? = nil,
-        onReorderEnded: (() -> Void)? = nil
+        onReorderEnded: (() -> Void)? = nil,
+        onLiveEdit: ((String) -> Void)? = nil
     ) -> some View {
         TodayTodoRow(
             entry: entry,
@@ -206,17 +210,21 @@ struct TodayTodoSection: View {
             onReorderDrag: onReorderDrag,
             onReorderEnded: onReorderEnded,
             onToggleComplete: {
-                commitEditingIfNeeded()
+                endEditingSessionIfNeeded()
                 store.toggleComplete(id: entry.id)
             },
             onBeginEdit: {
                 beginEditing(entry)
             },
             onCommitEdit: {
-                commitEditing(entryId: entry.id)
+                endEditingSession(entryId: entry.id)
+            },
+            onLiveEdit: onLiveEdit ?? { text in
+                store.updateTitleLive(id: entry.id, title: text)
             },
             onDelete: {
                 if editingEntryId == entry.id {
+                    store.flushPendingTitleEdits()
                     editingEntryId = nil
                     editingText = ""
                 }
@@ -233,7 +241,7 @@ struct TodayTodoSection: View {
             Spacer(minLength: 0)
             if store.canMutate {
                 Button("历史") {
-                    commitEditingIfNeeded()
+                    endEditingSessionIfNeeded()
                     showHistory = true
                 }
                 .controlSize(.small)
@@ -248,27 +256,28 @@ struct TodayTodoSection: View {
 
     private func beginEditing(_ entry: TodayTodoEntry) {
         if editingEntryId != entry.id {
-            commitEditingIfNeeded()
+            endEditingSessionIfNeeded()
+            store.beginTitleEditing(id: entry.id)
             editingEntryId = entry.id
             editingText = entry.title
         }
     }
 
-    private func commitEditing(entryId: UUID) {
+    private func endEditingSession(entryId: UUID) {
         guard editingEntryId == entryId else { return }
-        store.updateTitle(id: entryId, title: editingText)
+        store.finalizeTitle(id: entryId, title: editingText)
         editingEntryId = nil
         editingText = ""
         TodayTodoEditingFocus.activeView = nil
     }
 
-    private func commitEditingIfNeeded() {
+    private func endEditingSessionIfNeeded() {
         guard let entryId = editingEntryId else { return }
-        commitEditing(entryId: entryId)
+        endEditingSession(entryId: entryId)
     }
 
     private func submitDraft() -> Bool {
-        commitEditingIfNeeded()
+        endEditingSessionIfNeeded()
         guard store.add(title: draft) else { return false }
         draft = ""
         draftFieldHeight = TodayTodoDraftFieldLayout.minHeight

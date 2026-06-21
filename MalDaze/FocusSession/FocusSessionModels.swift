@@ -85,6 +85,7 @@ enum FocusSessionStoreError: Error, Equatable {
     case unsupportedSchemaVersion(Int)
     case decodeFailed
     case writeFailed
+    case notFound
 }
 
 enum FocusSessionFormatting {
@@ -118,11 +119,24 @@ enum FocusSessionFormatting {
     }
 }
 
-struct FocusSessionInProgress: Equatable {
+struct FocusPomodoroInProgress: Equatable {
     let startedAt: Date
+    let endsAt: Date
+    let remainingSeconds: Int
     let elapsedSeconds: Int
 
     var elapsedMinutes: Int {
         FocusSessionFormatting.displayMinutes(fromSeconds: elapsedSeconds)
     }
+
+    var configuredDurationSeconds: Int {
+        FocusSessionFormatting.durationSeconds(from: startedAt, to: endsAt)
+    }
+
+    var configuredDurationMinutes: Int {
+        FocusSessionFormatting.displayMinutes(fromSeconds: configuredDurationSeconds)
+    }
 }
+
+/// Backward-compatible alias for timeline call sites migrating to pomodoro-scoped projection.
+typealias FocusSessionInProgress = FocusPomodoroInProgress

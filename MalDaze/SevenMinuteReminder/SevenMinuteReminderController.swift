@@ -104,6 +104,7 @@ final class SevenMinuteReminderController {
     private func onCountdownFinished() {
         stopTickTimer()
         tearDownCountdownUI()
+        removeScreenObserver()
         onRunningChanged?(false)
         let message = completionMessage.isEmpty
             ? "\(startedDurationMinutes) 分钟计时结束"

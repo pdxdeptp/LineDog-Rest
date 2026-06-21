@@ -13,6 +13,8 @@ enum TransientOverlayKind: Hashable {
 protocol MalDazeTransientOverlayPresenting: AnyObject {
     var isCenterBellVisible: Bool { get }
     var isHydrationReminderVisible: Bool { get }
+    var isSmartReminderInputVisible: Bool { get }
+    var isSmartReminderToastVisible: Bool { get }
 
     func presentCenterBell(message: String, onDismiss: @escaping () -> Void)
     func dismissCenterBell()
@@ -24,6 +26,11 @@ protocol MalDazeTransientOverlayPresenting: AnyObject {
     )
     func dismissHydrationReminder()
 
-    func presentSmartReminderInput(panel: NSPanel, anchor: NSRect, size: NSSize)
-    func presentSmartReminderToast(panel: NSPanel, anchor: NSRect, size: NSSize)
+    func presentSmartReminderInput(content: TransientOverlayContent, anchor: NSRect)
+    func dismissSmartReminderInput()
+    func smartReminderInputContains(screenPoint: NSPoint) -> Bool
+
+    func presentSmartReminderToast(content: TransientOverlayContent, anchor: NSRect)
+    func dismissSmartReminderToast()
+    func smartReminderToastContains(screenPoint: NSPoint) -> Bool
 }

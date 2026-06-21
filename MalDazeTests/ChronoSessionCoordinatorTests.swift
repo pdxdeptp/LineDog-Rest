@@ -6,57 +6,28 @@ final class ChronoSessionCoordinatorTests: XCTestCase {
     override func setUp() {
         super.setUp()
         ChronoSessionStore.clear()
+        UserDefaults.standard.removeObject(forKey: MalDazeDefaults.suspendedTimerModeSnapshot)
     }
 
     override func tearDown() {
         ChronoSessionStore.clear()
+        UserDefaults.standard.removeObject(forKey: MalDazeDefaults.suspendedTimerModeSnapshot)
         super.tearDown()
     }
 
     func testCaptureRunningManualRecordIncludesPhaseEnd() throws {
         let manual = ManualTimerEngine(workDuration: 600, restDuration: 120)
         manual.start()
-        let startedAt = Date().addingTimeInterval(-30)
         let context = ChronoSessionCaptureContext(
             mode: .manual,
             manualEngine: manual,
-            autoEngine: AutoTimerEngine(restDuration: 60),
-            workSegmentStartedAt: startedAt,
-            wasInManualWorkPhase: true
+            autoEngine: AutoTimerEngine(restDuration: 60)
         )
-        let record = try XCTUnwrap(
-            ChronoSessionCoordinator().capture(from: context, pauseKind: .none)
-        )
+        let record = try XCTUnwrap(ChronoSessionCoordinator().capture(from: context))
 
         XCTAssertEqual(record.mode, .manual)
         XCTAssertEqual(record.phase, .manualWorking)
-        XCTAssertEqual(record.pauseKind, .none)
         XCTAssertGreaterThan(record.phaseEnd.timeIntervalSinceNow, 500)
-        XCTAssertEqual(record.workSegmentStartedAt, startedAt)
-    }
-
-    func testPersistUserPausedWritesEnvelopeBeforeEngineStop() throws {
-        var coordinator = ChronoSessionCoordinator()
-        let manual = ManualTimerEngine(workDuration: 600, restDuration: 120)
-        manual.start()
-        let endBeforeStop = try XCTUnwrap(manual.currentPhaseEnd)
-        let context = ChronoSessionCaptureContext(
-            mode: .manual,
-            manualEngine: manual,
-            autoEngine: AutoTimerEngine(restDuration: 60),
-            workSegmentStartedAt: Date().addingTimeInterval(-120),
-            wasInManualWorkPhase: true
-        )
-
-        coordinator.persistUserPaused(from: context)
-        manual.stop()
-
-        guard case .record(let stored) = ChronoSessionStore.loadState() else {
-            return XCTFail("Expected stored chrono record")
-        }
-        XCTAssertEqual(stored.pauseKind, .user)
-        XCTAssertEqual(stored.phase, .manualWorking)
-        XCTAssertEqual(stored.phaseEnd.timeIntervalSince1970, endBeforeStop.timeIntervalSince1970, accuracy: 1)
     }
 
     func testRunningRecordBootstrapPlanRestoresImmediately() {
@@ -64,9 +35,7 @@ final class ChronoSessionCoordinatorTests: XCTestCase {
         let record = ChronoSessionRecord(
             mode: .manual,
             phase: .manualWorking,
-            phaseEnd: phaseEnd,
-            pauseKind: .none,
-            workSegmentStartedAt: Date().addingTimeInterval(-100)
+            phaseEnd: phaseEnd
         )
         let plan = ChronoSessionCoordinator().planBootstrap(
             stored: .record(record),
@@ -75,13 +44,39 @@ final class ChronoSessionCoordinatorTests: XCTestCase {
         XCTAssertEqual(plan, .restoreRunning(record))
     }
 
-    func testLegacyModeOnlyTokenMapsToUserPausedModeOnlyPlan() {
+    func testLegacyModeOnlyTokenIsClearedOnLoad() {
         UserDefaults.standard.set("manual", forKey: MalDazeDefaults.suspendedTimerModeSnapshot)
-        let plan = ChronoSessionCoordinator().planBootstrap(
-            stored: ChronoSessionStore.loadState(),
-            preferredMode: .auto
+
+        let stored = ChronoSessionStore.loadState()
+        XCTAssertEqual(stored, .none)
+        XCTAssertNil(UserDefaults.standard.object(forKey: MalDazeDefaults.suspendedTimerModeSnapshot))
+    }
+
+    func testLegacyUserPausedV2EnvelopeClearsOnLoad() throws {
+        struct V2Record: Codable {
+            let mode: String
+            let phase: String
+            let phaseEnd: Date
+            let pauseKind: String
+        }
+        struct V2Envelope: Codable {
+            let schemaVersion: Int
+            let record: V2Record
+        }
+        let envelope = V2Envelope(
+            schemaVersion: 2,
+            record: V2Record(
+                mode: "manual",
+                phase: "manualWorking",
+                phaseEnd: Date().addingTimeInterval(300),
+                pauseKind: "user"
+            )
         )
-        XCTAssertEqual(plan, .restoreUserPausedModeOnly(ChronoSessionModeOnlyPause(mode: .manual)))
+        let data = try JSONEncoder().encode(envelope)
+        UserDefaults.standard.set(data, forKey: MalDazeDefaults.chronoSessionSnapshot)
+
+        XCTAssertEqual(ChronoSessionStore.loadState(), .none)
+        XCTAssertNil(UserDefaults.standard.data(forKey: MalDazeDefaults.chronoSessionSnapshot))
     }
 
     func testRestoreEnginesUsesWallClockRemaining() {
@@ -89,12 +84,10 @@ final class ChronoSessionCoordinatorTests: XCTestCase {
         let record = ChronoSessionRecord(
             mode: .manual,
             phase: .manualWorking,
-            phaseEnd: phaseEnd,
-            pauseKind: .user,
-            workSegmentStartedAt: Date().addingTimeInterval(-360)
+            phaseEnd: phaseEnd
         )
         let manual = ManualTimerEngine(workDuration: 600, restDuration: 120)
-        let hints = ChronoSessionCoordinator().applyEngines(
+        ChronoSessionCoordinator().applyEngines(
             record: record,
             manualEngine: manual,
             autoEngine: AutoTimerEngine(restDuration: 60)
@@ -102,20 +95,14 @@ final class ChronoSessionCoordinatorTests: XCTestCase {
 
         XCTAssertTrue(manual.isTimerRunning)
         XCTAssertGreaterThan(manual.workPhaseRemainingOrZero, 200)
-        XCTAssertNotNil(hints.workSegmentStartedAt)
+        XCTAssertNotNil(manual.currentWorkPhase)
     }
 
-    func testStopTimersIntegrationPersistsResumableRecord() {
-        let vm = AppViewModel(windowManager: MockWindowManager(), bootstrapAutoEngine: false)
-        vm.setMode(.manual)
-        vm.startManualFocus()
-        vm.stopTimers()
+    func testStopAutoRemindersIntegrationClearsChronoRecord() {
+        let vm = AppViewModel(windowManager: MockWindowManager(), bootstrapAutoEngine: true)
+        vm.stopAutoReminders()
 
-        guard case .record(let stored) = ChronoSessionStore.loadState() else {
-            return XCTFail("Expected chrono record after stopTimers")
-        }
-        XCTAssertEqual(stored.mode, .manual)
-        XCTAssertEqual(stored.pauseKind, .user)
-        XCTAssertEqual(stored.phase, .manualWorking)
+        XCTAssertEqual(ChronoSessionStore.loadState(), .none)
+        XCTAssertFalse(vm.canStopAutoReminders)
     }
 }

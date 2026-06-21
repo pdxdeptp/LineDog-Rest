@@ -63,6 +63,45 @@ final class FocusSessionStore: ObservableObject {
         return session
     }
 
+    @discardableResult
+    func updateSession(
+        id: UUID,
+        startedAt: Date,
+        endedAt: Date,
+        calendar: Calendar = .current
+    ) throws -> FocusSession {
+        loadIfNeeded()
+        guard let index = allSessions.firstIndex(where: { $0.id == id }) else {
+            throw FocusSessionStoreError.notFound
+        }
+        let durationSeconds = FocusSessionFormatting.durationSeconds(from: startedAt, to: endedAt)
+        guard durationSeconds > 0 else {
+            throw FocusSessionStoreError.writeFailed
+        }
+        let existing = allSessions[index]
+        let updated = FocusSession(
+            id: existing.id,
+            date: FocusSessionFormatting.isoDate(endedAt, calendar: calendar),
+            startedAt: startedAt,
+            endedAt: endedAt,
+            durationSeconds: durationSeconds,
+            source: existing.source,
+            labels: existing.labels
+        )
+        allSessions[index] = updated
+        try writeFile(FocusSessionFile(schemaVersion: 1, sessions: allSessions))
+        return updated
+    }
+
+    func deleteSession(id: UUID) throws {
+        loadIfNeeded()
+        guard let index = allSessions.firstIndex(where: { $0.id == id }) else {
+            throw FocusSessionStoreError.notFound
+        }
+        allSessions.remove(at: index)
+        try writeFile(FocusSessionFile(schemaVersion: 1, sessions: allSessions))
+    }
+
     func todaySessions(calendar: Calendar = .current, now: Date = Date()) -> [FocusSession] {
         loadIfNeeded()
         let today = FocusSessionFormatting.isoDate(now, calendar: calendar)
@@ -73,6 +112,16 @@ final class FocusSessionStore: ObservableObject {
 
     func todayFinalizedSeconds(calendar: Calendar = .current, now: Date = Date()) -> Int {
         todaySessions(calendar: calendar, now: now).reduce(0) { $0 + $1.durationSeconds }
+    }
+
+    func todayCompletedSeconds(calendar: Calendar = .current, now: Date = Date()) -> Int {
+        todaySessions(calendar: calendar, now: now)
+            .filter { $0.source == .completed }
+            .reduce(0) { $0 + $1.durationSeconds }
+    }
+
+    func todayCompletedMinutes(calendar: Calendar = .current, now: Date = Date()) -> Int {
+        FocusSessionFormatting.displayMinutes(fromSeconds: todayCompletedSeconds(calendar: calendar, now: now))
     }
 
     func todayFinalizedMinutes(calendar: Calendar = .current, now: Date = Date()) -> Int {

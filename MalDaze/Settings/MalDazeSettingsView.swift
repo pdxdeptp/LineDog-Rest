@@ -394,7 +394,7 @@ struct MalDazeSettingsView: View {
                         in: DashboardLayout.leftPlanFractionMin...DashboardLayout.leftPlanFractionMax,
                         step: 0.05
                     )
-                    Text("默认计划 60% / 饮食 40%。范围 40%–75% 计划区。")
+                    Text("默认计划 60% / 饮食 40%（计划在下方）。范围 40%–75% 计划区。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

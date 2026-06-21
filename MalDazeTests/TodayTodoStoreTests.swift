@@ -4,6 +4,7 @@ import XCTest
 @MainActor
 final class TodayTodoStoreTests: XCTestCase {
     private var fileURL: URL!
+    private var archiveURL: URL!
     private var todayISO: String!
 
     override func setUp() async throws {
@@ -11,6 +12,7 @@ final class TodayTodoStoreTests: XCTestCase {
             .appendingPathComponent("TodayTodoStoreTests-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         fileURL = dir.appendingPathComponent("today-todo.json")
+        archiveURL = dir.appendingPathComponent("today-todo-archive.jsonl")
         todayISO = "2026-06-18"
     }
 
@@ -21,7 +23,136 @@ final class TodayTodoStoreTests: XCTestCase {
     }
 
     private func makeStore() -> TodayTodoStore {
-        TodayTodoStore(fileURL: fileURL, todayISO: { [unowned self] in self.todayISO })
+        TodayTodoStore(fileURL: fileURL, archiveFileURL: archiveURL, todayISO: { [unowned self] in self.todayISO })
+    }
+
+    private func readArchiveRecords() throws -> [TodayTodoArchiveRecord] {
+        let data = try Data(contentsOf: archiveURL)
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try data
+            .split(separator: 0x0A, omittingEmptySubsequences: true)
+            .map { try decoder.decode(TodayTodoArchiveRecord.self, from: Data($0)) }
+    }
+
+    func testMutationsAppendArchiveRecords() throws {
+        let store = makeStore()
+        store.loadAndRollForward()
+
+        XCTAssertTrue(store.add(title: "买打印纸"))
+        XCTAssertTrue(store.add(title: "第二项"))
+        let id = try XCTUnwrap(store.incompleteEntries.first?.id)
+
+        store.updateTitle(id: id, title: "买 A4 纸")
+        store.toggleComplete(id: id)
+        store.toggleComplete(id: id)
+        store.delete(id: id)
+        store.restore(id: id)
+        store.reorderIncomplete(draggedId: id, toFinalIndex: 1)
+        store.delete(id: id)
+        store.permanentlyDelete(id: id)
+
+        let records = try readArchiveRecords()
+        XCTAssertEqual(records.map(\.action), [
+            .add,
+            .add,
+            .updateTitle,
+            .toggleComplete,
+            .toggleComplete,
+            .delete,
+            .restore,
+            .reorder,
+            .delete,
+            .permanentDelete,
+        ])
+        XCTAssertEqual(records[2].previousTitle, "买打印纸")
+        XCTAssertEqual(records[2].entry?.title, "买 A4 纸")
+        XCTAssertEqual(records.last?.entry?.id, id)
+    }
+
+    func testLiveTitlePersistsBeforeEndEditing() throws {
+        let store = makeStore()
+        store.loadAndRollForward()
+        XCTAssertTrue(store.add(title: "原始标题"))
+        let id = try XCTUnwrap(store.incompleteEntries.first?.id)
+
+        store.beginTitleEditing(id: id)
+        store.updateTitleLive(id: id, title: "实时修改")
+        store.flushPendingTitleEdits()
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let file = try decoder.decode(TodayTodoFile.self, from: Data(contentsOf: fileURL))
+        let saved = try XCTUnwrap(file.entries.first(where: { $0.id == id }))
+        XCTAssertEqual(saved.title, "实时修改")
+
+        let records = try readArchiveRecords()
+        XCTAssertTrue(records.contains(where: { $0.action == .updateTitle && $0.entry?.title == "实时修改" }))
+    }
+
+    func testFinalizeTitleTrimsWhitespace() throws {
+        let store = makeStore()
+        store.loadAndRollForward()
+        XCTAssertTrue(store.add(title: "原始"))
+        let id = try XCTUnwrap(store.incompleteEntries.first?.id)
+
+        store.beginTitleEditing(id: id)
+        store.finalizeTitle(id: id, title: "  定稿标题  \n")
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let file = try decoder.decode(TodayTodoFile.self, from: Data(contentsOf: fileURL))
+        let saved = try XCTUnwrap(file.entries.first(where: { $0.id == id }))
+        XCTAssertEqual(saved.title, "定稿标题")
+    }
+
+    func testLoadIfNeededDoesNotReloadAfterReady() throws {
+        let store = makeStore()
+        store.loadAndRollForward()
+        XCTAssertTrue(store.add(title: "第一条"))
+
+        store.beginTitleEditing(id: store.incompleteEntries[0].id)
+        store.updateTitleLive(id: store.incompleteEntries[0].id, title: "未 flush")
+        store.loadIfNeeded()
+        store.flushPendingTitleEdits()
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let file = try decoder.decode(TodayTodoFile.self, from: Data(contentsOf: fileURL))
+        XCTAssertEqual(file.entries.first?.title, "未 flush")
+    }
+
+    func testRollForwardWritesArchiveRecord() throws {
+        let yesterday = "2026-06-17"
+        let entryId = UUID()
+        let seed = TodayTodoFile(
+            version: 1,
+            entries: [
+                TodayTodoEntry(
+                    id: entryId,
+                    title: "未完成",
+                    dateISO: yesterday,
+                    rolledFromDateISO: nil,
+                    isCompleted: false,
+                    createdAt: Date(),
+                    completedAt: nil,
+                    sortIndex: 0
+                )
+            ]
+        )
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        try encoder.encode(seed).write(to: fileURL, options: .atomic)
+
+        let store = makeStore()
+        store.loadAndRollForward()
+
+        let records = try readArchiveRecords()
+        XCTAssertEqual(records.count, 1)
+        XCTAssertEqual(records[0].action, .rollForward)
+        XCTAssertEqual(records[0].entry?.id, entryId)
+        XCTAssertEqual(records[0].entry?.dateISO, todayISO)
+        XCTAssertEqual(records[0].entry?.rolledFromDateISO, yesterday)
     }
 
     func testAddMultilineTitlePreservesNewlines() {

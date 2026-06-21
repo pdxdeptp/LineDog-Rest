@@ -176,6 +176,29 @@ final class FocusSessionStoreTests: XCTestCase {
         XCTAssertEqual(store.todaySessionCount(calendar: calendar, now: today), 2)
         XCTAssertEqual(store.todayPomodoroCount(calendar: calendar, now: today), 1)
         XCTAssertEqual(store.todayFinalizedMinutes(calendar: calendar, now: today), 30)
+        XCTAssertEqual(store.todayCompletedMinutes(calendar: calendar, now: today), 25)
+    }
+
+    func testTodayCompletedMinutesExcludesStoppedEarly() throws {
+        let store = makeStore()
+        let today = date(year: 2026, month: 6, day: 20, hour: 16, minute: 0)
+        let completedStart = date(year: 2026, month: 6, day: 20, hour: 9, minute: 0)
+        _ = try store.appendFinalized(
+            startedAt: completedStart,
+            endedAt: completedStart.addingTimeInterval(25 * 60),
+            source: .completed,
+            calendar: calendar
+        )
+        let earlyStart = date(year: 2026, month: 6, day: 20, hour: 10, minute: 0)
+        _ = try store.appendFinalized(
+            startedAt: earlyStart,
+            endedAt: earlyStart.addingTimeInterval(15 * 60),
+            source: .stoppedEarly,
+            calendar: calendar
+        )
+
+        XCTAssertEqual(store.todayCompletedMinutes(calendar: calendar, now: today), 25)
+        XCTAssertEqual(store.todayPomodoroCount(calendar: calendar, now: today), 1)
     }
 
     func testZeroDurationSessionIsRejected() {
@@ -190,6 +213,51 @@ final class FocusSessionStoreTests: XCTestCase {
             )
         ) { error in
             XCTAssertEqual(error as? FocusSessionStoreError, .writeFailed)
+        }
+    }
+
+    func testUpdateSessionRewritesStartedAndEndedAt() throws {
+        let store = makeStore()
+        let started = date(year: 2026, month: 6, day: 20, hour: 14, minute: 0)
+        let ended = date(year: 2026, month: 6, day: 20, hour: 14, minute: 25)
+        let session = try store.appendFinalized(
+            startedAt: started,
+            endedAt: ended,
+            source: .completed,
+            calendar: calendar
+        )
+
+        let newStarted = date(year: 2026, month: 6, day: 20, hour: 15, minute: 0)
+        let newEnded = date(year: 2026, month: 6, day: 20, hour: 15, minute: 18)
+        let updated = try store.updateSession(
+            id: session.id,
+            startedAt: newStarted,
+            endedAt: newEnded,
+            calendar: calendar
+        )
+
+        XCTAssertEqual(updated.startedAt, newStarted)
+        XCTAssertEqual(updated.endedAt, newEnded)
+        XCTAssertEqual(updated.durationSeconds, 18 * 60)
+        XCTAssertEqual(store.allSessions.count, 1)
+    }
+
+    func testDeleteSessionRemovesRecord() throws {
+        let store = makeStore()
+        let started = date(year: 2026, month: 6, day: 20, hour: 14, minute: 0)
+        let ended = date(year: 2026, month: 6, day: 20, hour: 14, minute: 25)
+        let session = try store.appendFinalized(
+            startedAt: started,
+            endedAt: ended,
+            source: .completed,
+            calendar: calendar
+        )
+
+        try store.deleteSession(id: session.id)
+
+        XCTAssertTrue(store.allSessions.isEmpty)
+        XCTAssertThrowsError(try store.deleteSession(id: session.id)) { error in
+            XCTAssertEqual(error as? FocusSessionStoreError, .notFound)
         }
     }
 

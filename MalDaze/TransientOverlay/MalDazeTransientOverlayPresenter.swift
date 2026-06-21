@@ -8,16 +8,36 @@ final class MalDazeTransientOverlayPresenter: MalDazeTransientOverlayPresenting 
         var reposition: () -> NSRect
     }
 
-    private let dashboardPolicy: TransientOverlayDashboardPolicy
-    private var passiveOverlays: [TransientOverlayKind: PassiveOverlayState] = [:]
-    private var screenObserver: NSObjectProtocol?
+    private struct InteractiveOverlayState {
+        var panel: NSPanel
+        var anchor: NSRect
+        var contentSize: NSSize
+        var generation: UInt64
+        var retainedObject: AnyObject?
+    }
 
-    init(dashboardPolicy: TransientOverlayDashboardPolicy) {
+    private let dashboardPolicy: TransientOverlayDashboardPolicy
+    private let scheduleFocusWork: (@escaping () -> Void) -> Void
+    private var passiveOverlays: [TransientOverlayKind: PassiveOverlayState] = [:]
+    private var smartInputState: InteractiveOverlayState?
+    private var smartToastState: InteractiveOverlayState?
+    private var screenObserver: NSObjectProtocol?
+    private var nextGeneration: UInt64 = 0
+
+    init(
+        dashboardPolicy: TransientOverlayDashboardPolicy,
+        scheduleFocusWork: @escaping (@escaping () -> Void) -> Void = { work in
+            DispatchQueue.main.async(execute: work)
+        }
+    ) {
         self.dashboardPolicy = dashboardPolicy
+        self.scheduleFocusWork = scheduleFocusWork
     }
 
     var isCenterBellVisible: Bool { passiveOverlays[.centerBell] != nil }
     var isHydrationReminderVisible: Bool { passiveOverlays[.hydration] != nil }
+    var isSmartReminderInputVisible: Bool { smartInputState != nil }
+    var isSmartReminderToastVisible: Bool { smartToastState != nil }
 
     func presentCenterBell(message: String, onDismiss: @escaping () -> Void) {
         dismissCenterBell()
@@ -67,21 +87,74 @@ final class MalDazeTransientOverlayPresenter: MalDazeTransientOverlayPresenting 
         dismissPassiveOverlay(kind: .hydration)
     }
 
-    func presentSmartReminderInput(panel: NSPanel, anchor: NSRect, size: NSSize) {
-        SmartReminderUIPanels.positionPanelTopCenter(panel, anchor: anchor, size: size)
+    func presentSmartReminderInput(content: TransientOverlayContent, anchor: NSRect) {
+        dismissSmartReminderInput()
+        let generation = bumpGeneration()
+        let panel = InteractiveAnchoredOverlayGeometry.makeInputPanelShell(contentSize: content.size)
+        panel.contentView = content.view
+        content.view.frame = NSRect(origin: .zero, size: content.size)
+        content.view.autoresizingMask = [.width, .height]
+
+        smartInputState = InteractiveOverlayState(
+            panel: panel,
+            anchor: anchor,
+            contentSize: content.size,
+            generation: generation,
+            retainedObject: content.retainedObject
+        )
+        installScreenObserverIfNeeded()
+        InteractiveAnchoredOverlayGeometry.positionPanel(panel, anchor: anchor, size: content.size)
         NSApp.activate(ignoringOtherApps: true)
         panel.makeKeyAndOrderFront(nil)
         panel.makeFirstResponder(panel.contentView)
-        DispatchQueue.main.async {
-            NSApp.activate(ignoringOtherApps: true)
-            panel.makeKeyAndOrderFront(nil)
-            panel.makeFirstResponder(panel.contentView)
-        }
+        scheduleInputFocus(for: panel, generation: generation)
     }
 
-    func presentSmartReminderToast(panel: NSPanel, anchor: NSRect, size: NSSize) {
-        SmartReminderUIPanels.positionPanelTopCenter(panel, anchor: anchor, size: size)
+    func dismissSmartReminderInput() {
+        guard smartInputState != nil else { return }
+        bumpGeneration()
+        smartInputState?.panel.orderOut(nil)
+        smartInputState?.panel.close()
+        smartInputState = nil
+        removeScreenObserverIfNeeded()
+    }
+
+    func smartReminderInputContains(screenPoint: NSPoint) -> Bool {
+        guard let panel = smartInputState?.panel, panel.isVisible else { return false }
+        return panel.frame.contains(screenPoint)
+    }
+
+    func presentSmartReminderToast(content: TransientOverlayContent, anchor: NSRect) {
+        dismissSmartReminderToast()
+        let generation = bumpGeneration()
+        let panel = InteractiveAnchoredOverlayGeometry.makeToastPanelShell(contentSize: content.size)
+        panel.contentView = content.view
+        content.view.frame = NSRect(origin: .zero, size: content.size)
+
+        smartToastState = InteractiveOverlayState(
+            panel: panel,
+            anchor: anchor,
+            contentSize: content.size,
+            generation: generation,
+            retainedObject: content.retainedObject
+        )
+        installScreenObserverIfNeeded()
+        InteractiveAnchoredOverlayGeometry.positionPanel(panel, anchor: anchor, size: content.size)
         panel.orderFrontRegardless()
+    }
+
+    func dismissSmartReminderToast() {
+        guard smartToastState != nil else { return }
+        bumpGeneration()
+        smartToastState?.panel.orderOut(nil)
+        smartToastState?.panel.close()
+        smartToastState = nil
+        removeScreenObserverIfNeeded()
+    }
+
+    func smartReminderToastContains(screenPoint: NSPoint) -> Bool {
+        guard let panel = smartToastState?.panel, panel.isVisible else { return false }
+        return panel.frame.contains(screenPoint)
     }
 
     private func presentPassiveOverlay(kind: TransientOverlayKind, contentView: NSView, contentSize: NSSize) {
@@ -107,9 +180,27 @@ final class MalDazeTransientOverlayPresenter: MalDazeTransientOverlayPresenting 
     }
 
     private func scheduleDashboardDemotionIfNeeded(appWasActiveBeforePresent: Bool) {
-        DispatchQueue.main.async { [dashboardPolicy] in
+        scheduleFocusWork { [dashboardPolicy] in
             dashboardPolicy.demoteVisibleDashboardIfNeeded(appWasActiveBeforePresent)
         }
+    }
+
+    private func scheduleInputFocus(for panel: NSPanel, generation: UInt64) {
+        scheduleFocusWork { [weak self, weak panel] in
+            guard let self, let panel else { return }
+            guard let state = self.smartInputState else { return }
+            guard state.generation == generation else { return }
+            guard state.panel === panel else { return }
+            NSApp.activate(ignoringOtherApps: true)
+            panel.makeKeyAndOrderFront(nil)
+            panel.makeFirstResponder(panel.contentView)
+        }
+    }
+
+    @discardableResult
+    private func bumpGeneration() -> UInt64 {
+        nextGeneration &+= 1
+        return nextGeneration
     }
 
     private func installScreenObserverIfNeeded() {
@@ -120,23 +211,37 @@ final class MalDazeTransientOverlayPresenter: MalDazeTransientOverlayPresenting 
             queue: .main
         ) { [weak self] _ in
             Task { @MainActor [weak self] in
-                self?.repositionPassiveOverlays()
+                self?.repositionAllOverlays()
             }
         }
     }
 
     private func removeScreenObserverIfNeeded() {
-        guard passiveOverlays.isEmpty else { return }
+        guard passiveOverlays.isEmpty, smartInputState == nil, smartToastState == nil else { return }
         if let observer = screenObserver {
             NotificationCenter.default.removeObserver(observer)
             screenObserver = nil
         }
     }
 
-    private func repositionPassiveOverlays() {
+    private func repositionAllOverlays() {
         for (kind, state) in passiveOverlays {
             state.panel.setFrame(state.reposition(), display: true)
             passiveOverlays[kind] = state
+        }
+        if let state = smartInputState {
+            InteractiveAnchoredOverlayGeometry.positionPanel(
+                state.panel,
+                anchor: state.anchor,
+                size: state.contentSize
+            )
+        }
+        if let state = smartToastState {
+            InteractiveAnchoredOverlayGeometry.positionPanel(
+                state.panel,
+                anchor: state.anchor,
+                size: state.contentSize
+            )
         }
     }
 }

@@ -394,7 +394,7 @@ struct DashboardRootView: View {
                     )
                     .id("dashboard-left-column-resize")
 
-                    LearningDeskPanelView()
+                    LearningDeskPanelView(appViewModel: viewModel)
                         .frame(minWidth: DashboardLayout.learningColumnMinWidth, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                         .padding(.horizontal, MainPanelChrome.horizontalPadding)
 
@@ -621,6 +621,9 @@ struct DashboardRootView: View {
                     Button("推迟到明天") {
                         Task { await deskReminders.postponeReminderToTomorrow(id: item.id) }
                     }
+                    Button("推迟 3 天") {
+                        Task { await deskReminders.postponeReminder(id: item.id, addingDays: 3) }
+                    }
                     Button("推迟 7 天") {
                         Task { await deskReminders.postponeReminder(id: item.id, addingDays: 7) }
                     }
@@ -647,6 +650,9 @@ struct DashboardRootView: View {
             }
             Button("推迟到明天") {
                 Task { await deskReminders.postponeReminderToTomorrow(id: item.id) }
+            }
+            Button("推迟 3 天") {
+                Task { await deskReminders.postponeReminder(id: item.id, addingDays: 3) }
             }
             Button("推迟 7 天") {
                 Task { await deskReminders.postponeReminder(id: item.id, addingDays: 7) }
@@ -772,8 +778,6 @@ struct DashboardRootView: View {
 
                 statusChip
 
-                todayFocusSection
-
                 dashboardModeControl
 
                 controlsQuickActions
@@ -812,15 +816,6 @@ struct DashboardRootView: View {
         )
     }
 
-    private var todayFocusSection: some View {
-        FocusSessionTodaySection(
-            sessionCount: viewModel.todayFocusSessionCount,
-            totalMinutes: viewModel.todayFocusMinutesTotal,
-            finalizedSessions: viewModel.todayFocusSessions,
-            inProgress: viewModel.inProgressFocusSegment
-        )
-    }
-
     // MARK: – Controls hierarchy
 
     private var dashboardModeControl: some View {
@@ -847,8 +842,8 @@ struct DashboardRootView: View {
 
     @ViewBuilder
     private var dashboardTimerQuickAction: some View {
-        let isManualIdle = viewModel.mode == .manual && !viewModel.canStopChronoButton && !viewModel.showResumeChronoButton
-        let isAutomaticIdle = viewModel.mode != .manual && !viewModel.canStopChronoButton && !viewModel.showResumeChronoButton
+        let isManualIdle = viewModel.canStartManualFocus
+        let isAutomaticIdle = viewModel.mode != .manual && !viewModel.canStopAutoReminders
 
         if isManualIdle {
             DashboardQuickActionButton(
@@ -860,22 +855,22 @@ struct DashboardRootView: View {
                 viewModel.startManualFocus()
             }
             .keyboardShortcut("s", modifiers: [.command])
-        } else if viewModel.showResumeChronoButton {
+        } else if viewModel.canAbandonManualFocus {
             DashboardQuickActionButton(
-                title: "恢复计时",
-                subtitle: "继续暂停前的休息或专注计时。",
-                systemImage: "play.fill",
+                title: "放弃当前番茄",
+                subtitle: "结束本次专注，不计入完成。",
+                systemImage: "leaf.fill",
                 isProminent: true
             ) {
-                viewModel.resumeTimers()
+                viewModel.abandonManualFocus()
             }
-        } else if viewModel.canStopChronoButton {
+        } else if viewModel.canStopAutoReminders {
             DashboardQuickActionButton(
-                title: "停止计时",
-                subtitle: "结束当前计时状态。",
-                systemImage: "stop.fill"
+                title: "停止自动提醒",
+                subtitle: "停止整点/半点提醒。",
+                systemImage: "bell.slash.fill"
             ) {
-                viewModel.stopTimers()
+                viewModel.stopAutoReminders()
             }
         } else {
             DashboardQuickActionButton(

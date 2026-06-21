@@ -117,19 +117,23 @@ final class DeskRemindersModel: ObservableObject {
         await coordinator.deleteReminder(id: id)
     }
 
-    /// 在现有截止日期上顺延 `days`；无截止日期时设为「今天起第 `days` 天」上午 9:00。
+    /// 截止日期改为「今天起第 `days` 天」：有时刻则保留钟点；仅日期则目标日全天；无截止日期则目标日 9:00。
     func postponeReminder(id: String, addingDays days: Int) async {
         mutationMessage = nil
         do {
             var detail = try await coordinator.loadReminderDetail(calendarItemIdentifier: id)
             let cal = Calendar.current
-            if let due = detail.dueDate {
-                guard let shifted = cal.date(byAdding: .day, value: days, to: due) else { return }
-                detail.dueDate = shifted
+            let todayStart = cal.startOfDay(for: Date())
+            guard let targetStart = cal.date(byAdding: .day, value: days, to: todayStart) else { return }
+            if detail.includesTimeInDueDate, let due = detail.dueDate {
+                let h = cal.component(.hour, from: due)
+                let m = cal.component(.minute, from: due)
+                detail.dueDate = cal.date(bySettingHour: h, minute: m, second: 0, of: targetStart) ?? targetStart
+            } else if detail.dueDate != nil {
+                detail.dueDate = targetStart
+                detail.includesTimeInDueDate = false
             } else {
-                let start = cal.startOfDay(for: Date())
-                guard let base = cal.date(byAdding: .day, value: days, to: start) else { return }
-                detail.dueDate = cal.date(bySettingHour: 9, minute: 0, second: 0, of: base) ?? base
+                detail.dueDate = cal.date(bySettingHour: 9, minute: 0, second: 0, of: targetStart) ?? targetStart
                 detail.includesTimeInDueDate = true
             }
             try await coordinator.saveReminderDetail(detail)
@@ -140,27 +144,7 @@ final class DeskRemindersModel: ObservableObject {
 
     /// 截止日期改为「明天」：有时刻则保留钟点；仅日期则明天全天；无截止日期则明天 9:00。
     func postponeReminderToTomorrow(id: String) async {
-        mutationMessage = nil
-        do {
-            var detail = try await coordinator.loadReminderDetail(calendarItemIdentifier: id)
-            let cal = Calendar.current
-            let todayStart = cal.startOfDay(for: Date())
-            guard let tomorrowStart = cal.date(byAdding: .day, value: 1, to: todayStart) else { return }
-            if detail.includesTimeInDueDate, let due = detail.dueDate {
-                let h = cal.component(.hour, from: due)
-                let m = cal.component(.minute, from: due)
-                detail.dueDate = cal.date(bySettingHour: h, minute: m, second: 0, of: tomorrowStart) ?? tomorrowStart
-            } else if detail.dueDate != nil {
-                detail.dueDate = tomorrowStart
-                detail.includesTimeInDueDate = false
-            } else {
-                detail.dueDate = cal.date(bySettingHour: 9, minute: 0, second: 0, of: tomorrowStart) ?? tomorrowStart
-                detail.includesTimeInDueDate = true
-            }
-            try await coordinator.saveReminderDetail(detail)
-        } catch {
-            mutationMessage = error.localizedDescription
-        }
+        await postponeReminder(id: id, addingDays: 1)
     }
 
     func clearMutationMessage() {

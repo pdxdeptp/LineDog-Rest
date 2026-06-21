@@ -47,7 +47,7 @@ struct TodayTodoContentLayout<ListContent: View, DraftContent: View>: View {
     @State private var liveWidth: CGFloat = 0
     @State private var availableHeight: CGFloat = 0
     @State private var lastResolvedMode: TodayTodoLayoutMode = .measuring
-    @State private var edgeScrollTimer: Timer?
+    @State private var edgeScrollVelocity: CGFloat = 0
 
     private var resolution: TodayTodoLayoutResolution {
         let snapshot = lastCompleteSnapshot
@@ -80,6 +80,9 @@ struct TodayTodoContentLayout<ListContent: View, DraftContent: View>: View {
                             Color.clear
                                 .frame(height: 0)
                                 .id(TodayTodoContentLayoutAnchors.bottom)
+
+                            TodayTodoScrollEdgeBridge(velocity: edgeScrollVelocity)
+                                .frame(width: 0, height: 0)
                         }
                     }
                     .scrollDisabled(!resolution.listScrollEnabled)
@@ -120,12 +123,11 @@ struct TodayTodoContentLayout<ListContent: View, DraftContent: View>: View {
                     scrollToAnchor(for: .pinned, scrollProxy: scrollProxy)
                 }
                 .onPreferenceChange(TodayTodoReorderEdgeScrollPreferenceKey.self) { preference in
-                    updateEdgeScroll(preference: preference, scrollProxy: scrollProxy)
+                    edgeScrollVelocity = resolution.listScrollEnabled && preference.enabled
+                        ? preference.velocity
+                        : 0
                 }
             }
-        }
-        .onDisappear {
-            stopEdgeScroll()
         }
     }
 
@@ -171,26 +173,5 @@ struct TodayTodoContentLayout<ListContent: View, DraftContent: View>: View {
                 break
             }
         }
-    }
-
-    private func updateEdgeScroll(
-        preference: TodayTodoReorderEdgeScrollPreference,
-        scrollProxy: ScrollViewProxy
-    ) {
-        stopEdgeScroll()
-        guard resolution.listScrollEnabled, preference.direction != 0 else { return }
-
-        let capturedTargetId = preference.targetEntryId
-        edgeScrollTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { _ in
-            DispatchQueue.main.async {
-                guard let targetId = capturedTargetId else { return }
-                scrollProxy.scrollTo(targetId, anchor: .center)
-            }
-        }
-    }
-
-    private func stopEdgeScroll() {
-        edgeScrollTimer?.invalidate()
-        edgeScrollTimer = nil
     }
 }

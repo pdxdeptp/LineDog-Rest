@@ -72,9 +72,102 @@ final class TransientOverlayPresenterTests: XCTestCase {
         )
 
         XCTAssertTrue(inputSource.contains("transientOverlayPresenter.presentSmartReminderInput"))
+        XCTAssertTrue(inputSource.contains("SmartReminderUIPanels.makeInputContent"))
         XCTAssertTrue(toastSource.contains("transientOverlayPresenter.presentSmartReminderToast"))
+        XCTAssertTrue(toastSource.contains("SmartReminderUIPanels.makeToastContent"))
         XCTAssertTrue(inputSource.contains("installSmartInputDismissMonitors()"))
         XCTAssertTrue(source.contains("smartReminderInputDraft"))
+        XCTAssertFalse(source.contains("private var smartInputPanel"))
+        XCTAssertFalse(source.contains("private var smartToastPanel"))
+    }
+
+    func testDismissedSmartInputDelayedFocusDoesNotRevivePanel() {
+        var pendingWork: [() -> Void] = []
+        let presenter = MalDazeTransientOverlayPresenter(
+            dashboardPolicy: .init(demoteVisibleDashboardIfNeeded: { _ in }),
+            scheduleFocusWork: { pendingWork.append($0) }
+        )
+        let content = makeTestOverlayContent(tag: 1)
+
+        presenter.presentSmartReminderInput(
+            content: content,
+            anchor: NSRect(x: 100, y: 100, width: 20, height: 20)
+        )
+        XCTAssertTrue(presenter.isSmartReminderInputVisible)
+        let staleFocusWork = pendingWork.last
+        presenter.dismissSmartReminderInput()
+        XCTAssertFalse(presenter.isSmartReminderInputVisible)
+
+        staleFocusWork?()
+        XCTAssertFalse(presenter.isSmartReminderInputVisible)
+    }
+
+    func testReplacedSmartInputStaleFocusDoesNotReviveFirstPanel() {
+        var pendingWork: [() -> Void] = []
+        let presenter = MalDazeTransientOverlayPresenter(
+            dashboardPolicy: .init(demoteVisibleDashboardIfNeeded: { _ in }),
+            scheduleFocusWork: { pendingWork.append($0) }
+        )
+        let anchor = NSRect(x: 120, y: 120, width: 20, height: 20)
+
+        presenter.presentSmartReminderInput(content: makeTestOverlayContent(tag: 1), anchor: anchor)
+        let staleFocusWork = pendingWork.last
+        presenter.presentSmartReminderInput(content: makeTestOverlayContent(tag: 2), anchor: anchor)
+
+        staleFocusWork?()
+        XCTAssertTrue(presenter.isSmartReminderInputVisible)
+    }
+
+    func testScreenObserverStaysUntilAllOverlaysDismissed() {
+        let presenter = MalDazeTransientOverlayPresenter(
+            dashboardPolicy: .init(demoteVisibleDashboardIfNeeded: { _ in })
+        )
+        presenter.presentCenterBell(message: "bell", onDismiss: {})
+        presenter.presentSmartReminderInput(
+            content: makeTestOverlayContent(tag: 3),
+            anchor: NSRect(x: 80, y: 80, width: 20, height: 20)
+        )
+        presenter.dismissCenterBell()
+        XCTAssertTrue(presenter.isSmartReminderInputVisible)
+
+        NotificationCenter.default.post(
+            name: NSApplication.didChangeScreenParametersNotification,
+            object: nil
+        )
+        XCTAssertTrue(presenter.isSmartReminderInputVisible)
+
+        presenter.dismissSmartReminderInput()
+        XCTAssertFalse(presenter.isSmartReminderInputVisible)
+    }
+
+    func testSmartReminderContentBuilderDoesNotConstructPanels() throws {
+        let source = try readProjectSource("MalDaze/SmartReminder/SmartReminderUIPanels.swift")
+        let makeInputSource = try functionSource(named: "makeInputContent", in: source)
+        let makeToastSource = try functionSource(named: "makeToastContent", in: source)
+
+        XCTAssertTrue(makeInputSource.contains("TransientOverlayContent"))
+        XCTAssertTrue(makeToastSource.contains("TransientOverlayContent"))
+        XCTAssertFalse(makeInputSource.contains("NSPanel("))
+        XCTAssertFalse(makeToastSource.contains("NSPanel("))
+    }
+
+    func testPresenterRepositionsPassiveAndInteractiveOverlaysOnScreenChange() throws {
+        let source = try readProjectSource("MalDaze/TransientOverlay/MalDazeTransientOverlayPresenter.swift")
+        let repositionSource = try functionSource(
+            named: "repositionAllOverlays",
+            in: source,
+            after: "final class MalDazeTransientOverlayPresenter"
+        )
+
+        XCTAssertTrue(repositionSource.contains("state.reposition()"))
+        XCTAssertTrue(repositionSource.contains("InteractiveAnchoredOverlayGeometry.positionPanel"))
+        XCTAssertTrue(source.contains("NSApplication.didChangeScreenParametersNotification"))
+    }
+
+    private func makeTestOverlayContent(tag: Int) -> TransientOverlayContent {
+        let view = NSView(frame: NSRect(x: 0, y: 0, width: 120, height: 40))
+        view.identifier = NSUserInterfaceItemIdentifier("overlay-\(tag)")
+        return TransientOverlayContent(view: view, size: view.frame.size)
     }
 
     private func readProjectSource(_ relativePath: String) throws -> String {

@@ -16,9 +16,14 @@ final class TodayTodoStore: ObservableObject {
 
     private var allEntries: [TodayTodoEntry] = []
     private let fileURL: URL
+    private var archiveLog: TodayTodoArchiveLog
     private let todayISO: () -> String
     private let jsonEncoder: JSONEncoder
     private let jsonDecoder: JSONDecoder
+    private let titleAutosave: TodayTodoAutosaveScheduler
+
+    private var pendingLiveEditId: UUID?
+    private var lastPersistedTitles: [UUID: String] = [:]
 
     var canMutate: Bool {
         if case .ready = loadState { return true }
@@ -27,10 +32,17 @@ final class TodayTodoStore: ObservableObject {
 
     init(
         fileURL: URL? = nil,
-        todayISO: @escaping () -> String = { TodayTodoFormatting.isoDate(Date()) }
+        archiveFileURL: URL? = nil,
+        todayISO: @escaping () -> String = { TodayTodoFormatting.isoDate(Date()) },
+        titleAutosave: TodayTodoAutosaveScheduler = TodayTodoAutosaveScheduler()
     ) {
-        self.fileURL = fileURL ?? Self.defaultFileURL()
+        let resolvedFileURL = fileURL ?? Self.defaultFileURL()
+        self.fileURL = resolvedFileURL
+        self.archiveLog = TodayTodoArchiveLog(
+            fileURL: archiveFileURL ?? TodayTodoArchiveLog.defaultFileURL(beside: resolvedFileURL)
+        )
         self.todayISO = todayISO
+        self.titleAutosave = titleAutosave
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         encoder.dateEncodingStrategy = .iso8601
@@ -47,12 +59,24 @@ final class TodayTodoStore: ObservableObject {
         return dir.appendingPathComponent("today-todo.json", isDirectory: false)
     }
 
+    func loadIfNeeded() {
+        if case .ready = loadState {
+            flushPendingTitleEdits()
+            return
+        }
+        loadAndRollForward()
+    }
+
     func loadAndRollForward() {
+        if case .ready = loadState {
+            flushPendingTitleEdits()
+        }
         mutationError = nil
         do {
             var file = try readFile()
             let today = todayISO()
             var changed = false
+            var rolledEntries: [TodayTodoEntry] = []
             file.entries = file.entries.map { entry in
                 guard entry.deletedAt == nil else { return entry }
                 guard !entry.isCompleted, entry.dateISO < today else { return entry }
@@ -60,12 +84,17 @@ final class TodayTodoStore: ObservableObject {
                 rolled.rolledFromDateISO = entry.rolledFromDateISO ?? entry.dateISO
                 rolled.dateISO = today
                 changed = true
+                rolledEntries.append(rolled)
                 return rolled
             }
             if changed {
                 try writeFile(file)
+                for entry in rolledEntries {
+                    recordArchive(.rollForward, entry: entry)
+                }
             }
             allEntries = file.entries
+            seedLastPersistedTitles()
             publishTodaySlices(for: today)
             loadState = .ready
         } catch let error as TodayTodoStoreError {
@@ -81,8 +110,68 @@ final class TodayTodoStore: ObservableObject {
         }
     }
 
+    func beginTitleEditing(id: UUID) {
+        guard let index = allEntries.firstIndex(where: { $0.id == id }) else { return }
+        lastPersistedTitles[id] = allEntries[index].title
+        pendingLiveEditId = id
+    }
+
+    func updateTitleLive(id: UUID, title: String) {
+        guard canMutate else { return }
+        guard let index = allEntries.firstIndex(where: { $0.id == id }) else { return }
+
+        pendingLiveEditId = id
+        if allEntries[index].title != title {
+            allEntries[index].title = title
+        }
+
+        titleAutosave.schedule { [weak self] in
+            self?.persistLiveTitleIfNeeded(for: id)
+        }
+    }
+
+    func flushPendingTitleEdits() {
+        titleAutosave.flush { [weak self] in
+            self?.persistPendingLiveTitleIfNeeded()
+        }
+    }
+
+    func finalizeTitle(id: UUID, title rawTitle: String) {
+        flushPendingTitleEdits()
+        guard canMutate else { return }
+        guard let index = allEntries.firstIndex(where: { $0.id == id }) else { return }
+
+        let trimmed = rawTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        let previousTitle = lastPersistedTitles[id] ?? allEntries[index].title
+
+        if trimmed.isEmpty {
+            softDelete(at: index)
+            guard persistTodaySlices() else { return }
+            lastPersistedTitles[id] = nil
+            pendingLiveEditId = nil
+            recordArchive(.delete, entry: allEntries[index], previousTitle: previousTitle)
+            return
+        }
+
+        if allEntries[index].title != trimmed {
+            allEntries[index].title = trimmed
+        }
+        guard persistTodaySlices() else { return }
+
+        if previousTitle != trimmed {
+            recordArchive(.updateTitle, entry: allEntries[index], previousTitle: previousTitle)
+        }
+        lastPersistedTitles[id] = trimmed
+        pendingLiveEditId = nil
+    }
+
+    func updateTitle(id: UUID, title rawTitle: String) {
+        finalizeTitle(id: id, title: rawTitle)
+    }
+
     @discardableResult
     func add(title rawTitle: String) -> Bool {
+        flushPendingTitleEdits()
         let title = rawTitle.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !title.isEmpty else { return false }
         guard canMutate else { return false }
@@ -100,10 +189,14 @@ final class TodayTodoStore: ObservableObject {
             sortIndex: nextIndex
         )
         allEntries.append(entry)
-        return persistTodaySlices() != nil
+        guard persistTodaySlices() else { return false }
+        lastPersistedTitles[entry.id] = title
+        recordArchive(.add, entry: entry)
+        return true
     }
 
     func toggleComplete(id: UUID) {
+        flushPendingTitleEdits()
         guard canMutate else { return }
         guard let index = allEntries.firstIndex(where: { $0.id == id }) else { return }
         allEntries[index].isCompleted.toggle()
@@ -113,39 +206,52 @@ final class TodayTodoStore: ObservableObject {
             allEntries[index].completedAt = nil
             allEntries[index].dateISO = todayISO()
         }
-        _ = persistTodaySlices()
-    }
-
-    func updateTitle(id: UUID, title rawTitle: String) {
-        let title = rawTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard canMutate else { return }
-        guard let index = allEntries.firstIndex(where: { $0.id == id }) else { return }
-        if title.isEmpty {
-            softDelete(at: index)
-        } else {
-            allEntries[index].title = title
-        }
-        _ = persistTodaySlices()
+        guard persistTodaySlices() else { return }
+        recordArchive(.toggleComplete, entry: allEntries[index])
     }
 
     func delete(id: UUID) {
+        flushPendingTitleEdits()
         guard canMutate else { return }
         guard let index = allEntries.firstIndex(where: { $0.id == id }) else { return }
+        let previousTitle = allEntries[index].title
         softDelete(at: index)
-        _ = persistTodaySlices()
+        guard persistTodaySlices() else { return }
+        lastPersistedTitles[id] = nil
+        if pendingLiveEditId == id { pendingLiveEditId = nil }
+        recordArchive(.delete, entry: allEntries[index], previousTitle: previousTitle)
     }
 
     func moveIncomplete(from source: IndexSet, to destination: Int) {
+        flushPendingTitleEdits()
         guard canMutate else { return }
         guard !source.isEmpty else { return }
 
         var ordered = incompleteEntries
         ordered.move(fromOffsets: source, toOffset: destination)
         applyIncompleteSortIndices(ordered)
-        _ = persistTodaySlices()
+        guard persistTodaySlices() else { return }
+        recordArchive(.reorder, incompleteOrder: incompleteEntries.map(\.id))
+    }
+
+    func reorderIncomplete(draggedId: UUID, toFinalIndex finalIndex: Int) {
+        flushPendingTitleEdits()
+        guard canMutate else { return }
+
+        var ordered = incompleteEntries
+        guard let fromIndex = ordered.firstIndex(where: { $0.id == draggedId }) else { return }
+        guard fromIndex != finalIndex else { return }
+
+        let item = ordered.remove(at: fromIndex)
+        let insertAt = min(max(finalIndex, 0), ordered.count)
+        ordered.insert(item, at: insertAt)
+        applyIncompleteSortIndices(ordered)
+        guard persistTodaySlices() else { return }
+        recordArchive(.reorder, entry: item, incompleteOrder: incompleteEntries.map(\.id))
     }
 
     func reorderIncomplete(fromSource sourceIndex: Int, toInsertionIndex insertionIndex: Int) {
+        flushPendingTitleEdits()
         guard canMutate else { return }
         guard insertionIndex != sourceIndex, insertionIndex != sourceIndex + 1 else { return }
 
@@ -155,10 +261,12 @@ final class TodayTodoStore: ObservableObject {
         let insertAt = insertionIndex > sourceIndex ? insertionIndex - 1 : insertionIndex
         ordered.insert(item, at: insertAt)
         applyIncompleteSortIndices(ordered)
-        _ = persistTodaySlices()
+        guard persistTodaySlices() else { return }
+        recordArchive(.reorder, entry: item, incompleteOrder: incompleteEntries.map(\.id))
     }
 
     func moveIncomplete(draggedId: UUID, before targetId: UUID) {
+        flushPendingTitleEdits()
         guard canMutate, draggedId != targetId else { return }
 
         var ordered = incompleteEntries
@@ -170,23 +278,32 @@ final class TodayTodoStore: ObservableObject {
         let insertIndex = fromIndex < targetIndex ? targetIndex - 1 : targetIndex
         ordered.insert(entry, at: insertIndex)
         applyIncompleteSortIndices(ordered)
-        _ = persistTodaySlices()
+        guard persistTodaySlices() else { return }
+        recordArchive(.reorder, entry: entry, incompleteOrder: incompleteEntries.map(\.id))
     }
 
     func restore(id: UUID) {
+        flushPendingTitleEdits()
         guard canMutate else { return }
         guard let index = allEntries.firstIndex(where: { $0.id == id }) else { return }
         guard allEntries[index].deletedAt != nil else { return }
         allEntries[index].deletedAt = nil
-        _ = persistTodaySlices()
+        guard persistTodaySlices() else { return }
+        lastPersistedTitles[id] = allEntries[index].title
+        recordArchive(.restore, entry: allEntries[index])
     }
 
     func permanentlyDelete(id: UUID) {
+        flushPendingTitleEdits()
         guard canMutate else { return }
         guard let index = allEntries.firstIndex(where: { $0.id == id }) else { return }
         guard allEntries[index].deletedAt != nil else { return }
+        let entry = allEntries[index]
         allEntries.remove(at: index)
-        _ = persistTodaySlices()
+        guard persistTodaySlices() else { return }
+        lastPersistedTitles[id] = nil
+        if pendingLiveEditId == id { pendingLiveEditId = nil }
+        recordArchive(.permanentDelete, entry: entry)
     }
 
     func historyGroupedByDate() -> [TodayTodoHistorySection] {
@@ -215,6 +332,44 @@ final class TodayTodoStore: ObservableObject {
             mutationError = "保存今日 todo 失败。"
             return false
         }
+    }
+
+    private func persistPendingLiveTitleIfNeeded() {
+        guard let id = pendingLiveEditId else { return }
+        persistLiveTitleIfNeeded(for: id)
+    }
+
+    private func persistLiveTitleIfNeeded(for id: UUID) {
+        guard canMutate else { return }
+        guard let index = allEntries.firstIndex(where: { $0.id == id }) else { return }
+
+        let title = allEntries[index].title
+        let previousTitle = lastPersistedTitles[id] ?? title
+        guard previousTitle != title else { return }
+
+        guard persistTodaySlices() else { return }
+        lastPersistedTitles[id] = title
+        recordArchive(.updateTitle, entry: allEntries[index], previousTitle: previousTitle)
+    }
+
+    private func seedLastPersistedTitles() {
+        lastPersistedTitles = Dictionary(uniqueKeysWithValues: allEntries.map { ($0.id, $0.title) })
+    }
+
+    private func recordArchive(
+        _ action: TodayTodoArchiveAction,
+        entry: TodayTodoEntry? = nil,
+        previousTitle: String? = nil,
+        incompleteOrder: [UUID]? = nil
+    ) {
+        archiveLog.append(
+            TodayTodoArchiveRecord(
+                action: action,
+                entry: entry,
+                previousTitle: previousTitle,
+                incompleteOrder: incompleteOrder
+            )
+        )
     }
 
     private func publishTodaySlices(for today: String) {

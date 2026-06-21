@@ -3,12 +3,14 @@ import Foundation
 /// 模式 A：从「开始」起 25 分钟工作 → 5 分钟休息 → 再进入下一轮 25 分钟。
 final class ManualTimerEngine: TimerEngine {
     var onStateChange: ((TimeState) -> Void)?
+    var onPhaseEvent: ((ManualPhaseEvent) -> Void)?
 
     private var workDuration: TimeInterval
     private var restDuration: TimeInterval
 
     private var tickTimer: Timer?
     private var phaseEnd: Date?
+    private var workPhaseStart: Date?
     private var isRestPhase = false
     /// 与 `AppViewModel.formatClock` 一致：仅整秒变化时上报，减少 0.25s 定时器带来的无效 UI 刷新。
     private var lastEmittedRemainingWholeSeconds: Int = -1
@@ -28,13 +30,13 @@ final class ManualTimerEngine: TimerEngine {
         restDuration = rest
     }
 
-    /// 计时器是否在跑（未点「停止计时」且 `start()` 已调用）。
+    /// 计时器是否在跑（`start()` 已调用且未 `stop()`）。
     var isTimerRunning: Bool { tickTimer != nil }
 
-    /// 当前是否处于休息段（`start()` 之后的 5 分钟休息内）。 
+    /// 当前是否处于休息段（`start()` 之后的休息内）。
     var isInRestPhase: Bool { isRestPhase }
 
-    /// 若计时器在跑且处于休息段，返回距该段结束剩余时间；否则为 0（用于测试休息结束后恢复霸屏时长）。
+    /// 若计时器在跑且处于休息段，返回距该段结束剩余时间；否则为 0。
     var restPhaseRemainingOrZero: TimeInterval {
         guard tickTimer != nil, isRestPhase, let end = phaseEnd else { return 0 }
         return max(0, end.timeIntervalSinceNow)
@@ -48,36 +50,62 @@ final class ManualTimerEngine: TimerEngine {
 
     var currentPhaseEnd: Date? { phaseEnd }
 
+    var currentWorkPhase: ManualWorkPhase? {
+        guard tickTimer != nil, !isRestPhase, let end = phaseEnd, let start = workPhaseStart else { return nil }
+        return ManualWorkPhase(startedAt: start, endsAt: end)
+    }
+
     func start() {
-        stop()
+        stop(emitStopped: false)
         isRestPhase = false
-        phaseEnd = Date().addingTimeInterval(workDuration)
+        let start = Date()
+        workPhaseStart = start
+        phaseEnd = start.addingTimeInterval(workDuration)
+        emitPhaseEvent(.workStarted(start: start, end: phaseEnd!))
         emit()
         scheduleTick()
     }
 
     func stop() {
+        stop(emitStopped: true)
+    }
+
+    private func stop(emitStopped: Bool) {
         tickTimer?.invalidate()
         tickTimer = nil
         phaseEnd = nil
+        workPhaseStart = nil
         isRestPhase = false
+        if emitStopped {
+            onPhaseEvent?(.engineStopped)
+        }
     }
 
     /// 用户在休息霸屏上双击小狗：跳过当前休息段，进入下一轮工作段。
     func skipRestPhaseToWork() {
-        guard tickTimer != nil, isRestPhase else { return }
+        guard tickTimer != nil, isRestPhase, phaseEnd != nil else { return }
         isRestPhase = false
-        phaseEnd = Date().addingTimeInterval(workDuration)
+        let nextStart = Date()
+        let nextEnd = nextStart.addingTimeInterval(workDuration)
+        workPhaseStart = nextStart
+        phaseEnd = nextEnd
         lastEmittedRemainingWholeSeconds = -1
+        emitPhaseEvent(.restEnded(nextWorkStart: nextStart, nextWorkEnd: nextEnd))
+        emitPhaseEvent(.workStarted(start: nextStart, end: nextEnd))
         scheduleTick()
         emit()
     }
 
-    /// 单测或调试：跳过工作段，直接进入休息段并派发 `.resting`（与真实 `tick` 切换后状态一致）。
+    /// 单测或调试：跳过工作段，直接进入休息段并派发 `.resting`。
     func testing_enterRestPhase(remaining: TimeInterval) {
         tickTimer?.invalidate()
+        if let start = workPhaseStart, let end = phaseEnd, !isRestPhase {
+            emitPhaseEvent(.workCompleted(start: start, end: end))
+        }
         isRestPhase = true
+        workPhaseStart = nil
         phaseEnd = Date().addingTimeInterval(remaining)
+        emitPhaseEvent(.restStarted(end: phaseEnd!))
         scheduleTick()
         emit()
     }
@@ -88,24 +116,45 @@ final class ManualTimerEngine: TimerEngine {
         tickTimer = nil
         self.isRestPhase = isRestPhase
         phaseEnd = end
+        workPhaseStart = isRestPhase ? nil : end.addingTimeInterval(-workDuration)
         lastEmittedRemainingWholeSeconds = -1
-        reconcileWallClockFromPersisted(now: now)
+        reconcileWallClockFromPersisted(now: now, emitEvents: true)
         scheduleTick()
         emit()
     }
 
-    private func reconcileWallClockFromPersisted(now: Date) {
+    private func reconcileWallClockFromPersisted(now: Date, emitEvents: Bool) {
         guard var end = phaseEnd else { return }
         while end.timeIntervalSince(now) <= 0 {
             if isRestPhase {
+                let nextStart = end
+                let nextEnd = nextStart.addingTimeInterval(workDuration)
                 isRestPhase = false
-                end = end.addingTimeInterval(workDuration)
+                end = nextEnd
+                workPhaseStart = nextStart
+                if emitEvents {
+                    emitPhaseEvent(.restEnded(nextWorkStart: nextStart, nextWorkEnd: nextEnd))
+                    emitPhaseEvent(.workStarted(start: nextStart, end: nextEnd))
+                }
             } else {
+                let workEnd = end
+                let workStart = workPhaseStart ?? workEnd.addingTimeInterval(-workDuration)
                 isRestPhase = true
-                end = end.addingTimeInterval(restDuration)
+                end = workEnd.addingTimeInterval(restDuration)
+                workPhaseStart = nil
+                if emitEvents {
+                    emitPhaseEvent(.workCompleted(start: workStart, end: workEnd))
+                    emitPhaseEvent(.restStarted(end: end))
+                }
             }
         }
         phaseEnd = end
+        if !isRestPhase, workPhaseStart == nil {
+            workPhaseStart = end.addingTimeInterval(-workDuration)
+            if emitEvents, let start = workPhaseStart {
+                emitPhaseEvent(.workStarted(start: start, end: end))
+            }
+        }
     }
 
     private func scheduleTick() {
@@ -135,12 +184,22 @@ final class ManualTimerEngine: TimerEngine {
 
         lastEmittedRemainingWholeSeconds = -1
         if isRestPhase {
+            let nextStart = Date()
+            let nextEnd = nextStart.addingTimeInterval(workDuration)
             isRestPhase = false
-            phaseEnd = Date().addingTimeInterval(workDuration)
+            phaseEnd = nextEnd
+            workPhaseStart = nextStart
+            emitPhaseEvent(.restEnded(nextWorkStart: nextStart, nextWorkEnd: nextEnd))
+            emitPhaseEvent(.workStarted(start: nextStart, end: nextEnd))
             onStateChange?(.working(remaining: workDuration))
         } else {
+            let workEnd = end
+            let workStart = workPhaseStart ?? workEnd.addingTimeInterval(-workDuration)
             isRestPhase = true
             phaseEnd = Date().addingTimeInterval(restDuration)
+            workPhaseStart = nil
+            emitPhaseEvent(.workCompleted(start: workStart, end: workEnd))
+            emitPhaseEvent(.restStarted(end: phaseEnd!))
             onStateChange?(.resting(remaining: restDuration))
         }
         lastEmittedRemainingWholeSeconds = max(0, Int((phaseEnd?.timeIntervalSinceNow ?? 0).rounded(.down)))
@@ -155,5 +214,9 @@ final class ManualTimerEngine: TimerEngine {
         } else {
             onStateChange?(.working(remaining: remaining))
         }
+    }
+
+    private func emitPhaseEvent(_ event: ManualPhaseEvent) {
+        onPhaseEvent?(event)
     }
 }

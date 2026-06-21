@@ -178,6 +178,27 @@ final class NutritionTodayViewModelTests: XCTestCase {
         XCTAssertEqual(oldPanelVM.recommendationMessage, "今日摄入已更新，Hermes 尚未写入匹配的饮食建议。")
     }
 
+    func testRefreshPanelReloadsFactsFromDisk() async {
+        let reader = ReloadingStubNutritionReader()
+        let recommendationReader = StubRecommendationReader(snapshot: .available())
+        let cli = MockNutritionCLI()
+        let vm = NutritionTodayViewModel(reader: reader, recommendationReader: recommendationReader, cli: cli)
+
+        vm.loadToday()
+        XCTAssertEqual(cli.refreshCount, 0)
+
+        await vm.refreshPanel()
+
+        XCTAssertEqual(cli.refreshCount, 1)
+        XCTAssertFalse(vm.isRefreshingPanel)
+        XCTAssertEqual(reader.readCount, 2)
+        if case .loaded(let log) = vm.loadState {
+            XCTAssertEqual(log.panel?.updatedAt, "2099-01-01T08:10:00+08:00")
+        } else {
+            XCTFail("expected loaded after refresh")
+        }
+    }
+
     func testMissingUnavailableAndInvalidRecommendationStatesDisableActions() {
         let missingVM = NutritionTodayViewModel(
             reader: StubNutritionReader(),
@@ -517,11 +538,16 @@ private final class MockNutritionCLI: NutritionHermesCLI {
     var lastName: String?
     var lastGrams: Double?
     var logCount = 0
+    var refreshCount = 0
 
     func logFood(name: String, grams: Double) async throws {
         logCount += 1
         lastName = name
         lastGrams = grams
+    }
+
+    func refreshPanel() async throws {
+        refreshCount += 1
     }
 }
 
@@ -534,4 +560,6 @@ private final class SlowMockNutritionCLI: NutritionHermesCLI {
         lastName = name
         try await Task.sleep(nanoseconds: 200_000_000)
     }
+
+    func refreshPanel() async throws {}
 }

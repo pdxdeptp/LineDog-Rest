@@ -2,6 +2,7 @@ import AppKit
 import SwiftUI
 
 struct LearningDeskPanelView: View {
+    @ObservedObject var appViewModel: AppViewModel
     @StateObject private var viewModel = LearningDeskPanelViewModel()
     @StateObject private var todayTodoStore = TodayTodoStore()
     @State private var showTodayTodoHistory = false
@@ -43,7 +44,10 @@ struct LearningDeskPanelView: View {
             await viewModel.loadToday()
         }
         .onAppear { viewModel.startWatching() }
-        .onDisappear { viewModel.stopWatching() }
+        .onDisappear {
+            viewModel.stopWatching()
+            appViewModel.focusTimelinePresenter.setVisible(false)
+        }
         .onChange(of: viewModel.selectedTab) { _ in
             Task { await viewModel.onTabChanged() }
         }
@@ -538,27 +542,19 @@ struct LearningDeskPanelView: View {
             budgetLine(
                 label: "正课",
                 totalMinutes: response.study.totalMinutes,
-                budgetMinutes: dailyCapacityMinutes
+                budgetMinutes: dailyCapacityMinutes,
+                progressDone: response.progress?.study.done,
+                progressTotal: response.progress?.study.total
             )
             budgetLine(
                 label: "复习",
                 totalMinutes: response.review.totalMinutes,
-                budgetMinutes: response.review.budget
+                budgetMinutes: response.review.budget,
+                progressDone: response.progress?.review.done,
+                progressTotal: response.progress?.review.total
             )
 
-            if let progress = response.progress {
-                progressLine(
-                    label: "正课完成",
-                    done: progress.study.done,
-                    total: progress.study.total
-                )
-                progressLine(
-                    label: "复习完成",
-                    done: progress.review.done,
-                    total: progress.review.total
-                )
-            }
-
+            focusTimelineRow(response: response)
         }
     }
 
@@ -567,7 +563,31 @@ struct LearningDeskPanelView: View {
         return rows.filter { $0.pending.projectId == filter }
     }
 
-    private func budgetLine(label: String, totalMinutes: Int, budgetMinutes: Int) -> some View {
+    private func focusTimelineRow(response: HermesTodayResponse) -> some View {
+        LearningDeskFocusTimelineRow(
+            presenter: appViewModel.focusTimelinePresenter,
+            responseDate: response.date,
+            onUpdateSession: { id, startedAt, endedAt in
+                appViewModel.updateFocusSession(id: id, startedAt: startedAt, endedAt: endedAt)
+            },
+            onDeleteSession: { id in
+                appViewModel.deleteFocusSession(id: id)
+            }
+        )
+        .onAppear {
+            if let timelineDay = FocusDayTimelineCellGridModel.dayStart(fromISODate: response.date) {
+                appViewModel.updateFocusTimelineDay(timelineDay)
+            }
+        }
+    }
+
+    private func budgetLine(
+        label: String,
+        totalMinutes: Int,
+        budgetMinutes: Int,
+        progressDone: Int? = nil,
+        progressTotal: Int? = nil
+    ) -> some View {
         let over = totalMinutes > budgetMinutes
         let loadText = label == "复习"
             ? LearningCapacityFormatting.formatMinutesLoad(totalMinutes: totalMinutes, budgetMinutes: budgetMinutes)
@@ -585,23 +605,12 @@ struct LearningDeskPanelView: View {
                     .font(.caption2.weight(.bold))
                     .foregroundStyle(.red)
             }
+            if let progressDone, let progressTotal {
+                Text("· 完成 \(progressDone)/\(progressTotal)")
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
             Spacer(minLength: 0)
-        }
-    }
-
-    private func progressLine(label: String, done: Int, total: Int) -> some View {
-        HStack(spacing: 8) {
-            Text(label)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .frame(width: 52, alignment: .leading)
-            Text("\(done)/\(total)")
-                .font(.caption.monospacedDigit())
-                .frame(width: 36, alignment: .leading)
-            ProgressView(
-                value: LearningCapacityFormatting.progressFraction(done: done, total: total)
-            )
-            .progressViewStyle(.linear)
         }
     }
 

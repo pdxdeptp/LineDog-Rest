@@ -96,6 +96,33 @@ struct NutritionPanelSuggestion: Equatable, Codable {
     }
 }
 
+struct NutritionEffectiveTdeeInterval: Equatable, Codable {
+    let pointKcalDay: Int?
+    let intervalLowKcalDay: Int?
+    let intervalHighKcalDay: Int?
+    let intervalLevel: Double?
+    let estimand: String?
+}
+
+struct NutritionEstimatorShadowSummary: Equatable, Codable {
+    let readiness: String?
+    let authorityMode: String?
+    let observationThrough: String?
+    let effectiveTdee: NutritionEffectiveTdeeInterval?
+    let confounded: Bool?
+}
+
+struct NutritionTargetBreakdownV2Shadow: Equatable, Codable {
+    let breakdownSchemaVersion: Int
+    let targetKcal: Int?
+    let estimatorReadiness: String?
+    let effectiveTdee: NutritionEffectiveTdeeInterval?
+    let weeklyDecision: String?
+    let holdReason: String?
+    let appliedAdjustmentKcalDay: Int?
+    let fallbackReason: String?
+}
+
 struct NutritionPanel: Equatable, Codable {
     let schemaVersion: Int
     let updatedAt: String
@@ -108,9 +135,11 @@ struct NutritionPanel: Equatable, Codable {
     let suggestions: [NutritionPanelSuggestion]
     let calorieSlack: Int
     let targetBreakdown: NutritionTargetBreakdown?
+    let estimatorShadow: NutritionEstimatorShadowSummary?
+    let targetBreakdownShadow: NutritionTargetBreakdownV2Shadow?
 
     enum CodingKeys: String, CodingKey {
-        case schemaVersion, updatedAt, dayLabel, workoutLabel, targets, consumed, remaining, suggestions, calorieSlack, targetBreakdown
+        case schemaVersion, updatedAt, dayLabel, workoutLabel, targets, consumed, remaining, suggestions, calorieSlack, targetBreakdown, estimatorShadow, targetBreakdownShadow
     }
 
     init(
@@ -123,7 +152,9 @@ struct NutritionPanel: Equatable, Codable {
         remaining: NutritionMacroBucket,
         suggestions: [NutritionPanelSuggestion],
         calorieSlack: Int,
-        targetBreakdown: NutritionTargetBreakdown? = nil
+        targetBreakdown: NutritionTargetBreakdown? = nil,
+        estimatorShadow: NutritionEstimatorShadowSummary? = nil,
+        targetBreakdownShadow: NutritionTargetBreakdownV2Shadow? = nil
     ) {
         self.schemaVersion = schemaVersion
         self.updatedAt = updatedAt
@@ -135,6 +166,8 @@ struct NutritionPanel: Equatable, Codable {
         self.suggestions = suggestions
         self.calorieSlack = calorieSlack
         self.targetBreakdown = targetBreakdown
+        self.estimatorShadow = estimatorShadow
+        self.targetBreakdownShadow = targetBreakdownShadow
     }
 
     init(from decoder: Decoder) throws {
@@ -149,6 +182,12 @@ struct NutritionPanel: Equatable, Codable {
         suggestions = try c.decodeIfPresent([NutritionPanelSuggestion].self, forKey: .suggestions) ?? []
         calorieSlack = try c.decodeIfPresent(Int.self, forKey: .calorieSlack) ?? 50
         targetBreakdown = try c.decodeIfPresent(NutritionTargetBreakdown.self, forKey: .targetBreakdown)
+        estimatorShadow = try c.decodeIfPresent(NutritionEstimatorShadowSummary.self, forKey: .estimatorShadow)
+        let shadowBreakdown = try c.decodeIfPresent(NutritionTargetBreakdownV2Shadow.self, forKey: .targetBreakdownShadow)
+        if let shadowBreakdown, shadowBreakdown.breakdownSchemaVersion >= 2, shadowBreakdown.effectiveTdee == nil {
+            throw NutritionDailyLogContractError.malformedTargetBreakdownV2
+        }
+        targetBreakdownShadow = shadowBreakdown
     }
 }
 
@@ -183,6 +222,8 @@ enum NutritionDailyLogContractError: Error, Equatable {
     case readFailed
     case invalidJSON
     case unsupportedPanelSchema(Int)
+    case unsupportedTargetBreakdownSchema(Int)
+    case malformedTargetBreakdownV2
 }
 
 protocol NutritionDailyLogReading {
@@ -239,6 +280,10 @@ struct NutritionDailyLogContractReader: NutritionDailyLogReading {
             return "daily_log.json 格式无效。"
         case .unsupportedPanelSchema(let version):
             return "不支持的 panel 契约版本：\(version)。"
+        case .unsupportedTargetBreakdownSchema(let version):
+            return "不支持的 targetBreakdown 契约版本：\(version)。"
+        case .malformedTargetBreakdownV2:
+            return "targetBreakdown v2 缺少 required effectiveTdee 证据字段。"
         }
     }
 

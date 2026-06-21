@@ -248,7 +248,6 @@ final class WindowManager: WindowManaging {
     /// 与 `AppViewModel.restBlocksClicksDuringRest` 同步；仅影响**休息全屏**阶段的鼠标是否穿透。
     private var restBlocksClicks: Bool = true
 
-    private var smartInputPanel: NSPanel?
     /// 用户取消智能输入时回调（Esc / 点外部 /「取消」）；提交成功前清除且不调用。
     private var smartInputUserOnCancel: (() -> Void)?
     private var smartInputEscapeMonitor: Any?
@@ -256,7 +255,6 @@ final class WindowManager: WindowManaging {
     private var smartInputLocalMouseMonitor: Any?
     /// 系统全局点击面板外关闭（需辅助功能授权）。
     private var smartInputClickAwayMonitor: Any?
-    private var smartToastPanel: NSPanel?
     private var smartToastDismiss: Timer?
     /// 智能输入框草稿：点外部 / Esc /「取消」关闭后面板不丢字；回车提交成功后清空。
     private var smartReminderInputDraft: String = ""
@@ -1049,8 +1047,7 @@ final class WindowManager: WindowManaging {
             NSEvent.removeMonitor(m)
             smartInputClickAwayMonitor = nil
         }
-        smartInputPanel?.close()
-        smartInputPanel = nil
+        transientOverlayPresenter.dismissSmartReminderInput()
         let cb = smartInputUserOnCancel
         smartInputUserOnCancel = nil
         if invokeUserCancel {
@@ -1060,23 +1057,22 @@ final class WindowManager: WindowManaging {
 
     private func installSmartInputDismissMonitors() {
         smartInputEscapeMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard let self, self.smartInputPanel != nil else { return event }
+            guard let self, self.transientOverlayPresenter.isSmartReminderInputVisible else { return event }
             guard event.keyCode == 53 else { return event }
             self.teardownSmartInputPanel(invokeUserCancel: true)
             return nil
         }
         smartInputLocalMouseMonitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { [weak self] event in
-            guard let self, let panel = self.smartInputPanel else { return event }
-            if !panel.frame.contains(NSEvent.mouseLocation) {
+            guard let self, self.transientOverlayPresenter.isSmartReminderInputVisible else { return event }
+            if !self.transientOverlayPresenter.smartReminderInputContains(screenPoint: NSEvent.mouseLocation) {
                 self.teardownSmartInputPanel(invokeUserCancel: true)
             }
             return event
         }
-        // 点其它 App / 桌面时关闭（需辅助功能）；否则依赖本地监听 + Esc +「取消」。
         smartInputClickAwayMonitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDown) { [weak self] _ in
             Task { @MainActor [weak self] in
-                guard let self, let panel = self.smartInputPanel else { return }
-                if !panel.frame.contains(NSEvent.mouseLocation) {
+                guard let self, self.transientOverlayPresenter.isSmartReminderInputVisible else { return }
+                if !self.transientOverlayPresenter.smartReminderInputContains(screenPoint: NSEvent.mouseLocation) {
                     self.teardownSmartInputPanel(invokeUserCancel: true)
                 }
             }
@@ -1097,7 +1093,7 @@ final class WindowManager: WindowManaging {
             get: { [weak self] in self?.smartReminderInputDraft ?? "" },
             set: { [weak self] newValue in self?.smartReminderInputDraft = newValue }
         )
-        let (panel, _) = SmartReminderUIPanels.makeInputPanel(
+        let content = SmartReminderUIPanels.makeInputContent(
             draft: draftBinding,
             onSubmit: { [weak self] text in
                 guard let self else { return }
@@ -1108,12 +1104,7 @@ final class WindowManager: WindowManaging {
                 self?.teardownSmartInputPanel(invokeUserCancel: true)
             }
         )
-        smartInputPanel = panel
-        transientOverlayPresenter.presentSmartReminderInput(
-            panel: panel,
-            anchor: anchor,
-            size: panel.frame.size
-        )
+        transientOverlayPresenter.presentSmartReminderInput(content: content, anchor: anchor)
         installSmartInputDismissMonitors()
     }
 
@@ -1122,7 +1113,7 @@ final class WindowManager: WindowManaging {
         onCancel: @escaping () -> Void
     ) {
         // 与桌宠菜单快捷键一致：已打开时再按同一全局快捷键则关闭（等同 Esc / 取消）。
-        if smartInputPanel != nil {
+        if transientOverlayPresenter.isSmartReminderInputVisible {
             teardownSmartInputPanel(invokeUserCancel: true)
             return
         }
@@ -1168,7 +1159,7 @@ final class WindowManager: WindowManaging {
         onAutoDismiss: @escaping () -> Void
     ) {
         dismissSmartReminderToast()
-        let (panel, _, size) = SmartReminderUIPanels.makeToastPanel(
+        let content = SmartReminderUIPanels.makeToastContent(
             message: message,
             showUndo: showUndo,
             onUndo: { [weak self] in
@@ -1176,9 +1167,8 @@ final class WindowManager: WindowManaging {
                 onUndo()
             }
         )
-        smartToastPanel = panel
         let anchor = window.map { $0.frame } ?? Self.defaultSmartInputAnchorInScreen()
-        transientOverlayPresenter.presentSmartReminderToast(panel: panel, anchor: anchor, size: size)
+        transientOverlayPresenter.presentSmartReminderToast(content: content, anchor: anchor)
         smartToastDismiss = Timer.scheduledTimer(withTimeInterval: 4.0, repeats: false) { [weak self] _ in
             Task { @MainActor in
                 self?.dismissSmartReminderToast()
@@ -1193,8 +1183,7 @@ final class WindowManager: WindowManaging {
     func dismissSmartReminderToast() {
         smartToastDismiss?.invalidate()
         smartToastDismiss = nil
-        smartToastPanel?.close()
-        smartToastPanel = nil
+        transientOverlayPresenter.dismissSmartReminderToast()
     }
 
     func clearSmartReminderInputDraftIfStillMatchesSubmittedText(_ submitted: String) {
@@ -1394,7 +1383,7 @@ extension WindowManager: PetStageDeskMenuPresenter {
             }
             guard event.keyCode == 53 else { return event }
             guard let dashboardWindow = self.deskMenuWindow, dashboardWindow.isVisible else { return event }
-            guard self.smartInputPanel == nil else { return event }
+            guard !self.transientOverlayPresenter.isSmartReminderInputVisible else { return event }
             if self.deskMenuViewModel?.dashboardEscapeRouter.consumeEscape() == true {
                 return nil
             }

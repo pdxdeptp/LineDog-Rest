@@ -15,8 +15,8 @@ struct TodayTodoRowFramePreferenceKey: PreferenceKey {
 }
 
 struct TodayTodoReorderEdgeScrollPreference: Equatable {
-    var direction: CGFloat = 0
-    var targetEntryId: UUID? = nil
+    var velocity: CGFloat = 0
+    var enabled: Bool = false
 }
 
 struct TodayTodoReorderEdgeScrollPreferenceKey: PreferenceKey {
