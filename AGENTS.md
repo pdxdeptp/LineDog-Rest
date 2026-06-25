@@ -8,7 +8,6 @@ Compact project contract. Expanded detail lives in `docs/agent-workflow.md`; mod
 - **SSOT, no shadow copies**: Prefer one authoritative store per fact; derive or read from it instead of caching the same field in profile/defaults/a second JSON.
 - Output in Chinese; reason in English unless code or technical terms require English.
 - Protect user work: never reset, revert, overwrite, merge, rebase, or discard user changes without explicit permission.
-- Before invoking any Superpowers skill, announce: `触发 skill: <skill-name>`.
 - Choose the lightest workflow that protects user work and gives verifiable evidence.
 
 ## Workflow Router

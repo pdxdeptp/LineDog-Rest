@@ -11,6 +11,8 @@ enum MalDazeBroadcastNotifications {
     static let focusDashboardFromDock = Notification.Name("com.maldaze.focusDashboardFromDock")
     /// 桌宠 Dashboard Panel 已显示；长生命周期内容可据此做非阻塞刷新。
     static let deskPetDashboardDidOpen = Notification.Name("com.maldaze.deskPetDashboardDidOpen")
+    /// 桌宠 Dashboard Panel 已隐藏（orderOut）；应 pause 周期性 UI / watcher。
+    static let deskPetDashboardDidClose = Notification.Name("com.maldaze.deskPetDashboardDidClose")
     /// 全局快捷键切换独立倒计时提醒（进行中则取消，否则按设置时长开始）。
     static let toggleSevenMinuteReminder = Notification.Name("com.maldaze.toggleSevenMinuteReminder")
     /// 全局快捷键：常态桌宠窗回到菜单栏屏可见区右下角并持久化（休息霸屏中忽略）。

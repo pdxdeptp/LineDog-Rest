@@ -4,7 +4,7 @@ This document preserves expanded workflow rationale and examples. Keep `AGENTS.m
 
 ## Workflow Mode Router
 
-The project no longer treats the heaviest OpenSpec/Superpowers pipeline as the default for every task. Agents should choose the lightest mode that protects user work and produces verifiable evidence.
+The project does not treat the heaviest OpenSpec pipeline as the default for every task. Agents should choose the lightest mode that protects user work and produces verifiable evidence.
 
 | Mode | Read | Use When |
 | --- | --- | --- |
@@ -19,9 +19,7 @@ Do not read every mode file by default. `AGENTS.md` routes to one mode; that mod
 
 The strict pipeline still exists for modes that call for it, especially Standard Path product changes, Full Delivery, and High Risk work:
 
-`Design (OpenSpec) -> Plan Refinement (Superpowers) -> Git Safety Check -> Implementation (TDD/review as appropriate) -> Finalization`
-
-Superpowers skills are mandatory when the selected mode invokes them. They are not optional suggestions once that path is chosen.
+`Design (OpenSpec) -> Plan Refinement -> Git Safety Check -> Implementation (TDD/review as appropriate) -> Finalization`
 
 ## Phase 0: Design Refinement
 
@@ -82,7 +80,7 @@ Default workflow:
 
 ### When To Use A Worktree
 
-Use `superpowers:using-git-worktrees` only when:
+Use a git worktree only when:
 
 - The user explicitly asks for a worktree.
 - Multiple unrelated features must be developed in parallel.
@@ -98,11 +96,7 @@ If a worktree is used, tell the user before implementation:
 
 ## Phase 2: Subagent-Driven Implementation
 
-For modes that require delegated implementation, the entry point is `opsx:apply`. The full execution chain is:
-
-`opsx:apply -> superpowers:subagent-driven-development -> per-subagent superpowers:test-driven-development`
-
-`opsx:apply` owns the task list. `subagent-driven-development` owns dispatch. `test-driven-development` owns per-task discipline.
+For modes that require delegated implementation, the entry point is `opsx:apply`. The OpenSpec task list owns execution scope, dispatch follows the rules below, and every behavior task follows the TDD discipline in this document.
 
 Fast Path and many documentation-only tasks do not need subagents. If the active environment does not permit spawning subagents unless the user explicitly asks for them, follow the higher-priority environment rule and document the deviation.
 
@@ -155,30 +149,18 @@ If implementation reveals a design flaw, update the OpenSpec delta before contin
 
 When all tasks are complete:
 
-1. Run `superpowers:verification-before-completion`.
-2. Verify relevant tests and checks pass.
-3. Confirm review passed or list remaining review gaps.
-4. Communicate manual QA needs or results for UI/UX changes.
-5. Present next-step options:
+1. Run fresh relevant tests and checks.
+2. Confirm review passed or list remaining review gaps.
+3. Communicate manual QA needs or results for UI/UX changes.
+4. Present next-step options:
    - Commit completed changes.
    - Create a GitHub PR for review.
    - Keep changes uncommitted for further manual testing.
    - Discard changes only by explicit user request.
-6. If a worktree was used, run `superpowers:finishing-a-development-branch` and clean up the worktree after the user chooses the finalization path.
-
-## On-Demand Skills
-
-| Skill | When to use |
-| --- | --- |
-| `superpowers:brainstorming` | Pure divergent ideation with no existing context; use before OpenSpec, not instead of it. |
-| `superpowers:systematic-debugging` | Non-obvious bugs; follow Observe -> Hypothesize -> Verify -> Fix. |
-| `superpowers:verification-before-completion` | Before declaring any task complete. |
-| `superpowers:receiving-code-review` | When a human or another agent provides review feedback. |
-| `superpowers:requesting-code-review` | When a complex change needs a second opinion. |
+5. If a worktree was used, clean it up only after the user chooses the finalization path.
 
 ## Hard Gates
 
-- Skill declaration before action: before invoking any Superpowers skill, announce `触发 skill: <skill-name>`.
 - Git safety before code: run `git status` before implementation.
 - Work in the current checkout by default for this desktop-pet project.
 - Use the selected mode file; do not default to the heaviest path.

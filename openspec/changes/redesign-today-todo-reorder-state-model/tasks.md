@@ -56,4 +56,4 @@
 - [x] 7.4 Complete final spec-compliance review against every scenario and code-quality review for performance, lifecycle, error handling, and removal of old paths; resolve all critical findings
 - [ ] 7.5 Perform and record Manual QA for quick click, long-press/no-drag release, 350ms pick-up, same-slot tracking, adjacent/multi-row/reverse drag, different-height rows, target settle, no-op, Esc, pointer beyond valid-region tolerance, view teardown during settle, compact/pinned, incremental edge scroll, and persistence after relaunch
 - [ ] 7.6 Before archive, complete and archive `add-learning-today-todo`; block this change's archive while the canonical capability is absent, and never archive the two superseded reorder changes
-- [ ] 7.7 Invoke `superpowers:verification-before-completion` with fresh evidence; do not mark the change complete while Manual QA, archive prerequisites, or either review remains open
+- [ ] 7.7 Run fresh completion verification with evidence; do not mark the change complete while Manual QA, archive prerequisites, or either review remains open

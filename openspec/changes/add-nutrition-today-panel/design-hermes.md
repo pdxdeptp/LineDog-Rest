@@ -12,7 +12,7 @@
 2. `total, consumed, remaining = calc_remaining(daily_log, targets)`
 3. `day_label = {"training": "训练日", "rest": "休息日"}[daily_log["day_type"]]`
 4. `suggestions = []` — compatibility only; do not generate user-visible recommendations here
-5. 返回附加到 `data["panel"]`：
+5. 返回附加到 `data["panel"]`（含 `targetBreakdown` 诊断层；`targets.kcal = formula_base + activity_extra`，校准不计入目标，见 Hermes `data/nutrition/README.md` § get_targets）：
 
 ```json
 {

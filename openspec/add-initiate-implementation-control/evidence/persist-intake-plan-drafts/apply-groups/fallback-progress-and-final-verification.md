@@ -18,7 +18,7 @@ Completed OpenSpec tasks:
 
 ## TDD Trace
 
-The implementation worker used `superpowers:test-driven-development` with RED/GREEN cycles.
+The implementation worker used TDD with RED/GREEN cycles.
 
 Initial RED:
 

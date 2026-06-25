@@ -1290,7 +1290,11 @@ final class ControlPanelPresentationTests: XCTestCase {
         let headerSource = try functionSource(named: "todayHeader", in: panelSource)
         let focusRowSource = try functionSource(named: "focusTimelineRow", in: panelSource)
 
-        XCTAssertTrue(dashboardSource.contains("LearningDeskPanelView(appViewModel:"))
+        XCTAssertFalse(panelSource.contains("@ObservedObject var appViewModel"))
+        XCTAssertTrue(panelSource.contains("LearningDeskPanelEnvironment"))
+
+        XCTAssertTrue(dashboardSource.contains("LearningDeskPanelEnvironment(appViewModel:"))
+        XCTAssertTrue(dashboardSource.contains("focusTimelinePresenter: viewModel.focusTimelinePresenter"))
         XCTAssertTrue(headerSource.contains("focusTimelineRow(response:"))
         XCTAssertFalse(headerSource.contains("progressLine"))
         let budgetLineSource = try functionSource(named: "budgetLine", in: panelSource)
@@ -1298,7 +1302,7 @@ final class ControlPanelPresentationTests: XCTestCase {
         XCTAssertFalse(budgetLineSource.contains("ProgressView"))
         XCTAssertFalse(focusRowSource.contains("FocusDayTimelineCellGridModel.make"))
         XCTAssertTrue(focusRowSource.contains("LearningDeskFocusTimelineRow"))
-        XCTAssertTrue(focusRowSource.contains("appViewModel.focusTimelinePresenter"))
+        XCTAssertTrue(focusRowSource.contains("focusTimelinePresenter"))
 
         let timelineRowSource = try readProjectSource("MalDaze/LearningDeskPanel/LearningDeskFocusTimelineRow.swift")
         XCTAssertTrue(timelineRowSource.contains("FocusDayTimelineCellGridView"))
@@ -1678,10 +1682,8 @@ final class ControlPanelPresentationTests: XCTestCase {
         for retainedSettingsToken in [
             "@AppStorage(MalDazeDefaults.smartInputLLMProvider)",
             "@AppStorage(MalDazeDefaults.smartInputLLMModel)",
-            "@AppStorage(MalDazeDefaults.smartInputGeminiAPIKey)",
-            "@AppStorage(MalDazeDefaults.smartInputOpenAIAPIKey)",
-            "@AppStorage(MalDazeDefaults.smartInputDeepSeekAPIKey)",
             "selectedSmartInputAPIKey",
+            "MalDazeDefaults.setSmartInputAPIKey",
             "shortcutsSettingsPane",
             "title: \"添加提醒\""
         ] {
@@ -1744,7 +1746,7 @@ final class ControlPanelPresentationTests: XCTestCase {
         XCTAssertTrue(apiKeyRowSource.contains("TextField"))
         XCTAssertTrue(apiKeyRowSource.contains("已保存在本机"))
         XCTAssertTrue(apiKeyRowSource.contains("未填写"))
-        XCTAssertTrue(apiKeyRowSource.contains("仅保存在本机 UserDefaults"))
+        XCTAssertTrue(apiKeyRowSource.contains("仅保存在本机 Keychain"))
         XCTAssertTrue(apiKeyRowSource.contains("显示 API Key"))
         XCTAssertTrue(apiKeyRowSource.contains("隐藏 API Key"))
         XCTAssertTrue(apiKeyRowSource.contains(".accessibilityLabel"))
@@ -1866,12 +1868,9 @@ final class ControlPanelPresentationTests: XCTestCase {
         let requiredSettingsTokens = [
             "@AppStorage(MalDazeDefaults.smartInputLLMProvider)",
             "@AppStorage(MalDazeDefaults.smartInputLLMModel)",
-            "@AppStorage(MalDazeDefaults.smartInputGeminiAPIKey)",
-            "@AppStorage(MalDazeDefaults.smartInputOpenAIAPIKey)",
-            "@AppStorage(MalDazeDefaults.smartInputDeepSeekAPIKey)",
-            "@AppStorage(MalDazeDefaults.geminiAPIKey)",
             "@AppStorage(MalDazeDefaults.geminiModelId)",
             "selectedSmartInputAPIKey",
+            "MalDazeDefaults.setSmartInputAPIKey",
             "selectedSmartInputModel"
         ]
 
@@ -1888,7 +1887,8 @@ final class ControlPanelPresentationTests: XCTestCase {
         XCTAssertTrue(catalogSource.contains("case deepseek"))
         XCTAssertTrue(catalogSource.contains("enum LLMProviderCatalog"))
         XCTAssertTrue(defaultsSource.contains("resolvedSmartInputAPIKey"))
-        XCTAssertTrue(defaultsSource.contains("resolvedSmartInputModel"))
+        XCTAssertTrue(defaultsSource.contains("setSmartInputAPIKey"))
+        XCTAssertTrue(defaultsSource.contains("migrateProviderAPIKeysToKeychainIfNeeded"))
     }
 
     func testMalDazeSettingsShortcutRowsUseReusableKeycapPresentation() throws {
@@ -1947,11 +1947,9 @@ final class ControlPanelPresentationTests: XCTestCase {
         let requiredTokens = [
             "@AppStorage(MalDazeDefaults.smartInputLLMProvider)",
             "@AppStorage(MalDazeDefaults.smartInputLLMModel)",
-            "@AppStorage(MalDazeDefaults.smartInputGeminiAPIKey)",
-            "@AppStorage(MalDazeDefaults.smartInputOpenAIAPIKey)",
-            "@AppStorage(MalDazeDefaults.smartInputDeepSeekAPIKey)",
-            "@AppStorage(MalDazeDefaults.geminiAPIKey)",
             "@AppStorage(MalDazeDefaults.geminiModelId)",
+            "selectedSmartInputAPIKey",
+            "MalDazeDefaults.setSmartInputAPIKey",
             "LLMProviderCatalog.defaultModel(for: newProvider)",
             "LLMProviderCatalog.providerOptions",
             "GlobalShortcutKeyRecorder(",

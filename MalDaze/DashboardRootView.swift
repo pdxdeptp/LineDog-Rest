@@ -394,7 +394,10 @@ struct DashboardRootView: View {
                     )
                     .id("dashboard-left-column-resize")
 
-                    LearningDeskPanelView(appViewModel: viewModel)
+                    LearningDeskPanelView(
+                        environment: LearningDeskPanelEnvironment(appViewModel: viewModel),
+                        focusTimelinePresenter: viewModel.focusTimelinePresenter
+                    )
                         .frame(minWidth: DashboardLayout.learningColumnMinWidth, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                         .padding(.horizontal, MainPanelChrome.horizontalPadding)
 

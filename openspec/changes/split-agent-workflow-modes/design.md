@@ -7,13 +7,13 @@
 **Goals:**
 
 - Default agents to a fast path for small, clear fixes.
-- Preserve full OpenSpec/Superpowers rigor for high-risk or explicitly delegated end-to-end work.
+- Preserve full OpenSpec, TDD, and review rigor for high-risk or explicitly delegated end-to-end work.
 - Avoid a large mode matrix inside `AGENTS.md`.
 - Make Computer Use opt-in or risk-triggered.
 
 **Non-Goals:**
 
-- Remove OpenSpec or Superpowers from the project.
+- Remove OpenSpec from the project.
 - Change Hermes SSOT/read-only UI rules.
 - Change application code.
 - Define every possible edge case in `AGENTS.md`.

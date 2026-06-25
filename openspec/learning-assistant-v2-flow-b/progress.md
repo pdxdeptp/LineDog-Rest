@@ -44,7 +44,7 @@
 
 ### Next Step
 
-Before implementation, create a checkpoint commit in the current checkout, then enter `opsx:apply` with Superpowers subagent/TDD discipline.
+Before implementation, create a checkpoint commit in the current checkout, then enter `opsx:apply` with delegated TDD discipline.
 
 ## Round 02 · 2026-05-23T14:55:55Z
 

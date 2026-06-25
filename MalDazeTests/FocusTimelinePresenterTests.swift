@@ -6,6 +6,7 @@ final class FocusTimelinePresenterTests: XCTestCase {
     private var calendar: Calendar!
 
     override func setUp() async throws {
+        FocusTimelinePresenter.allowsLiveTickSchedulingInTests = false
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = TimeZone(secondsFromGMT: 0)!
         calendar = cal
@@ -44,10 +45,22 @@ final class FocusTimelinePresenterTests: XCTestCase {
         )
     }
 
-    func testLiveOverlayRefreshDoesNotRebuildSkeleton() {
+    override func tearDown() async throws {
+        FocusTimelinePresenter.allowsLiveTickSchedulingInTests = false
+    }
+
+    private func timelinePresenter(
+        day: Date? = nil
+    ) -> FocusTimelinePresenter {
         let presenter = FocusTimelinePresenter(calendar: calendar)
-        let day = date(year: 2026, month: 6, day: 20, hour: 12, minute: 0)
-        presenter.setTimelineDay(day, calendar: calendar)
+        let timelineDay = day ?? date(year: 2026, month: 6, day: 20, hour: 12, minute: 0)
+        presenter.setTimelineDay(timelineDay, calendar: calendar)
+        presenter.rebuildSkeleton(finalizedSessions: [])
+        return presenter
+    }
+
+    func testLiveOverlayRefreshDoesNotRebuildSkeleton() {
+        let presenter = timelinePresenter()
         let started = date(year: 2026, month: 6, day: 20, hour: 14, minute: 0)
         let ended = date(year: 2026, month: 6, day: 20, hour: 14, minute: 25)
         presenter.rebuildSkeleton(finalizedSessions: [session(startedAt: started, endedAt: ended)])
@@ -70,10 +83,94 @@ final class FocusTimelinePresenterTests: XCTestCase {
         )
 
         XCTAssertEqual(presenter.skeletonGeneration, skeletonGeneration)
+        XCTAssertEqual(presenter.schedulingPhase, .live)
+    }
+
+    func testVisibleAutoWatchingDoesNotStartLiveTick() {
+        let presenter = timelinePresenter()
+        presenter.liveInputProvider = {
+            FocusTimelineLiveInput(projection: nil, isManualWorkActive: false)
+        }
+        presenter.setVisible(true)
+
+        XCTAssertEqual(presenter.schedulingPhase, .idle)
+        XCTAssertFalse(presenter.isLiveTickActive)
+    }
+
+    func testVisibleAutoWatchingLiveTickDoesNotPublishDisplayModel() {
+        let presenter = timelinePresenter()
+        presenter.liveInputProvider = {
+            FocusTimelineLiveInput(projection: nil, isManualWorkActive: false)
+        }
+        presenter.setVisible(true)
+        let publishCountAfterVisible = presenter.displayModelPublishCount
+
+        presenter.refreshLiveScheduling()
+        presenter.syncLiveOverlay()
+
+        XCTAssertEqual(presenter.displayModelPublishCount, publishCountAfterVisible)
+        XCTAssertFalse(presenter.isLiveTickActive)
+    }
+
+    func testManualWorkVisibleStartsLiveTickAndUpdatesOverlay() {
+        FocusTimelinePresenter.allowsLiveTickSchedulingInTests = true
+        defer { FocusTimelinePresenter.allowsLiveTickSchedulingInTests = false }
+        let presenter = timelinePresenter()
+        let now = date(year: 2026, month: 6, day: 20, hour: 15, minute: 5)
+        presenter.setVisible(true)
+        presenter.syncLiveOverlay(
+            projection: inProgress(at: now, elapsedMinutes: 5),
+            isManualWorkActive: true
+        )
+
+        XCTAssertEqual(presenter.schedulingPhase, .live)
+        XCTAssertTrue(presenter.isLiveTickActive)
+        XCTAssertTrue(presenter.displayModel.cells.contains {
+            $0.fillSegments.contains(where: \.isInProgress)
+        })
+        presenter.enterHidden()
+    }
+
+    func testManualWorkEndsStopsTickAndClearsOverlayOnce() {
+        let presenter = timelinePresenter()
+        let now = date(year: 2026, month: 6, day: 20, hour: 15, minute: 5)
+        presenter.setVisible(true)
+        presenter.syncLiveOverlay(
+            projection: inProgress(at: now, elapsedMinutes: 5),
+            isManualWorkActive: true
+        )
+        let publishCountAfterLive = presenter.displayModelPublishCount
+
+        presenter.syncLiveOverlay(projection: nil, isManualWorkActive: false)
+
+        XCTAssertEqual(presenter.schedulingPhase, .idle)
+        XCTAssertFalse(presenter.isLiveTickActive)
+        XCTAssertFalse(presenter.displayModel.cells.contains {
+            $0.fillSegments.contains(where: \.isInProgress)
+        })
+        XCTAssertEqual(presenter.displayModelPublishCount, publishCountAfterLive + 1)
+    }
+
+    func testHiddenStopsTickAndClearsOverlay() {
+        let presenter = timelinePresenter()
+        let now = date(year: 2026, month: 6, day: 20, hour: 15, minute: 5)
+        presenter.setVisible(true)
+        presenter.syncLiveOverlay(
+            projection: inProgress(at: now, elapsedMinutes: 5),
+            isManualWorkActive: true
+        )
+
+        presenter.enterHidden()
+
+        XCTAssertEqual(presenter.schedulingPhase, .hidden)
+        XCTAssertFalse(presenter.isLiveTickActive)
+        XCTAssertFalse(presenter.displayModel.cells.contains {
+            $0.fillSegments.contains(where: \.isInProgress)
+        })
     }
 
     func testLiveOverlayOmittedWhenConsumerHidden() throws {
-        let presenter = FocusTimelinePresenter(calendar: calendar)
+        let presenter = timelinePresenter()
         presenter.setVisible(false)
 
         let now = date(year: 2026, month: 6, day: 20, hour: 14, minute: 10)
@@ -91,7 +188,7 @@ final class FocusTimelinePresenterTests: XCTestCase {
     }
 
     func testSkipRestProjectionStartsAtOrBeforeNow() throws {
-        let presenter = FocusTimelinePresenter(calendar: calendar)
+        let presenter = timelinePresenter()
         presenter.setVisible(true)
 
         let now = date(year: 2026, month: 6, day: 20, hour: 14, minute: 0)
@@ -112,7 +209,7 @@ final class FocusTimelinePresenterTests: XCTestCase {
     }
 
     func testSetVisibleFalseStopsPublishingInProgressFill() {
-        let presenter = FocusTimelinePresenter(calendar: calendar)
+        let presenter = timelinePresenter()
         presenter.setVisible(true)
 
         let now = date(year: 2026, month: 6, day: 20, hour: 14, minute: 5)

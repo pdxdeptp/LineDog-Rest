@@ -12,7 +12,7 @@ The repository SHALL keep `AGENTS.md` as a concise entry contract that preserves
 - **THEN** `AGENTS.md` links to the detailed workflow reference document
 
 ### Requirement: Detailed Workflow Reference
-The repository SHALL preserve the expanded OpenSpec, Superpowers, git safety, TDD, review, finalization, hotfix, and language guidance in a dedicated documentation file.
+The repository SHALL preserve the expanded OpenSpec, git safety, TDD, review, finalization, hotfix, and language guidance in a dedicated documentation file.
 
 #### Scenario: Workflow detail is moved out of AGENTS
 - **WHEN** detailed process text is removed from `AGENTS.md`

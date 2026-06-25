@@ -13,7 +13,7 @@
 ## 3. Backend, Docs, And Specs Cleanup
 
 - [x] 3.1 Delete tracked `assistant_backend/` code, tests, launch-agent scripts, dependency files, and local learning database artifacts.
-- [x] 3.2 Delete or rewrite Learning Assistant-only tests, docs, acceptance reports, planning notes, and superpowers plans; keep unrelated docs intact.
+- [x] 3.2 Delete or rewrite Learning Assistant-only tests, docs, acceptance reports, and planning notes; keep unrelated docs intact.
 - [x] 3.3 Delete retired Learning Assistant OpenSpec specs and active changes/evidence while preserving unrelated active work such as `add-t7-eject-helper`.
 - [x] 3.4 Update README/PRD references so the app description no longer advertises Learning Assistant behavior.
 

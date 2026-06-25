@@ -45,9 +45,9 @@ If `opsx:product-deepen`, `opsx:scope-decision`, or `opsx:apply-readiness` chang
 
 When all tasks are complete in this desktop-pet project:
 
-1. Run `superpowers:verification-before-completion` to verify relevant tests/checks pass, review has passed, and manual QA requirements have been communicated or completed.
+1. Run fresh relevant tests/checks, confirm review has passed, and ensure manual QA requirements have been communicated or completed.
 2. Present the current state and next-step options, such as committing the completed changes, creating a GitHub PR, keeping the changes uncommitted for further manual testing, or discarding the changes and restoring the previous state.
-3. Run `superpowers:finishing-a-development-branch` only if a git worktree was used, then clean up the worktree after the user chooses how to proceed.
+3. If a git worktree was used, clean it up only after the user chooses how to proceed.
 
 
 

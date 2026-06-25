@@ -6,10 +6,6 @@ struct MalDazeSettingsView: View {
     // 桌宠智能输入 LLM
     @AppStorage(MalDazeDefaults.smartInputLLMProvider)    private var smartInputProvider    = MalDazeDefaults.defaultSmartInputLLMProvider
     @AppStorage(MalDazeDefaults.smartInputLLMModel)       private var smartInputModel       = MalDazeDefaults.defaultSmartInputLLMModel
-    @AppStorage(MalDazeDefaults.smartInputGeminiAPIKey)   private var smartInputGeminiKey   = ""
-    @AppStorage(MalDazeDefaults.smartInputOpenAIAPIKey)   private var smartInputOpenAIKey   = ""
-    @AppStorage(MalDazeDefaults.smartInputDeepSeekAPIKey) private var smartInputDeepSeekKey = ""
-    @AppStorage(MalDazeDefaults.geminiAPIKey) private var geminiAPIKey = ""
     @AppStorage(MalDazeDefaults.geminiModelId) private var geminiModelId = MalDazeDefaults.defaultGeminiModelId
 
     @AppStorage(MalDazeDefaults.smartReminderInputShortcutKeyCode) private var smartKeyCode: Int = Int(SmartReminderInputShortcut.defaultKeyCode)
@@ -127,24 +123,15 @@ struct MalDazeSettingsView: View {
     private var selectedSmartInputAPIKey: Binding<String> {
         Binding(
             get: {
-                switch LLMProviderCatalog.provider(for: smartInputProvider) {
-                case .openai:
-                    return smartInputOpenAIKey
-                case .deepseek:
-                    return smartInputDeepSeekKey
-                case .gemini:
-                    if UserDefaults.standard.object(forKey: MalDazeDefaults.smartInputGeminiAPIKey) != nil {
-                        return smartInputGeminiKey
-                    }
-                    return geminiAPIKey
-                }
+                MalDazeDefaults.resolvedSmartInputAPIKey(
+                    for: LLMProviderCatalog.provider(for: smartInputProvider)
+                )
             },
             set: { newValue in
-                switch LLMProviderCatalog.provider(for: smartInputProvider) {
-                case .openai: smartInputOpenAIKey = newValue
-                case .deepseek: smartInputDeepSeekKey = newValue
-                case .gemini: smartInputGeminiKey = newValue
-                }
+                MalDazeDefaults.setSmartInputAPIKey(
+                    newValue,
+                    for: LLMProviderCatalog.provider(for: smartInputProvider)
+                )
             }
         )
     }
@@ -785,7 +772,7 @@ private struct LLMProviderSettingsCard<ExtraRows: View>: View {
                     .pickerStyle(.menu)
                     .frame(maxWidth: 280, alignment: .leading)
 
-                    Text("仅保存在本机 UserDefaults；切换此处不会改写另一项功能的服务商、模型或 API Key。")
+                    Text("仅保存在本机 Keychain；切换此处不会改写另一项功能的服务商、模型或 API Key。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -916,7 +903,7 @@ private struct APIKeySettingRow: View {
                 .help(isKeyVisible ? "隐藏 API Key" : "显示 API Key")
             }
 
-            Text("仅保存在本机 UserDefaults；本页不会上传、测试或转存 API Key。")
+            Text("仅保存在本机 Keychain；本页不会上传、测试或转存 API Key。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

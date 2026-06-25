@@ -85,4 +85,4 @@ The current checkpoint may stage only:
 
 ## Next Step
 
-Create the pre-apply checkpoint commit for this planning state, then on the next heartbeat start `openspec-apply-change redesign-add-initiate-ui` with the `session-adapter-and-api-contract` group under the mandatory Superpowers subagent/TDD chain.
+Create the pre-apply checkpoint commit for this planning state, then on the next heartbeat start `openspec-apply-change redesign-add-initiate-ui` with the `session-adapter-and-api-contract` group under the required delegated TDD workflow.

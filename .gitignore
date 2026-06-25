@@ -8,7 +8,6 @@ xcuserdata/
 .swiftpm/
 .DS_Store
 .cursor/
-.superpowers/
 
 # Learning Assistant backend
 assistant_backend/.env

@@ -1344,6 +1344,7 @@ extension WindowManager: PetStageDeskMenuPresenter {
         NSApp.activate(ignoringOtherApps: true)
         dashboardWindow.makeKeyAndOrderFront(nil)
         installDashboardEscMonitor()
+        deskMenuViewModel?.dashboardPresentationDidShow()
         DispatchQueue.main.async { [weak self] in
             guard let self, let dashboardWindow = self.deskMenuWindow else { return }
             self.restoreDashboardWindowFrameIfShrunk(dashboardWindow, expected: targetFrame)
@@ -1364,10 +1365,14 @@ extension WindowManager: PetStageDeskMenuPresenter {
         deskMenuViewModel?.dashboardEscapeRouter.reset()
         guard let dashboardWindow = deskMenuWindow, dashboardWindow.isVisible else {
             deskMenuWindow?.orderOut(nil)
+            deskMenuViewModel?.dashboardPresentationDidHide()
+            NotificationCenter.default.post(name: MalDazeBroadcastNotifications.deskPetDashboardDidClose, object: nil)
             return
         }
         persistDashboardWindowFrame(dashboardWindow.frame)
         dashboardWindow.orderOut(nil)
+        deskMenuViewModel?.dashboardPresentationDidHide()
+        NotificationCenter.default.post(name: MalDazeBroadcastNotifications.deskPetDashboardDidClose, object: nil)
     }
 
     private func installDashboardEscMonitor() {

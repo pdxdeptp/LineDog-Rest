@@ -2,7 +2,8 @@ import AppKit
 import SwiftUI
 
 struct LearningDeskPanelView: View {
-    @ObservedObject var appViewModel: AppViewModel
+    let environment: LearningDeskPanelEnvironment
+    @ObservedObject var focusTimelinePresenter: FocusTimelinePresenter
     @StateObject private var viewModel = LearningDeskPanelViewModel()
     @StateObject private var todayTodoStore = TodayTodoStore()
     @State private var showTodayTodoHistory = false
@@ -13,6 +14,19 @@ struct LearningDeskPanelView: View {
     @AppStorage(MalDazeDefaults.learningTodayHermesTaskFraction) private var todayHermesTaskFractionStored =
         MalDazeDefaults.defaultLearningTodayHermesTaskFraction
     @State private var todayHermesTaskFractionDragLive: Double?
+
+    init(environment: LearningDeskPanelEnvironment, focusTimelinePresenter: FocusTimelinePresenter) {
+        self.environment = environment
+        self._focusTimelinePresenter = ObservedObject(wrappedValue: focusTimelinePresenter)
+    }
+
+    /// Deprecated: prefer `init(environment:focusTimelinePresenter:)`.
+    init(appViewModel: AppViewModel) {
+        self.init(
+            environment: LearningDeskPanelEnvironment(appViewModel: appViewModel),
+            focusTimelinePresenter: appViewModel.focusTimelinePresenter
+        )
+    }
 
     private var todayGrouping: LearningDeskPanelViewModel.TodayGroupingMode {
         LearningDeskPanelViewModel.TodayGroupingMode(rawValue: todayGroupingRaw) ?? .flat
@@ -46,7 +60,11 @@ struct LearningDeskPanelView: View {
         .onAppear { viewModel.startWatching() }
         .onDisappear {
             viewModel.stopWatching()
-            appViewModel.focusTimelinePresenter.setVisible(false)
+            environment.setTimelineVisible(false)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: MalDazeBroadcastNotifications.deskPetDashboardDidClose)) { _ in
+            viewModel.stopWatching()
+            environment.enterTimelineHidden()
         }
         .onChange(of: viewModel.selectedTab) { _ in
             Task { await viewModel.onTabChanged() }
@@ -565,18 +583,18 @@ struct LearningDeskPanelView: View {
 
     private func focusTimelineRow(response: HermesTodayResponse) -> some View {
         LearningDeskFocusTimelineRow(
-            presenter: appViewModel.focusTimelinePresenter,
+            presenter: focusTimelinePresenter,
             responseDate: response.date,
             onUpdateSession: { id, startedAt, endedAt in
-                appViewModel.updateFocusSession(id: id, startedAt: startedAt, endedAt: endedAt)
+                environment.updateFocusSession(id, startedAt, endedAt)
             },
             onDeleteSession: { id in
-                appViewModel.deleteFocusSession(id: id)
+                environment.deleteFocusSession(id)
             }
         )
         .onAppear {
             if let timelineDay = FocusDayTimelineCellGridModel.dayStart(fromISODate: response.date) {
-                appViewModel.updateFocusTimelineDay(timelineDay)
+                environment.updateFocusTimelineDay(timelineDay)
             }
         }
     }

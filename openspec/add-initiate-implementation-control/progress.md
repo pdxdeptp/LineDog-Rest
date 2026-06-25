@@ -530,7 +530,7 @@ Automation status:
   - Acquired `run.lock`.
   - Read `state.json`, `runbook.md`, `progress.md`, `evidence/manifest.json`, `workspace-baseline.json`, apply planning, and current task-group evidence source.
   - Ran `git status --porcelain=v1` and protected unrelated dirty files.
-  - Triggered `openspec-apply-change`, `superpowers:subagent-driven-development`, and `superpowers:test-driven-development`.
+  - Followed OpenSpec apply with delegated TDD.
   - Delegated implementation to a worker subagent with a bounded write set for this apply group.
   - Added RED tests for intake-linked draft shells, legacy draft migration/idempotency, router default draft columns, and both 60-minute capacity defaults.
   - Implemented additive draft header/task schema columns, idempotent startup migration, intake-linked draft shell reuse, and `reduced_capacity_min` legacy migration.
@@ -566,7 +566,7 @@ Automation status:
   - Acquired `run.lock`.
   - Read `state.json`, `runbook.md`, `progress.md`, `evidence/manifest.json`, `workspace-baseline.json`, apply planning, and current task-group source.
   - Ran `git status --porcelain=v1` and protected unrelated dirty files.
-  - Triggered `openspec-apply-change`, `superpowers:subagent-driven-development`, `superpowers:test-driven-development`, and `superpowers:receiving-code-review`.
+  - Followed OpenSpec apply with delegated TDD and review feedback processing.
   - Delegated TDD implementation to a worker subagent with a bounded write set.
   - Added package/versioning storage helpers, draft version snapshot storage, intake handoff draft shell creation, and package status/closed-state guards.
   - Ran spec compliance and code quality reviews; both initially required changes.
@@ -608,7 +608,7 @@ Automation status:
   - Acquired `run.lock`.
   - Read `state.json`, `runbook.md`, `progress.md`, `evidence/manifest.json`, `workspace-baseline.json`, and the current apply task group.
   - Ran `git status --porcelain=v1` and protected unrelated dirty files.
-  - Triggered `openspec-apply-change`, `superpowers:subagent-driven-development`, `superpowers:test-driven-development`, `superpowers:receiving-code-review`, and `superpowers:verification-before-completion`.
+  - Followed OpenSpec apply with delegated TDD, review feedback processing, and fresh completion verification.
   - Delegated TDD implementation to a worker subagent with a bounded write set.
   - Implemented transactional draft activation, activation event payloads, stale/latest-activatable version guards, activation-ready task/schedule guards, existing-plan activation, duplicate activation safety, post-activation discard rejection, and package lifecycle transition validation.
   - Ran spec compliance review three times; fixed router stale selection, required schedule version, latest activatable semantics, and package transition validation before final approval.
@@ -650,7 +650,7 @@ Automation status:
   - Acquired `run.lock`.
   - Read `state.json`, `runbook.md`, `progress.md`, `evidence/manifest.json`, `workspace-baseline.json`, and the current apply task group.
   - Ran `git status --porcelain=v1` and protected unrelated dirty files.
-  - Triggered `openspec-apply-change`, `superpowers:subagent-driven-development`, `superpowers:test-driven-development`, `superpowers:receiving-code-review`, and `superpowers:verification-before-completion`.
+  - Followed OpenSpec apply with delegated TDD, review feedback processing, and fresh completion verification.
   - Delegated TDD implementation to a worker subagent with a bounded write set.
   - Added fallback-progress persistence columns, idempotent fallback migration, `complete_task_fallback()`, and the fallback completion endpoint.
   - Ensured fallback-only completion does not set full `completed_at` or full `actual_minutes`, does not update unit/resource completion counts, and does not emit full completion events.
@@ -862,7 +862,7 @@ Automation status:
   - Acquired `run.lock`.
   - Read `state.json`, `runbook.md`, `progress.md`, `evidence/manifest.json`, and `workspace-baseline.json`.
   - Ran `git status --porcelain=v1` and protected unrelated dirty files.
-  - Triggered `openspec-apply-change`, `superpowers:subagent-driven-development`, and `superpowers:test-driven-development`.
+  - Followed OpenSpec apply with delegated TDD.
   - Implemented `assistant_backend/src/study_plan/compiler.py` and exports for envelope normalization, compiler statuses, archetype/scope selection, ambiguity recovery, and target-depth obligations.
   - Added `assistant_backend/tests/test_study_plan_compiler.py` with TDD coverage for envelope, status, mixed GitHub archetype cases, tie-breakers, keyword negative cases, recovery semantics, and depth obligations.
   - Updated `openspec/changes/introduce-plan-compiler/tasks.md` for tasks 1.1-1.6, 4.1-4.4, and 4.6.
@@ -892,7 +892,7 @@ Automation status:
   - Acquired `run.lock`.
   - Read `state.json`, `runbook.md`, `progress.md`, `evidence/manifest.json`, and `workspace-baseline.json`.
   - Ran `git status --porcelain=v1` and protected unrelated dirty files.
-  - Triggered `openspec-apply-change`, `superpowers:subagent-driven-development`, and `superpowers:test-driven-development`.
+  - Followed OpenSpec apply with delegated TDD.
   - Implemented source/goal synopsis, thin-source low calibration, structured phase/task candidate contracts, validation severity gates, no-date/no-calendar filtering, dependency gates, archetype-aware default tasks, and bounded repair with invalid-fragment tokens.
   - Updated `openspec/changes/introduce-plan-compiler/tasks.md` for tasks 2.1-2.5, 3.1-3.3, 4.5, and 4.7-4.9.
   - Wrote evidence at `openspec/add-initiate-implementation-control/evidence/introduce-plan-compiler/apply-groups/synopsis-llm-validation-and-repair.md`.
@@ -920,7 +920,7 @@ Automation status:
   - Acquired `run.lock`.
   - Read `state.json`, `runbook.md`, `progress.md`, `evidence/manifest.json`, and `workspace-baseline.json`.
   - Ran `git status --porcelain=v1` and protected unrelated dirty files.
-  - Triggered `openspec-apply-change`, `superpowers:subagent-driven-development`, and `superpowers:test-driven-development`.
+  - Followed OpenSpec apply with delegated TDD.
   - Implemented estimate normalization, estimate confidence, outlier replacement, oversized split validation, low-calibration thresholds, compiler trace facts, sensitive trace redaction, and real-context unscheduled fixtures.
   - Tightened real-context phase shapes for AgentGuide, easyagent, LeetCode / 灵茶山, interview prep, and resume/project packaging.
   - Updated `openspec/changes/introduce-plan-compiler/tasks.md` for tasks 3.4-3.7 and 4.10-4.13.
@@ -1089,7 +1089,7 @@ Automation status:
 - Checkpoint: introduce-deadline-scheduler:apply:scheduler-contract-preflight-and-capacity
 - Result: completed
 - Actions:
-  - Triggered `openspec-apply-change`, `superpowers:subagent-driven-development`, and `superpowers:test-driven-development`.
+  - Followed OpenSpec apply with delegated TDD.
   - Wrote failing scheduler tests first, verified RED failures, then implemented minimal scheduler contract/preflight/capacity behavior.
   - Fixed spec-review findings around pass-through, visible assumptions, invalid date recovery, optional risk reporting, and capacity-gap math.
   - Fixed code-quality findings around package anchor merge, essential-first placement, compiler assumption preservation, invalid container inputs, and deadline-before-start risk math.
@@ -1114,7 +1114,7 @@ Automation status:
 - Checkpoint: introduce-deadline-scheduler:apply:placement-buffer-splitting-fallback-and-risk
 - Result: completed
 - Actions:
-  - Triggered `openspec-apply-change`, `superpowers:subagent-driven-development`, and `superpowers:test-driven-development`.
+  - Followed OpenSpec apply with delegated TDD.
   - Wrote failing scheduler tests first, verified RED failures, then implemented placement budget, buffer, load-shape, split-session, fallback, overload, and risk-report behavior.
   - Fixed spec-review P1 findings around split-session date capacity, split estimate conservation, and buffer capacity-gap math.
   - Fixed code-quality P1 findings around dependency reordering, overload facts, and zero-usable accepted overload.
@@ -1141,7 +1141,7 @@ Automation status:
 - Checkpoint: introduce-deadline-scheduler:apply:infeasibility-options-and-recompute-effects
 - Result: completed
 - Actions:
-  - Triggered `openspec-apply-change`, `superpowers:subagent-driven-development`, and `superpowers:test-driven-development`.
+  - Followed OpenSpec apply with delegated TDD.
   - Wrote failing scheduler option tests first, verified RED failures, then implemented canonical option mapping and deterministic option effects.
   - Added `apply_schedule_option` for review recomputation, storage state, and compiler recomputation handoffs without creating active tasks or Today actions.
   - Implemented `accept_crunch` as selected-date usable-capacity scheduling and kept it distinct from visible accepted overload.
@@ -1171,7 +1171,7 @@ Automation status:
   - Acquired `run.lock`.
   - Read `state.json`, `runbook.md`, `progress.md`, `evidence/manifest.json`, and `workspace-baseline.json`.
   - Ran `git status --porcelain=v1` and protected unrelated dirty files.
-  - Triggered `openspec-apply-change`, `superpowers:subagent-driven-development`, and `superpowers:test-driven-development`.
+  - Followed OpenSpec apply with delegated TDD.
   - Wrote failing dry-run tests first, verified RED failures, then exposed scheduler capacity math in `ScheduleRiskReport`.
   - Added feasible resume/project packaging dry-run coverage: 285 essential minutes, 300 available execution minutes, one reserved buffer day, and `draft_review`.
   - Added infeasible easyagent source-understanding rebuild dry-run coverage: 525 essential minutes, 300 available execution minutes, 225-minute gap, hard deadline, no `accept_late_finish`, and no standalone `reduce_scope`.
@@ -1334,7 +1334,7 @@ Automation status:
 - Checkpoint: redesign-add-initiate-ui:apply:session-adapter-and-api-contract
 - Result: completed
 - Actions:
-  - Triggered `openspec-apply-change`, `superpowers:subagent-driven-development`, and per-task `superpowers:test-driven-development`.
+  - Followed OpenSpec apply with delegated per-task TDD.
   - Implemented the thin Add / Initiate session adapter and backend routes for sessions, role confirmation, anchor confirmation, option effects, and activation.
   - Added session identity, canonical progress/review states, draft version, stale-event/session guards, and no-active-task-before-activation checks.
   - Added Swift Add / Initiate request/response/progress models plus API-client and protocol methods.
@@ -1380,7 +1380,7 @@ Automation status:
 - Checkpoint: redesign-add-initiate-ui:apply:anchor-state-machine-and-recovery
 - Result: completed
 - Actions:
-  - Triggered `openspec-apply-change`, `superpowers:subagent-driven-development`, and per-task `superpowers:test-driven-development`.
+  - Followed OpenSpec apply with delegated per-task TDD.
   - Implemented the Add / Initiate anchor review, planning progress, needs-input recovery, compile-failed retry, infeasible/draft/activation progress states, activation-failed recovery, cancelled state, and non-plan terminal actions.
   - Added generation/request identity guards for stale session, stale draft-version, cancel invalidation, superseded starts, anchor confirmations, option effects, and activation responses.
   - Updated the UI to keep review states to one prominent primary action, keep anchors editable when input is needed, and avoid visible raw state-machine tokens.
@@ -1402,7 +1402,7 @@ Automation status:
 - Checkpoint: redesign-add-initiate-ui:apply:draft-review-options-and-activation
 - Result: completed
 - Actions:
-  - Triggered `openspec-apply-change`, `superpowers:subagent-driven-development`, and per-task `superpowers:test-driven-development`.
+  - Followed OpenSpec apply with delegated per-task TDD.
   - Implemented summary-first draft review, first-week schedule rendering, explicit expansion controls, fallback/risk/source metadata, canonical infeasibility options, hard-deadline late-finish filtering, option effects, activation, stale-draft blocking, retry, edit, cancel, and activation-failure paths.
   - Added local per-task estimate edit controls while keeping edits scoped to session/draft/version and sending backend-compatible `estimate_edits: [taskId: minutes]` payloads.
   - Fixed `autoLoadWhenReady: false` isolation so tests/previews do not respond to global backend-ready notifications.
@@ -1428,7 +1428,7 @@ Automation status:
 - Checkpoint: redesign-add-initiate-ui:apply:noise-boundaries-and-active-refresh
 - Result: completed
 - Actions:
-  - Followed the apply chain: openspec-apply-change -> superpowers:subagent-driven-development -> per-task superpowers:test-driven-development.
+  - Followed OpenSpec apply with delegated per-task TDD.
   - Added backend verification tests for Today, active Calendar, and smart-mode proposal silence around Add / Initiate draft/reference/material-only states.
   - Added Swift ViewModel/UI-source tests for quiet processing/terminal states, activation success refresh, stale activation success, and stale activation thrown-error handling.
   - Updated the ViewModel so active surfaces refresh only for task-creating activation success and stale activation success/error responses cannot overwrite an edited flow.
@@ -1453,7 +1453,7 @@ Automation status:
 - Checkpoint: redesign-add-initiate-ui:apply:real-context-qa-and-final-verification
 - Result: completed
 - Actions:
-  - Followed the apply chain: openspec-apply-change -> superpowers:subagent-driven-development -> per-task superpowers:test-driven-development.
+  - Followed OpenSpec apply with delegated per-task TDD.
   - Added backend real-context Add / Initiate session/noise regression coverage for AgentGuide, easyagent repo rebuild, LeetCode cadence, agent/backend interview prep, resume/project rewrite, MalDaze existing-project material, and MalDaze note material.
   - Added Swift ViewModel real-context coverage proving typed adapter source values are sent and legacy URL ingestion/start/confirm paths are not used as the primary Add / Initiate path.
   - Completed spec compliance and code quality review loops; final reviews approved.

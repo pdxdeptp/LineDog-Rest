@@ -4,6 +4,16 @@ import XCTest
 
 @MainActor
 final class SmartReminderOrchestratorTests: XCTestCase {
+    override func setUp() {
+        super.setUp()
+        ProviderAPIKeySecureStore.activateInMemoryStoreForTesting()
+    }
+
+    override func tearDown() {
+        ProviderAPIKeySecureStore.deactivateInMemoryStoreForTesting()
+        super.tearDown()
+    }
+
     private let sampleJSON = """
     {"title":"发邮件","is_routine":false,"notes":null,"target_list_name":"工作","has_alarm":true,"alarm_date":{"year":2030,"month":6,"day":10,"hour":15,"minute":30},"priority":0}
     """
@@ -59,8 +69,8 @@ final class SmartReminderOrchestratorTests: XCTestCase {
         XCTAssertEqual(MalDazeDefaults.resolvedSmartInputModel(defaults: d), "gemini-2.5-pro")
         XCTAssertEqual(MalDazeDefaults.resolvedSmartInputAPIKey(for: .gemini, defaults: d), "legacy-gemini-key")
 
-        d.set("new-smart-gemini-key", forKey: MalDazeDefaults.smartInputGeminiAPIKey)
         d.set("gemini-2.5-flash-lite", forKey: MalDazeDefaults.smartInputLLMModel)
+        MalDazeDefaults.setSmartInputAPIKey("new-smart-gemini-key", for: .gemini, defaults: d)
 
         XCTAssertEqual(MalDazeDefaults.resolvedSmartInputModel(defaults: d), "gemini-2.5-flash-lite")
         XCTAssertEqual(MalDazeDefaults.resolvedSmartInputAPIKey(for: .gemini, defaults: d), "new-smart-gemini-key")
@@ -74,7 +84,7 @@ final class SmartReminderOrchestratorTests: XCTestCase {
         d.set("legacy-gemini-key", forKey: MalDazeDefaults.geminiAPIKey)
         XCTAssertEqual(MalDazeDefaults.resolvedSmartInputAPIKey(for: .gemini, defaults: d), "legacy-gemini-key")
 
-        d.set("", forKey: MalDazeDefaults.smartInputGeminiAPIKey)
+        MalDazeDefaults.setSmartInputAPIKey("", for: .gemini, defaults: d)
         XCTAssertEqual(MalDazeDefaults.resolvedSmartInputAPIKey(for: .gemini, defaults: d), "")
     }
 

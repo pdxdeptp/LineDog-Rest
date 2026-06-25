@@ -27,6 +27,9 @@
 		A2FS6 /* FocusDayTimelineSegmentPopover.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2FS6 /* FocusDayTimelineSegmentPopover.swift */; };
 		A2FS7 /* FocusDayTimelineFailedMarkerPopover.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2FS7 /* FocusDayTimelineFailedMarkerPopover.swift */; };
 		A2FTP /* FocusTimelinePresenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2FTP /* FocusTimelinePresenter.swift */; };
+		A2DQC /* DashboardQuiescenceCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2DQC /* DashboardQuiescenceCoordinator.swift */; };
+		A2LDPE /* LearningDeskPanelEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2LDPE /* LearningDeskPanelEnvironment.swift */; };
+		A2PAKS /* ProviderAPIKeySecureStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2PAKS /* ProviderAPIKeySecureStore.swift */; };
 		A208 /* PetRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B208 /* PetRenderer.swift */; };
 		A2GF /* GIFFrameCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2GF /* GIFFrameCache.swift */; };
 		A20A /* WindowManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20A /* WindowManager.swift */; };
@@ -113,6 +116,8 @@
 		A31FS /* FocusSessionStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31FS /* FocusSessionStoreTests.swift */; };
 		A31FG /* FocusDayTimelineCellGridModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31FG /* FocusDayTimelineCellGridModelTests.swift */; };
 		A31FTP /* FocusTimelinePresenterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31FTP /* FocusTimelinePresenterTests.swift */; };
+		A31DQC /* DashboardQuiescenceCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31DQC /* DashboardQuiescenceCoordinatorTests.swift */; };
+		A31PAKS /* ProviderAPIKeySecureStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31PAKS /* ProviderAPIKeySecureStoreTests.swift */; };
 		A31CS /* ChronoSessionCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31CS /* ChronoSessionCoordinatorTests.swift */; };
 		A31MFC /* ManualFocusCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31MFC /* ManualFocusCoordinatorTests.swift */; };
 		A31MPE /* ManualTimerEnginePhaseReplayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31MPE /* ManualTimerEnginePhaseReplayTests.swift */; };
@@ -247,6 +252,9 @@
 		B2FS6 /* FocusDayTimelineSegmentPopover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusDayTimelineSegmentPopover.swift; sourceTree = "<group>"; };
 		B2FS7 /* FocusDayTimelineFailedMarkerPopover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusDayTimelineFailedMarkerPopover.swift; sourceTree = "<group>"; };
 		B2FTP /* FocusTimelinePresenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusTimelinePresenter.swift; sourceTree = "<group>"; };
+		B2DQC /* DashboardQuiescenceCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardQuiescenceCoordinator.swift; sourceTree = "<group>"; };
+		B2LDPE /* LearningDeskPanelEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningDeskPanelEnvironment.swift; sourceTree = "<group>"; };
+		B2PAKS /* ProviderAPIKeySecureStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderAPIKeySecureStore.swift; sourceTree = "<group>"; };
 		B208 /* PetRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetRenderer.swift; sourceTree = "<group>"; };
 		B2GF /* GIFFrameCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GIFFrameCache.swift; sourceTree = "<group>"; };
 		B20A /* WindowManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowManager.swift; sourceTree = "<group>"; };
@@ -332,6 +340,8 @@
 		B31FS /* FocusSessionStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusSessionStoreTests.swift; sourceTree = "<group>"; };
 		B31FG /* FocusDayTimelineCellGridModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusDayTimelineCellGridModelTests.swift; sourceTree = "<group>"; };
 		B31FTP /* FocusTimelinePresenterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusTimelinePresenterTests.swift; sourceTree = "<group>"; };
+		B31DQC /* DashboardQuiescenceCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardQuiescenceCoordinatorTests.swift; sourceTree = "<group>"; };
+		B31PAKS /* ProviderAPIKeySecureStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderAPIKeySecureStoreTests.swift; sourceTree = "<group>"; };
 		B31CS /* ChronoSessionCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChronoSessionCoordinatorTests.swift; sourceTree = "<group>"; };
 		B31MFC /* ManualFocusCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManualFocusCoordinatorTests.swift; sourceTree = "<group>"; };
 		B31MPE /* ManualTimerEnginePhaseReplayTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManualTimerEnginePhaseReplayTests.swift; sourceTree = "<group>"; };
@@ -493,6 +503,7 @@
 				B213 /* MalDazeBroadcastNotifications.swift */,
 				E203 /* TimerEngine */,
 				E216 /* FocusSession */,
+				E217 /* DashboardQuiescence */,
 				E204 /* PetRenderer */,
 				E205 /* WindowManager */,
 				E207 /* SevenMinuteReminder */,
@@ -563,6 +574,14 @@
 			path = FocusSession;
 			sourceTree = "<group>";
 		};
+		E217 /* DashboardQuiescence */ = {
+			isa = PBXGroup;
+			children = (
+				B2DQC /* DashboardQuiescenceCoordinator.swift */,
+			);
+			path = DashboardQuiescence;
+			sourceTree = "<group>";
+		};
 		E204 /* PetRenderer */ = {
 			isa = PBXGroup;
 			children = (
@@ -614,6 +633,8 @@
 					B31FS /* FocusSessionStoreTests.swift */,
 					B31FG /* FocusDayTimelineCellGridModelTests.swift */,
 					B31FTP /* FocusTimelinePresenterTests.swift */,
+					B31PAKS /* ProviderAPIKeySecureStoreTests.swift */,
+					B31DQC /* DashboardQuiescenceCoordinatorTests.swift */,
 					B31CS /* ChronoSessionCoordinatorTests.swift */,
 					B31MFC /* ManualFocusCoordinatorTests.swift */,
 					B31MPE /* ManualTimerEnginePhaseReplayTests.swift */,
@@ -719,6 +740,7 @@
 				B291 /* HermesScheduleCLI.swift */,
 				B292 /* LearningDeskPanelViewModel.swift */,
 				B2RP /* DeadlineRepackPreviewFormatter.swift */,
+				B2LDPE /* LearningDeskPanelEnvironment.swift */,
 				B293 /* LearningDeskPanelView.swift */,
 				B2LFT /* LearningDeskFocusTimelineRow.swift */,
 				B294 /* LearningTaskRow.swift */,
@@ -807,6 +829,7 @@
 			isa = PBXGroup;
 			children = (
 				B228 /* MalDazeSettingsView.swift */,
+				B2PAKS /* ProviderAPIKeySecureStore.swift */,
 			);
 			path = Settings;
 			sourceTree = "<group>";
@@ -971,6 +994,7 @@
 				A2FS6 /* FocusDayTimelineSegmentPopover.swift in Sources */,
 				A2FS7 /* FocusDayTimelineFailedMarkerPopover.swift in Sources */,
 				A2FTP /* FocusTimelinePresenter.swift in Sources */,
+				A2DQC /* DashboardQuiescenceCoordinator.swift in Sources */,
 				A208 /* PetRenderer.swift in Sources */,
 				A2GF /* GIFFrameCache.swift in Sources */,
 				A20A /* WindowManager.swift in Sources */,
@@ -1006,6 +1030,7 @@
 				A291 /* HermesScheduleCLI.swift in Sources */,
 				A292 /* LearningDeskPanelViewModel.swift in Sources */,
 				A2RP /* DeadlineRepackPreviewFormatter.swift in Sources */,
+				A2LDPE /* LearningDeskPanelEnvironment.swift in Sources */,
 				A293 /* LearningDeskPanelView.swift in Sources */,
 				A2LFT /* LearningDeskFocusTimelineRow.swift in Sources */,
 				A294 /* LearningTaskRow.swift in Sources */,
@@ -1079,6 +1104,7 @@
 				A23A /* ResetIdlePetPositionShortcut.swift in Sources */,
 				A23B /* MalDazeDockIcon.swift in Sources */,
 				A228 /* MalDazeSettingsView.swift in Sources */,
+				A2PAKS /* ProviderAPIKeySecureStore.swift in Sources */,
 				A229 /* MalDazePresentationAnchor.swift in Sources */,
 				A230 /* SmartReminderNotesComposer.swift in Sources */,
 				A231 /* DeskReminderSidebarFormatting.swift in Sources */,
@@ -1138,6 +1164,8 @@
 					A31FS /* FocusSessionStoreTests.swift in Sources */,
 					A31FG /* FocusDayTimelineCellGridModelTests.swift in Sources */,
 					A31FTP /* FocusTimelinePresenterTests.swift in Sources */,
+					A31PAKS /* ProviderAPIKeySecureStoreTests.swift in Sources */,
+					A31DQC /* DashboardQuiescenceCoordinatorTests.swift in Sources */,
 					A31CS /* ChronoSessionCoordinatorTests.swift in Sources */,
 					A31MFC /* ManualFocusCoordinatorTests.swift in Sources */,
 					A31MPE /* ManualTimerEnginePhaseReplayTests.swift in Sources */,

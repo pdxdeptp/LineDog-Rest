@@ -31,7 +31,7 @@ Task 4.11 was already completed by the previous apply group for draft kind and t
 
 ## TDD Trace
 
-The implementation worker used `superpowers:test-driven-development` with RED/GREEN cycles.
+The implementation worker used TDD with RED/GREEN cycles.
 
 Initial RED:
 

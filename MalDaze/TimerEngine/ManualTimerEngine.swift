@@ -12,7 +12,7 @@ final class ManualTimerEngine: TimerEngine {
     private var phaseEnd: Date?
     private var workPhaseStart: Date?
     private var isRestPhase = false
-    /// 与 `AppViewModel.formatClock` 一致：仅整秒变化时上报，减少 0.25s 定时器带来的无效 UI 刷新。
+    /// 与 `AppViewModel.formatClock` 一致：仅整秒变化时上报；one-shot chain 保证 MainActor 唤醒 ≤1 Hz。
     private var lastEmittedRemainingWholeSeconds: Int = -1
 
     /// 生产环境用默认番茄时长；测试可传入秒级时长。
@@ -159,14 +159,24 @@ final class ManualTimerEngine: TimerEngine {
 
     private func scheduleTick() {
         tickTimer?.invalidate()
-        let t = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
+        tickTimer = nil
+        guard let end = phaseEnd else { return }
+        let remaining = end.timeIntervalSinceNow
+        guard remaining > 0 else {
+            tick()
+            return
+        }
+
+        let delay = min(1, remaining)
+        let timer = Timer(timeInterval: delay, repeats: false) { [weak self] _ in
             self?.tick()
         }
-        RunLoop.main.add(t, forMode: .common)
-        tickTimer = t
+        RunLoop.main.add(timer, forMode: .common)
+        tickTimer = timer
     }
 
     private func tick() {
+        tickTimer = nil
         guard let end = phaseEnd else { return }
         let remaining = end.timeIntervalSinceNow
         if remaining > 0 {
@@ -179,6 +189,7 @@ final class ManualTimerEngine: TimerEngine {
                     onStateChange?(.working(remaining: remaining))
                 }
             }
+            scheduleTick()
             return
         }
 
@@ -203,6 +214,7 @@ final class ManualTimerEngine: TimerEngine {
             onStateChange?(.resting(remaining: restDuration))
         }
         lastEmittedRemainingWholeSeconds = max(0, Int((phaseEnd?.timeIntervalSinceNow ?? 0).rounded(.down)))
+        scheduleTick()
     }
 
     private func emit() {

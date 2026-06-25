@@ -20,6 +20,7 @@ final class MalDazeAppDelegate: NSObject, NSApplicationDelegate {
             MalDazeDefaults.idlePetIconSidePoints: MalDazeDefaults.idlePetIconSideDefault,
             MalDazeDefaults.learningDailyCapacityHours: MalDazeDefaults.defaultLearningDailyCapacityHours,
         ])
+        MalDazeDefaults.migrateProviderAPIKeysToKeychainIfNeeded()
         if NSApp.activationPolicy() != .regular {
             _ = NSApp.setActivationPolicy(.regular)
         }

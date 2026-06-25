@@ -16,6 +16,12 @@ typealias FocusDayTimelineDaySkeleton = FocusDayTimelineCellGridModel
 
 @MainActor
 final class FocusTimelinePresenter: ObservableObject {
+    enum LiveSchedulingPhase: Equatable {
+        case hidden
+        case idle
+        case live
+    }
+
     @Published private(set) var displayModel: FocusDayTimelineCellGridModel
     @Published private(set) var sessionCount: Int = 0
     @Published private(set) var totalMinutes: Int = 0
@@ -23,6 +29,8 @@ final class FocusTimelinePresenter: ObservableObject {
 
     private(set) var skeletonGeneration = 0
     private(set) var liveOverlayGeneration = 0
+    private(set) var displayModelPublishCount = 0
+    private(set) var schedulingPhase: LiveSchedulingPhase = .hidden
 
     var liveInputProvider: (() -> FocusTimelineLiveInput)?
 
@@ -31,8 +39,18 @@ final class FocusTimelinePresenter: ObservableObject {
     private var calendar: Calendar = .current
     private var lastFinalizedSessions: [FocusSession] = []
     private var isConsumerVisible = false
+    private var hasActiveInProgressOverlay = false
     private var liveTickTimer: Timer?
-    private var lastPublishedWholeSecond = -1
+
+    var isLiveTickActive: Bool { liveTickTimer != nil }
+
+    /// Unit tests set this to verify timer scheduling without relying on the run loop.
+    static var allowsLiveTickSchedulingInTests = false
+
+    private static var isRunningUnderXCTest: Bool {
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+            || NSClassFromString("XCTestCase") != nil
+    }
 
     init(calendar: Calendar = .current) {
         self.calendar = calendar
@@ -69,17 +87,50 @@ final class FocusTimelinePresenter: ObservableObject {
         skeletonGeneration += 1
         updateSummary(from: finalizedSessions)
         publishDisplayModel(overlay: nil)
+        refreshLiveScheduling()
     }
 
+    /// SwiftUI visibility hint; pairs with dashboard quiescence in a later change.
     func setVisible(_ visible: Bool) {
+        setConsumerVisible(visible)
+    }
+
+    func setConsumerVisible(_ visible: Bool) {
         guard isConsumerVisible != visible else { return }
         isConsumerVisible = visible
         if visible {
-            startLiveTickIfNeeded()
+            refreshLiveScheduling()
             syncLiveOverlay()
         } else {
+            enterHidden()
+        }
+    }
+
+    /// Dashboard hide / quiescence entry point (Change 2 coordinator).
+    func enterHidden() {
+        isConsumerVisible = false
+        stopLiveTick()
+        clearInProgressOverlayIfNeeded()
+        schedulingPhase = .hidden
+    }
+
+    func refreshLiveScheduling(
+        projection: FocusPomodoroInProgress? = nil,
+        isManualWorkActive: Bool? = nil
+    ) {
+        guard isConsumerVisible else {
             stopLiveTick()
-            publishDisplayModel(overlay: nil)
+            schedulingPhase = .hidden
+            return
+        }
+
+        let input = resolvedLiveInput(projection: projection, isManualWorkActive: isManualWorkActive)
+        if input.isManualWorkActive, input.projection != nil {
+            schedulingPhase = .live
+            scheduleLiveTickIfNeeded()
+        } else {
+            schedulingPhase = .idle
+            stopLiveTick()
         }
     }
 
@@ -88,19 +139,18 @@ final class FocusTimelinePresenter: ObservableObject {
         isManualWorkActive: Bool? = nil
     ) {
         guard isConsumerVisible else {
-            publishDisplayModel(overlay: nil)
+            clearInProgressOverlayIfNeeded()
             return
         }
 
-        let input = liveInputProvider?() ?? FocusTimelineLiveInput(
-            projection: projection,
-            isManualWorkActive: isManualWorkActive ?? false
-        )
+        let input = resolvedLiveInput(projection: projection, isManualWorkActive: isManualWorkActive)
         let resolvedProjection = projection ?? input.projection
         let resolvedActive = isManualWorkActive ?? input.isManualWorkActive
 
+        refreshLiveScheduling(projection: resolvedProjection, isManualWorkActive: resolvedActive)
+
         guard resolvedActive, let resolvedProjection else {
-            publishDisplayModel(overlay: nil)
+            clearInProgressOverlayIfNeeded()
             return
         }
 
@@ -113,6 +163,19 @@ final class FocusTimelinePresenter: ObservableObject {
         publishDisplayModel(overlay: overlay, now: now)
     }
 
+    private func resolvedLiveInput(
+        projection: FocusPomodoroInProgress?,
+        isManualWorkActive: Bool?
+    ) -> FocusTimelineLiveInput {
+        if projection != nil || isManualWorkActive != nil {
+            return FocusTimelineLiveInput(
+                projection: projection,
+                isManualWorkActive: isManualWorkActive ?? false
+            )
+        }
+        return liveInputProvider?() ?? FocusTimelineLiveInput(projection: nil, isManualWorkActive: false)
+    }
+
     private func updateSummary(from finalizedSessions: [FocusSession]) {
         sessionCount = finalizedSessions.filter { $0.source == .completed }.count
         totalMinutes = finalizedSessions
@@ -122,22 +185,50 @@ final class FocusTimelinePresenter: ObservableObject {
     }
 
     private func publishDisplayModel(overlay: FocusTimelineLiveOverlay?, now: Date = Date()) {
-        displayModel = FocusDayTimelineCellGridModel.applying(
+        let nextModel = FocusDayTimelineCellGridModel.applying(
             liveOverlay: overlay,
             to: skeleton,
             now: now,
             calendar: calendar
         )
+        guard nextModel != displayModel else { return }
+        displayModel = nextModel
+        displayModelPublishCount += 1
+        hasActiveInProgressOverlay = nextModel.cells.contains {
+            $0.fillSegments.contains(where: \.isInProgress)
+        }
         if overlay != nil {
             hasActivity = true
         }
     }
 
-    private func startLiveTickIfNeeded() {
-        stopLiveTick()
-        let timer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
+    private func clearInProgressOverlayIfNeeded() {
+        guard hasActiveInProgressOverlay else { return }
+        publishDisplayModel(overlay: nil)
+    }
+
+    private func scheduleLiveTickIfNeeded() {
+        if Self.isRunningUnderXCTest, !Self.allowsLiveTickSchedulingInTests {
+            return
+        }
+        guard liveTickTimer == nil else { return }
+        scheduleNextLiveTick()
+    }
+
+    private func scheduleNextLiveTick() {
+        if Self.isRunningUnderXCTest, !Self.allowsLiveTickSchedulingInTests {
+            return
+        }
+        liveTickTimer?.invalidate()
+        liveTickTimer = nil
+        guard isConsumerVisible, schedulingPhase == .live else { return }
+
+        let now = Date()
+        let nextWholeSecond = floor(now.timeIntervalSince1970) + 1
+        let delay = max(0.01, nextWholeSecond - now.timeIntervalSince1970)
+        let timer = Timer(timeInterval: delay, repeats: false) { [weak self] _ in
             Task { @MainActor [weak self] in
-                self?.liveTick()
+                self?.liveTickFired()
             }
         }
         RunLoop.main.add(timer, forMode: .common)
@@ -147,16 +238,13 @@ final class FocusTimelinePresenter: ObservableObject {
     private func stopLiveTick() {
         liveTickTimer?.invalidate()
         liveTickTimer = nil
-        lastPublishedWholeSecond = -1
     }
 
-    private func liveTick() {
-        guard isConsumerVisible else { return }
-        let now = Date()
-        let wholeSecond = Int(now.timeIntervalSince1970)
-        guard wholeSecond != lastPublishedWholeSecond else { return }
-        lastPublishedWholeSecond = wholeSecond
+    private func liveTickFired() {
+        liveTickTimer = nil
+        guard isConsumerVisible, schedulingPhase == .live else { return }
         liveOverlayGeneration += 1
         syncLiveOverlay()
+        scheduleNextLiveTick()
     }
 }

@@ -10,7 +10,6 @@ final class InterventionRequestController {
     private let ackStore: InterventionRequestAckStore
     private let bellPresenter: SevenMinuteReminderController
     private var fileWatcher: InterventionRequestFileWatcher?
-    private var pollTimer: Timer?
     private var wakeObserver: NSObjectProtocol?
     private var becomeActiveObserver: NSObjectProtocol?
 
@@ -27,14 +26,12 @@ final class InterventionRequestController {
     func start() {
         installLifecycleObserversIfNeeded()
         startFileWatcher()
-        startPollTimerIfNeeded()
         processPendingIfNeeded()
     }
 
     func cancel() {
         removeLifecycleObservers()
         stopFileWatcher()
-        stopPollTimer()
         onError?(nil)
     }
 
@@ -179,22 +176,5 @@ final class InterventionRequestController {
     private func stopFileWatcher() {
         fileWatcher?.stop()
         fileWatcher = nil
-    }
-
-    /// FSEvents 偶发漏报外部写入；轻量轮询兜底（对齐睡眠链路的 watchdog 思路）。
-    private func startPollTimerIfNeeded() {
-        guard pollTimer == nil else { return }
-        let timer = Timer(timeInterval: 3.0, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                self?.processPendingIfNeeded()
-            }
-        }
-        RunLoop.main.add(timer, forMode: .common)
-        pollTimer = timer
-    }
-
-    private func stopPollTimer() {
-        pollTimer?.invalidate()
-        pollTimer = nil
     }
 }

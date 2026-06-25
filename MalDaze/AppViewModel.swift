@@ -66,6 +66,7 @@ final class AppViewModel: ObservableObject {
     @Published private(set) var inProgressFocusSegment: FocusPomodoroInProgress?
     /// 学习面板专注时间轴：静态 skeleton + live overlay，与 statusLine tick 解耦。
     let focusTimelinePresenter = FocusTimelinePresenter()
+    let dashboardQuiescence = DashboardQuiescenceCoordinator()
     /// 桌宠 Dashboard Esc 分级：sheet / 对话框优先于关面板。
     let dashboardEscapeRouter = DeskPetDashboardEscapeRouter()
 
@@ -383,7 +384,18 @@ final class AppViewModel: ObservableObject {
                 isManualWorkActive: self.isManualWorkActiveForTimeline
             )
         }
+        _ = dashboardQuiescence.registerPauseHandler { [weak self] in
+            self?.focusTimelinePresenter.enterHidden()
+        }
         refreshFocusSessionProjection()
+    }
+
+    func dashboardPresentationDidHide() {
+        dashboardQuiescence.transition(to: .hidden)
+    }
+
+    func dashboardPresentationDidShow() {
+        dashboardQuiescence.transition(to: .visible)
     }
 
     func updateFocusTimelineDay(_ day: Date) {
@@ -405,7 +417,7 @@ final class AppViewModel: ObservableObject {
             windowAnchors = [start]
         }
         syncFocusTimelineSkeleton(windowAnchorDates: windowAnchors)
-        focusTimelinePresenter.syncLiveOverlay()
+        refreshFocusTimelineLiveState()
     }
 
     private func syncFocusTimelineSkeleton(windowAnchorDates: [Date] = []) {
@@ -975,7 +987,7 @@ final class AppViewModel: ObservableObject {
             autoEngine.start()
         }
         persistPreferredTimerMode()
-        refreshFocusSessionProjection()
+        refreshFocusSessionProjection(rebuildSkeleton: false)
         refreshChronoChrome()
         syncPetDisplayMode()
     }
@@ -993,7 +1005,7 @@ final class AppViewModel: ObservableObject {
         manualEngine.start()
         isChronoSessionActive = true
         refreshChronoChrome()
-        refreshFocusSessionProjection()
+        refreshFocusSessionProjection(rebuildSkeleton: false)
         syncPetDisplayMode()
     }
 
@@ -1008,7 +1020,7 @@ final class AppViewModel: ObservableObject {
         clearChronoSessionPersistence()
         publishStatus("手动模式：点击「开始专注」。")
         refreshChronoChrome()
-        refreshFocusSessionProjection()
+        refreshFocusSessionProjection(rebuildSkeleton: false)
         syncPetDisplayMode()
     }
 
@@ -1221,10 +1233,17 @@ final class AppViewModel: ObservableObject {
         )
     }
 
-    private func refreshFocusSessionProjection(now: Date = Date()) {
-        refreshFocusSessionSummary(now: now)
-        syncFocusTimelineSkeleton()
+    private func refreshFocusTimelineLiveState() {
+        focusTimelinePresenter.refreshLiveScheduling()
         focusTimelinePresenter.syncLiveOverlay()
+    }
+
+    private func refreshFocusSessionProjection(rebuildSkeleton: Bool = true, now: Date = Date()) {
+        refreshFocusSessionSummary(now: now)
+        if rebuildSkeleton {
+            syncFocusTimelineSkeleton()
+        }
+        refreshFocusTimelineLiveState()
     }
 
     func updateFocusSession(id: UUID, startedAt: Date, endedAt: Date) {

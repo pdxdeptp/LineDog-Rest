@@ -69,6 +69,11 @@ struct NutritionTodayPanelView: View {
             digitMonitor = nil
             viewModel.stopWatching()
         }
+        .onReceive(NotificationCenter.default.publisher(for: MalDazeBroadcastNotifications.deskPetDashboardDidClose)) { _ in
+            digitMonitor?.stop()
+            digitMonitor = nil
+            viewModel.stopWatching()
+        }
         .onChange(of: digitKeysEnabled) { _ in
             installDigitMonitor()
         }

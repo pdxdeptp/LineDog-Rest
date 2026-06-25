@@ -36,21 +36,41 @@ enum MalDazeDefaults {
     }
 
     static func resolvedSmartInputAPIKey(for provider: LLMProviderID, defaults: UserDefaults = .standard) -> String {
-        switch provider {
-        case .gemini:
-            return resolvedSmartInputGeminiAPIKey(defaults: defaults)
-        case .openai:
-            return trimmed(defaults.string(forKey: smartInputOpenAIAPIKey))
-        case .deepseek:
-            return trimmed(defaults.string(forKey: smartInputDeepSeekAPIKey))
+        migrateProviderAPIKeyIfNeeded(for: provider, defaults: defaults)
+        return trimmed(ProviderAPIKeySecureStore.read(for: provider))
+    }
+
+    static func setSmartInputAPIKey(_ value: String, for provider: LLMProviderID, defaults: UserDefaults = .standard) {
+        migrateProviderAPIKeyIfNeeded(for: provider, defaults: defaults)
+        ProviderAPIKeySecureStore.write(trimmed(value), for: provider)
+        for key in ProviderAPIKeySecureStore.legacyUserDefaultsKeys(for: provider) {
+            defaults.removeObject(forKey: key)
+        }
+    }
+
+    static func migrateProviderAPIKeysToKeychainIfNeeded(defaults: UserDefaults = .standard) {
+        ProviderAPIKeySecureStore.migrateFromUserDefaultsIfNeeded(defaults: defaults)
+    }
+
+    private static func migrateProviderAPIKeyIfNeeded(for provider: LLMProviderID, defaults: UserDefaults) {
+        guard ProviderAPIKeySecureStore.read(for: provider) == nil else {
+            for key in ProviderAPIKeySecureStore.legacyUserDefaultsKeys(for: provider) {
+                defaults.removeObject(forKey: key)
+            }
+            return
+        }
+        for key in ProviderAPIKeySecureStore.legacyUserDefaultsKeys(for: provider) {
+            guard defaults.object(forKey: key) != nil else { continue }
+            let value = defaults.string(forKey: key)?
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            ProviderAPIKeySecureStore.write(value, for: provider)
+            defaults.removeObject(forKey: key)
+            return
         }
     }
 
     static func resolvedSmartInputGeminiAPIKey(defaults: UserDefaults = .standard) -> String {
-        if let newKey = defaults.object(forKey: smartInputGeminiAPIKey) as? String {
-            return trimmed(newKey)
-        }
-        return trimmed(defaults.string(forKey: geminiAPIKey))
+        resolvedSmartInputAPIKey(for: .gemini, defaults: defaults)
     }
 
     private static func resolvedModel(rawModel: String?, provider: LLMProviderID, fallbackModel: String) -> String {

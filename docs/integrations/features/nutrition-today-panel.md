@@ -32,8 +32,8 @@ MalDaze **不写** `recommendation.json`，也不在 recommendation 缺失或过
 |------|------|
 | `dayLabel` | 训练日 / 休息日 |
 | `workoutLabel` | 训练日可选：练胸 / 练背和腿（由 `daily_log.workout_split` 派生；轮换历史只读 `training_log`） |
-| `targets` / `consumed` / `remaining` | 含 `sodium_mg` |
-| `targetBreakdown` | 今日目标 kcal 计算明细（v1 layers；v3 authority 时可为 schema v2） |
+| `targets` / `consumed` / `remaining` | 含 `sodium_mg`；**顶栏「今日卡路里上限」只读 `targets.kcal`** |
+| `targetBreakdown` | 今日目标 kcal **展示**明细（与 `targets.kcal` 同源投影；v1 layers）。V3 / legacy OLS 校准层（`calibration_v3`、`calibration_legacy_ols`）为诊断信息，`appliedToTarget: false`，**不计入** `targets.kcal` |
 | `estimatorShadow` | 可选。V3 shadow 诊断：readiness、effective TDEE 区间、confounded |
 | `targetBreakdownShadow` | 可选。formula authority 时的 v2 shadow 明细；Malformed v2 fail loud |
 | `suggestions` | 第一版固定 `[]`，仅 schema 兼容；不是推荐来源 |
@@ -41,6 +41,23 @@ MalDaze **不写** `recommendation.json`，也不在 recommendation 缺失或过
 | `updatedAt` | ISO；与 recommendation `basedOn` 对齐判定 fresh/stale |
 
 归档 `history/` **不含** `panel`。
+
+### 今日 kcal 上限（权威语义，2026-06-21）
+
+Hermes 写入的权威目标：
+
+```text
+formula_base + activity_extra  →  panel.targets.kcal
+```
+
+MalDaze **不**本地重算、**不**从 `targetBreakdown` 各层加总替代 `targets.kcal`。展开明细里的 V3 / 14 天 OLS 校准行仅供阅读（建议偏移、readiness 等），与顶栏数字不一致时以 `targets.kcal` 为准。
+
+刷新来源（均写同一 `panel`）：
+
+- 记餐 / 日型变更等 mutating 命令（自动 `_attach_panel`）
+- `recommend.py refresh-panel`（桌宠明细区刷新按钮、晨报 `nutrition_contracts.refresh_panel`）
+
+若晨报超时或 refresh 未成功，磁盘 `panel` 可能仍为旧快照；记餐或手动 refresh 会按当前 Hermes 代码重算。
 
 ## Dashboard 布局
 

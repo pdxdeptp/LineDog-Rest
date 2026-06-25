@@ -9,6 +9,10 @@ struct EnergyWakeupSourceTests {
         try testBreakRunHelperPanelsRemainVisibleDuringApplicationHideAndDeactivation()
         try testFullscreenRestUsesWholeSecondTicksAfterApproachCompletes()
         try testExtractedEnergyHelpersExercisePassThroughBounceTurnsAndRestCadence()
+        try testFocusTimelineDoesNotUnconditionallyStartLiveTick()
+        try testDashboardHideInvokesQuiescence()
+        try testManualTimerEngineDoesNotUseQuarterSecondRepeatingTimer()
+        try testInterventionControllerDoesNotUseThreeSecondPoll()
     }
 
     private func testIdleCursorTrackingUsesAdaptiveFarAndNearIntervals() throws {
@@ -205,6 +209,68 @@ struct EnergyWakeupSourceTests {
             formatter.contains("Int(floor(remaining))")
                 && source.contains("RestCountdownFormatter.string(remaining:"),
             "Fullscreen rest countdown should be formatted through a whole-second helper used by PetStageView."
+        )
+    }
+
+    private func testFocusTimelineDoesNotUnconditionallyStartLiveTick() throws {
+        let source = try readProjectSource("MalDaze/FocusSession/FocusTimelinePresenter.swift")
+        try expect(
+            source.contains("enum LiveSchedulingPhase"),
+            "Focus timeline should model hidden/idle/live scheduling phases."
+        )
+        try expect(
+            source.contains("schedulingPhase == .live"),
+            "Live tick scheduling should require the live phase."
+        )
+        try expect(
+            !(source.contains("withTimeInterval: 0.25, repeats: true")),
+            "Focus timeline must not keep a 4 Hz repeating live tick."
+        )
+        try expect(
+            source.contains("repeats: false"),
+            "Focus timeline live tick should use one-shot scheduling."
+        )
+    }
+
+    private func testDashboardHideInvokesQuiescence() throws {
+        let windowManagerSource = try readProjectSource("MalDaze/WindowManager/WindowManager.swift")
+        let hideBody = try expectFunctionBody(named: "hideDashboardWindow", in: windowManagerSource)
+
+        try expect(
+            hideBody.contains("dashboardPresentationDidHide()"),
+            "hideDashboardWindow should transition dashboard presentation to hidden."
+        )
+        try expect(
+            hideBody.contains("deskPetDashboardDidClose"),
+            "hideDashboardWindow should broadcast dashboard close for SwiftUI consumers."
+        )
+    }
+
+    private func testManualTimerEngineDoesNotUseQuarterSecondRepeatingTimer() throws {
+        let source = try readProjectSource("MalDaze/TimerEngine/ManualTimerEngine.swift")
+        try expect(
+            !(source.contains("withTimeInterval: 0.25, repeats: true")),
+            "ManualTimerEngine must not use a 4 Hz repeating tick timer."
+        )
+        try expect(
+            source.contains("repeats: false"),
+            "ManualTimerEngine should schedule one-shot ticks."
+        )
+    }
+
+    private func testInterventionControllerDoesNotUseThreeSecondPoll() throws {
+        let source = try readProjectSource("MalDaze/InterventionRequest/InterventionRequestController.swift")
+        try expect(
+            !(source.contains("timeInterval: 3.0, repeats: true")),
+            "InterventionRequestController must not keep a 3 second repeating poll timer."
+        )
+        try expect(
+            source.contains("didWakeNotification"),
+            "Intervention reconcile should still observe wake notifications."
+        )
+        try expect(
+            source.contains("InterventionRequestFileWatcher"),
+            "Intervention reconcile should still use FSEvents file watching."
         )
     }
 
