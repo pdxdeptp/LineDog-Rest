@@ -20,7 +20,7 @@ MalDaze **不写** `recommendation.json`，也不在 recommendation 缺失或过
 
 ### 桌宠角色（当前倾向，可演进）
 
-- **展示 facts/metrics**：读磁盘上的 `daily_log.json` `panel` / `records`；FSEvents 只在 Hermes **已改写文件** 后刷新 UI。
+- **展示 facts/metrics**：读磁盘上的 `daily_log.json` `panel` / `records`；FSEvents 在 Dashboard **可见**期间监听，hide/show 生命周期由 `DashboardQuiescenceCoordinator` 对称 pause/resume（**非** SwiftUI `onAppear`）。
 - **展示 recommendation**：读 `recommendation.json` 的 summary、rationale、warnings、items；只有 fresh 且 `loggable: true` 的 item 可点击或数字键记录。
 - **写动作**：通过 `recommend.py log` 记一笔已吃；用户可点目标明细区刷新按钮调用 `recommend.py refresh-panel` 重算 panel（不改 records）。桌宠**不**调用 `plan_engine`、LLM，也不本地重算营养。
 - **「现在可以吃」来源**：只来自 Hermes-authored `recommendation.json`。`daily_log.panel.suggestions` 第一版保留为空数组 `[]` 只作 schema 兼容；MalDaze 必须忽略它，即使 legacy 数据非空也不能展示。

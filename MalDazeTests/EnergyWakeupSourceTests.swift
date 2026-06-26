@@ -11,6 +11,9 @@ struct EnergyWakeupSourceTests {
         try testExtractedEnergyHelpersExercisePassThroughBounceTurnsAndRestCadence()
         try testFocusTimelineDoesNotUnconditionallyStartLiveTick()
         try testDashboardHideInvokesQuiescence()
+        try testDashboardShowInvokesQuiescenceResume()
+        try testDashboardPanelsDoNotOwnHermesWatcherLifecycle()
+        try testAppViewModelRegistersDashboardQuiescenceConsumers()
         try testManualTimerEngineDoesNotUseQuarterSecondRepeatingTimer()
         try testInterventionControllerDoesNotUseThreeSecondPoll()
     }
@@ -243,6 +246,75 @@ struct EnergyWakeupSourceTests {
         try expect(
             hideBody.contains("deskPetDashboardDidClose"),
             "hideDashboardWindow should broadcast dashboard close for SwiftUI consumers."
+        )
+    }
+
+    private func testDashboardShowInvokesQuiescenceResume() throws {
+        let windowManagerSource = try readProjectSource("MalDaze/WindowManager/WindowManager.swift")
+        let showBody = try expectFunctionBody(named: "showDashboardWindow", in: windowManagerSource)
+
+        try expect(
+            showBody.contains("dashboardPresentationDidShow()"),
+            "showDashboardWindow should transition dashboard presentation to visible."
+        )
+    }
+
+    private func testDashboardPanelsDoNotOwnHermesWatcherLifecycle() throws {
+        let nutritionSource = try readProjectSource("MalDaze/NutritionToday/NutritionTodayPanelView.swift")
+        let learningSource = try readProjectSource("MalDaze/LearningDeskPanel/LearningDeskPanelView.swift")
+
+        try expect(
+            !nutritionSource.contains("deskPetDashboardDidClose"),
+            "Nutrition panel must not pause Hermes watchers via dashboard close notification."
+        )
+        try expect(
+            !nutritionSource.contains("startWatching()"),
+            "Nutrition panel must not own Hermes watcher start lifecycle."
+        )
+        try expect(
+            !nutritionSource.contains("stopWatching()"),
+            "Nutrition panel must not own Hermes watcher stop lifecycle."
+        )
+        try expect(
+            !learningSource.contains("deskPetDashboardDidClose"),
+            "Learning panel must not pause Hermes watchers via dashboard close notification."
+        )
+        try expect(
+            !learningSource.contains("startWatching()"),
+            "Learning panel must not own Hermes watcher start lifecycle."
+        )
+        try expect(
+            !learningSource.contains("stopWatching()"),
+            "Learning panel must not own Hermes watcher stop lifecycle."
+        )
+    }
+
+    private func testAppViewModelRegistersDashboardQuiescenceConsumers() throws {
+        let source = try readProjectSource("MalDaze/AppViewModel.swift")
+
+        try expect(
+            source.contains("registerDashboardQuiescenceConsumers()"),
+            "AppViewModel should centralize dashboard quiescence consumer registration."
+        )
+        try expect(
+            source.contains("nutritionTodayViewModel.pauseDashboardObservation()"),
+            "AppViewModel should pause nutrition observation through the coordinator."
+        )
+        try expect(
+            source.contains("nutritionTodayViewModel.resumeDashboardObservation()"),
+            "AppViewModel should resume nutrition observation through the coordinator."
+        )
+        try expect(
+            source.contains("learningDeskPanelViewModel.pauseDashboardObservation()"),
+            "AppViewModel should pause learning observation through the coordinator."
+        )
+        try expect(
+            source.contains("learningDeskPanelViewModel.resumeDashboardObservation()"),
+            "AppViewModel should resume learning observation through the coordinator."
+        )
+        try expect(
+            source.contains("registerConsumer"),
+            "AppViewModel should register paired pause/resume dashboard consumers."
         )
     }
 

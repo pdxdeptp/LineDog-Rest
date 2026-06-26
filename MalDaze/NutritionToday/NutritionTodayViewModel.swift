@@ -154,6 +154,17 @@ final class NutritionTodayViewModel: ObservableObject {
         recommendationFileWatcher = nil
     }
 
+    /// Dashboard quiescence pause entry point.
+    func pauseDashboardObservation() {
+        stopWatching()
+    }
+
+    /// Dashboard quiescence resume entry point: restart FSEvents and catch up from disk.
+    func resumeDashboardObservation() {
+        startWatching()
+        loadToday(showLoading: false)
+    }
+
     func scheduleDebouncedRefresh() {
         if isLogging {
             pendingRefreshAfterLogging = true

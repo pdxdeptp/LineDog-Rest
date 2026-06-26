@@ -396,7 +396,8 @@ struct DashboardRootView: View {
 
                     LearningDeskPanelView(
                         environment: LearningDeskPanelEnvironment(appViewModel: viewModel),
-                        focusTimelinePresenter: viewModel.focusTimelinePresenter
+                        focusTimelinePresenter: viewModel.focusTimelinePresenter,
+                        viewModel: viewModel.learningDeskPanelViewModel
                     )
                         .frame(minWidth: DashboardLayout.learningColumnMinWidth, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                         .padding(.horizontal, MainPanelChrome.horizontalPadding)
@@ -683,6 +684,7 @@ struct DashboardRootView: View {
             onFractionDragEnded: commitPlanFractionDrag,
             upper: {
                 NutritionTodayPanelView(
+                    viewModel: viewModel.nutritionTodayViewModel,
                     digitKeysEnabled: reminderUnderEdit == nil && deleteConfirmationId == nil
                 )
             },

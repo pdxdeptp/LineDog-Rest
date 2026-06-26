@@ -67,6 +67,10 @@ final class AppViewModel: ObservableObject {
     /// 学习面板专注时间轴：静态 skeleton + live overlay，与 statusLine tick 解耦。
     let focusTimelinePresenter = FocusTimelinePresenter()
     let dashboardQuiescence = DashboardQuiescenceCoordinator()
+    /// Dashboard 左栏饮食面板；生命周期由 quiescence coordinator 驱动。
+    let nutritionTodayViewModel: NutritionTodayViewModel
+    /// Dashboard 中栏学习面板；生命周期由 quiescence coordinator 驱动。
+    let learningDeskPanelViewModel: LearningDeskPanelViewModel
     /// 桌宠 Dashboard Esc 分级：sheet / 对话框优先于关面板。
     let dashboardEscapeRouter = DeskPetDashboardEscapeRouter()
 
@@ -153,6 +157,8 @@ final class AppViewModel: ObservableObject {
         interventionRequest: InterventionRequestController? = nil,
         deskReminders: DeskRemindersModel? = nil,
         focusSessionStore: FocusSessionStore? = nil,
+        nutritionTodayViewModel: NutritionTodayViewModel? = nil,
+        learningDeskPanelViewModel: LearningDeskPanelViewModel? = nil,
         t7EjectService: (any T7EjectServiceLifecycle)? = nil,
         bootstrapT7EjectScheduler: Bool? = nil
     ) {
@@ -185,6 +191,8 @@ final class AppViewModel: ObservableObject {
         self.deskReminders = deskReminders ?? DeskRemindersModel()
         self.focusSessionStore = focusSessionStore ?? FocusSessionStore()
         self.focusSessionStore.loadIfNeeded()
+        self.nutritionTodayViewModel = nutritionTodayViewModel ?? NutritionTodayViewModel()
+        self.learningDeskPanelViewModel = learningDeskPanelViewModel ?? LearningDeskPanelViewModel()
         self.manualFocusCoordinator = ManualFocusCoordinator(store: self.focusSessionStore)
         self.smartReminderOrchestrator = SmartReminderOrchestrator()
         let ud = UserDefaults.standard
@@ -384,10 +392,26 @@ final class AppViewModel: ObservableObject {
                 isManualWorkActive: self.isManualWorkActiveForTimeline
             )
         }
-        _ = dashboardQuiescence.registerPauseHandler { [weak self] in
-            self?.focusTimelinePresenter.enterHidden()
-        }
+        registerDashboardQuiescenceConsumers()
         refreshFocusSessionProjection()
+    }
+
+    private func registerDashboardQuiescenceConsumers() {
+        _ = dashboardQuiescence.registerConsumer { [weak self] in
+            self?.focusTimelinePresenter.enterHidden()
+        } resume: { }
+
+        _ = dashboardQuiescence.registerConsumer { [weak self] in
+            self?.nutritionTodayViewModel.pauseDashboardObservation()
+        } resume: { [weak self] in
+            self?.nutritionTodayViewModel.resumeDashboardObservation()
+        }
+
+        _ = dashboardQuiescence.registerConsumer { [weak self] in
+            self?.learningDeskPanelViewModel.pauseDashboardObservation()
+        } resume: { [weak self] in
+            self?.learningDeskPanelViewModel.resumeDashboardObservation()
+        }
     }
 
     func dashboardPresentationDidHide() {

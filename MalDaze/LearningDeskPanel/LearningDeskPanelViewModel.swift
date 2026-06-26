@@ -684,6 +684,34 @@ final class LearningDeskPanelViewModel: ObservableObject {
         fileWatcher = nil
     }
 
+    /// Dashboard quiescence pause entry point.
+    func pauseDashboardObservation() {
+        stopWatching()
+    }
+
+    /// Dashboard quiescence resume entry point: restart FSEvents and refresh loaded tab data.
+    func resumeDashboardObservation() {
+        startWatching()
+        Task { await catchUpAfterDashboardResume() }
+    }
+
+    func catchUpAfterDashboardResume() async {
+        switch selectedTab {
+        case .today:
+            if case .loaded = loadState {
+                await refreshTodayOnly()
+            }
+        case .schedule:
+            if case .loaded = scheduleLoadState {
+                await loadSchedule(force: true)
+            }
+        case .projects:
+            if case .loaded = statusLoadState {
+                await loadStatus(force: true)
+            }
+        }
+    }
+
     func scheduleDebouncedRefresh() {
         fsDebounceTask?.cancel()
         fsDebounceTask = Task {

@@ -4,7 +4,7 @@ import SwiftUI
 struct LearningDeskPanelView: View {
     let environment: LearningDeskPanelEnvironment
     @ObservedObject var focusTimelinePresenter: FocusTimelinePresenter
-    @StateObject private var viewModel = LearningDeskPanelViewModel()
+    @ObservedObject var viewModel: LearningDeskPanelViewModel
     @StateObject private var todayTodoStore = TodayTodoStore()
     @State private var showTodayTodoHistory = false
     @AppStorage(MalDazeDefaults.learningDailyCapacityHours) private var dailyCapacityHours =
@@ -15,16 +15,22 @@ struct LearningDeskPanelView: View {
         MalDazeDefaults.defaultLearningTodayHermesTaskFraction
     @State private var todayHermesTaskFractionDragLive: Double?
 
-    init(environment: LearningDeskPanelEnvironment, focusTimelinePresenter: FocusTimelinePresenter) {
+    init(
+        environment: LearningDeskPanelEnvironment,
+        focusTimelinePresenter: FocusTimelinePresenter,
+        viewModel: LearningDeskPanelViewModel
+    ) {
         self.environment = environment
         self._focusTimelinePresenter = ObservedObject(wrappedValue: focusTimelinePresenter)
+        self._viewModel = ObservedObject(wrappedValue: viewModel)
     }
 
-    /// Deprecated: prefer `init(environment:focusTimelinePresenter:)`.
+    /// Deprecated: prefer `init(environment:focusTimelinePresenter:viewModel:)`.
     init(appViewModel: AppViewModel) {
         self.init(
             environment: LearningDeskPanelEnvironment(appViewModel: appViewModel),
-            focusTimelinePresenter: appViewModel.focusTimelinePresenter
+            focusTimelinePresenter: appViewModel.focusTimelinePresenter,
+            viewModel: appViewModel.learningDeskPanelViewModel
         )
     }
 
@@ -57,14 +63,8 @@ struct LearningDeskPanelView: View {
         .task {
             await viewModel.loadToday()
         }
-        .onAppear { viewModel.startWatching() }
         .onDisappear {
-            viewModel.stopWatching()
             environment.setTimelineVisible(false)
-        }
-        .onReceive(NotificationCenter.default.publisher(for: MalDazeBroadcastNotifications.deskPetDashboardDidClose)) { _ in
-            viewModel.stopWatching()
-            environment.enterTimelineHidden()
         }
         .onChange(of: viewModel.selectedTab) { _ in
             Task { await viewModel.onTabChanged() }

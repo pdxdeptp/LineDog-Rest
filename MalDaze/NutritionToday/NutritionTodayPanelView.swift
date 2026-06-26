@@ -15,7 +15,7 @@ enum NutritionRecommendationRowDisplay {
 struct NutritionTodayPanelView: View {
     let digitKeysEnabled: Bool
 
-    @StateObject private var viewModel = NutritionTodayViewModel()
+    @ObservedObject var viewModel: NutritionTodayViewModel
     @State private var digitMonitor: NutritionDigitKeyMonitor?
     @AppStorage(MalDazeDefaults.dashboardNutritionRecommendationExpanded)
     private var recommendationSectionExpanded = true
@@ -49,7 +49,8 @@ struct NutritionTodayPanelView: View {
         static let sodiumWidth: CGFloat = 34
     }
 
-    init(digitKeysEnabled: Bool = true) {
+    init(viewModel: NutritionTodayViewModel, digitKeysEnabled: Bool = true) {
+        self.viewModel = viewModel
         self.digitKeysEnabled = digitKeysEnabled
     }
 
@@ -60,19 +61,11 @@ struct NutritionTodayPanelView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .onAppear {
-            viewModel.loadToday()
-            viewModel.startWatching()
             installDigitMonitor()
         }
         .onDisappear {
             digitMonitor?.stop()
             digitMonitor = nil
-            viewModel.stopWatching()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: MalDazeBroadcastNotifications.deskPetDashboardDidClose)) { _ in
-            digitMonitor?.stop()
-            digitMonitor = nil
-            viewModel.stopWatching()
         }
         .onChange(of: digitKeysEnabled) { _ in
             installDigitMonitor()

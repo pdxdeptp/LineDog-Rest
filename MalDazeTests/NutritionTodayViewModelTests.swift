@@ -178,6 +178,20 @@ final class NutritionTodayViewModelTests: XCTestCase {
         XCTAssertEqual(oldPanelVM.recommendationMessage, "今日摄入已更新，Hermes 尚未写入匹配的饮食建议。")
     }
 
+    func testResumeDashboardObservationCatchUpFromDisk() {
+        let reader = ReloadingStubNutritionReader()
+        let recommendationReader = StubRecommendationReader(snapshot: .available())
+        let vm = NutritionTodayViewModel(reader: reader, recommendationReader: recommendationReader, cli: MockNutritionCLI())
+
+        vm.loadToday()
+        let readsAfterInitialLoad = reader.readCount
+
+        vm.pauseDashboardObservation()
+        vm.resumeDashboardObservation()
+
+        XCTAssertGreaterThan(reader.readCount, readsAfterInitialLoad)
+    }
+
     func testRefreshPanelReloadsFactsFromDisk() async {
         let reader = ReloadingStubNutritionReader()
         let recommendationReader = StubRecommendationReader(snapshot: .available())

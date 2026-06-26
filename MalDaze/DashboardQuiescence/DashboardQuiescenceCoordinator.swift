@@ -9,31 +9,51 @@ enum DashboardPresentationPhase: Equatable {
 /// AppKit-authoritative pause/resume for Dashboard-scoped periodic work.
 @MainActor
 final class DashboardQuiescenceCoordinator {
+    private struct Consumer {
+        let pause: () -> Void
+        let resume: () -> Void
+    }
+
     private(set) var phase: DashboardPresentationPhase = .absent
-    private var pauseHandlers: [UUID: () -> Void] = [:]
+    private var consumers: [UUID: Consumer] = [:]
 
     @discardableResult
-    func registerPauseHandler(_ handler: @escaping () -> Void) -> UUID {
+    func registerConsumer(
+        pause: @escaping () -> Void,
+        resume: @escaping () -> Void
+    ) -> UUID {
         let id = UUID()
-        pauseHandlers[id] = handler
+        consumers[id] = Consumer(pause: pause, resume: resume)
         return id
     }
 
-    func unregisterPauseHandler(_ id: UUID) {
-        pauseHandlers.removeValue(forKey: id)
+    func unregisterConsumer(_ id: UUID) {
+        consumers.removeValue(forKey: id)
     }
 
     func transition(to newPhase: DashboardPresentationPhase) {
         let oldPhase = phase
+        guard oldPhase != newPhase else { return }
         phase = newPhase
-        if oldPhase == .visible, newPhase == .hidden {
+        switch (oldPhase, newPhase) {
+        case (.visible, .hidden):
             pauseAll()
+        case (.hidden, .visible), (.absent, .visible):
+            resumeAll()
+        default:
+            break
         }
     }
 
-    func pauseAll() {
-        for handler in pauseHandlers.values {
-            handler()
+    private func pauseAll() {
+        for consumer in consumers.values {
+            consumer.pause()
+        }
+    }
+
+    private func resumeAll() {
+        for consumer in consumers.values {
+            consumer.resume()
         }
     }
 }

@@ -6,7 +6,7 @@
 
 - [x] 1.1 添加 `DashboardPresentationPhase` enum
 - [x] 1.2 实现 `DashboardQuiescenceCoordinator`（register / pause / resume）
-- [ ] 1.3 `DashboardQuiescentConsumer` protocol
+- [x] 1.3 `DashboardQuiescentConsumer` protocol — superseded by paired `registerConsumer` in `complete-dashboard-quiescence-resume`
 - [x] 1.4 `AppViewModel` 持有 coordinator；init 时 register consumers
 
 ## 2. WindowManager integration
@@ -33,7 +33,7 @@
 
 - [x] 5.1 `openspec validate add-dashboard-presentation-quiescence`
 - [ ] 5.2 Manual QA Release：开 Dashboard 今日 Tab → 关 → 后台 idle **10 min**，无 ~50% CPU / 新 diag
-- [ ] 5.3 Manual QA：关→开 Dashboard，learning/nutrition 数据仍可通过 refresh/onAppear 加载
+- [ ] 5.3 Manual QA：关→开 Dashboard，learning/nutrition 数据仍可通过 refresh/onAppear 加载 — **code complete** via `complete-dashboard-quiescence-resume`; awaiting manual sign-off
 - [ ] 5.4 填写 `evidence/after-quiescence-idle-10min.md`
 
 ## 6. Archive milestone M1
